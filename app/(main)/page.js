@@ -1,0 +1,401 @@
+/**
+ * Home Page
+ *
+ * The main landing page of the application.
+ * Displays hero slider, categories, and featured products.
+ */
+
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { useAppContext } from '@/context/AppContext';
+import ProductCard from '@/components/ProductCard';
+import ProductCardSkeleton from '@/components/ProductCardSkeleton';
+
+// Hero slides
+const slides = [
+  {
+    id: 1,
+    title: 'Elevate Your Dining Experience',
+    subtitle: 'Premium tableware crafted for modern living.',
+    // put this in /public/hero/Rectangle-1.png or change the path
+    image: '/hero/Rectangle-1.png',
+    ctaText: 'Shop Collections',
+    ctaLink: '/catalog',
+  },
+  {
+    id: 6,
+    title: 'Elevate Your Dining Experience',
+    subtitle: 'Premium tableware crafted for modern living.',
+    // put this in /public/hero/Rectangle-1.png or change the path
+    image: '/hero/Rectangle-1.png',
+    ctaText: 'Shop Collections',
+    ctaLink: '/catalog',
+  },
+  {
+    id: 1,
+    title: 'Elevate Your Dining Experience',
+    subtitle: 'Premium tableware crafted for modern living.',
+    // put this in /public/hero/Rectangle-1.png or change the path
+    image: '/hero/Rectangle-1.png',
+    ctaText: 'Shop Collections',
+    ctaLink: '/catalog',
+  },
+  {
+    id: 4,
+    title: 'Elevate Your Dining Experience',
+    subtitle: 'Premium tableware crafted for modern living.',
+    // put this in /public/hero/Rectangle-1.png or change the path
+    image: '/hero/Rectangle-1.png',
+    ctaText: 'Shop Collections',
+    ctaLink: '/catalog',
+  },
+  {
+    id: 5,
+    title: 'Elevate Your Dining Experience',
+    subtitle: 'Premium tableware crafted for modern living.',
+    // put this in /public/hero/Rectangle-1.png or change the path
+    image: '/hero/Rectangle-1.png',
+    ctaText: 'Shop Collections',
+    ctaLink: '/catalog',
+  },
+  {
+    id: 2,
+    title: 'Timeless Glassware',
+    subtitle: 'Crystal-clear designs for every occasion.',
+    image: '/images/hero-2.jpg',
+    ctaText: 'Explore Drinkware',
+    ctaLink: '/catalog?category=glassware',
+  },
+  {
+    id: 3,
+    title: 'Host Like a Pro',
+    subtitle: 'Serveware that makes every gathering special.',
+    image: '/images/hero-3.jpg',
+    ctaText: 'Discover Serveware',
+    ctaLink: '/catalog?category=serveware',
+  },
+];
+
+export default function HomePage() {
+  const { products, categories, loading } = useAppContext();
+  const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [newArrivals, setNewArrivals] = useState([]);
+  const [mainCategories, setMainCategories] = useState([]);
+
+  // Hero slider state
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [touchStartX, setTouchStartX] = useState(null);
+  const [touchEndX, setTouchEndX] = useState(null);
+
+  // Filter featured products, new arrivals & main categories
+  useEffect(() => {
+    const featured = products.filter((p) => p.featured).slice(0, 4);
+    setFeaturedProducts(featured);
+
+    // Get new arrivals sorted by createdAt (newest first)
+    const arrivals = [...products]
+      .sort((a, b) => {
+        const dateA = new Date(a.createdAt || a.created_at || 0);
+        const dateB = new Date(b.createdAt || b.created_at || 0);
+        return dateB - dateA;
+      })
+      .slice(0, 4);
+    setNewArrivals(arrivals);
+
+    const mainCats = categories
+      .filter((c) => c.level === 'category')
+      .slice(0, 6);
+    setMainCategories(mainCats);
+  }, [products, categories]);
+
+  // Slider logic
+  const goToSlide = useCallback(
+    (index) => {
+      if (isAnimating) return;
+      setIsAnimating(true);
+
+      const normalizedIndex = (index + slides.length) % slides.length;
+      setCurrentIndex(normalizedIndex);
+
+      // match duration-700 in Tailwind
+      setTimeout(() => setIsAnimating(false), 700);
+    },
+    [isAnimating]
+  );
+
+  const goToNext = useCallback(() => {
+    goToSlide(currentIndex + 1);
+  }, [currentIndex, goToSlide]);
+
+  const goToPrev = useCallback(() => {
+    goToSlide(currentIndex - 1);
+  }, [currentIndex, goToSlide]);
+
+  // Auto-play
+  useEffect(() => {
+    const interval = setInterval(() => {
+      goToNext();
+    }, 6000); // 6s per slide
+
+    return () => clearInterval(interval);
+  }, [goToNext]);
+
+  // Swipe handlers (mobile)
+  const onTouchStart = (e) => {
+    setTouchStartX(e.touches[0].clientX);
+    setTouchEndX(null);
+  };
+
+  const onTouchMove = (e) => {
+    setTouchEndX(e.touches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (touchStartX === null || touchEndX === null) return;
+
+    const diff = touchStartX - touchEndX;
+
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) {
+        // swipe left
+        goToNext();
+      } else {
+        // swipe right
+        goToPrev();
+      }
+    }
+
+    setTouchStartX(null);
+    setTouchEndX(null);
+  };
+
+  return (
+    <div >
+      {/* Hero Slider Section */}
+      <section className="w-full relative overflow-hidden bg-black">
+        <div
+          className="relative h-[70vh] sm:h-[80vh] lg:h-[85vh]"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
+          {/* Slides track */}
+          <div
+            className="flex h-full transition-transform duration-700 ease-[cubic-bezier(0.25,0.8,0.25,1)]"
+            style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+          >
+            {slides.map((slide) => (
+              <div
+                key={slide.id}
+                className="relative w-screen flex-shrink-0 h-full"
+              >
+                {/* Background image */}
+                <div className="absolute inset-0">
+                  <Image
+                    src={slide.image}
+                    alt={slide.title}
+                    fill
+                    priority
+                    className="object-cover"
+                  />
+                  {/* Gradient overlay for readability */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/10" />
+                </div>
+
+                {/* Content */}
+                <div className="relative z-10 h-full flex items-center">
+                  <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+                    <div className="max-w-xl">
+                      <p className="uppercase tracking-[0.25em] text-xs sm:text-sm text-gray-200/80 mb-4">
+                        Regal HoReCa
+                      </p>
+                      <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-white leading-tight drop-shadow-md">
+                        {slide.title}
+                      </h1>
+                      <p className="mt-4 text-sm sm:text-base text-gray-200/90 max-w-md">
+                        {slide.subtitle}
+                      </p>
+                      <div className="mt-6 flex flex-wrap items-center gap-4">
+                        <Link
+                          href={slide.ctaLink}
+                          className="inline-flex items-center justify-center rounded-full px-6 py-2.5 text-sm font-medium bg-white text-gray-900 shadow-[0_10px_30px_rgba(0,0,0,0.25)] hover:shadow-[0_15px_40px_rgba(0,0,0,0.35)] hover:-translate-y-0.5 transition-all duration-300"
+                        >
+                          {slide.ctaText}
+                        </Link>
+                        
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Left Arrow */}
+          <button
+            type="button"
+            onClick={goToPrev}
+            className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 inline-flex items-center justify-center rounded-full w-9 h-9 sm:w-10 sm:h-10 bg-black/35 hover:bg-black/55 backdrop-blur-md border border-white/10 transition-all duration-300 group"
+            aria-label="Previous slide"
+          >
+            <span className="text-white text-xl sm:text-2xl leading-none group-hover:-translate-x-0.5 transition-transform duration-300">
+              ‹
+            </span>
+          </button>
+
+          {/* Right Arrow */}
+          <button
+            type="button"
+            onClick={goToNext}
+            className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 inline-flex items-center justify-center rounded-full w-9 h-9 sm:w-10 sm:h-10 bg-black/35 hover:bg-black/55 backdrop-blur-md border border-white/10 transition-all duration-300 group"
+            aria-label="Next slide"
+          >
+            <span className="text-white text-xl sm:text-2xl leading-none group-hover:translate-x-0.5 transition-transform duration-300">
+              ›
+            </span>
+          </button>
+
+          {/* Dots / Indicators */}
+          <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-3">
+            {slides.map((slide, index) => {
+              const isActive = index === currentIndex;
+              return (
+                <button
+                  key={slide.id}
+                  type="button"
+                  onClick={() => goToSlide(index)}
+                  className="relative group"
+                  aria-label={`Go to slide ${index + 1}`}
+                >
+                  <span
+                    className={
+                      'block h-1.5 rounded-full transition-all duration-500 ' +
+                      (isActive
+                        ? 'w-7 sm:w-8 bg-white'
+                        : 'w-2.5 sm:w-3 bg-white/50 group-hover:bg-white/80')
+                    }
+                  />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Categories Section */}
+      <section className="py-20 bg-white">
+        <div className="container px-4">
+          <h2 className="text-3xl font-bold text-center mb-12 tracking-tight">
+            Our Categories
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 ">
+            {mainCategories.map((cat) => (
+              <Link
+                key={cat._id || cat.id}
+                href={`/catalog?category=${cat.slug}`}
+                className="group block text-center"
+              >
+                <div className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+                  {cat.image ? (
+                    <Image
+                      src={cat.image}
+                      alt={cat.name}
+                      width={300}
+                      height={300}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gray-200" />
+                  )}
+                </div>
+                <h3 className="mt-4 font-semibold text-gray-800 group-hover:text-primary">
+                  {cat.name}
+                </h3>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Featured Products Section */}
+      <section className="py-20 bg-light">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-bold text-center mb-12 tracking-tight">
+            Featured Products
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {loading ? (
+              // Show skeleton loaders while loading
+              Array.from({ length: 4 }).map((_, index) => (
+                <ProductCardSkeleton key={`skeleton-${index}`} />
+              ))
+            ) : featuredProducts.length > 0 ? (
+              featuredProducts.map((product) => (
+                <ProductCard
+                  key={product._id || product.id}
+                  product={product}
+                />
+              ))
+            ) : (
+              <div className="col-span-full text-center py-8 text-gray-500">
+                No featured products available
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* New Arrivals Section */}
+      <section className="py-20 bg-white">
+        <div className="container mx-auto px-4">
+          <h2 className="text-3xl font-bold text-center mb-12 tracking-tight">
+            New Arrivals
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {loading ? (
+              // Show skeleton loaders while loading
+              Array.from({ length: 4 }).map((_, index) => (
+                <ProductCardSkeleton key={`new-arrival-skeleton-${index}`} />
+              ))
+            ) : newArrivals.length > 0 ? (
+              newArrivals.map((product) => (
+                <ProductCard
+                  key={product._id || product.id}
+                  product={product}
+                />
+              ))
+            ) : (
+              <div className="col-span-full text-center py-8 text-gray-500">
+                No new arrivals available
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* About Teaser */}
+      <section className="py-24 bg-white">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl font-bold tracking-tight">
+            45+ Years of Excellence
+          </h2>
+          <p className="mt-4 max-w-3xl mx-auto text-gray-600">
+            Regal HoReCa has been a prominent manufacturer and distributor in
+            the hospitality industry, delivering quality and trust to esteemed
+            clients across national and international markets.
+          </p>
+          <Link
+            href="/about"
+            className="mt-6 inline-block text-primary font-semibold hover:underline"
+          >
+            Learn More About Us
+          </Link>
+        </div>
+      </section>
+    </div>
+  );
+}

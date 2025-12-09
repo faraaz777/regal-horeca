@@ -22,6 +22,7 @@ import { SWRProvider } from '@/lib/hooks/useSWRConfig';
 const AppContext = createContext(undefined);
 
 const WISHLIST_KEY = 'regal_wishlist';
+const CART_KEY = 'regal_cart';
 const ADMIN_KEY = 'regal_admin_auth';
 const ADMIN_TOKEN_KEY = 'regal_admin_token';
 
@@ -33,6 +34,7 @@ export function AppProvider({ children }) {
   
   // State for UI
   const [wishlist, setWishlist] = useState([]);
+  const [cart, setCart] = useState([]); // Cart items: [{ productId, quantity }, ...]
   const [isAdmin] = useState(true); // Admin is always accessible (no authentication)
   const [loading, setLoading] = useState(true);
 
@@ -43,6 +45,11 @@ export function AppProvider({ children }) {
       const storedWishlist = localStorage.getItem(WISHLIST_KEY);
       if (storedWishlist) {
         setWishlist(JSON.parse(storedWishlist));
+      }
+      // Load cart
+      const storedCart = localStorage.getItem(CART_KEY);
+      if (storedCart) {
+        setCart(JSON.parse(storedCart));
       }
     } catch (error) {
       console.error('Failed to load from localStorage', error);
@@ -133,6 +140,65 @@ export function AppProvider({ children }) {
     return wishlist.includes(productId);
   };
 
+  // Cart functions
+  const updateCart = (newCart) => {
+    setCart(newCart);
+    localStorage.setItem(CART_KEY, JSON.stringify(newCart));
+  };
+
+  const addToCart = (productId, quantity = 1) => {
+    const productIdStr = productId?.toString();
+    const existingItem = cart.find(item => item.productId?.toString() === productIdStr);
+    
+    if (existingItem) {
+      // Update quantity if item already exists
+      updateCart(cart.map(item => 
+        item.productId?.toString() === productIdStr
+          ? { ...item, quantity: item.quantity + quantity }
+          : item
+      ));
+    } else {
+      // Add new item
+      updateCart([...cart, { productId: productIdStr, quantity }]);
+    }
+  };
+
+  const removeFromCart = (productId) => {
+    const productIdStr = productId?.toString();
+    updateCart(cart.filter(item => item.productId?.toString() !== productIdStr));
+  };
+
+  const updateCartQuantity = (productId, quantity) => {
+    const productIdStr = productId?.toString();
+    if (quantity <= 0) {
+      removeFromCart(productIdStr);
+    } else {
+      updateCart(cart.map(item => 
+        item.productId?.toString() === productIdStr
+          ? { ...item, quantity }
+          : item
+      ));
+    }
+  };
+
+  const getCartItemQuantity = (productId) => {
+    const productIdStr = productId?.toString();
+    const item = cart.find(item => item.productId?.toString() === productIdStr);
+    return item ? item.quantity : 0;
+  };
+
+  const isInCart = (productId) => {
+    return getCartItemQuantity(productId) > 0;
+  };
+
+  const getCartTotalItems = () => {
+    return cart.reduce((total, item) => total + item.quantity, 0);
+  };
+
+  const clearCart = () => {
+    updateCart([]);
+  };
+
   // Admin authentication removed - admin panel is directly accessible
 
   // Product management functions (for admin)
@@ -204,6 +270,16 @@ export function AppProvider({ children }) {
     addToWishlist,
     removeFromWishlist,
     isInWishlist,
+    
+    // Cart
+    cart,
+    addToCart,
+    removeFromCart,
+    updateCartQuantity,
+    getCartItemQuantity,
+    isInCart,
+    getCartTotalItems,
+    clearCart,
     
     // Admin
     isAdmin,

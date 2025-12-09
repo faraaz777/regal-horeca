@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { HeartIcon } from './Icons';
+import { HeartIcon, ShoppingCartIcon } from './Icons';
 import { useAppContext } from '@/context/AppContext';
+import toast from 'react-hot-toast';
 
 export default function ProductCard({ product, onAdd }) {
-  const { addToWishlist, removeFromWishlist, isInWishlist } = useAppContext();
+  const { addToWishlist, removeFromWishlist, isInWishlist, addToCart, isInCart } = useAppContext();
 
   // Get product image - support multiple field names
   const productImage = 
@@ -21,6 +22,7 @@ export default function ProductCard({ product, onAdd }) {
   // Get product ID
   const productId = product._id || product.id;
   const isLiked = isInWishlist(productId);
+  const inCart = isInCart(productId);
 
   // Format price
   const formatPrice = (price) => {
@@ -51,6 +53,13 @@ export default function ProductCard({ product, onAdd }) {
     } else {
       addToWishlist(productId);
     }
+  };
+
+  const handleAddToCart = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addToCart(productId, 1);
+    toast.success('Added to cart!');
   };
 
   return (
@@ -88,6 +97,17 @@ export default function ProductCard({ product, onAdd }) {
         <div className="mt-1.5 flex items-center justify-between">
           <div className="text-xs md:text-sm font-semibold">{formatPrice(product.price)}</div>
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleAddToCart}
+              className={`px-2 py-0.5 text-xs border rounded transition flex items-center gap-1 ${
+                inCart 
+                  ? 'bg-primary text-white border-primary' 
+                  : 'hover:bg-primary hover:text-white border-gray-300'
+              }`}
+            >
+              <ShoppingCartIcon className="w-3 h-3" />
+              {inCart ? 'In Cart' : 'Add'}
+            </button>
             {onAdd && (
               <button
                 onClick={handleAdd}

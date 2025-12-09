@@ -24,17 +24,20 @@ import {
   ChevronRightIcon,
   ChevronLeftIcon,
   SearchIcon,
+  ShoppingCartIcon,
 } from "./Icons";
 import { useAppContext } from "@/context/AppContext";
 import SearchBar from "./new/SearchBar";
+import CartDrawer from "./CartDrawer";
 
 export default function Header() {
-  const { wishlist, categories, businessTypes, products } = useAppContext();
+  const { wishlist, cart, getCartTotalItems, categories, businessTypes, products } = useAppContext();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
   const [activeDesktopMenu, setActiveDesktopMenu] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
@@ -144,6 +147,16 @@ export default function Header() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [lastScrollY]);
 
+  // Listen for custom event to open cart drawer
+  useEffect(() => {
+    const handleOpenCartDrawer = () => {
+      setIsCartOpen(true);
+    };
+
+    window.addEventListener('openCartDrawer', handleOpenCartDrawer);
+    return () => window.removeEventListener('openCartDrawer', handleOpenCartDrawer);
+  }, []);
+
   // Prevent horizontal scroll when dropdown is open
   useEffect(() => {
     if (activeDepartment || activeDesktopMenu === "products") {
@@ -192,6 +205,8 @@ export default function Header() {
           {/* DESKTOP HEADER */}
           <DesktopHeaderTopRow
             wishlist={wishlist}
+            cartTotalItems={getCartTotalItems()}
+            onCartClick={() => setIsCartOpen(true)}
             navLinkClass={navLinkClass}
             productsMenuRef={productsMenuRef}
             activeDesktopMenu={activeDesktopMenu}
@@ -236,11 +251,19 @@ export default function Header() {
         setIsMenuOpen={setIsMenuOpen}
         navStack={navStack}
         wishlist={wishlist}
+        cartTotalItems={getCartTotalItems()}
+        onCartClick={() => {
+          setIsMenuOpen(false);
+          setIsCartOpen(true);
+        }}
         openAccordions={openAccordions}
         toggleAccordion={toggleAccordion}
         handleNavForward={handleNavForward}
         handleNavBack={handleNavBack}
       />
+
+      {/* Cart Drawer */}
+      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
     </>
   );
 }
@@ -251,6 +274,8 @@ export default function Header() {
 
 function DesktopHeaderTopRow({
   wishlist,
+  cartTotalItems,
+  onCartClick,
   navLinkClass,
   productsMenuRef,
   activeDesktopMenu,
@@ -286,7 +311,7 @@ function DesktopHeaderTopRow({
     </div>
   </div>
 
-  {/* Wishlist as Cart */}
+  {/* Wishlist and Cart */}
   <div className="flex items-center gap-4 order-2 md:order-none">
     <Link
       href="/wishlist"
@@ -299,6 +324,18 @@ function DesktopHeaderTopRow({
         </span>
       )}
     </Link>
+    <button
+      onClick={onCartClick}
+      className="relative text-secondary hover:text-primary transition-colors"
+      aria-label="Open cart"
+    >
+      <ShoppingCartIcon className="w-6 h-6" />
+      {cartTotalItems > 0 && (
+        <span className="absolute -top-1 -right-2 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center shadow-sm">
+          {cartTotalItems}
+        </span>
+      )}
+    </button>
   </div>
 </div>
 
@@ -661,6 +698,8 @@ function MobileMenuOverlay({
   setIsMenuOpen,
   navStack,
   wishlist,
+  cartTotalItems,
+  onCartClick,
   openAccordions,
   toggleAccordion,
   handleNavForward,
@@ -695,17 +734,31 @@ function MobileMenuOverlay({
               {/* Panel Header */}
               <div className="p-4 flex items-center justify-between border-b">
                 {index === 0 ? (
-                  <Link
-                    href="/wishlist"
-                    className="relative text-secondary hover:text-primary"
-                  >
-                    <HeartIcon className="w-6 h-6" />
-                    {wishlist.length > 0 && (
-                      <span className="absolute -top-1 -right-2 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                        {wishlist.length}
-                      </span>
-                    )}
-                  </Link>
+                  <div className="flex items-center gap-4">
+                    <Link
+                      href="/wishlist"
+                      className="relative text-secondary hover:text-primary"
+                    >
+                      <HeartIcon className="w-6 h-6" />
+                      {wishlist.length > 0 && (
+                        <span className="absolute -top-1 -right-2 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                          {wishlist.length}
+                        </span>
+                      )}
+                    </Link>
+                    <button
+                      onClick={onCartClick}
+                      className="relative text-secondary hover:text-primary"
+                      aria-label="Open cart"
+                    >
+                      <ShoppingCartIcon className="w-6 h-6" />
+                      {cartTotalItems > 0 && (
+                        <span className="absolute -top-1 -right-2 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                          {cartTotalItems}
+                        </span>
+                      )}
+                    </button>
+                  </div>
                 ) : (
                   <button
                     onClick={handleNavBack}

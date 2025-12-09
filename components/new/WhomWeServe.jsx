@@ -50,7 +50,7 @@ export default function OurCategories() {
   return (
     <section className="max-w-7xl mx-auto px-4 py-12 md:py-16">
       <h2 className="text-center text-2xl md:text-3xl font-semibold mb-8 md:mb-10">
-        Our Categories
+        Whom We Serve
       </h2>
 
       {/* 
@@ -62,7 +62,7 @@ export default function OurCategories() {
         {categories.map((cat) => (
           <Link
             key={cat.slug}
-            href={`/catalog?category=${cat.slug}`}
+            href={`/enquiry?category=${cat.title}`}
             className={`relative group overflow-hidden transform-gpu w-full h-full ${cat.layout}
               shadow-sm hover:shadow-2xl hover:shadow-black/25
               transition-all duration-700 ease-out

@@ -11,15 +11,16 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { HeartIcon, ChevronLeftIcon, ChevronRightIcon, WhatsAppIcon } from '@/components/Icons';
+import { HeartIcon, ChevronLeftIcon, ChevronRightIcon, WhatsAppIcon, ShoppingCartIcon } from '@/components/Icons';
 import { useAppContext } from '@/context/AppContext';
 import ProductCard from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
+import toast from 'react-hot-toast';
 
 export default function ProductDetailPage() {
   const params = useParams();
   const { slug } = params;
-  const { isInWishlist, addToWishlist, removeFromWishlist, products, loading: contextLoading } = useAppContext();
+  const { isInWishlist, addToWishlist, removeFromWishlist, addToCart, isInCart, products, loading: contextLoading } = useAppContext();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState('');
@@ -99,6 +100,7 @@ export default function ProductDetailPage() {
 
   const productId = product._id || product.id;
   const isLiked = isInWishlist(productId);
+  const inCart = isInCart(productId);
   const allImages = [product.heroImage, ...(product.gallery || [])];
   const relatedProducts = products.filter(p => {
     const pid = p._id || p.id;
@@ -114,6 +116,11 @@ export default function ProductDetailPage() {
     } else {
       addToWishlist(productId);
     }
+  };
+
+  const handleAddToCart = () => {
+    addToCart(productId, 1);
+    toast.success('Added to cart!');
   };
 
   const handleColorSelect = (variant) => {
@@ -316,7 +323,22 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Contact Buttons */}
-          <div className="flex gap-4 mt-8">
+          <div className="flex flex-col sm:flex-row gap-4 mt-8">
+            <button
+              onClick={handleAddToCart}
+              className={`flex-1 flex items-center justify-center gap-2 font-semibold py-3 px-6 rounded-lg transition-colors ${
+                inCart
+                  ? isPremium
+                    ? 'bg-premium-light/20 border-2 border-premium-light text-premium-light'
+                    : 'bg-primary/20 border-2 border-primary text-primary'
+                  : isPremium
+                    ? 'bg-premium-light hover:bg-premium-light/80 text-premium-dark'
+                    : 'bg-primary hover:bg-primary/90 text-white'
+              }`}
+            >
+              <ShoppingCartIcon className="w-5 h-5" />
+              <span>{inCart ? 'Added to Cart' : 'Add to Cart'}</span>
+            </button>
             <button
               onClick={handleWhatsAppContact}
               className="flex-1 flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20BA5A] text-white font-semibold py-3 px-6 rounded-lg transition-colors"
@@ -335,7 +357,7 @@ export default function ProductDetailPage() {
               }`}
             >
               <HeartIcon isFilled={isLiked} className="w-5 h-5" />
-              <span>Add to Wishlist</span>
+              <span>Wishlist</span>
             </button>
           </div>
         </div>

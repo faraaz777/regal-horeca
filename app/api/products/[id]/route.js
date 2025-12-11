@@ -34,6 +34,7 @@ export async function GET(request, { params }) {
       // Try to find by ID first
       product = await Product.findById(id)
         .populate('categoryId')
+        .populate('categoryIds', 'name slug level')
         .populate('relatedProductIds', 'title slug heroImage price')
         .lean();
     }
@@ -42,6 +43,7 @@ export async function GET(request, { params }) {
     if (!product) {
       product = await Product.findOne({ slug: id })
         .populate('categoryId')
+        .populate('categoryIds', 'name slug level')
         .populate('relatedProductIds', 'title slug heroImage price')
         .lean();
     }
@@ -93,6 +95,16 @@ export async function PUT(request, { params }) {
     }
     // If categoryId is a valid string (ObjectId format), keep it - MongoDB will handle conversion
 
+    // Handle categoryIds array
+    if (updateData.categoryIds !== undefined) {
+      if (!Array.isArray(updateData.categoryIds)) {
+        updateData.categoryIds = [];
+      } else {
+        // Filter out empty values
+        updateData.categoryIds = updateData.categoryIds.filter(id => id && id.trim() !== '');
+      }
+    }
+
     // Find product
     const product = await Product.findById(id);
     if (!product) {
@@ -135,7 +147,10 @@ export async function PUT(request, { params }) {
 
     return NextResponse.json({
       success: true,
-      product: await Product.findById(id).populate('categoryId').lean(),
+      product: await Product.findById(id)
+        .populate('categoryId')
+        .populate('categoryIds', 'name slug level')
+        .lean(),
     });
   } catch (error) {
     console.error('Error updating product:', error);

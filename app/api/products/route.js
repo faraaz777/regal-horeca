@@ -37,6 +37,7 @@ export async function GET(request) {
 
     // Build query
     const query = {};
+    const andConditions = [];
 
     // Category filter
     if (categorySlug) {
@@ -53,7 +54,12 @@ export async function GET(request) {
           return ids;
         };
         const categoryIds = await getAllSubcategoryIds(category._id);
-        query.categoryId = { $in: categoryIds };
+        andConditions.push({
+          $or: [
+            { categoryId: { $in: categoryIds } },
+            { categoryIds: { $in: categoryIds } }
+          ]
+        });
       }
     }
 
@@ -74,16 +80,24 @@ export async function GET(request) {
 
     // Search filter
     if (searchQuery) {
-      query.$or = [
-        { title: { $regex: searchQuery, $options: 'i' } },
-        { brand: { $regex: searchQuery, $options: 'i' } },
-        { tags: { $in: [new RegExp(searchQuery, 'i')] } },
-      ];
+      andConditions.push({
+        $or: [
+          { title: { $regex: searchQuery, $options: 'i' } },
+          { brand: { $regex: searchQuery, $options: 'i' } },
+          { tags: { $in: [new RegExp(searchQuery, 'i')] } },
+        ]
+      });
+    }
+
+    // Combine all conditions
+    if (andConditions.length > 0) {
+      query.$and = andConditions;
     }
 
     // Execute query
     const products = await Product.find(query)
       .populate('categoryId', 'name slug level')
+      .populate('categoryIds', 'name slug level')
       .sort({ createdAt: -1 })
       .limit(limit)
       .skip(skip)
@@ -143,6 +157,14 @@ export async function POST(request) {
     }
     // If categoryId is a valid string (ObjectId format), keep it - MongoDB will handle conversion
 
+    // Handle categoryIds array
+    if (!productData.categoryIds || !Array.isArray(productData.categoryIds)) {
+      productData.categoryIds = [];
+    } else {
+      // Filter out empty values
+      productData.categoryIds = productData.categoryIds.filter(id => id && id.trim() !== '');
+    }
+
     // Set defaults for optional fields
     if (productData.price === undefined || productData.price === null || productData.price === '') {
       productData.price = 0;
@@ -182,7 +204,10 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
-      product: await Product.findById(product._id).populate('categoryId').lean(),
+      product: await Product.findById(product._id)
+        .populate('categoryId')
+        .populate('categoryIds', 'name slug level')
+        .lean(),
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating product:', error);

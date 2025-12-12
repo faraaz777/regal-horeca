@@ -462,7 +462,7 @@ function DesktopHeaderTopRow({
                 <div className="flex flex-col lg:flex-row gap-8 items-start">
                   {/* Categories Columns */}
                   <div className="flex-1 flex flex-col md:flex-row gap-6 md:gap-8">
-                    {activeDept.children.slice(0, 3).map((childCat) => (
+                    {activeDept.children.slice(0, 6).map((childCat) => (
                       <div
                         key={childCat._id || childCat.id}
                         className="flex-1 min-w-0 transition-transform duration-500 ease-out"
@@ -515,110 +515,113 @@ function DesktopHeaderTopRow({
    
 
 
-function FeaturedProductsSection({ department, products }) {
-  // Get products for this department (featured first, then by category)
-  const featuredProducts = useMemo(() => {
-    if (!products || products.length === 0) return [];
-    
-    const deptId = department._id || department.id;
-    
-    // Collect all category IDs in this department tree
-    const getAllCategoryIds = (cat) => {
-      const ids = [cat._id || cat.id];
-      if (cat.children && cat.children.length > 0) {
-        cat.children.forEach(child => {
-          ids.push(...getAllCategoryIds(child));
-        });
-      }
-      return ids;
+  function FeaturedProductsSection({ department, products }) {
+    // Get products for this department (featured first, then by category)
+    const featuredProducts = useMemo(() => {
+      if (!products || products.length === 0) return [];
+      
+      const deptId = department._id || department.id;
+      
+      // Collect all category IDs in this department tree
+      const getAllCategoryIds = (cat) => {
+        const ids = [cat._id || cat.id];
+        if (cat.children && cat.children.length > 0) {
+          cat.children.forEach(child => {
+            ids.push(...getAllCategoryIds(child));
+          });
+        }
+        return ids;
+      };
+      
+      const deptCategoryIds = getAllCategoryIds(department).map(id => id?.toString());
+      
+      // Filter products that belong to this department
+      let deptProducts = products.filter((p) => {
+        const pCategoryId = p.categoryId?._id || p.categoryId;
+        if (!pCategoryId) return false;
+        return deptCategoryIds.includes(pCategoryId?.toString());
+      });
+      
+      // Prioritize featured products, then sort by price/date
+      const featured = deptProducts.filter(p => p.featured);
+      const others = deptProducts.filter(p => !p.featured);
+      
+      return [...featured, ...others].slice(0, 2);
+    }, [department, products]);
+  
+    if (featuredProducts.length === 0) return null;
+  
+    const formatPrice = (price) => {
+      if (price == null) return 'Price on request';
+      return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      })
+        .format(price)
+        .replace('₹', '₹ ');
     };
-    
-    const deptCategoryIds = getAllCategoryIds(department).map(id => id?.toString());
-    
-    // Filter products that belong to this department
-    let deptProducts = products.filter((p) => {
-      const pCategoryId = p.categoryId?._id || p.categoryId;
-      if (!pCategoryId) return false;
-      return deptCategoryIds.includes(pCategoryId?.toString());
-    });
-    
-    // Prioritize featured products, then sort by price/date
-    const featured = deptProducts.filter(p => p.featured);
-    const others = deptProducts.filter(p => !p.featured);
-    
-    return [...featured, ...others].slice(0, 3);
-  }, [department, products]);
-
-  if (featuredProducts.length === 0) return null;
-
-  const formatPrice = (price) => {
-    if (price == null) return 'Price on request';
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    })
-      .format(price)
-      .replace('₹', '₹ ');
-  };
-
-  return (
-    <div className="w-80 flex-shrink-0">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-900 mb-4">
-        Featured
-      </h3>
-      <div className="flex gap-4">
-        {featuredProducts.map((product) => {
-          const isOnSale = product.mrp && product.price && product.mrp > product.price;
-          const heroImage = product.heroImage || product.image || (product.images && product.images[0]) || '/placeholder-product.jpg';
-          
-          return (
-            <Link
-              key={product._id || product.id}
-              href={`/products/${product.slug}`}
-              className="flex-shrink-0 w-48 group"
-            >
-              <div className="relative mb-2">
-                {/* Sale Badge */}
-                {isOnSale && (
-                  <div className="absolute top-2 left-2 z-10 bg-red-600 text-white text-[10px] font-semibold px-2.5 py-1 rounded-full shadow-sm">
-                    Sale
+  
+    return (
+      <div className="w-full lg:w-auto lg:min-w-[460px] lg:max-w-[420px]">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-900 mb-4">
+          Featured
+        </h3>
+  
+        {/* Use a responsive grid so cards don't force horizontal overflow */}
+        <div className="grid grid-cols-2 gap-3 lg:gap-4 w-full items-start">
+          {featuredProducts.map((product) => {
+            const isOnSale = product.mrp && product.price && product.mrp > product.price;
+            const heroImage = product.heroImage || product.image || (product.images && product.images[0]) || '/placeholder-product.jpg';
+            
+            return (
+              <Link
+                key={product._id || product.id}
+                href={`/products/${product.slug}`}
+                className="group min-w-0 overflow-hidden"
+              >
+                <div className="relative mb-2">
+                  {/* Sale Badge */}
+                  {isOnSale && (
+                    <div className="absolute top-2 left-2 z-10 bg-red-600 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full shadow-sm">
+                      Sale
+                    </div>
+                  )}
+                  {/* Product Image */}
+                  <div className="aspect-square bg-gray-100 rounded overflow-hidden relative">
+                    <Image
+                      src={heroImage}
+                      alt={product.title || product.name}
+                      fill
+                      sizes="(max-width: 640px) 140px, (max-width: 1024px) 160px, 180px"
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
                   </div>
-                )}
-                {/* Product Image */}
-                <div className="aspect-square bg-gray-100 rounded overflow-hidden relative">
-                  <Image
-                    src={heroImage}
-                    alt={product.title || product.name}
-                    fill
-                    sizes="192px"
-                    className="object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
                 </div>
-              </div>
-              {/* Product Name */}
-              <h4 className="text-xs font-medium text-gray-900 mb-1.5 line-clamp-2 group-hover:text-primary transition-colors leading-snug">
-                {product.title || product.name}
-              </h4>
-              {/* Price */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-semibold text-red-600">
-                  {formatPrice(product.price)}
-                </span>
-                {isOnSale && (
-                  <span className="text-xs text-gray-500 line-through">
-                    {formatPrice(product.mrp)}
+                {/* Product Name */}
+                <h4 className="text-xs font-medium text-gray-900 mb-1.5 line-clamp-2 group-hover:text-primary transition-colors leading-snug min-w-0">
+                  {product.title || product.name}
+                </h4>
+                {/* Price */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs sm:text-sm font-semibold text-red-600">
+                    {formatPrice(product.price)}
                   </span>
-                )}
-              </div>
-            </Link>
-          );
-        })}
+                  {isOnSale && (
+                    <span className="text-[10px] sm:text-xs text-gray-500 line-through">
+                      {formatPrice(product.mrp)}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            );
+          })}
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
+  
 
 /* =========================
    MOBILE HEADER + SEARCH

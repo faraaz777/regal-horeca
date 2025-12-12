@@ -10,6 +10,7 @@ import { useState, Suspense, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { WhatsAppIcon, ChevronDownIcon } from '@/components/Icons';
 import { useAppContext } from '@/context/AppContext';
+import { getWhatsAppBusinessLink } from '@/lib/utils/whatsapp';
 import toast from 'react-hot-toast';
 
 function EnquiryForm() {
@@ -28,8 +29,6 @@ function EnquiryForm() {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSubmittingEnquiryOnly, setIsSubmittingEnquiryOnly] = useState(false);
-  const [includeCart, setIncludeCart] = useState(true); // Default to including cart
   const [isCartDropdownOpen, setIsCartDropdownOpen] = useState(false); // Dropdown state
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false); // Category dropdown state
   const categoryDropdownRef = useRef(null);
@@ -91,23 +90,21 @@ function EnquiryForm() {
     });
   };
 
-  const submitEnquiry = async (includeCartItems = true) => {
+  const submitEnquiry = async (e) => {
+    e.preventDefault();
+    
     if (!formData.name || !formData.email || !formData.phone) {
       toast.error('Please fill in all required fields');
       return;
     }
 
-    if (includeCartItems) {
-      setIsSubmitting(true);
-    } else {
-      setIsSubmittingEnquiryOnly(true);
-    }
+    setIsSubmitting(true);
 
     try {
-      // Prepare enquiry data
+      // Always include cart items if they exist
       const enquiryData = {
         ...formData,
-        cartItems: includeCartItems && includeCart && cartItems.length > 0 ? cartItems : [],
+        cartItems: cartItems.length > 0 ? cartItems : [],
       };
 
       // Save enquiry to MongoDB
@@ -125,10 +122,7 @@ function EnquiryForm() {
         throw new Error(data.error || 'Failed to submit enquiry');
       }
 
-      // WhatsApp phone number
-      const phoneNumber = '911234567890';
-      
-      // Format message for WhatsApp
+      // Format message for WhatsApp - always include cart items if they exist
       let whatsappMessage = 'Hello! I would like to make an enquiry:\n\n';
       whatsappMessage += `Name: ${formData.name}\n`;
       whatsappMessage += `Email: ${formData.email}\n`;
@@ -140,20 +134,21 @@ function EnquiryForm() {
         whatsappMessage += `Categories: ${formData.categories.join(', ')}\n`;
       }
       
-      // Add cart items to WhatsApp message (only if includeCartItems is true and includeCart is true)
-      if (includeCartItems && includeCart && cartItems.length > 0) {
-        whatsappMessage += `\n📦 Cart Items:\n`;
+      // Always include cart items in WhatsApp message if they exist
+      if (cartItems.length > 0) {
+        whatsappMessage += `\n📦 Products I'm interested in:\n`;
         cartItems.forEach((item, index) => {
-          whatsappMessage += `${index + 1}. ${item.productName} (Qty: ${item.quantity})\n`;
+          whatsappMessage += `${index + 1}. ${item.productName} (Quantity: ${item.quantity})\n`;
         });
-        whatsappMessage += `Total Items: ${cartItems.reduce((sum, item) => sum + item.quantity, 0)}\n`;
+        whatsappMessage += `\nTotal Items: ${cartItems.reduce((sum, item) => sum + item.quantity, 0)}\n`;
       }
       
       if (formData.message) {
         whatsappMessage += `\nMessage: ${formData.message}\n`;
       }
       
-      const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(whatsappMessage)}`;
+      // Generate WhatsApp link to business number
+      const whatsappUrl = getWhatsAppBusinessLink(whatsappMessage);
       window.open(whatsappUrl, '_blank');
       
       // Reset form
@@ -166,27 +161,13 @@ function EnquiryForm() {
         categories: categoryParam ? [categoryParam] : [],
       });
       
-      toast.success('Enquiry submitted successfully! Redirecting to WhatsApp...');
+      toast.success('Enquiry submitted successfully! Opening WhatsApp...');
     } catch (error) {
       console.error('Error submitting enquiry:', error);
       toast.error(error.message || 'Failed to submit enquiry. Please try again.');
     } finally {
-      if (includeCartItems) {
-        setIsSubmitting(false);
-      } else {
-        setIsSubmittingEnquiryOnly(false);
-      }
+      setIsSubmitting(false);
     }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    await submitEnquiry(true); // Submit with cart items
-  };
-
-  const handleSubmitEnquiryOnly = async (e) => {
-    e.preventDefault();
-    await submitEnquiry(false); // Submit without cart items
   };
 
   return (
@@ -195,11 +176,11 @@ function EnquiryForm() {
         <div className="mb-6 md:mb-8 text-center">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Enquiry Form</h1>
           <p className="text-sm sm:text-base text-gray-600">
-            Fill out the form below and we'll get back to you via WhatsApp
+            Fill out the form below and we'll send your enquiry details to WhatsApp
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-gray-50 rounded-lg p-4 sm:p-6 md:p-8 shadow-sm">
+        <form onSubmit={submitEnquiry} className="bg-gray-50 rounded-lg p-4 sm:p-6 md:p-8 shadow-sm">
           <div className="space-y-6">
             {/* Two Column Grid Layout */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
@@ -384,26 +365,14 @@ function EnquiryForm() {
                     <div className="flex items-center gap-2">
                       <span className="text-base sm:text-lg">📦</span>
                       <h3 className="text-xs sm:text-sm font-semibold text-gray-900">
-                        Cart Items ({cartItems.reduce((sum, item) => sum + item.quantity, 0)} items)
+                        Products in Cart ({cartItems.reduce((sum, item) => sum + item.quantity, 0)} items)
                       </h3>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3">
-                    <label 
-                      className="flex items-center gap-1.5 sm:gap-2 cursor-pointer"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={includeCart}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          setIncludeCart(e.target.checked);
-                        }}
-                        className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary focus:ring-2 transition-all duration-200 hover:scale-110"
-                      />
-                      <span className="text-xs text-gray-700 font-medium">Include</span>
-                    </label>
+                    <span className="text-xs text-green-700 font-medium px-2 py-1 bg-green-100 rounded">
+                      ✓ Will be included
+                    </span>
                     <ChevronDownIcon 
                       className={`w-4 h-4 sm:w-5 sm:h-5 text-gray-600 transition-transform duration-300 ease-in-out ${
                         isCartDropdownOpen ? 'rotate-180' : ''
@@ -419,65 +388,47 @@ function EnquiryForm() {
                   }`}
                 >
                   <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-2 border-t border-blue-200">
-                    {includeCart ? (
-                      <>
-                        <div className="space-y-2 sm:space-y-2.5 mt-2">
-                          {cartItems.map((item, index) => (
-                            <button
-                              type="button"
-                              key={index} 
-                              onClick={() => {
-                                // Dispatch custom event to open cart drawer
-                                window.dispatchEvent(new CustomEvent('openCartDrawer'));
-                              }}
-                              className="w-full text-left text-xs sm:text-sm text-gray-700 flex justify-between items-center p-2 rounded-md bg-white/60 hover:bg-white transition-all duration-200 hover:shadow-sm hover:translate-x-1 active:scale-[0.98] cursor-pointer group"
-                              style={{
-                                animationDelay: `${index * 50}ms`,
-                              }}
-                            >
-                              <span className="font-medium group-hover:text-primary transition-colors truncate pr-2">{item.productName}</span>
-                              <span className="font-semibold text-primary px-2 py-0.5 bg-primary/10 rounded-full group-hover:bg-primary/20 transition-colors flex-shrink-0">
-                                Qty: {item.quantity}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                        <p className="text-xs text-green-700 mt-3 flex items-center gap-1 font-medium">
-                          <span>✓</span>
-                          These items will be included in your enquiry
-                        </p>
-                      </>
-                    ) : (
-                      <p className="text-xs text-gray-600 mt-2 flex items-center gap-1">
-                        <span>ℹ</span>
-                        Cart items will not be included in your enquiry
-                      </p>
-                    )}
+                    <div className="space-y-2 sm:space-y-2.5 mt-2">
+                      {cartItems.map((item, index) => (
+                        <button
+                          type="button"
+                          key={index} 
+                          onClick={() => {
+                            // Dispatch custom event to open cart drawer
+                            window.dispatchEvent(new CustomEvent('openCartDrawer'));
+                          }}
+                          className="w-full text-left text-xs sm:text-sm text-gray-700 flex justify-between items-center p-2 rounded-md bg-white/60 hover:bg-white transition-all duration-200 hover:shadow-sm hover:translate-x-1 active:scale-[0.98] cursor-pointer group"
+                          style={{
+                            animationDelay: `${index * 50}ms`,
+                          }}
+                        >
+                          <span className="font-medium group-hover:text-primary transition-colors truncate pr-2">{item.productName}</span>
+                          <span className="font-semibold text-primary px-2 py-0.5 bg-primary/10 rounded-full group-hover:bg-primary/20 transition-colors flex-shrink-0">
+                            Qty: {item.quantity}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-green-700 mt-3 flex items-center gap-1 font-medium">
+                      <span>✓</span>
+                      These products will be included in your enquiry and WhatsApp message
+                    </p>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Submit Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 max-w-2xl mx-auto">
-              {/* Submit with Cart Button */}
+            {/* Submit Button */}
+            <div className="flex justify-center max-w-2xl mx-auto">
               <button
                 type="submit"
-                disabled={isSubmitting || isSubmittingEnquiryOnly}
-                className="flex-1 bg-green-500 hover:bg-green-600 active:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg active:scale-[0.98]"
+                disabled={isSubmitting}
+                className="w-full sm:w-auto min-w-[200px] bg-green-500 hover:bg-green-600 active:bg-green-700 text-white font-semibold py-3 px-8 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg active:scale-[0.98]"
               >
                 <WhatsAppIcon className="w-5 h-5" />
-                <span className="text-sm sm:text-base">{isSubmitting ? 'Processing...' : 'Submit with Cart'}</span>
-              </button>
-
-              {/* Submit Enquiry Only Button */}
-              <button
-                type="button"
-                onClick={handleSubmitEnquiryOnly}
-                disabled={isSubmitting || isSubmittingEnquiryOnly}
-                className="flex-1 bg-black hover:bg-slate-800 active:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg active:scale-[0.98]"
-              >
-                <span className="text-sm sm:text-base">{isSubmittingEnquiryOnly ? 'Processing...' : 'Submit Enquiry Only'}</span>
+                <span className="text-sm sm:text-base">
+                  {isSubmitting ? 'Submitting...' : 'Submit Enquiry'}
+                </span>
               </button>
             </div>
           </div>

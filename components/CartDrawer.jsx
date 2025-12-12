@@ -12,6 +12,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useAppContext } from '@/context/AppContext';
 import { PlusIcon, MinusIcon, TrashIcon, XIcon, WhatsAppIcon } from '@/components/Icons';
+import { getWhatsAppBusinessLink } from '@/lib/utils/whatsapp';
 import toast from 'react-hot-toast';
 
 export default function CartDrawer({ isOpen, onClose }) {
@@ -54,9 +55,6 @@ export default function CartDrawer({ isOpen, onClose }) {
   };
 
   const handleWhatsAppCheckout = () => {
-    // WhatsApp phone number (you can make this configurable via environment variable)
-    const phoneNumber = '911234567890'; // Remove + and spaces, add country code
-    
     // Format cart items for WhatsApp message
     let message = 'Hello! I would like to place an order:\n\n';
     
@@ -68,7 +66,8 @@ export default function CartDrawer({ isOpen, onClose }) {
     
     message += `\nTotal Items: ${totalItems}\n\nPlease confirm the order.`;
     
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+    // Generate WhatsApp link to business number
+    const whatsappUrl = getWhatsAppBusinessLink(message);
     window.open(whatsappUrl, '_blank');
     onClose();
   };

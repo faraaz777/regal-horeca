@@ -105,9 +105,13 @@ R2_SECRET_ACCESS_KEY=your-r2-secret-access-key
 R2_BUCKET_NAME=your-bucket-name
 R2_PUBLIC_URL=https://your-bucket-name.r2.cloudflarestorage.com
 
-# MongoDB
-MONGODB_URI=mongodb://localhost:27017/regal-horeca
-```
+   # MongoDB
+   MONGODB_URI=mongodb://localhost:27017/regal-horeca
+
+   # WhatsApp Business Number (with country code, no + sign)
+   # Example: 917093913311 for India (91 is country code + 7093913311)
+   NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER=917093913311
+   ```
 
 ## 🎯 Key Features
 

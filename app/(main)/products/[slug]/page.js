@@ -13,6 +13,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { HeartIcon, ChevronLeftIcon, ChevronRightIcon, WhatsAppIcon, ShoppingCartIcon } from '@/components/Icons';
 import { useAppContext } from '@/context/AppContext';
+import { getWhatsAppBusinessLink } from '@/lib/utils/whatsapp';
 import ProductCard from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 import toast from 'react-hot-toast';
@@ -153,10 +154,9 @@ export default function ProductDetailPage() {
   };
 
   const handleWhatsAppContact = () => {
-    // WhatsApp phone number (you can make this configurable via environment variable)
-    const phoneNumber = '911234567890'; // Remove + and spaces, add country code
-    const message = encodeURIComponent(`Hello! I'm interested in this product:\n\n${product.title}\nPrice: ${formatPrice(product.price)}\n\nPlease provide more information.`);
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+    const message = `Hello! I'm interested in this product:\n\n${product.title}\nPrice: ${formatPrice(product.price)}\n\nPlease provide more information.`;
+    // Generate WhatsApp link to business number
+    const whatsappUrl = getWhatsAppBusinessLink(message);
     window.open(whatsappUrl, '_blank');
   };
 

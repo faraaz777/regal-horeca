@@ -17,9 +17,31 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import useSWR from 'swr';
+
+// SWR fetcher for enquiry counts
+const fetcher = async (url) => {
+  const response = await fetch(url);
+  if (!response.ok) {
+    return { statusCounts: {} };
+  }
+  return response.json();
+};
 
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
+
+  // Fetch new enquiries count
+  const { data: enquiriesData } = useSWR(
+    '/api/enquiries?limit=1&skip=0&status=new',
+    fetcher,
+    {
+      revalidateOnFocus: true,
+      refreshInterval: 60000, // Refresh every minute
+    }
+  );
+
+  const newEnquiriesCount = enquiriesData?.statusCounts?.new || 0;
 
   const navLinkClass = (isActive) =>
     `block w-full text-left px-4 py-3 rounded-lg text-base font-medium transition-colors ${
@@ -68,6 +90,20 @@ export default function AdminLayout({ children }) {
 
           <Link href="/admin/business-types" className={navLinkClass(pathname === '/admin/business-types')}>
             Business Types
+          </Link>
+
+          <Link 
+            href="/admin/enquiries" 
+            className={`${navLinkClass(pathname?.startsWith('/admin/enquiries'))} relative`}
+          >
+            <span className="flex items-center justify-between">
+              <span>Enquiries</span>
+              {newEnquiriesCount > 0 && (
+                <span className="ml-2 px-2 py-0.5 bg-red-600 text-white text-xs font-bold rounded-full">
+                  {newEnquiriesCount}
+                </span>
+              )}
+            </span>
           </Link>
         </nav>
 

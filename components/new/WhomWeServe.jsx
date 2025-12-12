@@ -3,43 +3,43 @@ import Image from "next/image";
 
 const categories = [
   {
-    title: "Crockery",
-    slug: "crockery",
+    title: "Hotels & Resorts",
+    slug: "hotels-resorts",
     image:
       "https://images.unsplash.com/photo-1606490203669-94bd3f0d8b5d?auto=format&fit=crop&w=1600&q=80",
     layout: "md:col-span-2 md:row-span-2 md:col-start-1 md:row-start-1",
   },
   {
-    title: "Cutlery",
-    slug: "cutlery",
+    title: "Restaurants & Bars",
+    slug: "restaurants-bars",
     image:
       "https://images.unsplash.com/photo-1556911220-bff31c812dba?auto=format&fit=crop&w=1200&q=80",
     layout: "md:col-span-1 md:row-span-1 md:col-start-3 md:row-start-1",
   },
   {
-    title: "Glassware",
-    slug: "glassware",
+    title: "Cafes & Coffee Shops",
+    slug: "cafes-coffee-shops",
     image:
       "https://images.unsplash.com/photo-1541534401786-f9a9fb3c1cdf?auto=format&fit=crop&w=1200&q=80",
     layout: "md:col-span-1 md:row-span-1 md:col-start-3 md:row-start-2",
   },
   {
-    title: "Barware",
-    slug: "barware",
+    title: "Room Service",
+    slug: "room-service",
     image:
       "https://images.unsplash.com/photo-1532635227-44b3e003b2a7?auto=format&fit=crop&w=1200&q=80",
     layout: "md:col-span-1 md:row-span-1 md:col-start-1 md:row-start-3",
   },
   {
-    title: "Wooden Accessories",
-    slug: "wooden-accessories",
+    title: "Bakeries & Confectioneries",
+    slug: "bakeries-confectioneries",
     image:
       "https://images.unsplash.com/photo-1603808033198-937c4864c1a5?auto=format&fit=crop&w=1200&q=80",
     layout: "md:col-span-1 md:row-span-1 md:col-start-2 md:row-start-3",
   },
   {
-    title: "Metalware",
-    slug: "metalware",
+    title: "Catering & Events",
+    slug: "catering-events",
     image:
       "https://images.unsplash.com/photo-1616627984393-ade1843f0aac?auto=format&fit=crop&w=1200&q=80",
     layout: "md:col-span-1 md:row-span-1 md:col-start-3 md:row-start-3",

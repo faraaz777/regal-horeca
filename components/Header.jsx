@@ -573,7 +573,7 @@ function DesktopHeaderTopRow({
     };
   
     return (
-      <div className="w-full lg:w-auto lg:min-w-[460px] lg:max-w-[420px]">
+      <div className="w-full lg:w-auto lg:min-w-[260px] lg:max-w-[420px]">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-900 mb-4">
           Featured
         </h3>

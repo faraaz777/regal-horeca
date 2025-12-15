@@ -97,6 +97,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
   const [formData, setFormData] = useState({
     title: '',
     brand: '',
+    sku: '',
     categoryId: '',
     categoryIds: [],
     summary: '',
@@ -552,17 +553,27 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
               />
             </div>
             <div>
-              <label className="block text-sm font-medium">Price (₹)</label>
+              <label className="block text-sm font-medium">SKU</label>
               <input 
-                type="number" 
-                name="price" 
-                value={formData.price || ''} 
+                name="sku" 
+                value={formData.sku || ''} 
                 onChange={handleChange} 
                 className="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm" 
-                min="0" 
-                placeholder="0"
+                placeholder="e.g., PROD-001"
               />
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium">Price (₹)</label>
+            <input 
+              type="number" 
+              name="price" 
+              value={formData.price || ''} 
+              onChange={handleChange} 
+              className="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm" 
+              min="0" 
+              placeholder="0"
+            />
           </div>
         </FormSection>
 

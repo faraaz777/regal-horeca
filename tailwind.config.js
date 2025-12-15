@@ -12,6 +12,9 @@ module.exports = {
         secondary: '#2d2d2d',
         medium: '#e5e5e5',
         light: '#f5f5f5',
+        'brand-orange': '#F97316',
+        'regal-orange': '#F97316',
+        'regal-black': '#1a1a1a',
         premium: {
           dark: '#3D402D',    // Dark Olive Green background
           light: '#C9A86A',   // Gold for borders and accents

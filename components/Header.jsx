@@ -411,16 +411,16 @@ function DesktopHeaderTopRow({
                   >
                     <Link
                       href={`/catalog?category=${dept.slug}`}
-                      className="text-md font-medium text-gray-900 hover:text-primary whitespace-nowrap transition-colors duration-300 ease-out flex items-center gap-1.5 group py-3"
+                      className="text-md font-medium text-gray-900 hover:text-primary whitespace-nowrap transition-colors duration-300 ease-out flex items-center gap-1.5 group py-3 relative"
                     >
-                      <span
-                        className={
-                          isActive
-                            ? "underline underline-offset-4 decoration-2"
-                            : ""
-                        }
-                      >
+                      <span className="relative inline-block">
                         {dept.name}
+                        {!isActive && (
+                          <span className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-primary transition-all duration-300 ease-out group-hover:w-full group-hover:left-1/2 group-hover:-translate-x-1/2"></span>
+                        )}
+                        {isActive && (
+                          <span className="absolute bottom-0 left-0 w-full h-0.5 bg-primary"></span>
+                        )}
                       </span>
                       {hasChildren && (
                         <ChevronDownIcon
@@ -433,6 +433,15 @@ function DesktopHeaderTopRow({
                   </div>
                 );
               })}
+              <Link
+                href="/aboutus"
+                className="text-md font-medium text-gray-900 hover:text-primary whitespace-nowrap transition-colors duration-300 ease-out py-3 relative group"
+              >
+                <span className="relative inline-block">
+                  About Us
+                  <span className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-primary transition-all duration-300 ease-out group-hover:w-full group-hover:left-1/2 group-hover:-translate-x-1/2"></span>
+                </span>
+              </Link>
             </div>
           </nav>
   
@@ -546,7 +555,7 @@ function DesktopHeaderTopRow({
       const featured = deptProducts.filter(p => p.featured);
       const others = deptProducts.filter(p => !p.featured);
       
-      return [...featured, ...others].slice(0, 2);
+      return [...featured, ...others].slice(0, 1);
     }, [department, products]);
   
     if (featuredProducts.length === 0) return null;
@@ -635,7 +644,7 @@ function MobileHeaderBar({
 }) {
   return (
     <div className="lg:hidden flex flex-col">
-      <div className="flex justify-between items-center h-20 relative z-50 bg-white">
+      <div className="flex justify-between items-center h-16 relative z-50 bg-white">
         <button onClick={() => setIsMenuOpen(true)}>
           <MenuIcon className="w-6 h-6" />
         </button>
@@ -643,7 +652,7 @@ function MobileHeaderBar({
           href="/"
           className="absolute left-1/2 -translate-x-1/2 text-2xl font-bold tracking-[0.3em] text-secondary uppercase"
         >
-          REGAL
+          <Image src={Logo} alt="Regal" width={100} height={100} />
         </Link>
         <div className="flex items-center gap-4">
           <button onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}>
@@ -871,7 +880,7 @@ function MobileMenuOverlay({
                 <div className="p-4 border-t text-sm text-gray-600">
                   <ul className="space-y-3">
                     <li>
-                      <Link href="/about" className="hover:underline">
+                      <Link href="/aboutus" className="hover:underline">
                         About Us
                       </Link>
                     </li>

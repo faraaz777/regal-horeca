@@ -146,20 +146,40 @@ export function AppProvider({ children }) {
     localStorage.setItem(CART_KEY, JSON.stringify(newCart));
   };
 
-  const addToCart = (productId, quantity = 1) => {
+  const addToCart = (productId, quantity = 1, options = {}) => {
     const productIdStr = productId?.toString();
-    const existingItem = cart.find(item => item.productId?.toString() === productIdStr);
+    const { selectedColor, price } = options;
+    
+    // Create a unique key for cart items that includes color variant
+    const itemKey = selectedColor 
+      ? `${productIdStr}_${selectedColor.colorName || selectedColor.colorHex}`
+      : productIdStr;
+    
+    const existingItem = cart.find(item => {
+      const itemKeyToCheck = item.selectedColor 
+        ? `${item.productId?.toString()}_${item.selectedColor.colorName || item.selectedColor.colorHex}`
+        : item.productId?.toString();
+      return itemKeyToCheck === itemKey;
+    });
     
     if (existingItem) {
-      // Update quantity if item already exists
-      updateCart(cart.map(item => 
-        item.productId?.toString() === productIdStr
+      // Update quantity if item already exists with same color
+      updateCart(cart.map(item => {
+        const itemKeyToCheck = item.selectedColor 
+          ? `${item.productId?.toString()}_${item.selectedColor.colorName || item.selectedColor.colorHex}`
+          : item.productId?.toString();
+        return itemKeyToCheck === itemKey
           ? { ...item, quantity: item.quantity + quantity }
-          : item
-      ));
+          : item;
+      }));
     } else {
-      // Add new item
-      updateCart([...cart, { productId: productIdStr, quantity }]);
+      // Add new item with color and price info
+      updateCart([...cart, { 
+        productId: productIdStr, 
+        quantity,
+        selectedColor: selectedColor || null,
+        price: price || null
+      }]);
     }
   };
 

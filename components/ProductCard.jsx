@@ -58,7 +58,9 @@ export default function ProductCard({ product, onAdd }) {
   const handleAddToCart = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    addToCart(productId, 1);
+    addToCart(productId, 1, {
+      price: product.price
+    });
     toast.success('Added to cart!');
   };
 

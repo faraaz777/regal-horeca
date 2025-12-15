@@ -393,7 +393,7 @@ export default function HomePage() {
             clients across national and international markets.
           </p>
           <Link
-            href="/about"
+            href="/aboutus"
             className="mt-6 inline-block text-primary font-semibold hover:underline"
           >
             Learn More About Us

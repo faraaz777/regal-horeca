@@ -92,12 +92,14 @@ const FormSection = ({ title, children }) => (
 );
 
 export default function ProductForm({ product, allProducts, onSave, onCancel }) {
-  const { categories, businessTypes } = useAppContext();
+  const { categories, brands, businessTypes } = useAppContext();
   
   const [formData, setFormData] = useState({
     title: '',
     brand: '',
     sku: '',
+    brandCategoryId: '',
+    brandCategoryIds: [],
     categoryId: '',
     categoryIds: [],
     summary: '',
@@ -122,8 +124,38 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
   const [isUploading, setIsUploading] = useState(false);
   const [categorySelection, setCategorySelection] = useState({});
   const [additionalCategorySelections, setAdditionalCategorySelections] = useState([]);
+  const [brandSelection, setBrandSelection] = useState({});
+  const [additionalBrandSelections, setAdditionalBrandSelections] = useState([]);
+  const [brandSuggestions, setBrandSuggestions] = useState([]);
+  const [showBrandSuggestions, setShowBrandSuggestions] = useState(false);
+  const [brandInputFocused, setBrandInputFocused] = useState(false);
+  const brandInputRef = useRef(null);
+  const brandSuggestionsRef = useRef(null);
   const [error, setError] = useState('');
   const initializedProductIdRef = useRef(null);
+
+  // Helper function to get brand ancestry (similar to category ancestry)
+  function getBrandAncestry(brandId, brands) {
+    const ancestry = {};
+    let current = brands.find(b => {
+      const bId = b._id || b.id;
+      return bId?.toString() === brandId?.toString();
+    });
+    
+    while (current) {
+      ancestry[current.level] = current._id || current.id;
+      const parentId = current.parent?._id || current.parent;
+      if (parentId) {
+        current = brands.find(b => {
+          const bId = b._id || b.id;
+          return bId?.toString() === parentId.toString();
+        });
+      } else {
+        break;
+      }
+    }
+    return ancestry;
+  }
 
   // Initialize form data when product is provided (edit mode) - only once per product
   useEffect(() => {
@@ -132,11 +164,15 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
     if (product && initializedProductIdRef.current !== currentProductId) {
       const categoryId = product.categoryId?._id || product.categoryId;
       const categoryIds = product.categoryIds || [];
+      const brandCategoryId = product.brandCategoryId?._id || product.brandCategoryId;
+      const brandCategoryIds = product.brandCategoryIds || [];
       
       setFormData({
         ...product,
         categoryId: categoryId?.toString() || '',
         categoryIds: categoryIds.map(cid => (cid?._id || cid)?.toString()).filter(Boolean),
+        brandCategoryId: brandCategoryId?.toString() || '',
+        brandCategoryIds: brandCategoryIds.map(bid => (bid?._id || bid)?.toString()).filter(Boolean),
         tagsInput: (product.tags || []).join(', '),
         materialInput: (product.filters?.material || []).join(', '),
         usageInput: (product.filters?.usage || []).join(', '),
@@ -157,13 +193,29 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
       } else {
         setAdditionalCategorySelections([]);
       }
+
+      if (brandCategoryId && brands.length > 0) {
+        const ancestry = getBrandAncestry(brandCategoryId, brands);
+        setBrandSelection(ancestry);
+      }
+
+      // Initialize additional brand selections
+      if (brandCategoryIds.length > 0 && brands.length > 0) {
+        const additionalSelections = brandCategoryIds.map(bid => {
+          const id = bid?._id || bid;
+          return getBrandAncestry(id, brands);
+        });
+        setAdditionalBrandSelections(additionalSelections);
+      } else {
+        setAdditionalBrandSelections([]);
+      }
       
       initializedProductIdRef.current = currentProductId;
     } else if (!product) {
       // Reset when switching from edit to add mode
       initializedProductIdRef.current = null;
     }
-  }, [product]); // intentionally only depends on product
+  }, [product, categories, brands]); // depends on product, categories, and brands
 
   const handleCategoryChange = (level, id) => {
     const newSelection = { [level]: id };
@@ -217,6 +269,97 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
   const subcategories = categorySelection.category ? getCategoriesByParent(categorySelection.category) : [];
   const types = categorySelection.subcategory ? getCategoriesByParent(categorySelection.subcategory) : [];
 
+  const brandDepartments = brands.filter(b => b.level === 'department');
+  const brandCategoriesList = brandSelection.department ? getBrandsByParent(brandSelection.department) : [];
+  const brandSubcategories = brandSelection.category ? getBrandsByParent(brandSelection.category) : [];
+
+  const getBrandsByParent = (parentId) => {
+    if (!parentId) {
+      return brands.filter(b => {
+        const bParent = b.parent?._id || b.parent;
+        return !bParent;
+      });
+    }
+    
+    return brands.filter(b => {
+      const bParent = b.parent?._id || b.parent;
+      return bParent?.toString() === parentId.toString();
+    });
+  };
+
+  const handleBrandCategoryChange = (level, id) => {
+    const newSelection = { [level]: id };
+    const levelOrder = ['department', 'category', 'subcategory'];
+    const currentLevelIndex = levelOrder.indexOf(level);
+    
+    // Preserve parent selections
+    for (let i = 0; i < currentLevelIndex; i++) {
+      const parentLevel = levelOrder[i];
+      if (brandSelection[parentLevel]) {
+        newSelection[parentLevel] = brandSelection[parentLevel];
+      }
+    }
+    
+    setBrandSelection(newSelection);
+
+    // Set brandCategoryId to the most specific level selected
+    if (id) {
+      setFormData({ ...formData, brandCategoryId: id });
+    } else {
+      const mostSpecificLevel = ['subcategory', 'category', 'department'].find(l => newSelection[l]);
+      if (mostSpecificLevel) {
+        setFormData({ ...formData, brandCategoryId: newSelection[mostSpecificLevel] });
+      } else {
+        setFormData({ ...formData, brandCategoryId: '' });
+      }
+    }
+  };
+
+  const handleAdditionalBrandCategoryChange = (index, level, id) => {
+    const newSelections = [...additionalBrandSelections];
+    const newSelection = { [level]: id };
+    const levelOrder = ['department', 'category', 'subcategory'];
+    const currentLevelIndex = levelOrder.indexOf(level);
+    
+    // Preserve parent selections
+    if (newSelections[index]) {
+      for (let i = 0; i < currentLevelIndex; i++) {
+        const parentLevel = levelOrder[i];
+        if (newSelections[index][parentLevel]) {
+          newSelection[parentLevel] = newSelections[index][parentLevel];
+        }
+      }
+    }
+    
+    newSelections[index] = newSelection;
+    setAdditionalBrandSelections(newSelections);
+
+    // Update brandCategoryIds array
+    const updatedBrandCategoryIds = newSelections.map(sel => {
+      const mostSpecificLevel = ['subcategory', 'category', 'department'].find(l => sel[l]);
+      return mostSpecificLevel ? sel[mostSpecificLevel] : null;
+    }).filter(Boolean);
+
+    setFormData({ ...formData, brandCategoryIds: updatedBrandCategoryIds });
+  };
+
+  const addAdditionalBrandCategory = () => {
+    setAdditionalBrandSelections([...additionalBrandSelections, {}]);
+  };
+
+  const removeAdditionalBrandCategory = (index) => {
+    const newSelections = additionalBrandSelections.filter((_, i) => i !== index);
+    setAdditionalBrandSelections(newSelections);
+    
+    // Update brandCategoryIds array
+    const updatedBrandCategoryIds = newSelections.map(sel => {
+      const mostSpecificLevel = ['subcategory', 'category', 'department'].find(l => sel[l]);
+      return mostSpecificLevel ? sel[mostSpecificLevel] : null;
+    }).filter(Boolean);
+
+    setFormData({ ...formData, brandCategoryIds: updatedBrandCategoryIds });
+  };
+
   const handleChange = (e) => {
     const { name, value, type } = e.target;
     if (type === 'checkbox') {
@@ -226,6 +369,141 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
       setFormData({ ...formData, [name]: value });
     }
   };
+
+  // Get brand suggestions based on input
+  const getBrandSuggestions = (query) => {
+    if (!query || query.trim().length < 2 || !brands || brands.length === 0) {
+      return [];
+    }
+    const queryLower = query.toLowerCase().trim();
+    
+    // Search in all brand levels
+    const matches = brands.filter(brand => {
+      const brandName = (brand.name || '').toLowerCase();
+      return brandName.includes(queryLower);
+    });
+    
+    // Prioritize departments, then categories, then subcategories
+    const sorted = matches.sort((a, b) => {
+      const levelOrder = { department: 0, category: 1, subcategory: 2 };
+      return (levelOrder[a.level] || 99) - (levelOrder[b.level] || 99);
+    });
+    
+    return sorted.slice(0, 5); // Limit to 5 suggestions
+  };
+
+  // Handle brand input change with autocomplete
+  const handleBrandInputChange = (e) => {
+    const value = e.target.value;
+    setFormData({ ...formData, brand: value });
+    
+    // Show suggestions if there's input
+    if (value.trim().length >= 2) {
+      const suggestions = getBrandSuggestions(value);
+      setBrandSuggestions(suggestions);
+      setShowBrandSuggestions(suggestions.length > 0);
+    } else {
+      setBrandSuggestions([]);
+      setShowBrandSuggestions(false);
+    }
+  };
+
+  // Handle selecting a brand suggestion
+  const handleBrandSuggestionSelect = (brand) => {
+    setFormData({ ...formData, brand: brand.name });
+    setShowBrandSuggestions(false);
+    setBrandInputFocused(false);
+    
+    // Auto-populate brand category selection based on brand level
+    if (brand.level === 'department') {
+      handleBrandCategoryChange('department', brand._id || brand.id);
+    } else if (brand.level === 'category') {
+      // Find parent department
+      const parentDept = brands.find(b => {
+        const bId = b._id || b.id;
+        const parentId = brand.parent?._id || brand.parent;
+        return bId?.toString() === parentId?.toString();
+      });
+      if (parentDept) {
+        handleBrandCategoryChange('department', parentDept._id || parentDept.id);
+        // Small delay to let state update
+        setTimeout(() => {
+          handleBrandCategoryChange('category', brand._id || brand.id);
+        }, 100);
+      }
+    } else if (brand.level === 'subcategory') {
+      // Find parent category and department
+      const parentCat = brands.find(b => {
+        const bId = b._id || b.id;
+        const parentId = brand.parent?._id || brand.parent;
+        return bId?.toString() === parentId?.toString();
+      });
+      if (parentCat) {
+        const parentDept = brands.find(b => {
+          const bId = b._id || b.id;
+          const parentId = parentCat.parent?._id || parentCat.parent;
+          return bId?.toString() === parentId?.toString();
+        });
+        if (parentDept && parentCat) {
+          handleBrandCategoryChange('department', parentDept._id || parentDept.id);
+          setTimeout(() => {
+            handleBrandCategoryChange('category', parentCat._id || parentCat.id);
+            setTimeout(() => {
+              handleBrandCategoryChange('subcategory', brand._id || brand.id);
+            }, 100);
+          }, 100);
+        }
+      }
+    }
+  };
+
+  // Auto-link brand category on form submit if brand text matches a department
+  const autoLinkBrandCategory = () => {
+    if (!formData.brand || !formData.brand.trim() || formData.brandCategoryId || !brands || brands.length === 0) {
+      return; // Skip if no brand text, already linked, or no brands available
+    }
+    
+    const brandText = formData.brand.trim();
+    // Find exact match (case-insensitive) with brand departments
+    const matchingBrand = brands.find(b => 
+      b.level === 'department' && 
+      b.name.toLowerCase() === brandText.toLowerCase()
+    );
+    
+    if (matchingBrand) {
+      // Auto-link if match found - update formData directly
+      const brandId = matchingBrand._id || matchingBrand.id;
+      setFormData(prev => ({
+        ...prev,
+        brandCategoryId: brandId.toString()
+      }));
+      // Also update brand selection for UI consistency
+      setBrandSelection({ department: brandId.toString() });
+    }
+  };
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        brandInputRef.current && 
+        !brandInputRef.current.contains(event.target) &&
+        brandSuggestionsRef.current &&
+        !brandSuggestionsRef.current.contains(event.target)
+      ) {
+        setShowBrandSuggestions(false);
+        setBrandInputFocused(false);
+      }
+    };
+
+    if (showBrandSuggestions) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showBrandSuggestions]);
 
   const handleBusinessTypeChange = (slug) => {
     const currentSlugs = formData.businessTypeSlugs || [];
@@ -463,6 +741,21 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
       return;
     }
     
+    // Auto-link brand category if brand text matches a department (check synchronously)
+    let updatedBrandCategoryId = formData.brandCategoryId;
+    if (!updatedBrandCategoryId && formData.brand && formData.brand.trim() && brands && brands.length > 0) {
+      const brandText = formData.brand.trim();
+      const matchingBrand = brands.find(b => 
+        b.level === 'department' && 
+        b.name.toLowerCase() === brandText.toLowerCase()
+      );
+      if (matchingBrand) {
+        updatedBrandCategoryId = (matchingBrand._id || matchingBrand.id).toString();
+        // Also update state for UI feedback
+        setBrandSelection({ department: updatedBrandCategoryId });
+      }
+    }
+    
     const tags = formData.tagsInput 
       ? formData.tagsInput.split(',').map(t => t.trim()).filter(Boolean) 
       : [];
@@ -475,12 +768,15 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
     
     // Ensure categoryIds is properly formatted
     const categoryIds = (formData.categoryIds || []).filter(id => id && id.trim() !== '');
+    const brandCategoryIds = (formData.brandCategoryIds || []).filter(id => id && id.trim() !== '');
 
     const finalProduct = {
       ...formData,
+      brandCategoryId: updatedBrandCategoryId || formData.brandCategoryId,
       price: Number(formData.price),
       tags,
       categoryIds,
+      brandCategoryIds,
       filters: {
         material: materials,
         usage: usages,
@@ -498,6 +794,11 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
     if (finalProduct.categoryId === '' || finalProduct.categoryId === null || finalProduct.categoryId === undefined) {
       // Remove empty categoryId - API will handle this
       delete finalProduct.categoryId;
+    }
+
+    // Ensure brandCategoryId is included if it exists
+    if (finalProduct.brandCategoryId === '' || finalProduct.brandCategoryId === null || finalProduct.brandCategoryId === undefined) {
+      delete finalProduct.brandCategoryId;
     }
 
     onSave(finalProduct);
@@ -543,14 +844,58 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
+            <div className="relative" ref={brandInputRef}>
               <label className="block text-sm font-medium">Brand</label>
               <input 
                 name="brand" 
                 value={formData.brand} 
-                onChange={handleChange} 
+                onChange={handleBrandInputChange}
+                onFocus={() => {
+                  setBrandInputFocused(true);
+                  if (formData.brand && formData.brand.trim().length >= 2) {
+                    const suggestions = getBrandSuggestions(formData.brand);
+                    setBrandSuggestions(suggestions);
+                    setShowBrandSuggestions(suggestions.length > 0);
+                  }
+                }}
                 className="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm" 
+                placeholder="Type brand name (e.g., Villeroy & Boch)"
               />
+              
+              {/* Autocomplete Suggestions Dropdown */}
+              {showBrandSuggestions && brandSuggestions.length > 0 && (
+                <div 
+                  ref={brandSuggestionsRef}
+                  className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
+                >
+                  <div className="px-2 py-1 text-xs text-gray-500 border-b bg-gray-50">
+                    Select to auto-link with brand category:
+                  </div>
+                  {brandSuggestions.map((brand) => (
+                    <button
+                      key={brand._id || brand.id}
+                      type="button"
+                      onClick={() => handleBrandSuggestionSelect(brand)}
+                      className="w-full text-left px-3 py-2 hover:bg-gray-100 flex items-center justify-between transition-colors"
+                    >
+                      <span className="font-medium text-gray-900">{brand.name}</span>
+                      <span className="text-xs text-gray-500 capitalize bg-gray-100 px-2 py-0.5 rounded">
+                        {brand.level}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              
+              {/* Show indicator if brand is linked to a category */}
+              {formData.brand && formData.brandCategoryId && (
+                <div className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <span>Linked to brand category</span>
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium">SKU</label>
@@ -574,6 +919,147 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
               min="0" 
               placeholder="0"
             />
+          </div>
+        </FormSection>
+
+        <FormSection title="Brand Categories">
+          <div>
+            <label className="block text-sm font-medium mb-2">Primary Brand Category</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium">Department</label>
+                <select 
+                  value={brandSelection.department || ''} 
+                  onChange={(e) => handleBrandCategoryChange('department', e.target.value)} 
+                  className="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm"
+                >
+                  <option value="">Select Department</option>
+                  {brandDepartments.map(d => (
+                    <option key={d._id || d.id} value={d._id || d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Category</label>
+                <select 
+                  value={brandSelection.category || ''} 
+                  onChange={(e) => handleBrandCategoryChange('category', e.target.value)} 
+                  disabled={!brandSelection.department} 
+                  className="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm disabled:bg-gray-100"
+                >
+                  <option value="">Select Category</option>
+                  {brandCategoriesList.map(c => (
+                    <option key={c._id || c.id} value={c._id || c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Subcategory</label>
+                <select 
+                  value={brandSelection.subcategory || ''} 
+                  onChange={(e) => handleBrandCategoryChange('subcategory', e.target.value)} 
+                  disabled={!brandSelection.category} 
+                  className="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm disabled:bg-gray-100"
+                >
+                  <option value="">Select Subcategory</option>
+                  {brandSubcategories.map(s => (
+                    <option key={s._id || s.id} value={s._id || s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 pt-6 border-t">
+            <label className="block text-sm font-medium mb-2">Additional Brand Categories</label>
+            <p className="text-xs text-gray-500 mb-3">Add this product to multiple brand categories</p>
+            <div className="space-y-4">
+              {additionalBrandSelections.map((selection, index) => {
+                const selDept = selection.department || '';
+                const selCat = selection.category || '';
+                const selSubcat = selection.subcategory || '';
+                
+                const selDeptBrands = selDept ? getBrandsByParent(selDept) : [];
+                const selSubcategories = selCat ? getBrandsByParent(selCat) : [];
+                
+                return (
+                  <div key={index} className="p-4 border border-gray-200 rounded-md bg-gray-50">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-sm font-medium text-gray-700">Brand Category {index + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeAdditionalBrandCategory(index)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <TrashIcon />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600">Department</label>
+                        <select 
+                          value={selDept} 
+                          onChange={(e) => handleAdditionalBrandCategoryChange(index, 'department', e.target.value)} 
+                          className="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm text-sm"
+                        >
+                          <option value="">Select Department</option>
+                          {brandDepartments.map(d => (
+                            <option key={d._id || d.id} value={d._id || d.id}>
+                              {d.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600">Category</label>
+                        <select 
+                          value={selCat} 
+                          onChange={(e) => handleAdditionalBrandCategoryChange(index, 'category', e.target.value)} 
+                          disabled={!selDept} 
+                          className="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm disabled:bg-gray-100 text-sm"
+                        >
+                          <option value="">Select Category</option>
+                          {selDeptBrands.map(c => (
+                            <option key={c._id || c.id} value={c._id || c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600">Subcategory</label>
+                        <select 
+                          value={selSubcat} 
+                          onChange={(e) => handleAdditionalBrandCategoryChange(index, 'subcategory', e.target.value)} 
+                          disabled={!selCat} 
+                          className="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm disabled:bg-gray-100 text-sm"
+                        >
+                          <option value="">Select Subcategory</option>
+                          {selSubcategories.map(s => (
+                            <option key={s._id || s.id} value={s._id || s.id}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <button 
+              type="button" 
+              onClick={addAdditionalBrandCategory} 
+              className="mt-3 text-sm text-primary hover:underline font-semibold flex items-center gap-1"
+            >
+              <PlusIcon className="w-4 h-4" /> Add Additional Brand Category
+            </button>
           </div>
         </FormSection>
 

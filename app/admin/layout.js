@@ -88,6 +88,10 @@ export default function AdminLayout({ children }) {
             Categories
           </Link>
 
+          <Link href="/admin/brands" className={navLinkClass(pathname === '/admin/brands')}>
+            Brands
+          </Link>
+
           <Link href="/admin/business-types" className={navLinkClass(pathname === '/admin/business-types')}>
             Business Types
           </Link>

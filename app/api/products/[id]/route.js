@@ -35,6 +35,8 @@ export async function GET(request, { params }) {
       product = await Product.findById(id)
         .populate('categoryId')
         .populate('categoryIds', 'name slug level')
+        .populate('brandCategoryId', 'name slug level')
+        .populate('brandCategoryIds', 'name slug level')
         .populate('relatedProductIds', 'title slug heroImage price')
         .lean();
     }
@@ -44,6 +46,8 @@ export async function GET(request, { params }) {
       product = await Product.findOne({ slug: id })
         .populate('categoryId')
         .populate('categoryIds', 'name slug level')
+        .populate('brandCategoryId', 'name slug level')
+        .populate('brandCategoryIds', 'name slug level')
         .populate('relatedProductIds', 'title slug heroImage price')
         .lean();
     }
@@ -105,6 +109,23 @@ export async function PUT(request, { params }) {
       }
     }
 
+    // Handle brandCategoryId - only remove if it's truly empty/null/undefined
+    if (updateData.brandCategoryId === '' || updateData.brandCategoryId === null || updateData.brandCategoryId === undefined) {
+      delete updateData.brandCategoryId;
+    } else if (typeof updateData.brandCategoryId === 'string' && updateData.brandCategoryId.trim() === '') {
+      delete updateData.brandCategoryId;
+    }
+
+    // Handle brandCategoryIds array
+    if (updateData.brandCategoryIds !== undefined) {
+      if (!Array.isArray(updateData.brandCategoryIds)) {
+        updateData.brandCategoryIds = [];
+      } else {
+        // Filter out empty values
+        updateData.brandCategoryIds = updateData.brandCategoryIds.filter(id => id && id.trim() !== '');
+      }
+    }
+
     // Find product
     const product = await Product.findById(id);
     if (!product) {
@@ -150,6 +171,8 @@ export async function PUT(request, { params }) {
       product: await Product.findById(id)
         .populate('categoryId')
         .populate('categoryIds', 'name slug level')
+        .populate('brandCategoryId', 'name slug level')
+        .populate('brandCategoryIds', 'name slug level')
         .lean(),
     });
   } catch (error) {

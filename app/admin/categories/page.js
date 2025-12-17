@@ -40,21 +40,10 @@ export default function AdminCategoriesPage() {
       const data = await response.json();
         if (data.success) {
           const cats = data.categories || [];
-          console.log('Fetched categories:', cats.length, cats);
-          // Log parent information for debugging
-          console.log('All fetched categories:');
-          cats.forEach((cat, idx) => {
-            console.log(`Category ${idx + 1}:`, {
-              name: cat.name,
-              _id: cat._id,
-              parent: cat.parent,
-              parentType: typeof cat.parent,
-              parentIsObject: typeof cat.parent === 'object',
-              parentId: cat.parent?._id,
-              parentIdStr: cat.parent?._id?.toString(),
-              rawParent: JSON.stringify(cat.parent),
-            });
-          });
+          // Only log in development
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Fetched categories:', cats.length);
+          }
           setCategoriesList(cats);
           return cats;
       } else {
@@ -292,11 +281,13 @@ export default function AdminCategoriesPage() {
 
   // Rebuild tree whenever categoriesList changes
   const categoryTree = useMemo(() => {
-    console.log('Rebuilding category tree with', categoriesList.length, 'categories');
-    console.log('Categories data:', categoriesList);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Rebuilding category tree with', categoriesList.length, 'categories');
+    }
     const tree = buildCategoryTree();
-    console.log('Built tree with', tree.length, 'root categories');
-    console.log('Tree structure:', JSON.stringify(tree, null, 2));
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Built tree with', tree.length, 'root categories');
+    }
     return tree;
   }, [categoriesList]);
 

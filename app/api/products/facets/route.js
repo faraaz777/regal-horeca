@@ -27,6 +27,9 @@ const PREDEFINED_COLORS = [
 
 const FILTERABLE_SPECS = ['Diameter', 'Volume', 'Capacity', 'Size', 'Weight', 'Length', 'Width', 'Height'];
 
+// Mark route as dynamic to prevent static generation
+export const dynamic = 'force-dynamic';
+
 export async function GET(request) {
   try {
     await connectToDatabase();

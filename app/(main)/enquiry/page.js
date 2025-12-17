@@ -6,6 +6,9 @@
 
 'use client';
 
+// Mark as dynamic to prevent static generation issues
+export const dynamic = 'force-dynamic';
+
 import { useState, Suspense, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { WhatsAppIcon, ChevronDownIcon } from '@/components/Icons';

@@ -12,7 +12,6 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Category from '@/lib/models/Category';
 import { clearCategoryCache } from '@/lib/utils/categoryCache';
-import { clearCategoryCache } from '@/lib/utils/categoryCache';
 
 /**
  * GET /api/categories/[id]

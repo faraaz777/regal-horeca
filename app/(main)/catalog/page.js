@@ -13,6 +13,9 @@
 
 'use client';
 
+// Mark as dynamic to prevent static generation issues
+export const dynamic = 'force-dynamic';
+
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';

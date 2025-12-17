@@ -87,12 +87,10 @@ function ProductCard({ product, onAdd }) {
   
   
   const nextImg = () => {
-    console.log(product.images.length);
     setIndex((prev) => (prev === product.images.length - 1 ? 0 : prev + 1));
   };
   
   const prevImg = () => {
-    console.log(product.images.length);
     setIndex((prev) => (prev === 0 ? product.images.length - 1 : prev - 1));
   };
 

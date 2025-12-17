@@ -6,9 +6,6 @@
 
 'use client';
 
-// Mark as dynamic to prevent static generation issues
-export const dynamic = 'force-dynamic';
-
 import { useMemo } from 'react';
 import { useAppContext } from '@/context/AppContext';
 import ProductCard from '@/components/ProductCard';

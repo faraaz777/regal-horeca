@@ -6,9 +6,6 @@
 
 'use client';
 
-// Mark as dynamic to prevent static generation issues
-export const dynamic = 'force-dynamic';
-
 import Hero from '@/components/about/Hero';
 import Stats from '@/components/about/Stats';
 import About from '@/components/about/About';

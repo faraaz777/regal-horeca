@@ -13,10 +13,7 @@
 
 'use client';
 
-// Mark as dynamic to prevent static generation issues
-export const dynamic = 'force-dynamic';
-
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import useSWR from 'swr';
@@ -31,7 +28,7 @@ const ITEMS_PER_PAGE = 24;
 // Fetcher for SWR
 const fetcher = (url) => fetch(url).then(res => res.json());
 
-export default function CatalogPage() {
+function CatalogPageContent() {
   const { products, categories, loading: contextLoading } = useAppContext();
   const searchParams = useSearchParams();
   
@@ -746,5 +743,23 @@ export default function CatalogPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function CatalogPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white">
+        <div className="container mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <ProductCardSkeleton key={`skeleton-${index}`} />
+            ))}
+          </div>
+        </div>
+      </div>
+    }>
+      <CatalogPageContent />
+    </Suspense>
   );
 }

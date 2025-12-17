@@ -22,7 +22,7 @@ export async function POST(request) {
     await connectToDatabase();
 
     const body = await request.json();
-    const { name, email, phone, company, categories, category, message, cartItems } = body;
+    const { name, email, phone, company, state, categories, category, message, cartItems } = body;
 
     // Validate required fields
     if (!name || !email || !phone) {
@@ -54,6 +54,7 @@ export async function POST(request) {
       email,
       phone,
       company: company || '',
+      state: state || '',
       source: 'website-form',
       type: enquiryType,
       categories: categoriesArray,

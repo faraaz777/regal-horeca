@@ -256,6 +256,7 @@ export default function CategoryPage() {
     email: '',
     phone: '',
     companyName: '',
+    state: '',
     query: '',
     countryCode: '+91',
   });
@@ -319,6 +320,7 @@ export default function CategoryPage() {
         email: formData.email,
         phone: formData.phone ? `${formData.countryCode}${formData.phone}` : '',
         company: formData.companyName,
+        state: formData.state,
         message: formData.query,
         categories: [category.title.replace('Shapes for ', '')],
         cartItems: cartItems.length > 0 ? cartItems : [],
@@ -347,6 +349,9 @@ export default function CategoryPage() {
       if (formData.companyName) {
         whatsappMessage += `Company: ${formData.companyName}\n`;
       }
+      if (formData.state) {
+        whatsappMessage += `State: ${formData.state}\n`;
+      }
       whatsappMessage += `Categories: ${category.title.replace('Shapes for ', '')}\n`;
       
       if (cartItems.length > 0) {
@@ -369,6 +374,7 @@ export default function CategoryPage() {
         email: '',
         phone: '',
         companyName: '',
+        state: '',
         query: '',
         countryCode: '+91',
       });
@@ -737,6 +743,20 @@ export default function CategoryPage() {
                     onChange={handleChange}
                     className="flex h-9 w-full rounded-md border border-black/20 bg-white px-3 py-2 text-sm ring-offset-background placeholder:text-black/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     placeholder="Your Company"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="state" className="text-sm font-semibold text-black">
+                    State
+                  </label>
+                  <input
+                    type="text"
+                    id="state"
+                    name="state"
+                    value={formData.state}
+                    onChange={handleChange}
+                    className="flex h-9 w-full rounded-md border border-black/20 bg-white px-3 py-2 text-sm ring-offset-background placeholder:text-black/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="Your State"
                   />
                 </div>
               </div>

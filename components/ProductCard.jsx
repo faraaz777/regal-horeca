@@ -101,6 +101,11 @@ export default function ProductCard({ product, onAdd }) {
         </button>
       </div>
       <div className="p-3">
+        {product.brand && (
+          <div className="text-[10px] text-black/50 uppercase tracking-wide mb-1">
+            {product.brand}
+          </div>
+        )}
         <Link href={`/products/${product.slug}`}>
           <h3 className="text-xs md:text-sm font-medium text-black line-clamp-2">{productName}</h3>
         </Link>

@@ -157,6 +157,7 @@ export default function EnquiryDetailPage() {
   const customerEmail = customer.email || enquiry?.email || '';
   const customerPhone = customer.phone || enquiry?.phone || '';
   const customerCompany = customer.companyName || enquiry?.company || '';
+  const customerState = enquiry?.state || '';
 
   if (isLoading) {
     return (
@@ -216,6 +217,12 @@ export default function EnquiryDetailPage() {
                 <div>
                   <label className="text-sm text-gray-600">Company</label>
                   <div className="text-lg text-gray-900">{customerCompany}</div>
+                </div>
+              )}
+              {customerState && (
+                <div>
+                  <label className="text-sm text-gray-600">State</label>
+                  <div className="text-lg text-gray-900">{customerState}</div>
                 </div>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

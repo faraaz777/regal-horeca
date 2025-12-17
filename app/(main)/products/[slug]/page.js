@@ -90,7 +90,15 @@ export default function ProductDetailPage() {
   const isLiked = isInWishlist(productId);
   // Check if the specific variant (with selected color) is in cart
   const inCart = isInCart(productId, selectedColor);
-  const allImages = [product.heroImage, ...(product.gallery || [])].filter(Boolean);
+  
+  // Get images based on selected color variant, or default to product images
+  const getDisplayImages = () => {
+    if (selectedColor && selectedColor.images && selectedColor.images.length > 0) {
+      return selectedColor.images.filter(Boolean);
+    }
+    return [product.heroImage, ...(product.gallery || [])].filter(Boolean);
+  };
+  const allImages = getDisplayImages();
   
   // Get category for breadcrumbs
   const getCategoryPath = () => {
@@ -155,7 +163,12 @@ export default function ProductDetailPage() {
   };
 
   const handleColorSelect = (variant) => {
-    setSelectedColor(variant);
+    // Toggle: if clicking the same color, unselect it
+    if (selectedColor?.colorName === variant.colorName) {
+      setSelectedColor(null);
+    } else {
+      setSelectedColor(variant);
+    }
   };
 
   const formatPrice = (price) => {
@@ -234,6 +247,11 @@ export default function ProductDetailPage() {
 
           {/* Right Column: Product Info */}
           <div>
+            {product.brand && (
+              <div className="text-sm text-black/60 mb-2 uppercase tracking-wide font-medium">
+                {product.brand}
+              </div>
+            )}
             <h1 className="text-3xl sm:text-4xl font-bold text-black mb-4">{product.title}</h1>
 
             <div className="flex items-end gap-4 mb-8">

@@ -24,6 +24,7 @@ function EnquiryForm() {
     email: '',
     phone: '',
     company: '',
+    state: '',
     message: '',
     categories: categoryParam ? [categoryParam] : [],
   });
@@ -130,6 +131,9 @@ function EnquiryForm() {
       if (formData.company) {
         whatsappMessage += `Company: ${formData.company}\n`;
       }
+      if (formData.state) {
+        whatsappMessage += `State: ${formData.state}\n`;
+      }
       if (formData.categories && formData.categories.length > 0) {
         whatsappMessage += `Categories: ${formData.categories.join(', ')}\n`;
       }
@@ -157,6 +161,7 @@ function EnquiryForm() {
         email: '',
         phone: '',
         company: '',
+        state: '',
         message: '',
         categories: categoryParam ? [categoryParam] : [],
       });
@@ -253,6 +258,22 @@ function EnquiryForm() {
                     onChange={handleChange}
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition hover:border-gray-400"
                     placeholder="Enter your company name"
+                  />
+                </div>
+
+                {/* State */}
+                <div>
+                  <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-2">
+                    State (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    id="state"
+                    name="state"
+                    value={formData.state}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition hover:border-gray-400"
+                    placeholder="Enter your state"
                   />
                 </div>
 

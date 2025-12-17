@@ -48,6 +48,7 @@ export default function Header() {
   const [dropdownLeft, setDropdownLeft] = useState(0);
   const [activeDepartment, setActiveDepartment] = useState(null);
   const [departmentDropdownLeft, setDepartmentDropdownLeft] = useState(0);
+  const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
 
   const productsMenuRef = useRef(null);
   const departmentMenuRefs = useRef({});
@@ -241,6 +242,8 @@ export default function Header() {
             departmentDropdownLeft={departmentDropdownLeft}
             setDepartmentDropdownLeft={setDepartmentDropdownLeft}
             products={products}
+            isMoreDropdownOpen={isMoreDropdownOpen}
+            setIsMoreDropdownOpen={setIsMoreDropdownOpen}
           />
         </div>
       </header>
@@ -379,6 +382,8 @@ function DesktopHeaderTopRow({
     activeDepartment,
     setActiveDepartment,
     products,
+    isMoreDropdownOpen,
+    setIsMoreDropdownOpen,
   }) {
     if (!departments.length) return null;
   
@@ -387,16 +392,37 @@ function DesktopHeaderTopRow({
     const hasActiveChildren =
       activeDept && activeDept.children && activeDept.children.length > 0;
   
+    // More dropdown links
+    const moreLinks = [
+      { name: 'Contact', href: '/contact' },
+      { name: "FAQ's", href: '/faq' },
+      { name: 'Enquiry', href: '/enquiry' },
+    ];
+  
     return (
       <div className="hidden lg:block">
         <hr className="absolute left-0 w-full border-black/20" />
   
         <div
           className="relative w-full mx-auto "
-          onMouseLeave={() => setActiveDepartment(null)}
+          onMouseLeave={() => {
+            setActiveDepartment(null);
+            setIsMoreDropdownOpen(false);
+          }}
         >
           <nav className="px-4">
             <div className="flex items-center justify-center gap-6 xl:gap-8 w-full ">
+              {/* Home Link */}
+              <Link
+                href="/"
+                className="text-md font-medium text-black hover:text-accent whitespace-nowrap transition-colors duration-300 ease-out py-3 relative group"
+              >
+                <span className="relative inline-block">
+                  Home
+                  <span className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-accent transition-all duration-300 ease-out group-hover:w-full group-hover:left-1/2 group-hover:-translate-x-1/2"></span>
+                </span>
+              </Link>
+
               {departments.map((dept) => {
                 const id = dept._id || dept.id;
                 const hasChildren = dept.children && dept.children.length > 0;
@@ -442,6 +468,46 @@ function DesktopHeaderTopRow({
                   <span className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-accent transition-all duration-300 ease-out group-hover:w-full group-hover:left-1/2 group-hover:-translate-x-1/2"></span>
                 </span>
               </Link>
+
+              {/* More Dropdown */}
+              <div
+                className="relative"
+                onMouseEnter={() => setIsMoreDropdownOpen(true)}
+                onMouseLeave={() => setIsMoreDropdownOpen(false)}
+              >
+                <button
+                  className="text-md font-medium text-black hover:text-accent whitespace-nowrap transition-colors duration-300 ease-out flex items-center gap-1.5 group py-3 relative"
+                >
+                  <span className="relative inline-block">
+                    More
+                    <span className={`absolute bottom-0 left-1/2 h-0.5 bg-accent transition-all duration-300 ease-out ${
+                      isMoreDropdownOpen ? 'w-full left-1/2 -translate-x-1/2' : 'w-0 group-hover:w-full group-hover:left-1/2 group-hover:-translate-x-1/2'
+                    }`}></span>
+                  </span>
+                  <ChevronDownIcon
+                    className={`w-3 h-3 transition-transform duration-300 ease-out ${
+                      isMoreDropdownOpen ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+
+                {/* More Dropdown Menu */}
+                {isMoreDropdownOpen && (
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white border border-black/10 rounded-lg shadow-lg z-50 min-w-[180px] overflow-hidden">
+                    <div className="py-2">
+                      {moreLinks.map((link) => (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          className="block px-4 py-2 text-sm text-black hover:bg-black/5 hover:text-accent transition-colors"
+                        >
+                          {link.name}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </nav>
   
@@ -505,7 +571,7 @@ function DesktopHeaderTopRow({
                   </div>
   
                   {/* Featured Products Section */}
-                  <div className="w-full lg:w-[32%] border-t lg:border-t-0 lg:border-l border-black/10 pt-6 lg:pt-0 lg:pl-6 transition-opacity duration-700 md:duration-1000 ease-out">
+                  <div className="w-full lg:w-[32%] border-t lg:border-t-0 lg:border-l border-black/10 pt-6 lg:pt-0 lg:pl-8 transition-opacity duration-700 md:duration-1000 ease-out">
                     <FeaturedProductsSection
                       department={activeDept}
                       products={products}
@@ -573,7 +639,7 @@ function DesktopHeaderTopRow({
     };
   
     return (
-      <div className="w-full lg:w-auto lg:min-w-[260px] lg:max-w-[420px]">
+      <div className="w-full lg:w-auto lg:min-w-[260px] lg:max-w-[320px]">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-black mb-4">
           Featured
         </h3>

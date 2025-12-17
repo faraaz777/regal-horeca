@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 
 /**
@@ -10,6 +10,11 @@ import Image from 'next/image';
  */
 export default function ProductGallery({ images, title, isPremium = false, featured = false }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
+
+  // Reset to first image when images change (e.g., when color variant is selected)
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [images]);
 
   if (!images || images.length === 0) {
     return null;

@@ -130,7 +130,7 @@ export default function AdminBusinessTypesPage() {
       )}
 
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Manage Business Types</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Manage Business Types</h1>
         <button
           type="button"
           onClick={handleAddBusinessType}

@@ -15,9 +15,11 @@
 
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import useSWR from 'swr';
+import { Menu, X } from 'lucide-react';
 
 // SWR fetcher for enquiry counts
 const fetcher = async (url) => {
@@ -30,6 +32,15 @@ const fetcher = async (url) => {
 
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
+  // Sidebar closed by default on mobile, open on desktop
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  // Set sidebar open on desktop by default
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsSidebarOpen(window.innerWidth >= 1024);
+    }
+  }, []);
 
   // Fetch new enquiries count
   const { data: enquiriesData } = useSWR(
@@ -42,6 +53,10 @@ export default function AdminLayout({ children }) {
   );
 
   const newEnquiriesCount = enquiriesData?.statusCounts?.new || 0;
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
 
   const navLinkClass = (isActive) =>
     `block w-full text-left px-4 py-3 rounded-lg text-base font-medium transition-colors ${
@@ -58,13 +73,63 @@ export default function AdminLayout({ children }) {
     }`;
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      <aside className="w-64 bg-secondary text-white flex flex-col p-4">
-        <div className="py-4 px-2 mb-4">
-          <Link href="/admin/dashboard" className="block">
-            <span className="text-xs font-medium text-gray-400 tracking-[0.2em] uppercase">REGAL</span>
-            <h1 className="text-2xl font-bold text-white mt-1">Control Hub</h1>
-          </Link>
+    <div className="flex h-screen bg-gray-100 relative">
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={toggleSidebar}
+        />
+      )}
+
+      {/* Mobile Toggle Button */}
+      <button
+        onClick={toggleSidebar}
+        className="fixed top-4 left-4 z-50 lg:hidden bg-secondary text-white p-2 rounded-lg shadow-lg hover:bg-gray-700 transition-colors"
+        aria-label="Toggle sidebar"
+      >
+        {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
+      </button>
+
+      {/* Desktop Toggle Button (when sidebar is closed) */}
+      {!isSidebarOpen && (
+        <button
+          onClick={toggleSidebar}
+          className="hidden lg:block fixed top-4 left-4 z-50 bg-secondary text-white p-2 rounded-lg shadow-lg hover:bg-gray-700 transition-colors"
+          aria-label="Toggle sidebar"
+        >
+          <Menu size={24} />
+        </button>
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed lg:fixed inset-y-0 left-0 z-50 bg-secondary text-white flex flex-col p-4 w-64 transform transition-transform duration-300 ease-in-out ${
+          isSidebarOpen 
+            ? 'translate-x-0' 
+            : '-translate-x-full'
+        }`}
+      >
+        {/* Header with Toggle Button */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="py-4 px-2 flex-1">
+            <Link href="/admin/dashboard" className="block" onClick={() => {
+              // Close sidebar on mobile when clicking logo
+              if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                setIsSidebarOpen(false);
+              }
+            }}>
+              <span className="text-xs font-medium text-gray-400 tracking-[0.2em] uppercase">REGAL</span>
+              <h1 className="text-xl sm:text-2xl font-bold text-white mt-1">Control Hub</h1>
+            </Link>
+          </div>
+          <button
+            onClick={toggleSidebar}
+            className="lg:block text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-800 transition-colors"
+            aria-label="Toggle sidebar"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <nav className="flex-1 space-y-2">
@@ -112,8 +177,10 @@ export default function AdminLayout({ children }) {
         </nav>
 
       </aside>
-      <main className="flex-1 p-8 overflow-y-auto">
-        {children}
+      <main className={`flex-1 pt-16 sm:pt-6 lg:pt-8 p-4 sm:p-6 lg:p-8 overflow-y-auto transition-all duration-300 ${isSidebarOpen ? 'lg:ml-64' : 'lg:ml-0'}`}>
+        <div className="max-w-full">
+          {children}
+        </div>
       </main>
     </div>
   );

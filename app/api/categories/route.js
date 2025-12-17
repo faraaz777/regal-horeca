@@ -10,6 +10,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Category from '@/lib/models/Category';
+import { clearCategoryCache } from '@/lib/utils/categoryCache';
 
 /**
  * GET /api/categories
@@ -28,11 +29,15 @@ export async function GET(request) {
     const parentId = searchParams.get('parent');
 
     if (asTree) {
-      // Return as tree structure
+      // Return as tree structure (cached on client side via SWR)
       const tree = await Category.buildTree();
       return NextResponse.json({
         success: true,
         categories: tree,
+      }, {
+        headers: {
+          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        },
       });
     }
 
@@ -63,6 +68,10 @@ export async function GET(request) {
     return NextResponse.json({
       success: true,
       categories,
+    }, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+      },
     });
   } catch (error) {
     console.error('Error fetching categories:', error);
@@ -102,6 +111,9 @@ export async function POST(request) {
     // Create category
     const category = new Category(categoryData);
     await category.save();
+
+    // Clear category cache since structure changed
+    clearCategoryCache();
 
     return NextResponse.json({
       success: true,

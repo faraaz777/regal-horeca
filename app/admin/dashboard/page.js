@@ -23,63 +23,22 @@ const fetcher = async (url) => {
 };
 
 export default function AdminDashboardPage() {
-  const { categories, businessTypes } = useAppContext();
-  
-  // Fetch only statistics, not full product data
-  const { data: statsData, error: statsError, isLoading: statsLoading } = useSWR(
-    '/api/products?limit=1&skip=0', // Just to get total count
-    fetcher,
-    { revalidateOnFocus: false }
-  );
-  
-  // Fetch recent products (only 5)
-  const { data: recentProducts, isLoading: recentLoading } = useSWR(
-    '/api/products?limit=5&skip=0',
+  // Single unified API call instead of 5-6 separate calls
+  const { data: statsResponse, error: statsError, isLoading: statsLoading } = useSWR(
+    '/api/admin/stats',
     fetcher,
     { revalidateOnFocus: false }
   );
 
-  // Fetch featured products count
-  const { data: featuredData } = useSWR(
-    '/api/products?featured=true&limit=1&skip=0',
-    fetcher,
-    { revalidateOnFocus: false }
-  );
-
-  // Fetch status distribution
-  const { data: inStockData } = useSWR(
-    '/api/products?status=In Stock&limit=1&skip=0',
-    fetcher,
-    { revalidateOnFocus: false }
-  );
-
-  const { data: outOfStockData } = useSWR(
-    '/api/products?status=Out of Stock&limit=1&skip=0',
-    fetcher,
-    { revalidateOnFocus: false }
-  );
-
-  const stats = {
-    totalProducts: statsData?.total || 0,
-    totalCategories: categories?.length || 0,
-    totalBusinessTypes: businessTypes?.length || 0,
-    featuredProducts: featuredData?.total || 0,
-    inStockProducts: inStockData?.total || 0,
-    outOfStockProducts: outOfStockData?.total || 0,
-  };
-
-  // Calculate status distribution
-  const statusDistribution = {
-    'In Stock': stats.inStockProducts,
-    'Out of Stock': stats.outOfStockProducts,
-    'Pre-Order': stats.totalProducts - stats.inStockProducts - stats.outOfStockProducts,
-  };
+  const stats = statsResponse?.stats || {};
+  const recentProducts = statsResponse?.recentProducts || [];
+  const statusDistribution = stats.statusDistribution || {};
 
   const statCards = [
-    { name: 'Total Products', value: stats.totalProducts, link: '/admin/products', color: 'blue' },
-    { name: 'Total Categories', value: stats.totalCategories, link: '/admin/categories', color: 'green' },
-    { name: 'Business Types', value: stats.totalBusinessTypes, link: '/admin/business-types', color: 'purple' },
-    { name: 'Featured Products', value: stats.featuredProducts, link: '/admin/products', color: 'yellow' },
+    { name: 'Total Products', value: stats.totalProducts || 0, link: '/admin/products', color: 'blue' },
+    { name: 'Total Categories', value: stats.totalCategories || 0, link: '/admin/categories', color: 'green' },
+    { name: 'Business Types', value: stats.totalBusinessTypes || 0, link: '/admin/business-types', color: 'purple' },
+    { name: 'Featured Products', value: stats.featuredProducts || 0, link: '/admin/products', color: 'yellow' },
   ];
 
   const quickActions = [
@@ -90,9 +49,9 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-        <div className="text-sm text-gray-500">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Dashboard</h1>
+        <div className="text-xs sm:text-sm text-gray-500">
           Last updated: {new Date().toLocaleTimeString()}
         </div>
       </div>
@@ -122,14 +81,14 @@ export default function AdminDashboardPage() {
               View All
             </Link>
           </div>
-          {recentLoading ? (
+          {statsLoading ? (
             <div className="text-center py-8 text-gray-500">
               <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
               <p className="mt-2">Loading...</p>
             </div>
-          ) : recentProducts?.success && recentProducts.products?.length > 0 ? (
+          ) : recentProducts && recentProducts.length > 0 ? (
             <div className="space-y-3">
-              {recentProducts.products.slice(0, 5).map((product) => (
+              {recentProducts.map((product) => (
                 <Link
                   key={product._id || product.id}
                   href={`/admin/products`}
@@ -186,12 +145,13 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Status Distribution Chart (Simple) */}
-      {stats.totalProducts > 0 && (
+      {(stats.totalProducts || 0) > 0 && (
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-xl font-bold text-gray-800 mb-4">Product Status Distribution</h2>
           <div className="space-y-3">
             {Object.entries(statusDistribution).map(([status, count]) => {
-              const percentage = stats.totalProducts > 0 ? (count / stats.totalProducts) * 100 : 0;
+              const total = stats.totalProducts || 0;
+              const percentage = total > 0 ? (count / total) * 100 : 0;
               return (
                 <div key={status} className="flex items-center gap-4">
                   <div className="w-24 text-sm text-gray-600">{status}</div>

@@ -90,8 +90,8 @@ export default function AdminEnquiriesPage() {
     getEnquiriesUrl(currentPage, searchTerm, statusFilter, priorityFilter),
     fetcher,
     {
-      revalidateOnFocus: true,
-      refreshInterval: 30000, // Refresh every 30 seconds
+      revalidateOnFocus: false, // Disable auto-refresh on focus
+      refreshInterval: 120000, // Refresh every 2 minutes (was 30s)
     }
   );
 
@@ -138,8 +138,8 @@ export default function AdminEnquiriesPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Customer Enquiries</h1>
-          <p className="text-gray-600 mt-1">Manage and respond to customer enquiries</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Customer Enquiries</h1>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">Manage and respond to customer enquiries</p>
         </div>
       </div>
 

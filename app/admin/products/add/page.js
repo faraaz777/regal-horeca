@@ -72,14 +72,14 @@ export default function AdminAddProductPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto w-full">
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 text-sm sm:text-base">
           {error}
         </div>
       )}
       
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Add New Product</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">Add New Product</h1>
       <ProductForm 
         product={null}
         allProducts={products}

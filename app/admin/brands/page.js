@@ -342,7 +342,7 @@ export default function AdminBrandsPage() {
       )}
       
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Manage Brands</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Manage Brands</h1>
         <div className="flex items-center gap-3">
           {brandTree.length > 0 && (
             <>

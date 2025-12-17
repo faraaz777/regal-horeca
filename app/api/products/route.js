@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
 import { generateUniqueSlug } from '@/lib/utils/slug';
+import { getCategoryIdsWithChildren } from '@/lib/utils/categoryCache';
 
 /**
  * GET /api/products
@@ -40,21 +41,10 @@ export async function GET(request) {
     const query = {};
     const andConditions = [];
 
-    // Category filter
+    // Category filter - use cached category tree
     if (categorySlug) {
-      const Category = (await import('@/lib/models/Category')).default;
-      const category = await Category.findOne({ slug: categorySlug });
-      if (category) {
-        // Get all subcategories recursively
-        const getAllSubcategoryIds = async (parentId) => {
-          const children = await Category.find({ parent: parentId });
-          let ids = [parentId];
-          for (const child of children) {
-            ids = ids.concat(await getAllSubcategoryIds(child._id));
-          }
-          return ids;
-        };
-        const categoryIds = await getAllSubcategoryIds(category._id);
+      const categoryIds = await getCategoryIdsWithChildren(categorySlug);
+      if (categoryIds.length > 0) {
         andConditions.push({
           $or: [
             { categoryId: { $in: categoryIds } },
@@ -114,6 +104,10 @@ export async function GET(request) {
       total,
       limit,
       skip,
+    }, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+      },
     });
   } catch (error) {
     console.error('Error fetching products:', error);

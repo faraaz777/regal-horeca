@@ -309,7 +309,8 @@ export default function AdminCategoriesPage() {
 
     return (
       <>
-        <tr className="bg-white hover:bg-gray-50 transition-colors">
+        {/* Desktop Table Row */}
+        <tr className="bg-white hover:bg-gray-50 transition-colors hidden md:table-row">
           <td 
             className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 cursor-pointer"
             style={{ paddingLeft: `${1.5 + level * 2}rem` }}
@@ -357,6 +358,64 @@ export default function AdminCategoriesPage() {
             </button>
           </td>
         </tr>
+        
+        {/* Mobile Card */}
+        <div className="md:hidden bg-white border-b border-gray-200 p-4 hover:bg-gray-50 transition-colors">
+          <div 
+            className="flex items-start justify-between gap-3"
+            onClick={() => hasChildren && toggleCategory(categoryId)}
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                {hasChildren ? (
+                  <span className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0">
+                    {isExpanded ? (
+                      <ChevronDownIcon className="w-4 h-4" />
+                    ) : (
+                      <ChevronRightIcon className="w-4 h-4" />
+                    )}
+                  </span>
+                ) : (
+                  <span className="w-4 h-4 flex-shrink-0"></span>
+                )}
+                <span className={`text-sm font-medium text-gray-900 ${hasChildren ? 'font-semibold' : ''}`} style={{ paddingLeft: `${level * 0.75}rem` }}>
+                  {category.name}
+                </span>
+              </div>
+              <div className="text-xs text-gray-500 mb-1" style={{ paddingLeft: `${(level + 1) * 0.75 + 1}rem` }}>
+                <span className="font-medium">Slug:</span> {category.slug}
+              </div>
+              <div className="text-xs text-gray-500 capitalize" style={{ paddingLeft: `${(level + 1) * 0.75 + 1}rem` }}>
+                <span className="font-medium">Level:</span> {category.level}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent row toggle
+                  handleEditCategory(category);
+                }} 
+                className="text-indigo-600 hover:text-indigo-900 p-2"
+                disabled={loading}
+                title="Edit category"
+              >
+                <EditIcon />
+              </button>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent row toggle
+                  handleDeleteCategory(categoryId);
+                }} 
+                className="text-red-600 hover:text-red-900 p-2"
+                disabled={loading}
+                title="Delete category"
+              >
+                <TrashIcon />
+              </button>
+            </div>
+          </div>
+        </div>
+        
         {hasChildren && isExpanded && Array.isArray(category.children) && category.children.map(child => (
           <CategoryRow key={getCategoryId(child) || (child._id || child.id)} category={child} level={level + 1} />
         ))}
@@ -367,26 +426,26 @@ export default function AdminCategoriesPage() {
   return (
     <div>
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 text-sm">
           {error}
         </div>
       )}
       
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Manage Categories</h1>
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Manage Categories</h1>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           {categoryTree.length > 0 && (
             <>
               <button 
                 onClick={() => expandAllCategories(categoryTree)} 
-                className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-md text-sm transition-colors"
+                className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-3 sm:px-4 rounded-md text-xs sm:text-sm transition-colors"
                 title="Expand all categories"
               >
                 Expand All
               </button>
               <button 
                 onClick={collapseAllCategories} 
-                className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-md text-sm transition-colors"
+                className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-3 sm:px-4 rounded-md text-xs sm:text-sm transition-colors"
                 title="Collapse all categories"
               >
                 Collapse All
@@ -395,41 +454,58 @@ export default function AdminCategoriesPage() {
           )}
           <button 
             onClick={handleAddCategory} 
-            className="bg-primary hover:bg-primary-700 text-white font-bold py-2 px-4 rounded-md flex items-center gap-2"
+            className="bg-primary hover:bg-primary-700 text-white font-bold py-2 px-3 sm:px-4 rounded-md flex items-center gap-2 text-sm sm:text-base"
           >
-            <PlusIcon /> Add Category
+            <PlusIcon /> <span className="hidden sm:inline">Add Category</span><span className="sm:hidden">Add</span>
           </button>
         </div>
       </div>
       
       <div className="bg-white shadow-md rounded-lg overflow-hidden">
         {isLoadingCategories ? (
-          <div className="px-6 py-8 text-center text-gray-500">
+          <div className="px-4 sm:px-6 py-8 text-center text-gray-500 text-sm sm:text-base">
             Loading categories...
           </div>
         ) : (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Slug</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Level</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Slug</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Level</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {categoryTree.map(cat => (
+                    <CategoryRow key={cat._id || cat.id} category={cat} level={0} />
+                  ))}
+                  {categoryTree.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                        No categories found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Mobile Card View */}
+            <div className="md:hidden divide-y divide-gray-200">
               {categoryTree.map(cat => (
                 <CategoryRow key={cat._id || cat.id} category={cat} level={0} />
               ))}
               {categoryTree.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
-                    No categories found
-                  </td>
-                </tr>
+                <div className="px-4 py-8 text-center text-gray-500 text-sm">
+                  No categories found
+                </div>
               )}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -515,46 +591,46 @@ function CategoryForm({ category, allCategories, onSave, onClose, loading }) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
-          <div className="p-6 border-b">
-            <h2 className="text-2xl font-bold">
+          <div className="p-4 sm:p-6 border-b">
+            <h2 className="text-xl sm:text-2xl font-bold">
               {category ? 'Edit Category' : 'Create New Category'}
             </h2>
           </div>
-          <div className="p-6 space-y-4">
+          <div className="p-4 sm:p-6 space-y-4">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
                 {error}
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium">Name *</label>
+              <label className="block text-sm font-medium mb-1">Name *</label>
               <input 
                 name="name" 
                 value={formData.name || ''} 
                 onChange={handleChange} 
-                className="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm" 
+                className="w-full mt-1 p-2.5 sm:p-2 border border-gray-300 rounded-md shadow-sm text-base" 
                 required 
               />
             </div>
             <div>
-              <label className="block text-sm font-medium">Slug (URL)</label>
+              <label className="block text-sm font-medium mb-1">Slug (URL)</label>
               <input 
                 name="slug" 
                 value={formData.slug || ''} 
                 onChange={handleChange} 
                 placeholder="auto-generated-if-left-blank" 
-                className="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm" 
+                className="w-full mt-1 p-2.5 sm:p-2 border border-gray-300 rounded-md shadow-sm text-base" 
               />
             </div>
             <div>
-              <label className="block text-sm font-medium">Level</label>
+              <label className="block text-sm font-medium mb-1">Level</label>
               <select 
                 name="level" 
                 value={formData.level} 
                 onChange={handleChange} 
-                className="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm"
+                className="w-full mt-1 p-2.5 sm:p-2 border border-gray-300 rounded-md shadow-sm text-base"
               >
                 {levelOptions.map(level => (
                   <option key={level} value={level}>
@@ -565,14 +641,14 @@ function CategoryForm({ category, allCategories, onSave, onClose, loading }) {
             </div>
             {parentLevel && (
               <div>
-                <label className="block text-sm font-medium">
+                <label className="block text-sm font-medium mb-1">
                   Parent {parentLevel.charAt(0).toUpperCase() + parentLevel.slice(1)}
                 </label>
                 <select 
                   name="parent" 
                   value={formData.parent?._id || formData.parent || ''} 
                   onChange={handleChange} 
-                  className="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm"
+                  className="w-full mt-1 p-2.5 sm:p-2 border border-gray-300 rounded-md shadow-sm text-base"
                 >
                   <option value="">Select a parent</option>
                   {parentOptions.map(p => (
@@ -584,27 +660,27 @@ function CategoryForm({ category, allCategories, onSave, onClose, loading }) {
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium">Tagline</label>
+              <label className="block text-sm font-medium mb-1">Tagline</label>
               <input 
                 name="tagline" 
                 value={formData.tagline || ''} 
                 onChange={handleChange} 
-                className="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm" 
+                className="w-full mt-1 p-2.5 sm:p-2 border border-gray-300 rounded-md shadow-sm text-base" 
               />
             </div>
           </div>
-          <div className="flex justify-end gap-4 p-4 border-t bg-gray-50">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 p-4 border-t bg-gray-50">
             <button 
               type="button" 
               onClick={onClose} 
-              className="px-6 py-2 bg-gray-200 text-gray-700 rounded-md font-semibold hover:bg-gray-300"
+              className="w-full sm:w-auto px-6 py-2.5 sm:py-2 bg-gray-200 text-gray-700 rounded-md font-semibold hover:bg-gray-300 text-base"
               disabled={loading}
             >
               Cancel
             </button>
             <button 
               type="submit" 
-              className="px-6 py-2 bg-primary text-white rounded-md font-semibold hover:bg-primary-700"
+              className="w-full sm:w-auto px-6 py-2.5 sm:py-2 bg-primary text-white rounded-md font-semibold hover:bg-primary-700 text-base"
               disabled={loading}
             >
               {loading ? 'Saving...' : 'Save Category'}

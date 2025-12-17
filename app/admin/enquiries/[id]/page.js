@@ -192,8 +192,8 @@ export default function EnquiryDetailPage() {
             <ChevronLeftIcon className="w-6 h-6" />
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">Enquiry Details</h1>
-            <p className="text-gray-600 mt-1">ID: {enquiryId}</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Enquiry Details</h1>
+            <p className="text-gray-600 mt-1 text-sm sm:text-base">ID: {enquiryId}</p>
           </div>
         </div>
       </div>

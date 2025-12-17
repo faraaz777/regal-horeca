@@ -57,11 +57,12 @@ export function AppProvider({ children }) {
     }
   }, []);
 
-  // Fetch products from API
+  // Fetch products from API - reduced limit for better performance
   useEffect(() => {
     async function fetchProducts() {
       try {
-        const response = await fetch('/api/products?limit=1000');
+        // Reduced limit from 1000 to 100 - use pagination when needed
+        const response = await fetch('/api/products?limit=100');
         const data = await response.json();
         if (data.success) {
           setProducts(data.products || []);
@@ -270,10 +271,10 @@ export function AppProvider({ children }) {
     }));
   };
 
-  // Refresh products from API
+  // Refresh products from API - reduced limit
   const refreshProducts = useCallback(async () => {
     try {
-      const response = await fetch('/api/products?limit=1000');
+      const response = await fetch('/api/products?limit=100');
       const data = await response.json();
       if (data.success) {
         setProducts(data.products || []);

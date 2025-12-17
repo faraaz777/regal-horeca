@@ -11,6 +11,7 @@
 
 import { NextResponse } from 'next/server';
 import { uploadToR2 } from '@/lib/utils/r2Upload';
+import { optimizeImage } from '@/lib/utils/imageOptimizer';
 
 export async function POST(request) {
   try {
@@ -51,8 +52,11 @@ export async function POST(request) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to R2
-    const publicUrl = await uploadToR2(buffer, file.name, folder);
+    // Optimize image before upload (550KB limit)
+    const optimizedBuffer = await optimizeImage(buffer);
+
+    // Upload optimized image to R2
+    const publicUrl = await uploadToR2(optimizedBuffer, file.name, folder);
 
     return NextResponse.json({
       success: true,

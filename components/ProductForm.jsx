@@ -2079,19 +2079,36 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
           </div>
           
           <div className="mt-6 pt-6 border-t">
-            <label className="block text-sm font-medium mb-2">Business Types (We Serve)</label>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-              {businessTypes.map(bt => (
-                <label key={bt._id || bt.id} className="flex items-center space-x-2 cursor-pointer p-2 border rounded hover:bg-gray-50">
-                  <input 
-                    type="checkbox" 
-                    checked={formData.businessTypeSlugs?.includes(bt.slug)} 
-                    onChange={() => handleBusinessTypeChange(bt.slug)} 
-                    className="h-4 w-4 rounded text-primary focus:ring-primary" 
-                  />
-                  <span className="text-sm">{bt.name}</span>
-                </label>
-              ))}
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-medium text-gray-700">Business Types (We Serve)</label>
+              <span className="text-xs text-gray-500">
+                {formData.businessTypeSlugs?.length || 0} selected
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {businessTypes.map(bt => {
+                const isSelected = formData.businessTypeSlugs?.includes(bt.slug);
+                return (
+                  <label 
+                    key={bt._id || bt.id} 
+                    className={`inline-flex items-center gap-2 cursor-pointer px-3 py-2 border-2 rounded-lg transition-all whitespace-nowrap ${
+                      isSelected 
+                        ? 'border-primary bg-primary/5 shadow-sm' 
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <input 
+                      type="checkbox" 
+                      checked={isSelected} 
+                      onChange={() => handleBusinessTypeChange(bt.slug)} 
+                      className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300 flex-shrink-0" 
+                    />
+                    <span className={`text-sm ${isSelected ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
+                      {bt.name}
+                    </span>
+                  </label>
+                );
+              })}
             </div>
           </div>
         </FormSection>

@@ -397,15 +397,14 @@ export default function ProductDetailPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 text-sm">
               <div className="flex items-center gap-3 text-black/70">
-                <div className="p-2 bg-black/5 rounded-full text-accent"><Truck size={18} /></div>
-                <span>Free shipping on orders over ₹500</span>
+                <div className="p-2 bg-black/5 rounded-full text-accent"><ShieldCheck size={18} /></div>
+                <span>Built to perform</span>
               </div>
               <div className="flex items-center gap-3 text-black/70">
                 <div className="p-2 bg-black/5 rounded-full text-accent"><ShieldCheck size={18} /></div>
-                <span>Lifetime warranty on manufacturing</span>
+                <span>Crafted to last</span>
               </div>
             </div>
-
             {/* Tabs */}
             <div>
               <div className="flex border-b border-black/10 mb-6">

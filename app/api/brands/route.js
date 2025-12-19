@@ -11,6 +11,10 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Brand from '@/lib/models/Brand';
 
+// Force dynamic rendering to prevent caching issues in production
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * GET /api/brands
  * Query parameters:
@@ -33,6 +37,12 @@ export async function GET(request) {
       return NextResponse.json({
         success: true,
         brands: tree,
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
       });
     }
 
@@ -63,6 +73,12 @@ export async function GET(request) {
     return NextResponse.json({
       success: true,
       brands,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
     });
   } catch (error) {
     console.error('Error fetching brands:', error);

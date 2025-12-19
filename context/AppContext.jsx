@@ -62,7 +62,13 @@ export function AppProvider({ children }) {
     async function fetchProducts() {
       try {
         // Reduced limit from 1000 to 100 - use pagination when needed
-        const response = await fetch('/api/products?limit=100');
+        // Add cache: 'no-store' to prevent caching in production
+        const response = await fetch('/api/products?limit=100', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        });
         const data = await response.json();
         if (data.success) {
           setProducts(data.products || []);
@@ -81,7 +87,12 @@ export function AppProvider({ children }) {
   useEffect(() => {
     async function fetchCategories() {
       try {
-        const response = await fetch('/api/categories?tree=true');
+        const response = await fetch('/api/categories?tree=true', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        });
         const data = await response.json();
         if (data.success) {
           // Flatten tree structure for easier access
@@ -109,7 +120,12 @@ export function AppProvider({ children }) {
   useEffect(() => {
     async function fetchBrands() {
       try {
-        const response = await fetch('/api/brands?tree=true');
+        const response = await fetch('/api/brands?tree=true', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        });
         const data = await response.json();
         if (data.success) {
           // Flatten tree structure for easier access

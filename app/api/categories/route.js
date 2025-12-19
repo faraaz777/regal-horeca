@@ -12,6 +12,10 @@ import { connectToDatabase } from '@/lib/db/connect';
 import Category from '@/lib/models/Category';
 import { clearCategoryCache } from '@/lib/utils/categoryCache';
 
+// Force dynamic rendering to prevent caching issues in production
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * GET /api/categories
  * Query parameters:
@@ -36,7 +40,9 @@ export async function GET(request) {
         categories: tree,
       }, {
         headers: {
-          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
         },
       });
     }
@@ -70,7 +76,9 @@ export async function GET(request) {
       categories,
     }, {
       headers: {
-        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
       },
     });
   } catch (error) {

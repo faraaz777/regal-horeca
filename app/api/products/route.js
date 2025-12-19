@@ -13,6 +13,10 @@ import Product from '@/lib/models/Product';
 import { generateUniqueSlug } from '@/lib/utils/slug';
 import { getCategoryIdsWithChildren } from '@/lib/utils/categoryCache';
 
+// Force dynamic rendering to prevent caching issues in production
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * GET /api/products
  * Query parameters:
@@ -140,7 +144,9 @@ export async function GET(request) {
       skip,
     }, {
       headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
       },
     });
   } catch (error) {

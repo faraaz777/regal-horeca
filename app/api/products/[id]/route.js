@@ -59,6 +59,37 @@ export async function GET(request, { params }) {
       );
     }
 
+    // Normalize filters (convert old object format to array format if needed)
+    if (product.filters && !Array.isArray(product.filters)) {
+      // Convert old object format {material: [], color: [], usage: []} to new array format
+      const oldFilters = product.filters;
+      product.filters = [];
+      if (oldFilters.material && Array.isArray(oldFilters.material) && oldFilters.material.length > 0) {
+        product.filters.push({ key: 'Material', values: oldFilters.material });
+      }
+      if (oldFilters.size && Array.isArray(oldFilters.size) && oldFilters.size.length > 0) {
+        product.filters.push({ key: 'Size', values: oldFilters.size });
+      }
+      if (oldFilters.color && Array.isArray(oldFilters.color) && oldFilters.color.length > 0) {
+        product.filters.push({ key: 'Color', values: oldFilters.color });
+      }
+      if (oldFilters.usage && Array.isArray(oldFilters.usage) && oldFilters.usage.length > 0) {
+        product.filters.push({ key: 'Usage', values: oldFilters.usage });
+      }
+      // Handle any other keys
+      Object.keys(oldFilters).forEach(key => {
+        if (!['material', 'size', 'color', 'usage'].includes(key.toLowerCase()) && 
+            Array.isArray(oldFilters[key]) && oldFilters[key].length > 0) {
+          product.filters.push({ 
+            key: key.charAt(0).toUpperCase() + key.slice(1), 
+            values: oldFilters[key] 
+          });
+        }
+      });
+    } else if (!product.filters) {
+      product.filters = [];
+    }
+
     return NextResponse.json({
       success: true,
       product,
@@ -161,6 +192,45 @@ export async function PUT(request, { params }) {
       }
     }
     // If title didn't change, slug remains unchanged (not included in updateData)
+
+    // Normalize filters to array format if filters are being updated
+    if (updateData.filters !== undefined) {
+      if (!Array.isArray(updateData.filters)) {
+        // Convert old object format to new array format
+        const oldFilters = updateData.filters;
+        updateData.filters = [];
+        if (oldFilters.material && Array.isArray(oldFilters.material) && oldFilters.material.length > 0) {
+          updateData.filters.push({ key: 'Material', values: oldFilters.material });
+        }
+        if (oldFilters.size && Array.isArray(oldFilters.size) && oldFilters.size.length > 0) {
+          updateData.filters.push({ key: 'Size', values: oldFilters.size });
+        }
+        if (oldFilters.color && Array.isArray(oldFilters.color) && oldFilters.color.length > 0) {
+          updateData.filters.push({ key: 'Color', values: oldFilters.color });
+        }
+        if (oldFilters.usage && Array.isArray(oldFilters.usage) && oldFilters.usage.length > 0) {
+          updateData.filters.push({ key: 'Usage', values: oldFilters.usage });
+        }
+        // Handle any other keys
+        Object.keys(oldFilters).forEach(key => {
+          if (!['material', 'size', 'color', 'usage'].includes(key.toLowerCase()) && 
+              Array.isArray(oldFilters[key]) && oldFilters[key].length > 0) {
+            updateData.filters.push({ 
+              key: key.charAt(0).toUpperCase() + key.slice(1), 
+              values: oldFilters[key] 
+            });
+          }
+        });
+      } else {
+        // Ensure it's a valid array with proper structure
+        updateData.filters = updateData.filters
+          .filter(f => f && f.key && Array.isArray(f.values))
+          .map(f => ({
+            key: f.key.trim(),
+            values: f.values.filter(v => v && v.trim())
+          }));
+      }
+    }
 
     // Update product
     Object.assign(product, updateData);

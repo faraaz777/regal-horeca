@@ -85,6 +85,8 @@ export async function PUT(request, { params }) {
       priority,
       assignedTo,
       notes,
+      phone,
+      userType,
     } = body;
 
     // Build update object
@@ -93,6 +95,8 @@ export async function PUT(request, { params }) {
     if (priority !== undefined) updateData.priority = priority;
     if (assignedTo !== undefined) updateData.assignedTo = assignedTo;
     if (notes !== undefined) updateData.notes = notes;
+    if (phone !== undefined) updateData.phone = phone;
+    if (userType !== undefined) updateData.userType = userType;
 
     // Update enquiry
     const enquiry = await Enquiry.findByIdAndUpdate(

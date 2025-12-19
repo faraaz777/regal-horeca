@@ -369,6 +369,8 @@ export default function CategoryPage() {
         message: formData.query,
         categories: allCategories,
         cartItems: includeCart && cartItems.length > 0 ? cartItems : [],
+        source: 'whom-we-serve', // Specific source for "whom we serve" pages
+        userType: 'business', // This is a "whom we serve" page, so default to business
       };
 
       const response = await fetch('/api/enquiries', {

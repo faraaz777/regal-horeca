@@ -247,14 +247,17 @@ export default function AdminEnquiriesPage() {
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Enquiry ID
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Customer
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Categories
+                      User Type
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Type
-                    </th>
+                    {/* Source column removed - not used in business logic */}
+                    {/* Categories column hidden from display */}
+                    {/* Type column hidden from display */}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
@@ -276,8 +279,21 @@ export default function AdminEnquiriesPage() {
                     const customerEmail = customer.email || enquiry.email || '';
                     const customerPhone = customer.phone || enquiry.phone || '';
                     
+                    const userTypeBadge = enquiry.userType === 'business' 
+                      ? 'bg-green-100 text-green-800' 
+                      : enquiry.userType === 'customer'
+                      ? 'bg-blue-100 text-blue-800'
+                      : 'bg-gray-100 text-gray-800';
+
                     return (
                       <tr key={enquiry._id} className="hover:bg-gray-50">
+                        {/* Enquiry ID */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-mono font-medium text-gray-900">
+                            {enquiry.enquiryId || enquiry._id.toString().slice(-8)}
+                          </div>
+                        </td>
+                        {/* Customer */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex flex-col">
                             <div className="text-sm font-medium text-gray-900">{customerName}</div>
@@ -297,35 +313,15 @@ export default function AdminEnquiriesPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900">
-                            {enquiry.categories && enquiry.categories.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {enquiry.categories.slice(0, 2).map((cat, idx) => (
-                                  <span key={idx} className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">
-                                    {cat}
-                                  </span>
-                                ))}
-                                {enquiry.categories.length > 2 && (
-                                  <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">
-                                    +{enquiry.categories.length - 2}
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
-                          </div>
-                        </td>
+                        {/* User Type */}
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-gray-900">
-                            {enquiry.type === 'cart + enquiry' ? (
-                              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">Cart + Enquiry</span>
-                            ) : (
-                              <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">Enquiry Only</span>
-                            )}
+                          <span className={`px-2 py-1 text-xs font-medium rounded ${userTypeBadge}`}>
+                            {enquiry.userType === 'business' ? 'Business' : enquiry.userType === 'customer' ? 'Customer' : 'Unknown'}
                           </span>
                         </td>
+                        {/* Source column removed - not used in business logic */}
+                        {/* Categories column hidden from display */}
+                        {/* Type column hidden from display */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <StatusBadge status={enquiry.status} />
                         </td>

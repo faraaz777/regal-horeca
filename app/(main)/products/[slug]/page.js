@@ -8,12 +8,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { HeartIcon, PlusIcon, MinusIcon,WhatsAppIcon,ShoppingCartIcon } from '@/components/Icons';
 import { ArrowRight, Check, Truck, ShieldCheck, Share2 } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { getWhatsAppBusinessLink } from '@/lib/utils/whatsapp';
+import { useEnquiry, createEnquiryAndRedirect } from '@/lib/hooks/useEnquiry';
+import LightCaptureModal from '@/components/LightCaptureModal';
 import ProductCard from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 import ProductGallery from '@/components/ProductGallery';
@@ -22,13 +24,22 @@ import toast from 'react-hot-toast';
 
 export default function ProductDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const { slug } = params;
   const { isInWishlist, addToWishlist, removeFromWishlist, addToCart, removeFromCart, isInCart, products, loading: contextLoading, categories } = useAppContext();
+  const { handleEnquiry } = useEnquiry();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState('description');
   const [selectedColor, setSelectedColor] = useState(null);
+  const [showCaptureModal, setShowCaptureModal] = useState(false);
+  const [pendingEnquiry, setPendingEnquiry] = useState(null);
+
+  // Detect if this is a business context (from URL param or product has businessTypeSlugs)
+  const isBusinessContext = searchParams?.get('business') || 
+    (product?.businessTypeSlugs && product.businessTypeSlugs.length > 0);
+  const defaultUserType = isBusinessContext ? 'business' : 'unknown';
 
   useEffect(() => {
     async function fetchProduct() {
@@ -162,9 +173,50 @@ export default function ProductDetailPage() {
   };
 
   const handleBuyNow = () => {
-    const message = `Hello! I'm interested in purchasing:\n\n${product.title}\nQuantity: ${quantity}\n${selectedColor ? `Color: ${selectedColor.colorName}\n` : ''}Price: ${formatPrice(product.price)}\n\nPlease proceed with the order.`;
-    const whatsappUrl = getWhatsAppBusinessLink(message);
-    window.open(whatsappUrl, '_blank');
+    // Use new enquiry flow instead of direct WhatsApp
+    handleEnquiry({
+      source: 'product-detail',
+      defaultUserType: defaultUserType,
+      products: [{
+        productId: productId,
+        productName: product.title,
+        quantity: quantity,
+        color: selectedColor?.colorName,
+      }],
+      onShowCapture: (data) => {
+        setPendingEnquiry(data);
+        setShowCaptureModal(true);
+      },
+    });
+  };
+
+  const handleEnquire = () => {
+    handleEnquiry({
+      source: 'product-detail',
+      defaultUserType: defaultUserType,
+      products: [{
+        productId: productId,
+        productName: product.title,
+        quantity: quantity,
+        color: selectedColor?.colorName,
+      }],
+      onShowCapture: (data) => {
+        setPendingEnquiry(data);
+        setShowCaptureModal(true);
+      },
+    });
+  };
+
+  const handleCaptureSubmit = async ({ phone, name, userType }) => {
+    if (pendingEnquiry) {
+      await createEnquiryAndRedirect({
+        ...pendingEnquiry,
+        phone,
+        name,
+        userType,
+      });
+      setPendingEnquiry(null);
+    }
   };
 
   const handleQuantityChange = (delta) => {
@@ -354,13 +406,13 @@ export default function ProductDetailPage() {
                     <ArrowRight size={18} />
                   </button>
 
-                  {/* Buy Now */}
+                  {/* Enquire */}
                   <button 
-                    onClick={handleBuyNow}
+                    onClick={handleEnquire}
                     className="flex-1 sm:flex-[0.5] border-2 border-green-400 text-green-400 hover:bg-green-400 hover:text-white font-bold py-3 px-6 rounded-md transition-colors flex items-center justify-center gap-2"
                   >
                     <span className="transition-colors"><WhatsAppIcon size={18}  /></span>
-                    <span className="text-base">Buy Now</span>
+                    <span className="text-base">Enquire</span>
                     <ArrowRight size={18} />
                   </button>
 
@@ -496,6 +548,17 @@ export default function ProductDetailPage() {
       </main>
 
       <AiAssistant productContext={productContextString} />
+
+      {/* Light Capture Modal */}
+      <LightCaptureModal
+        isOpen={showCaptureModal}
+        onClose={() => {
+          setShowCaptureModal(false);
+          setPendingEnquiry(null);
+        }}
+        onSubmit={handleCaptureSubmit}
+        defaultUserType={defaultUserType}
+      />
     </div>
   );
 }

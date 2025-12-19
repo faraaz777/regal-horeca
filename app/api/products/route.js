@@ -86,7 +86,7 @@ export async function GET(request) {
     }
 
     // Execute query
-    const products = await Product.find(query)
+    let products = await Product.find(query)
       .populate('categoryId', 'name slug level')
       .populate('categoryIds', 'name slug level')
       .populate('brandCategoryId', 'name slug level')
@@ -95,6 +95,40 @@ export async function GET(request) {
       .limit(limit)
       .skip(skip)
       .lean();
+
+    // Normalize filters for all products (convert old object format to array format)
+    products = products.map(product => {
+      if (product.filters && !Array.isArray(product.filters)) {
+        // Convert old object format {material: [], color: [], usage: []} to new array format
+        const oldFilters = product.filters;
+        product.filters = [];
+        if (oldFilters.material && Array.isArray(oldFilters.material) && oldFilters.material.length > 0) {
+          product.filters.push({ key: 'Material', values: oldFilters.material });
+        }
+        if (oldFilters.size && Array.isArray(oldFilters.size) && oldFilters.size.length > 0) {
+          product.filters.push({ key: 'Size', values: oldFilters.size });
+        }
+        if (oldFilters.color && Array.isArray(oldFilters.color) && oldFilters.color.length > 0) {
+          product.filters.push({ key: 'Color', values: oldFilters.color });
+        }
+        if (oldFilters.usage && Array.isArray(oldFilters.usage) && oldFilters.usage.length > 0) {
+          product.filters.push({ key: 'Usage', values: oldFilters.usage });
+        }
+        // Handle any other keys
+        Object.keys(oldFilters).forEach(key => {
+          if (!['material', 'size', 'color', 'usage'].includes(key.toLowerCase()) && 
+              Array.isArray(oldFilters[key]) && oldFilters[key].length > 0) {
+            product.filters.push({ 
+              key: key.charAt(0).toUpperCase() + key.slice(1), 
+              values: oldFilters[key] 
+            });
+          }
+        });
+      } else if (!product.filters) {
+        product.filters = [];
+      }
+      return product;
+    });
 
     const total = await Product.countDocuments(query);
 
@@ -198,12 +232,43 @@ export async function POST(request) {
     if (!productData.status) {
       productData.status = 'In Stock';
     }
+    // Normalize filters to array format
     if (!productData.filters) {
-      productData.filters = {
-        material: [],
-        color: [],
-        usage: [],
-      };
+      productData.filters = [];
+    } else if (!Array.isArray(productData.filters)) {
+      // Convert old object format {material: [], color: [], usage: []} to new array format
+      const oldFilters = productData.filters;
+      productData.filters = [];
+      if (oldFilters.material && Array.isArray(oldFilters.material) && oldFilters.material.length > 0) {
+        productData.filters.push({ key: 'Material', values: oldFilters.material });
+      }
+      if (oldFilters.size && Array.isArray(oldFilters.size) && oldFilters.size.length > 0) {
+        productData.filters.push({ key: 'Size', values: oldFilters.size });
+      }
+      if (oldFilters.color && Array.isArray(oldFilters.color) && oldFilters.color.length > 0) {
+        productData.filters.push({ key: 'Color', values: oldFilters.color });
+      }
+      if (oldFilters.usage && Array.isArray(oldFilters.usage) && oldFilters.usage.length > 0) {
+        productData.filters.push({ key: 'Usage', values: oldFilters.usage });
+      }
+      // Handle any other keys
+      Object.keys(oldFilters).forEach(key => {
+        if (!['material', 'size', 'color', 'usage'].includes(key.toLowerCase()) && 
+            Array.isArray(oldFilters[key]) && oldFilters[key].length > 0) {
+          productData.filters.push({ 
+            key: key.charAt(0).toUpperCase() + key.slice(1), 
+            values: oldFilters[key] 
+          });
+        }
+      });
+    } else {
+      // Ensure it's a valid array with proper structure
+      productData.filters = productData.filters
+        .filter(f => f && f.key && Array.isArray(f.values))
+        .map(f => ({
+          key: f.key.trim(),
+          values: f.values.filter(v => v && v.trim())
+        }));
     }
     if (!productData.tags) {
       productData.tags = [];

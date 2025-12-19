@@ -22,53 +22,89 @@ export async function POST(request) {
     await connectToDatabase();
 
     const body = await request.json();
-    const { name, email, phone, company, state, categories, category, message, cartItems } = body;
+    const { 
+      name, 
+      email, 
+      phone, 
+      company, 
+      state, 
+      categories, 
+      category, 
+      message, 
+      cartItems,
+      source = 'website-form',
+      userType = 'unknown',
+      products = [],
+    } = body;
 
-    // Validate required fields
-    if (!name || !email || !phone) {
+    // Validate required fields - phone is minimum required
+    if (!phone) {
       return NextResponse.json(
-        { error: 'Name, email, and phone are required fields' },
+        { error: 'Phone number is required' },
         { status: 400 }
       );
     }
 
+    // For light capture flow, name and email are optional
+    // If not provided, use defaults
+    const enquiryName = name || 'Guest User';
+    const enquiryEmail = email || `${phone}@temp.regal-horeca.com`;
+
     // Handle backward compatibility: if category (singular) is provided, convert to categories array
     const categoriesArray = categories || (category ? [category] : []);
 
-    // Find or create customer
-    const customer = await Customer.findOrCreate({
-      name,
-      email,
-      phone,
-      companyName: company || '',
-    });
+    // Prepare cart items - use products array if cartItems not provided
+    const finalCartItems = cartItems && cartItems.length > 0 
+      ? cartItems 
+      : products.map(p => ({
+          productId: p.productId || p._id || p.id,
+          productName: p.productName || p.title || p.name || 'Product',
+          quantity: p.quantity || 1,
+        }));
+
+    // Find or create customer (only if name/email provided, otherwise skip)
+    let customer = null;
+    if (name && email) {
+      customer = await Customer.findOrCreate({
+        name: enquiryName,
+        email: enquiryEmail,
+        phone,
+        companyName: company || '',
+      });
+    }
 
     // Determine enquiry type
-    const hasCartItems = cartItems && cartItems.length > 0;
+    const hasCartItems = finalCartItems && finalCartItems.length > 0;
     const enquiryType = hasCartItems ? 'cart + enquiry' : 'enquiry only';
+
+    // Set priority: High for business enquiries from "whom we serve" pages
+    const priority = (source === 'whom-we-serve' && userType === 'business') 
+      ? 'high' 
+      : 'normal';
 
     // Create new enquiry
     const enquiry = new Enquiry({
-      customerId: customer._id,
-      name, // Keep for backward compatibility
-      email,
+      customerId: customer?._id || null,
+      name: enquiryName, // Keep for backward compatibility
+      email: enquiryEmail,
       phone,
       company: company || '',
       state: state || '',
-      source: 'website-form',
+      source: source,
+      userType: userType,
       type: enquiryType,
       categories: categoriesArray,
       message: message || '',
-      cartItems: cartItems || [], // Keep for backward compatibility
+      cartItems: finalCartItems || [], // Keep for backward compatibility
       status: 'new',
-      priority: 'normal',
+      priority: priority,
     });
 
     await enquiry.save();
 
     // Create EnquiryItem records for cart products
     if (hasCartItems) {
-      const enquiryItems = cartItems.map(item => ({
+      const enquiryItems = finalCartItems.map(item => ({
         enquiryId: enquiry._id,
         productId: item.productId,
         productName: item.productName,
@@ -83,6 +119,7 @@ export async function POST(request) {
       success: true,
       enquiry: {
         _id: enquiry._id,
+        enquiryId: enquiry.enquiryId,
         customerId: enquiry.customerId,
         name: enquiry.name,
         email: enquiry.email,
@@ -93,6 +130,8 @@ export async function POST(request) {
         cartItems: enquiry.cartItems,
         status: enquiry.status,
         type: enquiry.type,
+        source: enquiry.source,
+        userType: enquiry.userType,
         createdAt: enquiry.createdAt,
       },
     }, { status: 201 });

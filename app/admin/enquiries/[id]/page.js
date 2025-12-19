@@ -41,6 +41,10 @@ export default function EnquiryDetailPage() {
   const [priority, setPriority] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
   const [notes, setNotes] = useState('');
+  const [phone, setPhone] = useState('');
+  const [userType, setUserType] = useState('');
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [isEditingUserType, setIsEditingUserType] = useState(false);
   const [messageText, setMessageText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isAddingNote, setIsAddingNote] = useState(false);
@@ -67,6 +71,8 @@ export default function EnquiryDetailPage() {
       setPriority(enquiry.priority || 'normal');
       setAssignedTo(enquiry.assignedTo || '');
       setNotes(enquiry.notes || '');
+      setPhone(enquiry.phone || '');
+      setUserType(enquiry.userType || 'unknown');
     }
   }, [enquiry]);
 
@@ -83,6 +89,8 @@ export default function EnquiryDetailPage() {
           priority,
           assignedTo,
           notes,
+          phone,
+          userType,
         }),
       });
 
@@ -91,6 +99,8 @@ export default function EnquiryDetailPage() {
       }
 
       toast.success('Enquiry updated successfully');
+      setIsEditingPhone(false);
+      setIsEditingUserType(false);
       mutate();
     } catch (error) {
       toast.error('Failed to update enquiry');
@@ -237,17 +247,72 @@ export default function EnquiryDetailPage() {
                     </div>
                   </div>
                 )}
-                {customerPhone && (
-                  <div>
-                    <label className="text-sm text-gray-600">Phone</label>
+                <div>
+                  <label className="text-sm text-gray-600 flex items-center justify-between">
+                    <span>Phone</span>
+                    {!isEditingPhone && (
+                      <button
+                        onClick={() => setIsEditingPhone(true)}
+                        className="text-xs text-blue-600 hover:text-blue-700 underline"
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </label>
+                  {isEditingPhone ? (
+                    <div className="mt-1">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="tel"
+                          value={phone}
+                          onChange={(e) => {
+                            const digits = e.target.value.replace(/\D/g, '');
+                            if (digits.length <= 10) {
+                              setPhone(digits);
+                            }
+                          }}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter 10-digit phone number"
+                          maxLength={10}
+                        />
+                        <button
+                          onClick={() => {
+                            if (phone.length !== 10) {
+                              toast.error('Phone number must be exactly 10 digits');
+                              return;
+                            }
+                            setIsEditingPhone(false);
+                            handleSave();
+                          }}
+                          className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => {
+                            setPhone(enquiry?.phone || customerPhone || '');
+                            setIsEditingPhone(false);
+                          }}
+                          className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      {phone && phone.length !== 10 && (
+                        <p className="text-xs text-red-500 mt-1">
+                          Phone number must be exactly 10 digits
+                        </p>
+                      )}
+                    </div>
+                  ) : (
                     <div className="flex items-center gap-2">
                       <PhoneIcon className="w-4 h-4 text-gray-400" />
-                      <a href={`tel:${customerPhone}`} className="text-primary hover:underline">
-                        {customerPhone}
+                      <a href={`tel:${phone || customerPhone}`} className="text-primary hover:underline">
+                        {phone || customerPhone}
                       </a>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
               {enquiry.customerEnquiriesCount > 1 && (
                 <div className="pt-2 border-t border-gray-200">
@@ -304,6 +369,62 @@ export default function EnquiryDetailPage() {
                   <label className="text-sm text-gray-600">Source</label>
                   <div className="mt-1 text-gray-900 capitalize">{enquiry.source || 'website-form'}</div>
                 </div>
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 flex items-center justify-between">
+                  <span>User Type</span>
+                  {!isEditingUserType && (
+                    <button
+                      onClick={() => setIsEditingUserType(true)}
+                      className="text-xs text-blue-600 hover:text-blue-700 underline"
+                    >
+                      Edit
+                    </button>
+                  )}
+                </label>
+                {isEditingUserType ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    <select
+                      value={userType}
+                      onChange={(e) => setUserType(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="unknown">Unknown</option>
+                      <option value="customer">Customer</option>
+                      <option value="business">Business</option>
+                    </select>
+                    <button
+                      onClick={() => {
+                        setIsEditingUserType(false);
+                        handleSave();
+                      }}
+                      className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => {
+                        setUserType(enquiry?.userType || 'unknown');
+                        setIsEditingUserType(false);
+                      }}
+                      className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-1">
+                    <span className={`px-3 py-1 rounded-full text-sm ${
+                      userType === 'business' 
+                        ? 'bg-green-100 text-green-800' 
+                        : userType === 'customer'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {userType === 'business' ? '🏢 Business' : userType === 'customer' ? '👤 Customer' : '❓ Unknown'}
+                    </span>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-sm text-gray-600">Submitted</label>

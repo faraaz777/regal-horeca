@@ -7,16 +7,30 @@
 
 'use client';
 
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAppContext } from '@/context/AppContext';
 import { PlusIcon, MinusIcon, XIcon, WhatsAppIcon } from '@/components/Icons';
 import { getWhatsAppBusinessLink } from '@/lib/utils/whatsapp';
+import { useEnquiry, createEnquiryAndRedirect } from '@/lib/hooks/useEnquiry';
+import LightCaptureModal, { getSavedLeadProfile } from './LightCaptureModal';
 import toast from 'react-hot-toast';
 
 export default function CartDrawer({ isOpen, onClose }) {
   const { cart, products, loading, updateCartQuantity, removeFromCart, getCartTotalItems } = useAppContext();
+  const { handleEnquiry } = useEnquiry();
+  const [showCaptureModal, setShowCaptureModal] = useState(false);
+  const [pendingEnquiry, setPendingEnquiry] = useState(null);
+  const [savedProfile, setSavedProfile] = useState(null);
+
+  // Check for saved profile when drawer opens
+  useEffect(() => {
+    if (isOpen) {
+      const profile = getSavedLeadProfile();
+      setSavedProfile(profile);
+    }
+  }, [isOpen]);
 
   const cartItems = useMemo(() => {
     return cart.map(cartItem => {
@@ -49,24 +63,76 @@ export default function CartDrawer({ isOpen, onClose }) {
     }
   };
 
-  const handleWhatsAppCheckout = () => {
-    // Format cart items for WhatsApp message
-    let message = 'Hello! I would like to place an order:\n\n';
-    
-    cartItems.forEach((item, index) => {
-      const product = item.product;
-      const productName = product.title || product.name || 'Product';
-      const price = item.price || product.price || 0;
-      const colorInfo = item.selectedColor ? ` - Color: ${item.selectedColor.colorName}` : '';
-      message += `${index + 1}. ${productName}${colorInfo} (Qty: ${item.quantity}) - ${formatPrice(price)}\n`;
+  const handleWhatsAppCheckout = async () => {
+    const cartItemsForEnquiry = cartItems.map(item => ({
+      productId: item.productId,
+      productName: item.product.title || item.product.name || 'Product',
+      quantity: item.quantity,
+      color: item.selectedColor?.colorName,
+    }));
+
+    // If user has saved profile, skip modal and go directly to WhatsApp
+    if (savedProfile && savedProfile.phone) {
+      try {
+        await createEnquiryAndRedirect({
+          source: 'cart',
+          phone: savedProfile.phone,
+          name: savedProfile.name,
+          userType: savedProfile.userType || 'unknown',
+          cartItems: cartItemsForEnquiry,
+        });
+        onClose();
+      } catch (error) {
+        console.error('Error creating enquiry:', error);
+        toast.error('Failed to create enquiry. Please try again.');
+      }
+    } else {
+      // First-time user - show modal
+      handleEnquiry({
+        source: 'cart',
+        defaultUserType: 'unknown',
+        cartItems: cartItemsForEnquiry,
+        onShowCapture: (data) => {
+          setPendingEnquiry(data);
+          setShowCaptureModal(true);
+        },
+      });
+    }
+  };
+
+  const handleChangeInfo = () => {
+    const cartItemsForEnquiry = cartItems.map(item => ({
+      productId: item.productId,
+      productName: item.product.title || item.product.name || 'Product',
+      quantity: item.quantity,
+      color: item.selectedColor?.colorName,
+    }));
+
+    handleEnquiry({
+      source: 'cart',
+      defaultUserType: savedProfile?.userType || 'unknown',
+      cartItems: cartItemsForEnquiry,
+      onShowCapture: (data) => {
+        setPendingEnquiry(data);
+        setShowCaptureModal(true);
+      },
     });
-    
-    message += `\nTotal Items: ${totalItems}\nTotal: ${formatPrice(subtotal)}\n\nPlease confirm the order.`;
-    
-    // Generate WhatsApp link to business number
-    const whatsappUrl = getWhatsAppBusinessLink(message);
-    window.open(whatsappUrl, '_blank');
-    onClose();
+  };
+
+  const handleCaptureSubmit = async ({ phone, name, userType }) => {
+    if (pendingEnquiry) {
+      await createEnquiryAndRedirect({
+        ...pendingEnquiry,
+        phone,
+        name,
+        userType,
+      });
+      setPendingEnquiry(null);
+      // Refresh saved profile after submission
+      const profile = getSavedLeadProfile();
+      setSavedProfile(profile);
+      onClose();
+    }
   };
 
   const subtotal = useMemo(() => {
@@ -228,9 +294,8 @@ export default function CartDrawer({ isOpen, onClose }) {
                           )}
                         </div>
 
-                        {/* Quantity and Price Row */}
-                        <div className="flex items-center justify-between mt-2 sm:mt-3">
-                          {/* Quantity Controls */}
+                        {/* Quantity Controls */}
+                        <div className="flex items-center mt-2 sm:mt-3">
                           <div className="flex items-center border border-black/20 rounded-md">
                             <button
                               onClick={() => handleQuantityChange(productId, item.quantity - 1, item.selectedColor)}
@@ -252,18 +317,6 @@ export default function CartDrawer({ isOpen, onClose }) {
                             >
                               <PlusIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                             </button>
-                          </div>
-
-                          {/* Price */}
-                          <div className="text-right">
-                            <div className="text-xs sm:text-sm font-semibold text-black">
-                              {formatPrice(itemPrice)}
-                            </div>
-                            {isOnSale && (
-                              <div className="text-[10px] sm:text-xs text-black/50 line-through">
-                                {formatPrice(originalPrice)}
-                              </div>
-                            )}
                           </div>
                         </div>
                       </div>
@@ -290,27 +343,69 @@ export default function CartDrawer({ isOpen, onClose }) {
         {/* Footer - Order Summary */}
         {cartItems.length > 0 && (
           <div className="border-t border-black/10 px-4 sm:px-5 py-4 sm:py-5 bg-white">
-            <div className="mb-3 sm:mb-4 space-y-1.5 sm:space-y-2">
-              <div className="flex justify-between text-xs sm:text-sm text-black/70">
-                <span>Subtotal</span>
-                <span className="font-semibold text-black">{formatPrice(subtotal)}</span>
+            {/* Business/Bulk Order Note (for first-time users OR returning normal customers) */}
+            {(!savedProfile || (savedProfile && savedProfile.userType !== 'business')) && (
+              <div className="mb-3 sm:mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-xs sm:text-sm text-gray-700">
+                  Special deals available for business & bulk orders
+                </p>
               </div>
-              <div className="flex justify-between text-sm sm:text-base font-bold text-black pt-1.5 sm:pt-2 border-t border-black/10">
-                <span>Total</span>
-                <span>{formatPrice(subtotal)}</span>
+            )}
+
+            {/* Saved Profile Info (for returning users) */}
+            {savedProfile && savedProfile.phone ? (
+              <div className="mb-3 sm:mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-700">
+                    <span className="font-medium">Enquiry will be sent using:</span>
+                  </div>
+                  <button
+                    onClick={handleChangeInfo}
+                    className="text-xs sm:text-sm text-blue-600 hover:text-blue-700 font-medium underline"
+                  >
+                    Change info
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 text-sm sm:text-base">
+                  <span className="text-lg">📞</span>
+                  <span className="font-semibold text-black">
+                    +91 {savedProfile.phone}
+                  </span>
+                  {savedProfile.userType === 'business' && (
+                    <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs font-medium">
+                      Business enquiry
+                    </span>
+                  )}
+                </div>
+                {savedProfile.name && (
+                  <div className="mt-1 text-xs sm:text-sm text-gray-600">
+                    {savedProfile.name}
+                  </div>
+                )}
               </div>
-            </div>
+            ) : null}
 
             <button
               className="w-full bg-accent hover:bg-accent/90 active:bg-accent text-white font-semibold py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg transition-colors touch-manipulation flex items-center justify-center gap-2 shadow-sm text-sm sm:text-base"
               onClick={handleWhatsAppCheckout}
             >
               <WhatsAppIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span>Checkout</span>
+              <span>Enquire for these items</span>
             </button>
           </div>
         )}
       </div>
+
+      {/* Light Capture Modal */}
+      <LightCaptureModal
+        isOpen={showCaptureModal}
+        onClose={() => {
+          setShowCaptureModal(false);
+          setPendingEnquiry(null);
+        }}
+        onSubmit={handleCaptureSubmit}
+        defaultUserType={savedProfile?.userType || 'unknown'}
+      />
     </>
   );
 }

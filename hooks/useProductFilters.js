@@ -237,14 +237,21 @@ export function useProductFilters(products, categories) {
           v.trim().charAt(0).toUpperCase() + v.trim().slice(1).toLowerCase()
         );
         filtered = filtered.filter(p => {
+          // Ensure filters is an array before calling find
+          if (!p.filters || !Array.isArray(p.filters)) return false;
+          
           // Find filter with case-insensitive key match
-          const productFilter = p.filters?.find(f => {
+          const productFilter = p.filters.find(f => {
             const normalizedKey = f.key?.trim().charAt(0).toUpperCase() + f.key?.trim().slice(1).toLowerCase();
             return normalizedKey === filterKey;
           });
           if (!productFilter) return false;
+          
+          // Ensure values is an array before calling some
+          if (!productFilter.values || !Array.isArray(productFilter.values)) return false;
+          
           // Check if any product value matches (case-insensitive)
-          return productFilter.values?.some(v => {
+          return productFilter.values.some(v => {
             const normalizedValue = v?.trim().charAt(0).toUpperCase() + v?.trim().slice(1).toLowerCase();
             return normalizedFilterValues.includes(normalizedValue);
           });

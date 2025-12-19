@@ -731,15 +731,14 @@ function MobileHeaderBar({
   return (
     <div className="lg:hidden flex flex-col px-2">
       <div className="flex justify-between items-center h-14 relative z-50 bg-white">
-        <button onClick={() => setIsMenuOpen(true)} className="p-1">
-          <MenuIcon className="w-5 h-5" />
-        </button>
-        <Link
-          href="/"
-          className="absolute left-1/2 -translate-x-1/2"
-        >
-          <Image src={Logo} alt="Regal" width={90} height={90} className="h-8 w-auto object-contain" />
-        </Link>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setIsMenuOpen(true)} className="p-1">
+            <MenuIcon className="w-5 h-5" />
+          </button>
+          <Link href="/">
+            <Image src={Logo} alt="Regal" width={90} height={90} className="h-8 w-auto object-contain" />
+          </Link>
+        </div>
         <div className="flex items-center gap-3">
           <button onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)} className="p-1">
             {isMobileSearchOpen ? (

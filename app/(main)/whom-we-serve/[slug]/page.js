@@ -539,7 +539,7 @@ export default function CategoryPage() {
       </section>
 
       {/* Value Propositions Section */}
-      <section className="py-16 md:py-24 lg:py-32 bg-white">
+      {/* <section className="py-16 md:py-24 lg:py-32 bg-white">
         <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-12">
           <div className="text-center mb-12 md:mb-16">
             <h2 className="text-3xl md:text-4xl lg:text-[2.5rem] font-bold text-black tracking-tight mb-4">
@@ -565,7 +565,7 @@ export default function CategoryPage() {
             ))}
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* Product Collections Section */}
       {departments.length > 0 && (

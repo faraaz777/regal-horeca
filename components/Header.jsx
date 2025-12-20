@@ -496,7 +496,7 @@ function DesktopHeaderTopRow({
 
                 {/* More Dropdown Menu */}
                 {isMoreDropdownOpen && (
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white border border-black/10 rounded-lg shadow-lg z-50 min-w-[180px] overflow-hidden">
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 bg-white border border-black/10 rounded-lg shadow-lg z-50 min-w-[180px] overflow-hidden">
                     <div className="py-2">
                       {moreLinks.map((link) => (
                         <Link
@@ -1000,11 +1000,6 @@ function MobileMenuOverlay({
                     <li>
                       <Link href="/faq" className="hover:text-black transition-colors">
                         FAQ&apos;s
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/admin/dashboard" className="hover:text-black transition-colors">
-                        Admin
                       </Link>
                     </li>
                   </ul>

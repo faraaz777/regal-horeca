@@ -14,6 +14,9 @@ import { useAppContext } from '@/context/AppContext';
 import ProductCard from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 import WhomWeServe from '@/components/new/WhomWeServe';
+import Brands from '@/components/Brands';
+import ContactUs from '@/components/ContactUs';
+import FAQs from '@/components/FAQs';
 
 // Hero slides
 const slides = [
@@ -394,9 +397,15 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Brands Section */}
+      <section className="py-20 bg-white">
+        <div className="container mx-auto px-4">
+          <Brands />
+        </div>
+      </section>
+
       {/* Whom We Serve Section */}
 <WhomWeServe/>
-
       {/* About Teaser */}
       <section className="py-24 bg-white">
         <div className="container mx-auto px-4 text-center">
@@ -416,6 +425,13 @@ export default function HomePage() {
           </Link>
         </div>
       </section>
+
+      {/* Contact Us Section */}
+      <ContactUs />
+
+      {/* FAQs Section */}
+      <FAQs />
+
     </div>
   );
 }

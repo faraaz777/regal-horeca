@@ -134,3 +134,17 @@ html, body {
   background: rgba(0, 0, 0, 0.25);
 }
 
+/* Marquee animation for Brands component */
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee var(--speed, 30000ms) linear infinite;
+}
+

@@ -19,7 +19,8 @@ import {
   WhatsAppIcon, 
   ClockIcon,
   UserIcon,
-  ShoppingCartIcon
+  ShoppingCartIcon,
+  ChevronDownIcon
 } from '@/components/Icons';
 import { getWhatsAppCustomerLink } from '@/lib/utils/whatsapp';
 
@@ -30,6 +31,25 @@ const fetcher = async (url) => {
     throw new Error('Failed to fetch');
   }
   return response.json();
+};
+
+// Status badge component
+const StatusBadge = ({ status }) => {
+  const statusConfig = {
+    'new': { label: 'New', color: 'bg-blue-100 text-blue-800' },
+    'in-progress': { label: 'In Progress', color: 'bg-yellow-100 text-yellow-800' },
+    'awaiting-customer': { label: 'Awaiting Customer', color: 'bg-purple-100 text-purple-800' },
+    'closed': { label: 'Closed', color: 'bg-green-100 text-green-800' },
+    'spam': { label: 'Spam', color: 'bg-red-100 text-red-800' },
+  };
+
+  const config = statusConfig[status] || statusConfig['new'];
+
+  return (
+    <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+      {config.label}
+    </span>
+  );
 };
 
 export default function EnquiryDetailPage() {
@@ -49,6 +69,8 @@ export default function EnquiryDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [newNote, setNewNote] = useState('');
+  const [isRelatedEnquiriesOpen, setIsRelatedEnquiriesOpen] = useState(true); // Default open
+  const [showAllRelated, setShowAllRelated] = useState(false); // For "View All" button
 
   // Fetch enquiry details
   const { data, error, isLoading, mutate } = useSWR(
@@ -63,6 +85,7 @@ export default function EnquiryDetailPage() {
   const enquiryItems = enquiry?.items || [];
   const messages = enquiry?.messages || [];
   const customer = enquiry?.customerId || {};
+  const relatedEnquiries = enquiry?.relatedEnquiries || [];
 
   // Initialize form fields when data loads
   useEffect(() => {
@@ -324,33 +347,92 @@ export default function EnquiryDetailPage() {
             </div>
           </div>
 
+          {/* Related Enquiries Section */}
+          {relatedEnquiries.length > 0 && (
+            <div className="bg-white rounded-lg shadow-md p-6" data-related-enquiries>
+              <button
+                onClick={() => setIsRelatedEnquiriesOpen(!isRelatedEnquiriesOpen)}
+                className="w-full flex items-center justify-between text-xl font-bold text-gray-800 mb-4 hover:text-gray-900 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <UserIcon className="w-5 h-5" />
+                  <span>Related Enquiries ({relatedEnquiries.length})</span>
+                  {enquiry.customerEnquiriesCount > 0 && (
+                    <span className="ml-2 text-sm font-normal text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                      🔵 Returning Customer
+                    </span>
+                  )}
+                </div>
+                <ChevronDownIcon 
+                  className={`w-5 h-5 transition-transform duration-200 ${
+                    isRelatedEnquiriesOpen ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+              
+              {isRelatedEnquiriesOpen && (
+                <div className="space-y-2">
+                  {/* Show first 4, or all if showAllRelated is true */}
+                  {(showAllRelated ? relatedEnquiries : relatedEnquiries.slice(0, 4)).map((related) => (
+                    <Link
+                      key={related._id}
+                      href={`/admin/enquiries/${related._id}`}
+                      className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-blue-300 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">{related.enquiryId}</div>
+                        <div className="text-sm text-gray-600 mt-1">
+                          {related.type === 'cart + enquiry' ? 'Cart + Enquiry' : 'Enquiry Only'} • {formatDate(related.createdAt)}
+                        </div>
+                        {related.name && related.name !== 'Guest User' && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {related.name}
+                          </div>
+                        )}
+                      </div>
+                      <div className="ml-4">
+                        <StatusBadge status={related.status} />
+                      </div>
+                    </Link>
+                  ))}
+                  
+                  {/* "View All" button - only show if more than 4 and not already showing all */}
+                  {relatedEnquiries.length > 4 && !showAllRelated && (
+                    <button
+                      onClick={() => setShowAllRelated(true)}
+                      className="w-full mt-3 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 hover:border-blue-300 transition-colors"
+                    >
+                      View All ({relatedEnquiries.length - 4} more)
+                    </button>
+                  )}
+                  
+                  {/* "Show Less" button - only show when showing all and more than 4 */}
+                  {relatedEnquiries.length > 4 && showAllRelated && (
+                    <button
+                      onClick={() => {
+                        setShowAllRelated(false);
+                        // Scroll to top of section
+                        const section = document.querySelector('[data-related-enquiries]');
+                        if (section) {
+                          section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                      }}
+                      className="w-full mt-3 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      Show Less
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Enquiry Details */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Enquiry Details</h2>
             <div className="space-y-4">
-              <div>
-                <label className="text-sm text-gray-600">Categories</label>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {enquiry.categories && enquiry.categories.length > 0 ? (
-                    enquiry.categories.map((cat, idx) => (
-                      <span key={idx} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                        {cat}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-gray-400">No categories specified</span>
-                  )}
-                </div>
-              </div>
-              {enquiry.message && (
-                <div>
-                  <label className="text-sm text-gray-600">Message</label>
-                  <div className="mt-1 p-3 bg-gray-50 rounded-md text-gray-900 whitespace-pre-wrap">
-                    {enquiry.message}
-                  </div>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Top row: Type and User Type side by side */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm text-gray-600">Type</label>
                   <div className="mt-1">
@@ -366,22 +448,17 @@ export default function EnquiryDetailPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600">Source</label>
-                  <div className="mt-1 text-gray-900 capitalize">{enquiry.source || 'website-form'}</div>
-                </div>
-              </div>
-              <div>
-                <label className="text-sm text-gray-600 flex items-center justify-between">
-                  <span>User Type</span>
-                  {!isEditingUserType && (
-                    <button
-                      onClick={() => setIsEditingUserType(true)}
-                      className="text-xs text-blue-600 hover:text-blue-700 underline"
-                    >
-                      Edit
-                    </button>
-                  )}
-                </label>
+                  <label className="text-sm text-gray-600 flex items-center justify-between">
+                    <span>User Type</span>
+                    {!isEditingUserType && (
+                      <button
+                        onClick={() => setIsEditingUserType(true)}
+                        className="text-xs text-blue-600 hover:text-blue-700 underline"
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </label>
                 {isEditingUserType ? (
                   <div className="flex items-center gap-2 mt-1">
                     <select
@@ -425,8 +502,37 @@ export default function EnquiryDetailPage() {
                     </span>
                   </div>
                 )}
+                </div>
               </div>
+              
+              {/* Categories */}
               <div>
+                <label className="text-sm text-gray-600">Categories</label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {enquiry.categories && enquiry.categories.length > 0 ? (
+                    enquiry.categories.map((cat, idx) => (
+                      <span key={idx} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                        {cat}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-gray-400">No categories specified</span>
+                  )}
+                </div>
+              </div>
+              
+              {/* Message */}
+              {enquiry.message && (
+                <div>
+                  <label className="text-sm text-gray-600">Message</label>
+                  <div className="mt-1 p-3 bg-gray-50 rounded-md text-gray-900 whitespace-pre-wrap">
+                    {enquiry.message}
+                  </div>
+                </div>
+              )}
+              
+              {/* Submitted Date */}
+              <div className="pt-2 border-t border-gray-200">
                 <label className="text-sm text-gray-600">Submitted</label>
                 <div className="mt-1 flex items-center gap-2 text-gray-900">
                   <ClockIcon className="w-4 h-4 text-gray-400" />

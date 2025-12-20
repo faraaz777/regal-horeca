@@ -193,6 +193,15 @@ export async function PUT(request, { params }) {
     }
     // If title didn't change, slug remains unchanged (not included in updateData)
 
+    // Handle availableSizes - optional field, trim and set to empty string if not provided
+    if (updateData.availableSizes !== undefined) {
+      if (updateData.availableSizes === null || updateData.availableSizes === '') {
+        updateData.availableSizes = '';
+      } else {
+        updateData.availableSizes = String(updateData.availableSizes).trim();
+      }
+    }
+
     // Normalize filters to array format if filters are being updated
     if (updateData.filters !== undefined) {
       if (!Array.isArray(updateData.filters)) {

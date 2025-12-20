@@ -10,6 +10,7 @@ import { connectToDatabase } from '@/lib/db/connect';
 import Enquiry from '@/lib/models/Enquiry';
 import EnquiryItem from '@/lib/models/EnquiryItem';
 import EnquiryMessage from '@/lib/models/EnquiryMessage';
+import { normalizePhone } from '@/lib/utils/phone';
 
 /**
  * GET /api/enquiries/[id]
@@ -51,6 +52,26 @@ export async function GET(request, { params }) {
       });
     }
 
+    // Get related enquiries - by customerId (primary) or phone (fallback for legacy data)
+    const relatedEnquiriesQuery = {
+      _id: { $ne: enquiry._id }, // Exclude current enquiry
+    };
+
+    // Build query: prioritize customerId, fallback to phone matching
+    if (enquiry.customerId) {
+      relatedEnquiriesQuery.customerId = enquiry.customerId._id || enquiry.customerId;
+    } else if (enquiry.phone) {
+      // Fallback: find by normalized phone for legacy enquiries without customerId
+      const normalizedPhone = normalizePhone(enquiry.phone);
+      relatedEnquiriesQuery.phone = normalizedPhone;
+    }
+
+    const relatedEnquiries = await Enquiry.find(relatedEnquiriesQuery)
+      .select('enquiryId source type status createdAt phone name')
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+
     return NextResponse.json({
       success: true,
       enquiry: {
@@ -58,6 +79,7 @@ export async function GET(request, { params }) {
         items: enquiryItems,
         messages: messages,
         customerEnquiriesCount,
+        relatedEnquiries, // NEW: All related enquiries from same customer
       },
     });
   } catch (error) {

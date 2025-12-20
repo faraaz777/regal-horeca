@@ -33,6 +33,7 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState('description');
   const [selectedColor, setSelectedColor] = useState(null);
+  const [selectedSize, setSelectedSize] = useState('');
   const [showCaptureModal, setShowCaptureModal] = useState(false);
   const [pendingEnquiry, setPendingEnquiry] = useState(null);
 
@@ -243,13 +244,19 @@ export default function ProductDetailPage() {
   };
 
   // Convert specifications to object format for specs tab
-  const specificationsObj = product?.specifications?.reduce((acc, spec) => {
-    acc[spec.label] = `${spec.value} ${spec.unit || ''}`.trim();
-    return acc;
-  }, {}) || {};
+  // Filter out "Available sizes" from specifications display
+  const specificationsObj = product?.specifications
+    ?.filter(spec => spec.label?.toLowerCase() !== 'available sizes')
+    ?.reduce((acc, spec) => {
+      acc[spec.label] = `${spec.value} ${spec.unit || ''}`.trim();
+      return acc;
+    }, {}) || {};
 
   // Convert specifications to features list
-  const features = product?.specifications?.map(spec => `${spec.label}: ${spec.value} ${spec.unit || ''}`) || [];
+  // Filter out "Available sizes" from features
+  const features = product?.specifications
+    ?.filter(spec => spec.label?.toLowerCase() !== 'available sizes')
+    ?.map(spec => `${spec.label}: ${spec.value} ${spec.unit || ''}`) || [];
   
   // Default rating
   const rating = 5;
@@ -369,6 +376,39 @@ export default function ProductDetailPage() {
                 </div>
               </div>
             )}
+
+            {/* Available Sizes Dropdown */}
+            {product.availableSizes && product.availableSizes.trim() && (() => {
+              const sizes = product.availableSizes.split(',').map(s => s.trim()).filter(Boolean);
+              if (sizes.length > 0) {
+                return (
+                  <div className="mb-6">
+                    <label className="block text-sm font-semibold text-black uppercase tracking-wide mb-3">
+                      Sizes :
+                    </label>
+                    <select
+                      value={selectedSize}
+                      onChange={(e) => setSelectedSize(e.target.value)}
+                      className="w-full p-3 border border-black/20 rounded-md text-black/60 hover:text-accent hover:border-accent transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent appearance-none bg-white cursor-pointer"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 12px center',
+                        paddingRight: '40px'
+                      }}
+                    >
+                      <option value="">Choose an option</option>
+                      {sizes.map((size, index) => (
+                        <option key={index} value={size}>
+                          {size}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             <div className="border-t border-b border-black/10 py-6 mb-8">
               <div className="flex flex-col gap-4">

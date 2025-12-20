@@ -394,6 +394,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
     status: 'In Stock',
     colorVariants: [],
     filters: [{ key: 'Material', values: [] }, { key: 'Size', values: [] }],
+    availableSizes: '', // Optional field for comma-separated sizes
   });
 
   const [isUploading, setIsUploading] = useState(false);
@@ -688,6 +689,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
         brandCategoryIds: brandCategoryIds.map(bid => (bid?._id || bid)?.toString()).filter(Boolean),
         tagsInput: (product.tags || []).join(', '),
         filters: filters,
+        availableSizes: product.availableSizes || '',
       });
 
       if (categoryId && categories.length > 0) {
@@ -2543,7 +2545,23 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
         </FormSection>
         
             <FormSection title="Specifications">
+          <p className="text-xs text-gray-600 mb-4">
+            <strong className="text-gray-700">Available sizes</strong> is a default optional field. If provided, it will appear as a dropdown on the product detail page. It will not be shown in the specifications table.
+          </p>
           <div className="space-y-3">
+            {/* Available Sizes - Default Optional Field */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <label className="md:col-span-3 text-sm font-medium text-gray-700">
+                Available sizes
+              </label>
+              <input 
+                name="availableSizes" 
+                placeholder="Values (comma-separated, e.g., 22,24,26,28,30)" 
+                value={formData.availableSizes || ''} 
+                onChange={e => setFormData({ ...formData, availableSizes: e.target.value })} 
+                className="md:col-span-9 p-2.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary focus:border-primary" 
+              />
+            </div>
             {formData.specifications?.map((spec, index) => (
               <div key={index} className="grid grid-cols-1 md:grid-cols-8 gap-2 items-center">
                 <input 

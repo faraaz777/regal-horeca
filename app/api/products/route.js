@@ -277,6 +277,12 @@ export async function POST(request) {
     if (!productData.tags) {
       productData.tags = [];
     }
+    // Handle availableSizes - optional field, trim and set to empty string if not provided
+    if (productData.availableSizes === undefined || productData.availableSizes === null) {
+      productData.availableSizes = '';
+    } else {
+      productData.availableSizes = String(productData.availableSizes).trim();
+    }
     if (!productData.gallery) {
       productData.gallery = [];
     }

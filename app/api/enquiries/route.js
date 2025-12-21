@@ -12,6 +12,7 @@ import { connectToDatabase } from '@/lib/db/connect';
 import Enquiry from '@/lib/models/Enquiry';
 import Customer from '@/lib/models/Customer';
 import EnquiryItem from '@/lib/models/EnquiryItem';
+import { normalizePhone } from '@/lib/utils/phone';
 
 /**
  * POST /api/enquiries
@@ -45,10 +46,13 @@ export async function POST(request) {
       );
     }
 
+    // Normalize phone number for consistent matching
+    const normalizedPhone = normalizePhone(phone);
+
     // For light capture flow, name and email are optional
     // If not provided, use defaults
     const enquiryName = name || 'Guest User';
-    const enquiryEmail = email || `${phone}@temp.regal-horeca.com`;
+    const enquiryEmail = email || `${normalizedPhone}@temp.regal-horeca.com`;
 
     // Handle backward compatibility: if category (singular) is provided, convert to categories array
     const categoriesArray = categories || (category ? [category] : []);
@@ -62,13 +66,14 @@ export async function POST(request) {
           quantity: p.quantity || 1,
         }));
 
-    // Find or create customer (only if name/email provided, otherwise skip)
+    // Find or create customer - ALWAYS link by phone if phone exists
+    // This ensures all enquiries from the same phone number are linked
     let customer = null;
-    if (name && email) {
+    if (normalizedPhone) {
       customer = await Customer.findOrCreate({
         name: enquiryName,
         email: enquiryEmail,
-        phone,
+        phone: normalizedPhone,
         companyName: company || '',
       });
     }
@@ -82,12 +87,12 @@ export async function POST(request) {
       ? 'high' 
       : 'normal';
 
-    // Create new enquiry
+    // Create new enquiry with normalized phone
     const enquiry = new Enquiry({
       customerId: customer?._id || null,
       name: enquiryName, // Keep for backward compatibility
       email: enquiryEmail,
-      phone,
+      phone: normalizedPhone, // Store normalized phone for consistency
       company: company || '',
       state: state || '',
       source: source,
@@ -200,6 +205,7 @@ export async function GET(request) {
         { phone: { $regex: search, $options: 'i' } },
         { message: { $regex: search, $options: 'i' } },
         { company: { $regex: search, $options: 'i' } },
+        { enquiryId: { $regex: search, $options: 'i' } },
       ];
     }
 

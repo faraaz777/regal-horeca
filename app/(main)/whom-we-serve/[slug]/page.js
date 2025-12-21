@@ -47,7 +47,7 @@ const categoryData = {
   },
   restaurants: {
     title: "Shapes for Restaurants",
-    subtitle: "Elevating Hospitality, One Table at a Time",
+    subtitle: "Turning Dining Spaces into Experiences",
     heroImage: "https://images.unsplash.com/photo-1556911220-bff31c812dba?auto=format&fit=crop&w=2000&q=80",
     introText: "Refined cutlery solutions for elevated dining spaces—crafted to complement exceptional cuisine with enduring elegance and design precision.",
     restaurantTypes: [
@@ -447,7 +447,7 @@ export default function CategoryPage() {
   }
 
   return (
-    <div className="">
+    <div className=" lg:pt-[100px] md:pt-0 sm:pt-10 pt-20 pb-10 ">
       {/* Hero Section */}
       <section className="relative min-h-[300px] max-h-[300px] md:min-h-[700px] flex items-center justify-center overflow-hidden">
         <div 

@@ -7,7 +7,7 @@
  */
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { MailIcon, PhoneIcon, MapPinIcon, WhatsAppIcon, ChevronDownIcon } from '@/components/Icons';
+import {  WhatsAppIcon, ChevronDownIcon } from '@/components/Icons';
 import { useAppContext } from '@/context/AppContext';
 import { getWhatsAppBusinessLink } from '@/lib/utils/whatsapp';
 import toast from 'react-hot-toast';
@@ -173,93 +173,18 @@ export default function ContactUs() {
   };
 
   return (
-    <section className="py-20 bg-gray-50">
+    <section className="py-12 bg-gray-50">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-          {/* Left Side - Get in Touch */}
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-3xl font-semibold mb-6">Get in Touch</h1>
-              <div className="flex flex-wrap gap-6 md:gap-8 lg:gap-12 mx-4 md:mx-6 lg:mx-8">
-                <div className="flex items-center gap-4">
-                  <div className="flex-shrink-0 w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">
-                    <MapPinIcon className="w-6 h-6 text-accent" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-black mb-1">Address</h4>
-                    <p className="text-black/70 text-sm">
-                      Begum Bazar, Hyderabad<br />
-                      Telangana, India
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="flex-shrink-0 w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">
-                    <PhoneIcon className="w-6 h-6 text-accent" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-black mb-1">Phone</h4>
-                    <p className="text-black/70 text-sm">
-                      <a href="tel:+911234567890" className="hover:text-accent transition-colors">
-                        +91 12345 67890
-                      </a>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="flex-shrink-0 w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">
-                    <MailIcon className="w-6 h-6 text-accent" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-black mb-1">Email</h4>
-                    <p className="text-black/70 text-sm">
-                      <a href="mailto:sales@regal.com" className="hover:text-accent transition-colors">
-                        sales@regal.com
-                      </a>
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Map */}
-            <div className="h-[400px] bg-white border border-black/10 shadow-xl rounded-sm overflow-hidden relative">
-              <iframe 
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3806.5!2d78.47!3d17.38!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bcb977e201015f3%3A0x0!2sAshok%20Bazar%2C%20Afzal%20Gunj%2C%20Hyderabad%2C%20Telangana%20500012!5e0!3m2!1sen!2sin!4v1709400000000!5m2!1sen!2sin&q=Ashok+Bazar+Afzal+Gunj+Hyderabad+Telangana+500012" 
-                width="100%" 
-                height="100%" 
-                style={{ border: 0, filter: 'grayscale(100%) contrast(1.2)' }} 
-                allowFullScreen={true} 
-                loading="lazy" 
-                referrerPolicy="no-referrer-when-downgrade"
-                title="Regal Horeca Location"
-              ></iframe>
-              
-              {/* Pinned Location Marker */}
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-                <div className="relative">
-                  <div className="w-6 h-6 bg-accent rounded-full border-2 border-white shadow-lg animate-pulse"></div>
-                  <div className="absolute top-6 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-8 border-transparent border-t-accent"></div>
-                </div>
-              </div>
-              
-              <div className="absolute top-4 right-4 bg-white px-4 py-2 shadow-md rounded-sm">
-                <span className="text-xs font-bold tracking-widest uppercase text-accent">Afzal Gunj</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Side - Contact Us Form */}
+        <div className="max-w-3xl mx-auto">
+          {/* Contact Us Form - Centered */}
           <div>
-            <div className="mb-6">
+            <div className="mb-6 text-center">
               <h2 className="text-3xl font-bold tracking-tight mb-4">Contact Us</h2>
               <p className="text-black/70">
                 Have questions? We'd love to hear from you. Fill out the form below and we'll send your enquiry details to WhatsApp.
               </p>
             </div>
-            <form onSubmit={submitEnquiry} className="bg-white rounded-lg p-6 md:p-8 shadow-sm">
+            <form onSubmit={submitEnquiry} className="bg-white rounded-lg p-6 md:p-8 shadow-sm border-2 ">
             <div className="space-y-6">
               {/* Two Column Grid Layout */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

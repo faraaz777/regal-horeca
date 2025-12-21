@@ -100,7 +100,7 @@ export default function Hero() {
   };
 
   return (
-    <section className="relative w-full overflow-hidden bg-black">
+    <section className="relative w-full overflow-hidden bg-black pt-[120px] md:pt-[140px]">
       <div
         className="relative h-[70vh] sm:h-[80vh] lg:h-[85vh]"
         onTouchStart={onTouchStart}

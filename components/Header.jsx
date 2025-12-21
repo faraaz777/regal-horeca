@@ -198,7 +198,7 @@ export default function Header() {
   return (
     <>
       <header
-        className={`bg-white/90 backdrop-blur  sticky top-0 z-30 transition-transform duration-300 ease-out  ${
+        className={`bg-white/90 backdrop-blur fixed top-0 left-0 right-0 z-30 transition-transform duration-300 ease-out ${
           isHeaderVisible ? "translate-y-0" : "-translate-y-full"
         }`}
       >
@@ -398,7 +398,7 @@ function DesktopHeaderTopRow({
     // More dropdown links
     const moreLinks = [
       { name: 'Contact', href: '/contact' },
-      { name: "FAQ's", href: '/faq' },
+      { name: "FAQ's", href: '/faqs' },
       { name: 'Enquiry', href: '/enquiry' },
     ];
   
@@ -998,7 +998,7 @@ function MobileMenuOverlay({
                       </Link>
                     </li>
                     <li>
-                      <Link href="/faq" className="hover:text-black transition-colors">
+                      <Link href="/faqs" className="hover:text-black transition-colors">
                         FAQ&apos;s
                       </Link>
                     </li>

@@ -40,16 +40,6 @@ const faqs = [
     question: 'Can I customize products?',
     answer: 'Yes, we offer customization services including branding, engraving, and custom designs. Customization options depend on the product type. Please reach out to discuss your specific requirements.',
   },
-  {
-    id: 7,
-    question: 'What is your return policy?',
-    answer: 'We have a comprehensive return policy for defective or damaged items. Returns must be initiated within a specified timeframe and items must be in original condition. Please contact our customer service for return authorization.',
-  },
-  {
-    id: 8,
-    question: 'How can I track my order?',
-    answer: 'Once your order is shipped, you will receive a tracking number via email. You can use this tracking number to monitor your shipment status. If you have any questions about your order, please contact our customer service team.',
-  },
 ];
 
 export default function FAQs() {
@@ -60,7 +50,7 @@ export default function FAQs() {
   };
 
   return (
-    <section className="py-20 bg-white">
+    <section className="py-12 bg-white">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold tracking-tight mb-4">Frequently Asked Questions</h2>

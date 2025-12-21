@@ -21,7 +21,7 @@ export default function SearchBar({ className = "", placeholder = "What are you 
   useEffect(() => {
     const existing = searchParams.get("search") || "";
     setQuery(existing);
-    
+
     // Set selected category based on URL
     const categoryParam = searchParams.get("category");
     if (categoryParam && categories.length > 0) {
@@ -98,81 +98,76 @@ export default function SearchBar({ className = "", placeholder = "What are you 
 
   return (
     <form onSubmit={handleSubmit} className={`w-full ${className}`}>
-      <div className="relative flex items-center gap-2">
+      <div className="relative flex items-center rounded-lg border border-black/5 bg-gray-50 hover:border-black/20 focus-within:border-accent focus-within:bg-white focus-within:ring-1 focus-within:ring-accent transition-all duration-300">
+
         {/* All Categories Dropdown Button */}
         <div className="relative">
           <button
             ref={buttonRef}
             type="button"
             onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-white hover:bg-black/5 text-black rounded-lg text-sm font-medium transition-colors border border-black/20 shadow-sm whitespace-nowrap"
+            className="flex items-center gap-2 pl-4 pr-3 py-3 text-black hover:text-accent text-sm font-bold uppercase tracking-wider transition-colors outline-none whitespace-nowrap"
           >
             <span>{selectedCategory}</span>
-            <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDownIcon className={`w-3.5 h-3.5 text-black/40 transition-transform duration-200 ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {/* Dropdown Menu */}
           {isCategoryDropdownOpen && (
             <div
               ref={dropdownRef}
-              className="absolute top-full left-0 mt-1 w-[280px] max-h-[400px] bg-white border  border-black/20 rounded-lg shadow-lg z-50 overflow-hidden"
+              className="absolute top-[calc(100%+8px)] left-0 w-[240px] max-h-[400px] bg-white border border-black/5 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
             >
-              <div className="overflow-y-auto max-h-[400px] custom-scrollbar">
-                {/* All Categories Option */}
+              <div className="overflow-y-auto max-h-[400px] custom-scrollbar p-1">
                 <button
                   type="button"
                   onClick={() => handleCategorySelect(null)}
-                  className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
-                    selectedCategory === "All Categories"
-                      ? "bg-accent text-white font-medium"
-                      : "text-black hover:bg-black/5"
-                  }`}
+                  className={`w-full text-left px-4 py-3 text-sm transition-colors rounded-lg ${selectedCategory === "All Categories"
+                    ? "bg-accent text-white font-medium"
+                    : "text-black/70 hover:bg-gray-50 hover:text-black"
+                    }`}
                 >
                   All Categories
                 </button>
 
-                {/* Category List */}
                 {topLevelCategories.length > 0 ? (
                   topLevelCategories.map((category) => (
                     <button
                       key={category._id || category.id}
                       type="button"
                       onClick={() => handleCategorySelect(category)}
-                      className={`w-full text-left px-4 py-2 text-sm transition-colors ${
-                        selectedCategory === category.name
-                          ? "bg-accent text-white font-medium"
-                          : "text-black hover:bg-black/5"
-                      }`}
+                      className={`w-full text-left px-4 py-3 text-sm transition-colors rounded-lg ${selectedCategory === category.name
+                        ? "bg-accent text-white font-medium"
+                        : "text-black/70 hover:bg-gray-50 hover:text-black"
+                        }`}
                     >
                       {category.name}
                     </button>
                   ))
                 ) : (
-                  <div className="px-4 py-2 text-sm text-black/60">No categories available</div>
+                  <div className="px-4 py-3 text-sm text-black/40">No categories</div>
                 )}
               </div>
             </div>
           )}
         </div>
 
-        {/* Search Input */}
-        <div className="flex items-center flex-1 rounded-full border border-black/20 bg-white px-3 py-2 shadow-sm focus-within:border-accent focus-within:bg-white transition-all duration-200">
-          {/* Search Icon */}
-          <Search className="w-4 h-4 mr-2 text-black/60" />
+        {/* Elegant Vertical Divider */}
+        <div className="h-5 w-px bg-black/10 mx-1" />
 
-          {/* Input Field */}
+        {/* Search Input Section */}
+        <div className="flex items-center flex-1 px-3 py-2">
+          <Search className="w-4 h-4 mr-3 text-black/30" />
           <input
             type="text"
             value={query}
             placeholder={placeholder}
             onChange={(e) => setQuery(e.target.value)}
-            className="flex-1 bg-transparent outline-none text-sm md:text-[15px] placeholder:text-black/40 text-black"
+            className="flex-1 bg-transparent outline-none text-sm placeholder:text-black/30 text-black tracking-wide"
           />
-
-          {/* Search Button */}
           <button
             type="submit"
-            className="ml-2 px-3 py-1 rounded-full text-xs md:text-sm font-medium border border-accent bg-accent text-white hover:bg-white hover:text-accent transition-colors"
+            className="ml-2 bg-accent text-white px-5 py-2 rounded-md text-[11px] font-bold uppercase tracking-[0.2em] hover:bg-accent/90 transition-all shadow-sm shadow-accent/20"
           >
             Search
           </button>

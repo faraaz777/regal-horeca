@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import useSWR from 'swr';
@@ -34,6 +34,13 @@ export default function AdminDashboardPage() {
   const recentProducts = statsResponse?.recentProducts || [];
   const statusDistribution = stats.statusDistribution || {};
 
+  // Fix hydration error by only setting time on client side
+  const [currentTime, setCurrentTime] = useState('');
+  
+  useEffect(() => {
+    setCurrentTime(new Date().toLocaleTimeString());
+  }, []);
+
   const statCards = [
     { name: 'Total Products', value: stats.totalProducts || 0, link: '/admin/products', color: 'blue' },
     { name: 'Total Categories', value: stats.totalCategories || 0, link: '/admin/categories', color: 'green' },
@@ -51,9 +58,11 @@ export default function AdminDashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Dashboard</h1>
-        <div className="text-xs sm:text-sm text-gray-500">
-          Last updated: {new Date().toLocaleTimeString()}
-        </div>
+        {currentTime && (
+          <div className="text-xs sm:text-sm text-gray-500">
+            Last updated: {currentTime}
+          </div>
+        )}
       </div>
 
       {/* Statistics Cards */}

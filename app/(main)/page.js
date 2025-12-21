@@ -68,7 +68,7 @@ export default function HomePage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8">
             {mainCategories.map((cat, i) => (
               <Link
-                key={cat._id || cat.id}
+                key={cat._id || cat.id || `category-${i}`}
                 href={`/catalog?category=${cat.slug}`}
                 className={`group text-center reveal transform transition-all duration-700`}
                 style={{ transitionDelay: `${i * 100}ms` }}
@@ -108,9 +108,9 @@ export default function HomePage() {
                 <ProductCardSkeleton key={`skeleton-${index}`} />
               ))
             ) : featuredProducts.length > 0 ? (
-              featuredProducts.map((product) => (
+              featuredProducts.map((product, index) => (
                 <ProductCard
-                  key={product._id || product.id}
+                  key={product._id || product.id || `featured-${index}`}
                   product={product}
                 />
               ))
@@ -158,9 +158,9 @@ export default function HomePage() {
                 <ProductCardSkeleton key={`new-arrival-skeleton-${index}`} />
               ))
             ) : newArrivals.length > 0 ? (
-              newArrivals.map((product) => (
+              newArrivals.map((product, index) => (
                 <ProductCard
-                  key={product._id || product.id}
+                  key={product._id || product.id || `new-arrival-${index}`}
                   product={product}
                 />
               ))

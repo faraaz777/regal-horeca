@@ -12,10 +12,10 @@ export default function ProductCard({ product, onAdd }) {
   const { addToWishlist, removeFromWishlist, isInWishlist, addToCart, removeFromCart, isInCart } = useAppContext();
 
   // Get product image - support multiple field names
-  const productImage = 
-    product.heroImage || 
-    product.image || 
-    (product.images && product.images[0]) || 
+  const productImage =
+    product.heroImage ||
+    product.image ||
+    (product.images && product.images[0]) ||
     '/placeholder-product.jpg';
 
   // Get product name/title
@@ -34,6 +34,9 @@ export default function ProductCard({ product, onAdd }) {
   useEffect(() => {
     setClicked(inCart);
   }, [inCart]);
+
+  // State for specs reveal (handling hover/click for mobile support)
+  const [specsOpen, setSpecsOpen] = useState(false);
 
   // Format price
   const formatPrice = (price) => {
@@ -157,9 +160,14 @@ export default function ProductCard({ product, onAdd }) {
           </div>
         </div>
       </div>
-      <div className="product-card-inside">
+      <div
+        className={`product-card-inside ${specsOpen ? 'active' : ''}`}
+        onClick={() => setSpecsOpen(!specsOpen)}
+        onMouseEnter={() => setSpecsOpen(true)}
+        onMouseLeave={() => setSpecsOpen(false)}
+      >
         <div className="product-card-icon">
-          <InfoIcon />
+          {specsOpen ? <ClearIcon /> : <InfoIcon />}
         </div>
         <div className="product-card-contents">
           {specifications.length > 0 ? (

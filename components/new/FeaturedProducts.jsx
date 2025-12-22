@@ -56,8 +56,8 @@ function ProductCard({ product }) {
   const prevImg = () => setIndex((i) => (i === 0 ? images.length - 1 : i - 1));
 
   return (
-    <Link href={`/products/${product.slug}`} className="min-w-[300px] snap-start block">
-      <div className="relative w-[300px] h-[350px] bg-white rounded-xl shadow overflow-hidden group">
+    <Link href={`/products/${product.slug}`} className="min-w-[220px] md:min-w-[270px] snap-start block group">
+      <div className="relative w-full h-[300px] md:h-[320px] bg-white rounded-xl border border-black/5 overflow-hidden transition-all duration-300">
 
         {/* MAIN IMAGE */}
         <Image
@@ -65,28 +65,28 @@ function ProductCard({ product }) {
           width={350}
           height={350}
           alt={product.title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
         />
 
-        {/* ARROWS */}
+        {/* ARROWS (Desktop Only) */}
         {images.length > 1 && (
-          <>
+          <div className="hidden md:block">
             <button
               onClick={(e) => { e.preventDefault(); prevImg(); }}
               className="absolute left-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100
-              bg-white shadow-lg rounded-full p-2 transition hover:scale-110"
+              bg-white/90 shadow-md rounded-full p-2 transition-all hover:scale-110 hover:bg-white"
             >
-              <ArrowLeft size={18} />
+              <ArrowLeft size={16} />
             </button>
 
             <button
               onClick={(e) => { e.preventDefault(); nextImg(); }}
               className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100
-              bg-white shadow-lg rounded-full p-2 transition hover:scale-110"
+              bg-white/90 shadow-md rounded-full p-2 transition-all hover:scale-110 hover:bg-white"
             >
-              <ArrowRight size={18} />
+              <ArrowRight size={16} />
             </button>
-          </>
+          </div>
         )}
 
         {/* WISHLIST */}
@@ -96,16 +96,20 @@ function ProductCard({ product }) {
             e.stopPropagation();
             wished ? removeFromWishlist(productId) : addToWishlist(productId);
           }}
-          className="absolute top-3 right-3 bg-white/90 backdrop-blur shadow 
-                     rounded-full p-2 hover:scale-110 transition z-10"
+          className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm border border-black/5 shadow-sm 
+                     rounded-full p-2 hover:scale-110 transition-all z-10"
         >
-          <HeartIcon isFilled={wished} className={`w-6 h-6 ${wished ? "text-red-500" : ""}`} />
+          <HeartIcon isFilled={wished} className={`w-5 h-5 ${wished ? "text-accent" : "text-black/60"}`} />
         </button>
 
       </div>
 
-      <p className="text-center text-sm text-gray-500 mt-3">{product.brand}</p>
-      <h3 className="text-center text-[17px] font-medium">{product.title}</h3>
+      <div className="mt-4 px-1">
+        <p className="text-center text-xs md:text-sm text-gray-500 mb-1 uppercase tracking-wide">{product.brand}</p>
+        <h3 className="text-center text-[15px] md:text-[17px] font-semibold text-black leading-tight line-clamp-2 px-2 group-hover:text-accent transition-colors">
+          {product.title}
+        </h3>
+      </div>
     </Link>
   );
 }
@@ -159,8 +163,8 @@ export default function FeaturedProducts({ limit = null }) {
           {loading
             ? Array.from({ length: limit || 6 }).map((_, i) => <ProductCardSkeleton key={i} />)
             : featured.length > 0
-            ? featured.map((p) => <ProductCard key={p._id} product={p} />)
-            : <div className="w-full text-center py-12 text-gray-500">No featured products available</div>}
+              ? featured.map((p) => <ProductCard key={p._id} product={p} />)
+              : <div className="w-full text-center py-12 text-gray-500">No featured products available</div>}
         </div>
       </div>
 
@@ -211,8 +215,8 @@ export function NewArrivals({ limit = 8 }) {
           {loading
             ? Array.from({ length: limit }).map((_, i) => <ProductCardSkeleton key={i} />)
             : newArrivals.length > 0
-            ? newArrivals.map((p) => <ProductCard key={p._id} product={p} />)
-            : <div className="w-full text-center py-12 text-gray-500">No new arrivals</div>}
+              ? newArrivals.map((p) => <ProductCard key={p._id} product={p} />)
+              : <div className="w-full text-center py-12 text-gray-500">No new arrivals</div>}
         </div>
       </div>
 

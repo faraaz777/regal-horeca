@@ -22,32 +22,56 @@ const BRANDS = [
 
 export default function Brands() {
   return (
-    <section className="py-20 bg-gray-50 border-y border-black/5 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-6 mb-12 text-center">
-        <p className="text-[10px] uppercase font-bold tracking-[0.4em] text-black/40">Trusted by the best in the world</p>
+    <section className="relative bg-black border-y border-white/10 overflow-hidden">
+    {/* Full-bleed background */}
+    <div className="w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] py-8 sm:py-10 md:py-12">
+  
+      {/* Heading */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 mb-8 sm:mb-10 md:mb-14 text-center">
+        <p className="text-xs sm:text-sm md:text-base uppercase font-semibold tracking-[0.2em] sm:tracking-[0.3em] md:tracking-[0.45em] text-white/50">
+          Trusted by the best in the world
+        </p>
       </div>
-      <div className="flex gap-20 animate-marquee whitespace-nowrap">
-        {[...BRANDS, ...BRANDS].map((brand, i) => (
-          <img 
-            key={i} 
-            src={brand} 
-            alt="Partner Brand" 
-            className="h-10 opacity-30 grayscale hover:opacity-100 hover:grayscale-0 transition-all cursor-crosshair"
-          />
-        ))}
+  
+      {/* Marquee */}
+      <div className="relative overflow-hidden">
+        {/* Padding container for logos */}
+        <div className="px-4 sm:px-6 md:px-8 lg:px-16 xl:px-24">
+          <div className="flex gap-12 sm:gap-16 md:gap-20 lg:gap-24 animate-marquee whitespace-nowrap items-center">
+            {[...BRANDS, ...BRANDS].map((brand, i) => (
+              <img
+                key={i}
+                src={brand}
+                alt="Partner Brand"
+                className="
+                  h-10 sm:h-12 md:h-14 lg:h-16
+                  opacity-50 grayscale
+                  hover:opacity-100 hover:grayscale-0
+                  transition-all duration-500 ease-out
+                  cursor-pointer
+                "
+              />
+            ))}
+          </div>
+        </div>
       </div>
+  
+      {/* Animation */}
       <style>{`
         @keyframes marquee {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
         }
         .animate-marquee {
-          display: flex;
           width: fit-content;
-          animation: marquee 30s linear infinite;
+          animation: marquee 35s linear infinite;
         }
       `}</style>
-    </section>
+  
+    </div>
+  </section>
+  
+
   );
 }
 

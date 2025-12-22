@@ -196,8 +196,8 @@ export default function HomePage() {
       </section>
 
       {/* Brands Section */}
-      <section className="py-12 bg-white">
-        <div className="container mx-auto px-4">
+      <section className="my-12 bg-black w-full flex justify-center items-center ">
+        <div className="container bg-black  ">
           <Brands />
         </div>
       </section>

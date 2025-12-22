@@ -1,266 +1,391 @@
 /**
  * Dynamic Whom We Serve Category Page
- * 
+ *
  * Displays category-specific content matching the SHAPES design
  */
 
-'use client';
+"use client";
 
-import { useState, useMemo, useRef, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useMemo, useRef, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { WhatsAppIcon, ChevronDownIcon } from '@/components/Icons';
-import { useAppContext } from '@/context/AppContext';
-import { getWhatsAppBusinessLink } from '@/lib/utils/whatsapp';
-import toast from 'react-hot-toast';
+import { motion } from "framer-motion";
+import { WhatsAppIcon, ChevronDownIcon } from "@/components/Icons";
+import { useAppContext } from "@/context/AppContext";
+import { getWhatsAppBusinessLink } from "@/lib/utils/whatsapp";
+import toast from "react-hot-toast";
+import hotelImage from "./images/hotelH.png";
+import partnersImage from "./images/Picture1.png";
+import partnersImage2 from "./images/Picture2.png";
+import partnersImage4 from "./images/Picture4.png";
+import partnersImage5 from "./images/Picture5.png";
+import partnersImage6 from "./images/Picture6.png";
+import partnersImage7 from "./images/Picture7.png";
+import partnersImage8 from "./images/Picture8.png";
+import partnersImage9 from "./images/Picture9.png";
+import partnersImage10 from "./images/Picture10.png";
+import partnersImage11 from "./images/Picture11.png";
+import partnersImage12 from "./images/Picture12.png";
+import partnersImage13 from "./images/Picture13.png";
+import partnersImage14 from "./images/Picture14.png";
+import partnersImage15 from "./images/Picture15.png";
 
 // Category-specific content data
 const categoryData = {
   hotels: {
-    title: "Shapes for Hotels",
-    subtitle: "Elevating Hospitality Excellence One Experience at a Time",
-    heroImage: "https://images.unsplash.com/photo-1606490203669-94bd3f0d8b5d?auto=format&fit=crop&w=2000&q=80",
-    introText: "Refined hospitality solutions for luxury hotels—crafted to complement exceptional service with enduring elegance and operational precision.",
+    title: "Designed for Distinguished Hotels",
+    subtitle: "Crafting Elevated Hospitality Experiences",
+    heroImage: hotelImage,
+    introText:
+      "From luxury hotels to boutique properties, Regal delivers refined hospitality solutions that balance timeless elegance, durability, and operational precision.",
     restaurantTypes: [
       {
         title: "Luxury Hotels",
-        description: "Designed to complement the sophistication and precision of elevated hospitality experiences.",
-        image: "https://images.unsplash.com/photo-1606490203669-94bd3f0d8b5d?auto=format&fit=crop&w=800&q=80"
+        description:
+          "Sophisticated solutions designed to complement high-end hotel environments and premium guest experiences.",
+        image: hotelImage,
       },
       {
         title: "Boutique Hotels",
-        description: "Thoughtfully crafted to align with unique concepts and immersive atmospheres enhancing their distinct identity.",
-        image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80"
+        description:
+          "Thoughtfully crafted designs that align with unique concepts and curated atmospheres.",
+        image:
+          "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80",
       },
       {
         title: "Resort Properties",
-        description: "Adaptable and versatile solutions that reflect the bold creativity of modern hospitality styles.",
-        image: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=800&q=80"
+        description:
+          "Versatile solutions reflecting relaxed luxury, comfort, and experiential design.",
+        image:
+          "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?auto=format&fit=crop&w=800&q=80",
       },
       {
         title: "Hotel Chains",
-        description: "Uniform excellence across all locations and formats to meet the scale and standards of growing brands.",
-        image: "https://images.unsplash.com/photo-1564501049412-61c2a3083791?auto=format&fit=crop&w=800&q=80"
-      }
-    ]
+        description:
+          "Consistent quality and design uniformity across multiple locations and formats.",
+        image:
+          "https://images.unsplash.com/photo-1564501049412-61c2a3083791?auto=format&fit=crop&w=800&q=80",
+      },
+    ],
   },
+
   restaurants: {
-    title: "Shapes for Restaurants",
-    subtitle: "Turning Dining Spaces into Experiences",
-    heroImage: "https://images.unsplash.com/photo-1556911220-bff31c812dba?auto=format&fit=crop&w=2000&q=80",
-    introText: "Refined cutlery solutions for elevated dining spaces—crafted to complement exceptional cuisine with enduring elegance and design precision.",
+    title: "Crafted for Exceptional Dining",
+    subtitle: "Where Culinary Spaces Meet Refined Design",
+    heroImage:
+      "https://images.unsplash.com/photo-1556911220-bff31c812dba?auto=format&fit=crop&w=2000&q=80",
+    introText:
+      "Premium dining and tableware solutions by Regal—crafted to elevate presentation, performance, and consistency across restaurant formats.",
     restaurantTypes: [
       {
         title: "Fine Dining Restaurants",
-        description: "Designed to complement the sophistication and precision of elevated dining experiences.",
-        image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80"
+        description:
+          "Precision-crafted solutions enhancing sophistication and attention to detail.",
+        image:
+          "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80",
       },
       {
-        title: "Theme-based Cafes",
-        description: "Thoughtfully crafted to align with unique concepts and immersive atmospheres enhancing their distinct identity.",
-        image: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80"
+        title: "Theme-based Cafés",
+        description:
+          "Design-forward solutions aligned with immersive concepts and storytelling.",
+        image:
+          "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80",
       },
       {
         title: "Fusion Cuisine Outlets",
-        description: "Adaptable and versatile solutions that reflect the bold creativity of modern culinary styles.",
-        image: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=800&q=80"
+        description:
+          "Adaptable designs reflecting creativity, versatility, and modern dining styles.",
+        image:
+          "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=800&q=80",
       },
       {
         title: "Multi-brand Chain Restaurants",
-        description: "Uniform excellence across all locations and formats to meet the scale and standards of growing brands.",
-        image: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80"
-      }
-    ]
+        description:
+          "Uniform excellence across locations while preserving brand identity.",
+        image:
+          "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80",
+      },
+    ],
   },
-  catering: {
-    title: "Shapes for Catering",
-    subtitle: "Event Excellence, Delivered Anywhere",
-    heroImage: "https://images.unsplash.com/photo-1616627984393-ade1843f0aac?auto=format&fit=crop&w=2000&q=80",
-    introText: "Versatile catering equipment for exceptional events—designed for portability, reliability, and stunning presentation at any venue.",
-    restaurantTypes: [
-      {
-        title: "Event Catering",
-        description: "Comprehensive solutions for weddings, corporate events, and special occasions.",
-        image: "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=800&q=80"
-      },
-      {
-        title: "Banquet Services",
-        description: "Large-scale equipment designed for grand celebrations and formal gatherings.",
-        image: "https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&w=800&q=80"
-      },
-      {
-        title: "Mobile Catering",
-        description: "Portable solutions that deliver exceptional results at any location.",
-        image: "https://images.unsplash.com/photo-1556911220-bff31c812dba?auto=format&fit=crop&w=800&q=80"
-      },
-      {
-        title: "Corporate Catering",
-        description: "Professional equipment for business events and corporate functions.",
-        image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80"
-      }
-    ]
-  },
-  gifting: {
-    title: "Shapes for Gifting",
-    subtitle: "Premium Gifts That Leave Lasting Impressions",
-    heroImage: "https://images.unsplash.com/photo-1606490203669-94bd3f0d8b5d?auto=format&fit=crop&w=2000&q=80",
-    introText: "Curated gifting solutions combining elegance and quality—perfect for corporate gifts, wedding favors, and special occasions.",
-    restaurantTypes: [
-      {
-        title: "Corporate Gifts",
-        description: "Premium solutions for business gifting and corporate recognition programs.",
-        image: "https://images.unsplash.com/photo-1606490203669-94bd3f0d8b5d?auto=format&fit=crop&w=800&q=80"
-      },
-      {
-        title: "Wedding Favors",
-        description: "Elegant pieces that make perfect wedding favors and keepsakes.",
-        image: "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=800&q=80"
-      },
-      {
-        title: "Special Occasions",
-        description: "Thoughtfully curated collections for memorable celebrations.",
-        image: "https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&w=800&q=80"
-      },
-      {
-        title: "Gift Sets",
-        description: "Beautifully packaged collections perfect for any occasion.",
-        image: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=800&q=80"
-      }
-    ]
-  },
+
   cafes: {
-    title: "Shapes for Cafes",
-    subtitle: "Creating Memorable Coffee Experiences",
-    heroImage: "https://images.unsplash.com/photo-1541534401786-f9a9fb3c1cdf?auto=format&fit=crop&w=2000&q=80",
-    introText: "Cafe equipment and tableware that enhance brand identity—combining aesthetic appeal with operational efficiency for exceptional customer experiences.",
+    title: "Curated Café Experiences",
+    subtitle: "Thoughtfully Designed for Modern Coffee Culture",
+    heroImage:
+      "https://images.unsplash.com/photo-1541534401786-f9a9fb3c1cdf?auto=format&fit=crop&w=2000&q=80",
+    introText:
+      "Cafe solutions by Regal that enhance brand identity, efficiency, and visual appeal for memorable coffee experiences.",
     restaurantTypes: [
       {
         title: "Coffee Shops",
-        description: "Equipment designed for the perfect coffee experience.",
-        image: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80"
+        description:
+          "Solutions designed for consistency, speed, and superior beverage presentation.",
+        image:
+          "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80",
       },
       {
-        title: "Artisan Cafes",
-        description: "Thoughtfully crafted solutions for unique cafe concepts.",
-        image: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80"
+        title: "Artisan Cafés",
+        description:
+          "Design-led solutions for specialty cafés and concept-driven spaces.",
+        image:
+          "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80",
       },
       {
-        title: "Dessert Cafes",
-        description: "Elegant presentation solutions for sweet experiences.",
-        image: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=800&q=80"
+        title: "Dessert Cafés",
+        description:
+          "Elegant presentation solutions for indulgent dessert experiences.",
+        image:
+          "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=800&q=80",
       },
       {
         title: "Cafe Chains",
-        description: "Consistent quality across multiple locations.",
-        image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80"
-      }
-    ]
+        description:
+          "Consistent quality and visual harmony across multiple outlets.",
+        image:
+          "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80",
+      },
+    ],
   },
+
   bakeries: {
-    title: "Shapes for Bakeries",
-    subtitle: "Displaying Freshness with Style",
-    heroImage: "https://images.unsplash.com/photo-1603808033198-937c4864c1a5?auto=format&fit=crop&w=2000&q=80",
-    introText: "Bakery equipment and display solutions—combining production efficiency with attractive presentation to showcase your baked goods beautifully.",
+    title: "Designed to Showcase Freshness",
+    subtitle: "Where Craft, Display, and Quality Come Together",
+    heroImage:
+      "https://images.unsplash.com/photo-1603808033198-937c4864c1a5?auto=format&fit=crop&w=2000&q=80",
+    introText:
+      "Bakery equipment and display solutions by Regal—balancing production efficiency with premium presentation.",
     restaurantTypes: [
       {
         title: "Artisan Bakeries",
-        description: "Equipment for craft bakeries focusing on quality and tradition.",
-        image: "https://images.unsplash.com/photo-1603808033198-937c4864c1a5?auto=format&fit=crop&w=800&q=80"
+        description:
+          "Craft-focused solutions celebrating quality, tradition, and authenticity.",
+        image:
+          "https://images.unsplash.com/photo-1603808033198-937c4864c1a5?auto=format&fit=crop&w=800&q=80",
       },
       {
         title: "Patisseries",
-        description: "Elegant solutions for pastry and dessert presentation.",
-        image: "https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=800&q=80"
+        description:
+          "Refined display solutions for pastries and premium desserts.",
+        image:
+          "https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=800&q=80",
       },
       {
         title: "Bakery Chains",
-        description: "Scalable solutions for multi-location operations.",
-        image: "https://images.unsplash.com/photo-1556911220-bff31c812dba?auto=format&fit=crop&w=800&q=80"
+        description:
+          "Scalable systems ensuring consistency across multiple locations.",
+        image:
+          "https://images.unsplash.com/photo-1556911220-bff31c812dba?auto=format&fit=crop&w=800&q=80",
       },
       {
         title: "Commercial Bakeries",
-        description: "High-volume equipment for production facilities.",
-        image: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=800&q=80"
-      }
-    ]
-  }
+        description:
+          "High-volume solutions engineered for large-scale production.",
+        image:
+          "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=800&q=80",
+      },
+    ],
+  },
+
+  catering: {
+    title: "Excellence for Every Event",
+    subtitle: "Event-Ready Solutions with Regal Precision",
+    heroImage:
+      "https://images.unsplash.com/photo-1616627984393-ade1843f0aac?auto=format&fit=crop&w=2000&q=80",
+    introText:
+      "Versatile catering solutions designed for portability, reliability, and premium presentation across event formats.",
+    restaurantTypes: [
+      {
+        title: "Event Catering",
+        description:
+          "Comprehensive solutions for weddings, celebrations, and special occasions.",
+        image:
+          "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=800&q=80",
+      },
+      {
+        title: "Banquet Services",
+        description:
+          "Large-scale solutions for formal events and grand gatherings.",
+        image:
+          "https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&w=800&q=80",
+      },
+      {
+        title: "Mobile Catering",
+        description:
+          "Portable solutions delivering consistent performance anywhere.",
+        image:
+          "https://images.unsplash.com/photo-1556911220-bff31c812dba?auto=format&fit=crop&w=800&q=80",
+      },
+      {
+        title: "Corporate Catering",
+        description:
+          "Professional-grade solutions for business and institutional events.",
+        image:
+          "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80",
+      },
+    ],
+  },
+
+  gifting: {
+    title: "Designed to Leave an Impression",
+    subtitle: "Thoughtfully Curated Premium Gifting",
+    heroImage:
+      "https://images.unsplash.com/photo-1606490203669-94bd3f0d8b5d?auto=format&fit=crop&w=2000&q=80",
+    introText:
+      "Curated gifting collections by Regal—combining refined design and lasting quality for meaningful occasions.",
+    restaurantTypes: [
+      {
+        title: "Corporate Gifts",
+        description:
+          "Sophisticated gifting solutions for corporate recognition and branding.",
+        image:
+          "https://images.unsplash.com/photo-1606490203669-94bd3f0d8b5d?auto=format&fit=crop&w=800&q=80",
+      },
+      {
+        title: "Wedding Favors",
+        description: "Elegant keepsakes designed to elevate celebrations.",
+        image:
+          "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=800&q=80",
+      },
+      {
+        title: "Special Occasions",
+        description:
+          "Thoughtfully curated pieces for memorable gifting experiences.",
+        image:
+          "https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&w=800&q=80",
+      },
+      {
+        title: "Gift Sets",
+        description:
+          "Beautifully packaged collections suited for premium gifting.",
+        image:
+          "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=800&q=80",
+      },
+    ],
+  },
 };
 
-const partners = [
-  { name: "Marriott", icon: "🏨" },
-  { name: "Taj Hotels", icon: "🏢" },
-  { name: "ITC Hotels", icon: "🏨" },
-  { name: "Oberoi", icon: "🏢" },
-  { name: "Hyatt", icon: "🏨" },
-  { name: "Radisson", icon: "🏢" }
+// Touchpoints data for Elevating Experiences section
+const TOUCHPOINTS = [
+  {
+    id: "fine-dining",
+    title: "Fine Dining",
+    category: "Dining",
+    description:
+      "Create a refined dining experience with premium tabletop pieces that photograph well, feel balanced in hand, and stay consistent across repeat orders.",
+    imageUrl:
+      "https://images.unsplash.com/photo-1550966842-28c456698471?auto=format&fit=crop&q=80&w=1200",
+  },
+  {
+    id: "breakfast-buffet",
+    title: "Breakfast & Buffet",
+    category: "Service",
+    description:
+      "Support high-volume service with durable, easy-to-handle solutions that look clean on the counter and stay strong through constant washing and refills.",
+    imageUrl:
+      "https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?auto=format&fit=crop&q=80&w=1200",
+  },
+  {
+    id: "in-room-dining",
+    title: "In-Room Dining",
+    category: "Lodging",
+    description:
+      "Deliver comfort and quality in-room with practical, guest-friendly essentials that feel premium and are easy for staff to set up and clear.",
+    imageUrl:
+      "https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&q=80&w=1200",
+  },
+  {
+    id: "banquets-events",
+    title: "Banquets & Events",
+    category: "Scale",
+    description:
+      "Scale confidently for large functions with coordinated ranges designed for speed of service, bulk availability, and a polished, uniform look.",
+    imageUrl:
+      "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=1200",
+  },
+  {
+    id: "lounges-bar",
+    title: "Lounges & Bar Service",
+    category: "Social",
+    description:
+      'Upgrade cocktails and small bites with sleek service pieces that suit bar counters, lounges, and late-night service without looking "generic".',
+    imageUrl:
+      "https://images.unsplash.com/photo-1470337458703-46ad1756a187?auto=format&fit=crop&q=80&w=1200",
+  },
+  {
+    id: "all-day-dining",
+    title: "All-Day Dining",
+    category: "Core",
+    description:
+      "Keep a reliable core range for breakfast-to-dinner service—everyday essentials that match across covers, shifts, and outlets.",
+    imageUrl:
+      "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&q=80&w=1200",
+  },
 ];
 
-const valuePropositions = [
-  {
-    icon: "📦",
-    title: "Built for consistency across service styles",
-    description: "Engineered to deliver reliable performance and uniform quality, no matter the service format or setting."
-  },
-  {
-    icon: "🌍",
-    title: "Global trends, local adaptations",
-    description: "Blending international design inspirations with regional preferences to meet diverse market needs."
-  },
-  {
-    icon: "⭐",
-    title: "Elevating Brand Presence Through Design",
-    description: "Creating cohesive and memorable dining moments by aligning every detail with your brand's identity."
-  },
-  {
-    icon: "🛡️",
-    title: "Precision-crafted for lasting durability",
-    description: "Combining expert craftsmanship and premium materials to ensure cutlery that withstands the demands of daily service and style."
-  },
-  {
-    icon: "✨",
-    title: "Crafted to Enhance Distinctive Culinary Displays",
-    description: "Designed to enhance your unique culinary style, elevating every dish with thoughtful elegance."
-  }
+const partners = [
+  { name: "TAJ", image: partnersImage },
+  { name: "Clarks", image: partnersImage2 },
+  { name: "ROYAL ORCHID HOTELS", image: partnersImage9 },
+  { name: "Oberoi HOTELS & RESORTS", image: partnersImage4 },
+  { name: "THE LEELA PALACES HOTELS RESORTS", image: partnersImage5 },
+  { name: "ORIS HÖLSTEIN 1904", image: partnersImage6 },
+  { name: "Marriott HOTELS · RESORTS · SUITES", image: partnersImage7 },
+  { name: "Shera town", image: partnersImage8 },
+  { name: "Radisson BLU", image: partnersImage13 },
+  { name: "Le MERIDIEN", image: partnersImage15 },
+  { name: "American M2 Pets", image: partnersImage10 },
+  { name: "JUMBO", image: partnersImage11 },
+  { name: "ANdAZ. HOTELS & RESORTS", image: partnersImage12 },
+  { name: "TEDi", image: partnersImage14 },
 ];
 
 const features = [
   {
     title: "Engineered for Maximum Durability",
-    description: "Crafted with premium materials and precision engineering, our products withstand the toughest demands of high-volume hospitality environments.",
-    icon: "🛡️"
+    description:
+      "Crafted with premium materials and precision engineering, our products withstand the toughest demands of high-volume hospitality environments.",
+    icon: "🛡️",
   },
   {
     title: "Dishwasher-safe, commercial grade quality",
-    description: "Built to handle rigorous cleaning cycles while maintaining their elegant appearance."
+    description:
+      "Built to handle rigorous cleaning cycles while maintaining their elegant appearance.",
   },
   {
     title: "Growth-Ready Stock Solutions",
-    description: "Scalable inventory management to support your business expansion."
+    description:
+      "Scalable inventory management to support your business expansion.",
   },
   {
     title: "On-demand replenishment capabilities",
-    description: "Flexible supply chain solutions that adapt to your operational needs."
-  }
+    description:
+      "Flexible supply chain solutions that adapt to your operational needs.",
+  },
 ];
 
 export default function CategoryPage() {
   const params = useParams();
   const router = useRouter();
-  const slug = params?.slug || '';
+  const slug = params?.slug || "";
   const category = categoryData[slug] || categoryData.restaurants;
-  const { cart, products, categories: allCategories, businessTypes } = useAppContext();
+  const {
+    cart,
+    products,
+    categories: allCategories,
+    businessTypes,
+  } = useAppContext();
 
   // Get current category name from the page
-  const currentCategoryName = category.title.replace('Shapes for ', '');
+  const currentCategoryName = category.title.replace("Shapes for ", "");
 
   const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    companyName: '',
-    state: '',
-    query: '',
+    fullName: "",
+    email: "",
+    phone: "",
+    companyName: "",
+    state: "",
+    query: "",
     categories: [currentCategoryName],
   });
 
@@ -274,81 +399,98 @@ export default function CategoryPage() {
   // Close category dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
+      if (
+        categoryDropdownRef.current &&
+        !categoryDropdownRef.current.contains(event.target)
+      ) {
         setIsCategoryDropdownOpen(false);
       }
     };
 
     if (isCategoryDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isCategoryDropdownOpen]);
 
   // Get departments (top-level categories) - limit to 4 for display
   const departments = useMemo(() => {
     if (!allCategories || allCategories.length === 0) return [];
-    return allCategories.filter(cat => {
-      const catParent = cat.parent?._id || cat.parent || null;
-      return catParent === null && (cat.level === 'department' || cat.level === 'category');
-    }).slice(0, 4);
+    return allCategories
+      .filter((cat) => {
+        const catParent = cat.parent?._id || cat.parent || null;
+        return (
+          catParent === null &&
+          (cat.level === "department" || cat.level === "category")
+        );
+      })
+      .slice(0, 4);
   }, [allCategories]);
 
   // Get cart items with product details
   const cartItems = useMemo(() => {
-    return cart.map(cartItem => {
-      const product = products.find(p => {
-        const pid = p._id || p.id;
-        return pid?.toString() === cartItem.productId?.toString();
-      });
-      return product ? {
-        productId: cartItem.productId,
-        productName: product.title || product.name || 'Product',
-        quantity: cartItem.quantity,
-      } : null;
-    }).filter(Boolean);
+    return cart
+      .map((cartItem) => {
+        const product = products.find((p) => {
+          const pid = p._id || p.id;
+          return pid?.toString() === cartItem.productId?.toString();
+        });
+        return product
+          ? {
+              productId: cartItem.productId,
+              productName: product.title || product.name || "Product",
+              quantity: cartItem.quantity,
+            }
+          : null;
+      })
+      .filter(Boolean);
   }, [cart, products]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
   const handleCategoryToggle = (categoryName) => {
-    setFormData(prev => {
+    setFormData((prev) => {
       const currentCategories = prev.categories || [];
       if (currentCategories.includes(categoryName)) {
         return {
           ...prev,
-          categories: currentCategories.filter(cat => cat !== categoryName)
+          categories: currentCategories.filter((cat) => cat !== categoryName),
         };
       } else {
         return {
           ...prev,
-          categories: [...currentCategories, categoryName]
+          categories: [...currentCategories, categoryName],
         };
       }
     });
   };
 
   const scrollToForm = () => {
-    const formElement = document.getElementById('contact');
+    const formElement = document.getElementById("contact");
     if (formElement) {
-      formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      formElement.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
 
   const submitEnquiry = async (e) => {
     e.preventDefault();
-    
-    if (!formData.fullName || !formData.email || !formData.phone || !formData.state) {
-      toast.error('Please fill in all required fields');
+
+    if (
+      !formData.fullName ||
+      !formData.email ||
+      !formData.phone ||
+      !formData.state
+    ) {
+      toast.error("Please fill in all required fields");
       return;
     }
 
@@ -356,9 +498,10 @@ export default function CategoryPage() {
 
     try {
       // Combine selected categories with the current page category
-      const allCategories = formData.categories.length > 0 
-        ? formData.categories 
-        : [category.title.replace('Shapes for ', '')];
+      const allCategories =
+        formData.categories.length > 0
+          ? formData.categories
+          : [category.title.replace("Shapes for ", "")];
 
       const enquiryData = {
         name: formData.fullName,
@@ -369,14 +512,14 @@ export default function CategoryPage() {
         message: formData.query,
         categories: allCategories,
         cartItems: includeCart && cartItems.length > 0 ? cartItems : [],
-        source: 'whom-we-serve', // Specific source for "whom we serve" pages
-        userType: 'business', // This is a "whom we serve" page, so default to business
+        source: "whom-we-serve", // Specific source for "whom we serve" pages
+        userType: "business", // This is a "whom we serve" page, so default to business
       };
 
-      const response = await fetch('/api/enquiries', {
-        method: 'POST',
+      const response = await fetch("/api/enquiries", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(enquiryData),
       });
@@ -384,10 +527,10 @@ export default function CategoryPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit enquiry');
+        throw new Error(data.error || "Failed to submit enquiry");
       }
 
-      let whatsappMessage = 'Hello! I would like to make an enquiry:\n\n';
+      let whatsappMessage = "Hello! I would like to make an enquiry:\n\n";
       whatsappMessage += `Name: ${formData.fullName}\n`;
       whatsappMessage += `Email: ${formData.email}\n`;
       whatsappMessage += `Phone: ${formData.phone}\n`;
@@ -396,38 +539,45 @@ export default function CategoryPage() {
       }
       whatsappMessage += `State: ${formData.state}\n`;
       if (allCategories.length > 0) {
-        whatsappMessage += `Categories: ${allCategories.join(', ')}\n`;
+        whatsappMessage += `Categories: ${allCategories.join(", ")}\n`;
       }
-      
+
       if (includeCart && cartItems.length > 0) {
         whatsappMessage += `\n📦 Products I'm interested in:\n`;
         cartItems.forEach((item, index) => {
-          whatsappMessage += `${index + 1}. ${item.productName} (Quantity: ${item.quantity})\n`;
+          whatsappMessage += `${index + 1}. ${item.productName} (Quantity: ${
+            item.quantity
+          })\n`;
         });
-        whatsappMessage += `\nTotal Items: ${cartItems.reduce((sum, item) => sum + item.quantity, 0)}\n`;
+        whatsappMessage += `\nTotal Items: ${cartItems.reduce(
+          (sum, item) => sum + item.quantity,
+          0
+        )}\n`;
       }
-      
+
       if (formData.query) {
         whatsappMessage += `\nMessage: ${formData.query}\n`;
       }
-      
+
       const whatsappUrl = getWhatsAppBusinessLink(whatsappMessage);
-      window.open(whatsappUrl, '_blank');
-      
+      window.open(whatsappUrl, "_blank");
+
       setFormData({
-        fullName: '',
-        email: '',
-        phone: '',
-        companyName: '',
-        state: '',
-        query: '',
+        fullName: "",
+        email: "",
+        phone: "",
+        companyName: "",
+        state: "",
+        query: "",
         categories: [currentCategoryName],
       });
-      
-      toast.success('Enquiry submitted successfully! Opening WhatsApp...');
+
+      toast.success("Enquiry submitted successfully! Opening WhatsApp...");
     } catch (error) {
-      console.error('Error submitting enquiry:', error);
-      toast.error(error.message || 'Failed to submit enquiry. Please try again.');
+      console.error("Error submitting enquiry:", error);
+      toast.error(
+        error.message || "Failed to submit enquiry. Please try again."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -437,7 +587,9 @@ export default function CategoryPage() {
     return (
       <div className="bg-white min-h-screen py-12 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-black mb-4">Category Not Found</h1>
+          <h1 className="text-2xl font-bold text-black mb-4">
+            Category Not Found
+          </h1>
           <Link href="/whom-we-serve" className="text-accent hover:underline">
             ← Back to Whom We Serve
           </Link>
@@ -447,39 +599,47 @@ export default function CategoryPage() {
   }
 
   return (
-    <div className=" lg:pt-[100px] md:pt-0 sm:pt-10 pt-20 pb-10 ">
+    <div className="pt-[80px] sm:pt-[90px] md:pt-[100px] lg:pt-[120px] pb-10">
       {/* Hero Section */}
-      <section className="relative min-h-[300px] max-h-[300px] md:min-h-[700px] flex items-center justify-center overflow-hidden">
-        <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: `url(${category.heroImage})` }}
+      <section className="relative min-h-[250px] sm:min-h-[300px] md:min-h-[500px] lg:min-h-[700px] flex items-center justify-center overflow-hidden">
+        <Image
+          src={category.heroImage}
+          alt={category.title}
+          fill
+          className="object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/40" />
-        <div className="relative z-10 max-w-4xl mx-auto px-4 md:px-8 lg:px-12 text-center">
-          <h1 className="text-4xl md:text-5xl lg:text-[3.5rem] font-bold text-white tracking-tight leading-tight mb-6">
+        <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12 text-center">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-[3.5rem] font-bold text-white tracking-tight leading-tight mb-4 sm:mb-6">
             {category.title}
           </h1>
-          <p className="text-lg md:text-xl text-white/90 leading-relaxed mb-10 max-w-2xl mx-auto">
+          <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/90 leading-relaxed mb-6 sm:mb-8 md:mb-10 max-w-2xl mx-auto px-2">
             {category.subtitle}
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
             <button
-              onClick={() => router.push('/catalog')}
-              className="inline-flex items-center justify-center whitespace-nowrap text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover-elevate active-elevate-2 border border-accent min-h-10 rounded-md bg-accent text-white font-semibold px-8 gap-2"
+              onClick={() => router.push("/catalog")}
+              className="inline-flex items-center justify-center whitespace-nowrap text-xs sm:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover-elevate active-elevate-2 border border-accent min-h-9 sm:min-h-10 rounded-md bg-accent text-white font-semibold px-6 sm:px-8 gap-2 w-full sm:w-auto"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" x2="12" y1="15" y2="3"></line>
-              </svg>
-              Download Catalog
+              View Catalog
             </button>
             <button
               onClick={scrollToForm}
-              className="inline-flex items-center justify-center whitespace-nowrap text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover-elevate active-elevate-2 border border-white/30 shadow-xs active:shadow-none min-h-10 rounded-md bg-white/10 backdrop-blur-sm text-white font-semibold px-8 gap-2"
+              className="inline-flex items-center justify-center whitespace-nowrap text-xs sm:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover-elevate active-elevate-2 border border-white/30 shadow-xs active:shadow-none min-h-9 sm:min-h-10 rounded-md bg-white/10 backdrop-blur-sm text-white font-semibold px-6 sm:px-8 gap-2 w-full sm:w-auto"
             >
               Enquire Now
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="w-5 h-5"
+              >
                 <path d="M5 12h14"></path>
                 <path d="m12 5 7 7-7 7"></path>
               </svg>
@@ -489,89 +649,208 @@ export default function CategoryPage() {
       </section>
 
       {/* Restaurant Types Section */}
-      <section className="py-16 md:py-24 lg:py-32 bg-white">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-12">
-          <div className="text-center mb-12 md:mb-16">
-            <p className="text-base md:text-lg text-black/70 leading-relaxed max-w-3xl mx-auto">
+      <section className="py-12 sm:py-16 md:py-20 px-4 sm:px-6 md:px-12 lg:px-20 bg-white">
+        <div className="max-w-[1600px] mx-auto">
+          <div className="text-center mb-8 sm:mb-12 md:mb-16">
+            <p className="text-sm sm:text-base md:text-lg text-black/70 leading-relaxed max-w-3xl mx-auto px-2">
               {category.introText}
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-            {category.restaurantTypes.map((type, index) => (
-              <div key={index} className="group relative aspect-[4/3] rounded-md overflow-hidden cursor-pointer">
-                <Image
-                  src={type.image}
-                  alt={type.title}
-                  fill
-                  className="object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
-                  <h4 className="text-lg md:text-xl font-semibold text-white mb-2">
-                    {type.title}
-                  </h4>
-                  <p className="text-sm text-white/80 leading-relaxed opacity-0 max-h-0 group-hover:opacity-100 group-hover:max-h-24 transition-all duration-300 overflow-hidden">
-                    {type.description}
-                  </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 sm:gap-x-6 gap-y-12 sm:gap-y-16 md:gap-y-20">
+            {category.restaurantTypes.map((type, index) => {
+              // Offset classes for staggered layout (only on large screens)
+              const offsetClasses = [
+                "lg:mt-20", // Col 1 sits lower
+                "lg:mt-8", // Col 2 sits highest
+                "lg:mt-32", // Col 3 sits lowest
+                "lg:mt-16", // Col 4 sits medium
+              ];
+
+              return (
+                <div
+                  key={index}
+                  className={`flex flex-col group transition-all duration-1000 ${
+                    offsetClasses[index % 4]
+                  }`}
+                >
+                  {/* Text Content */}
+                  <div className="mb-6 sm:mb-8 md:mb-10 max-w-[320px]">
+                    <h3 className="text-lg sm:text-xl font-bold text-black mb-4 sm:mb-6 leading-tight transition-colors duration-700 group-hover:text-accent">
+                      {type.title}
+                    </h3>
+                    <p className="text-gray-500 text-xs sm:text-[13px] leading-relaxed font-normal">
+                      {type.description}
+                    </p>
+                  </div>
+
+                  {/* Image Container */}
+                  <div className="relative overflow-hidden aspect-[4/5] shadow-sm">
+                    <div className="absolute inset-0 bg-black/5 z-10 pointer-events-none group-hover:bg-transparent transition-all duration-1000" />
+                    <Image
+                      src={type.image}
+                      alt={type.title}
+                      fill
+                      className="object-cover grayscale-[20%] group-hover:grayscale-0 scale-100 group-hover:scale-105 transition-all duration-[1500ms] ease-out"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                    />
+
+                    {/* Reveal Overlay Animation */}
+                    <div
+                      className="absolute inset-0 bg-white z-20"
+                      style={{
+                        animation: `reveal-overlay 1.5s ease-out forwards`,
+                        animationDelay: `${(index + 1) * 200}ms`,
+                        transform: "translateY(0)",
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
-
 
       {/* Partners Section */}
-      <section className="py-16 md:py-24 bg-[#F5F5F5]">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-12">
-          <p className="text-center text-sm font-semibold uppercase tracking-wider text-black/60 mb-10">
+      <section className="py-8 sm:py-12 md:py-16 bg-gray-900 transition-colors duration-500">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12">
+          <p className="text-center text-xs sm:text-sm font-semibold uppercase tracking-wider text-white/60 mb-6 sm:mb-8 md:mb-10 transition-colors duration-500">
             Proud Partners in Hospitality
           </p>
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-8 md:gap-12 items-center justify-items-center">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4 md:gap-6">
             {partners.map((partner, index) => (
-              <div key={index} className="flex flex-col items-center gap-2 opacity-60 hover:opacity-100 transition-opacity duration-300 grayscale hover:grayscale-0">
-                <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-2xl md:text-3xl">
-                  {partner.icon}
+              <div
+                key={index}
+                className="group relative bg-gray-800 rounded-lg p-1 sm:p-1.5 md:p-2 flex items-center justify-center min-h-[80px] sm:min-h-[90px] md:min-h-[100px] aspect-square shadow-sm hover:shadow-xl transition-all duration-500 cursor-pointer overflow-hidden transform hover:scale-105 hover:-translate-y-2"
+                style={{
+                  animationDelay: `${index * 50}ms`,
+                }}
+              >
+                {/* Hover gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-accent/0 via-accent/0 to-accent/0 group-hover:from-accent/5 group-hover:via-accent/10 group-hover:to-accent/5 transition-all duration-500 rounded-lg" />
+
+                {/* Shine effect on hover */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700">
+                  <div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out"
+                    style={{
+                      background:
+                        "linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent)",
+                    }}
+                  />
                 </div>
-                <span className="text-xs font-medium text-black/60">{partner.name}</span>
+
+                {/* Border glow effect */}
+                <div className="absolute inset-0 rounded-lg border-2 border-transparent group-hover:border-accent/30 transition-all duration-500" />
+
+                {/* Partner Logo Image */}
+                <div className="relative z-10 w-full h-full flex items-center justify-center">
+                  <Image
+                    src={partner.image}
+                    alt={partner.name}
+                    fill
+                    className="object-contain transition-all duration-500 transform group-hover:scale-110"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 14vw"
+                  />
+                </div>
+
+                {/* Ripple effect on click */}
+                <div className="absolute inset-0 rounded-lg opacity-0 group-active:opacity-100 group-active:bg-accent/10 transition-opacity duration-300" />
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Value Propositions Section */}
-      {/* <section className="py-16 md:py-24 lg:py-32 bg-white">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-12">
-          <div className="text-center mb-12 md:mb-16">
-            <h2 className="text-3xl md:text-4xl lg:text-[2.5rem] font-bold text-black tracking-tight mb-4">
-              Embodying Distinction in {category.title.replace('Shapes for ', '')}
-            </h2>
-            <p className="text-base md:text-lg text-black/70 leading-relaxed max-w-2xl mx-auto">
-              Crafted to elevate every experience with unmatched elegance, bringing a distinctive touch to your operations.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-            {valuePropositions.map((prop, index) => (
-              <div key={index} className="rounded-xl bg-white text-black shadow-sm border border-black/10 hover:shadow-lg transition-shadow duration-300">
-                <div className="p-6 md:p-8">
-                  <div className="text-4xl mb-4">{prop.icon}</div>
-                  <h4 className="text-lg md:text-xl font-semibold text-black mb-3">
-                    {prop.title}
-                  </h4>
-                  <p className="text-sm md:text-base text-black/70 leading-relaxed">
-                    {prop.description}
-                  </p>
-                </div>
+      {/* Split Section: Elevating Experiences (Video Inspired) */}
+      <section className="py-12 sm:py-16 md:py-20 lg:py-12 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12">
+          <div className="flex flex-col lg:flex-row gap-12 sm:gap-16 lg:gap-20">
+            {/* Left Sticky Heading */}
+            <div className="lg:w-1/2 lg:sticky lg:top-40 self-start">
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8 }}
+              >
+                <p className="text-accent uppercase tracking-[0.2em] sm:tracking-[0.3em] font-bold text-xs sm:text-sm mb-3 sm:mb-4">
+                  HoReCa Excellence
+                </p>
+                <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.1] tracking-tighter mb-6 sm:mb-8">
+                  Elevating Experiences <br className="hidden sm:block" />{" "}
+                  across your Property
+                </h2>
+                <p className="text-gray-500 text-base sm:text-lg max-w-md leading-relaxed">
+                  Designed to bring consistency, elegance, and elevated
+                  presentation to every space within your property.
+                </p>
+              </motion.div>
+            </div>
+
+            {/* Right Grid Layout */}
+            <div className="lg:w-1/2">
+              <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10 sm:auto-rows-fr overflow-x-auto sm:overflow-x-visible pb-4 sm:pb-0">
+                {TOUCHPOINTS.map((tp, idx) => (
+                  <motion.div
+                    key={tp.id}
+                    initial={{ opacity: 0, y: 40 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: "-50px" }}
+                    transition={{ duration: 0.7, delay: idx * 0.1 }}
+                    className="group flex flex-col h-full min-w-[280px] sm:min-w-0"
+                  >
+                    <h3 className="text-lg sm:text-xl font-bold uppercase tracking-tight mb-3 group-hover:text-accent transition-colors duration-300">
+                      {tp.title}
+                    </h3>
+                    <p className="text-gray-600 text-xs sm:text-sm leading-relaxed flex-grow">
+                      {tp.description}
+                    </p>
+                  </motion.div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </div>
-      </section> */}
+      </section>
+
+      {/* Comprehensive Solutions Section (Video Inspired) */}
+      <section className="py-8 sm:py-16 md:py-20 lg:py-8 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12 text-center mb-12 sm:mb-16 md:mb-20">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8 }}
+          >
+            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl 2xl:text-8xl font-bold tracking-tighter mb-6 sm:mb-8">
+              Comprehensive <br /> <span className="text-accent">Table-top </span> Solutions
+            </h2>
+            <p className="text-gray-500 text-base sm:text-lg max-w-2xl mx-auto mb-8 sm:mb-12 px-4">
+              A tabletop collection that unifies form, function, and guest
+              experience across every dining touchpoint.
+            </p>
+            <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
+              <button
+                onClick={scrollToForm}
+                className="bg-black text-white px-6 sm:px-8 md:px-10 py-3 sm:py-4 text-xs sm:text-sm font-bold uppercase tracking-widest hover:bg-accent transition-all duration-300"
+              >
+                Enquire Now
+              </button>
+              <button
+                onClick={() => router.push("/catalog?category=tableware")}
+                className="border border-black px-6 sm:px-8 md:px-10 py-3 sm:py-4 text-xs sm:text-sm font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all duration-300"
+              >
+                VIEW TABLEWARE{" "}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      </section>
 
       {/* Product Collections Section */}
       {departments.length > 0 && (
-        <section id="products" className="py-16 md:py-24 lg:py-32 bg-[#F5F5F5]">
+        <section id="products" className="py-16 md:py-24 lg:py-12 bg-[#F5F5F5]">
           <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-12">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12 md:mb-16">
               <div>
@@ -579,7 +858,8 @@ export default function CategoryPage() {
                   Dining Experience Collections
                 </h2>
                 <p className="text-base md:text-lg text-black/70 leading-relaxed max-w-xl">
-                  Crafted for elegance, durability, and effortless maintenance—designed to enhance every dining occasion.
+                  Crafted for elegance, durability, and effortless
+                  maintenance—designed to enhance every dining occasion.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -590,11 +870,22 @@ export default function CategoryPage() {
                   Enquire Now
                 </button>
                 <button
-                  onClick={() => router.push('/catalog')}
+                  onClick={() => router.push("/catalog")}
                   className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover-elevate active-elevate-2 border border-black/20 shadow-xs active:shadow-none min-h-9 px-4 py-2 gap-2"
                 >
-                  Download Catalog
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                  View Catalog
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="w-4 h-4"
+                  >
                     <path d="M5 12h14"></path>
                     <path d="m12 5 7 7-7 7"></path>
                   </svg>
@@ -603,12 +894,13 @@ export default function CategoryPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
               {departments.map((dept) => {
-                const deptSlug = dept.slug || dept.name?.toLowerCase().replace(/\s+/g, '-');
+                const deptSlug =
+                  dept.slug || dept.name?.toLowerCase().replace(/\s+/g, "-");
                 return (
                   <Link
                     key={dept._id || dept.id}
                     href={`/catalog?department=${deptSlug}`}
-                    className="group relative aspect-[3/4] md:aspect-[4/3] rounded-md overflow-hidden"
+                    className="group relative aspect-[2/3] md:aspect-[4/3] rounded-md overflow-hidden"
                   >
                     {dept.image ? (
                       <Image
@@ -627,7 +919,18 @@ export default function CategoryPage() {
                       </h4>
                       <span className="inline-flex items-center gap-2 text-accent font-medium text-sm md:text-base group-hover:gap-3 transition-all duration-300">
                         Learn More
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="w-4 h-4"
+                        >
                           <path d="M5 12h14"></path>
                           <path d="m12 5 7 7-7 7"></path>
                         </svg>
@@ -641,133 +944,38 @@ export default function CategoryPage() {
         </section>
       )}
 
-      {/* Statistics Section */}
-      <section className="py-16 md:py-24 bg-black">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-12">
-          <div className="text-center mb-12 md:mb-16">
-            <h2 className="text-3xl md:text-4xl lg:text-[2.5rem] font-bold text-white tracking-tight">
-              Powering Quality and Growth
-            </h2>
-            <p className="text-base md:text-lg text-white/70 mt-4 max-w-2xl mx-auto">
-              Robust infrastructure and advanced systems drive consistent quality while supporting scalable business expansion.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
-            <div className="text-center">
-              <div className="text-4xl md:text-5xl lg:text-6xl font-bold text-accent mb-3">100K+</div>
-              <p className="text-sm md:text-base text-white/80">sq. ft. state of the art facility</p>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl md:text-5xl lg:text-6xl font-bold text-accent mb-3">400+</div>
-              <p className="text-sm md:text-base text-white/80">Hospitality and Trade Dealers</p>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl md:text-5xl lg:text-6xl font-bold text-accent mb-3">25+</div>
-              <p className="text-sm md:text-base text-white/80">countries spanning</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-16 md:py-24 lg:py-32 bg-white">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-12">
-          <div className="flex flex-col lg:flex-row gap-8 lg:gap-16">
-            <div className="lg:w-1/3">
-              <div className="flex flex-col gap-2">
-                {features.map((feature, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setActiveFeature(index)}
-                    className={`text-left px-4 py-4 transition-all duration-300 ${
-                      index === activeFeature 
-                        ? 'bg-black/5 pl-6 border-l-4 border-l-accent' 
-                        : 'hover:bg-black/5'
-                    }`}
-                  >
-                    <span className={`text-sm md:text-base font-semibold ${
-                      index === activeFeature ? 'text-black' : 'text-black/70'
-                    }`}>
-                      {feature.title}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="lg:w-2/3">
-              <div className="bg-black/5 rounded-md p-8 md:p-12 min-h-[300px] flex flex-col justify-center">
-                <div className="text-5xl mb-6">{features[activeFeature].icon}</div>
-                <h3 className="text-2xl md:text-3xl font-bold text-black mb-4">
-                  {features[activeFeature].title}
-                </h3>
-                <p className="text-base md:text-lg text-black/70 leading-relaxed">
-                  {features[activeFeature].description}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Catering CTA Section */}
-      {slug === 'restaurants' && (
-        <section id="catering" className="py-16 md:py-24 bg-[#F5F5F5]">
-          <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-12">
-            <div className="relative rounded-md overflow-hidden min-h-[300px] md:min-h-[400px] flex items-center">
-              <div 
-                className="absolute inset-0 bg-cover bg-center max-h-[400px]"
-                style={{ backgroundImage: `url(${categoryData.catering.heroImage})` }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-transparent" />
-              <div className="relative z-10 p-8 md:p-12 lg:p-16 max-w-xl">
-                <h2 className="text-3xl md:text-4xl lg:text-[2.5rem] font-bold text-white tracking-tight mb-6">
-                  Shapes for Catering
-                </h2>
-                <div className="flex flex-wrap gap-4">
-                  <Link
-                    href="/whom-we-serve/catering"
-                    className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover-elevate active-elevate-2 border border-white/30 shadow-xs active:shadow-none min-h-9 px-4 py-2 bg-white/10 backdrop-blur-sm text-white font-semibold gap-2"
-                  >
-                    Learn More
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                      <path d="M5 12h14"></path>
-                      <path d="m12 5 7 7-7 7"></path>
-                    </svg>
-                  </Link>
-                  <button
-                    onClick={scrollToForm}
-                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover-elevate active-elevate-2 bg-accent text-white border border-accent min-h-9 px-4 py-2"
-                  >
-                    Enquire Now
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
+      
 
       {/* Contact Form Section */}
-      <section id="contact" className="py-16 md:py-24 lg:py-32 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 md:px-8 lg:px-12">
-          <div className="text-center mb-10">
-            <h2 className="text-3xl md:text-4xl lg:text-[2.5rem] font-bold text-black tracking-tight mb-4">
+      <section
+        id="contact"
+        className=" sm:py-16 md:py-24 lg:py-12 bg-gray-50"
+      >
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12">
+          <div className="text-center mb-8 sm:mb-10">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-[2.5rem] font-bold text-black tracking-tight mb-3 sm:mb-4">
               Get in Touch
             </h2>
-            <p className="text-base md:text-lg text-black/70">
+            <p className="text-sm sm:text-base md:text-lg text-black/70 px-2">
               Have questions about our products? We'd love to hear from you.
             </p>
           </div>
-          
-          <form onSubmit={submitEnquiry} className="bg-white rounded-lg p-6 md:p-8 shadow-sm">
-            <div className="space-y-6">
+
+          <form
+            onSubmit={submitEnquiry}
+            className="bg-white rounded-lg p-4 sm:p-6 md:p-8 shadow-sm"
+          >
+            <div className="space-y-4 sm:space-y-6">
               {/* Two Column Grid Layout */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 {/* Column 1 - Contact Details */}
                 <div className="space-y-6">
                   {/* Name */}
                   <div>
-                    <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label
+                      htmlFor="fullName"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
                       Name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -784,7 +992,10 @@ export default function CategoryPage() {
 
                   {/* Email */}
                   <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label
+                      htmlFor="email"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
                       Email <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -801,7 +1012,10 @@ export default function CategoryPage() {
 
                   {/* Phone */}
                   <div>
-                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label
+                      htmlFor="phone"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
                       Phone Number <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -820,10 +1034,13 @@ export default function CategoryPage() {
                 {/* Column 2 - Additional Details */}
                 <div className="space-y-6">
                   {/* Company & State - Side by Side */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     {/* Company */}
                     <div>
-                      <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label
+                        htmlFor="companyName"
+                        className="block text-sm font-medium text-gray-700 mb-2"
+                      >
                         Company (Optional)
                       </label>
                       <input
@@ -839,7 +1056,10 @@ export default function CategoryPage() {
 
                     {/* State */}
                     <div>
-                      <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label
+                        htmlFor="state"
+                        className="block text-sm font-medium text-gray-700 mb-2"
+                      >
                         State <span className="text-red-500">*</span>
                       </label>
                       <input
@@ -863,22 +1083,25 @@ export default function CategoryPage() {
                     <div className="relative" ref={categoryDropdownRef}>
                       <button
                         type="button"
-                        onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                        onClick={() =>
+                          setIsCategoryDropdownOpen(!isCategoryDropdownOpen)
+                        }
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-left flex items-center justify-between hover:border-gray-400 transition-colors focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
                       >
                         <span className="text-sm text-gray-700">
-                          {formData.categories.length > 0 
-                            ? `${formData.categories.length} categor${formData.categories.length === 1 ? 'y' : 'ies'} selected`
-                            : 'Select categories'
-                          }
+                          {formData.categories.length > 0
+                            ? `${formData.categories.length} categor${
+                                formData.categories.length === 1 ? "y" : "ies"
+                              } selected`
+                            : "Select categories"}
                         </span>
-                        <ChevronDownIcon 
+                        <ChevronDownIcon
                           className={`w-5 h-5 text-gray-500 transition-transform duration-300 ${
-                            isCategoryDropdownOpen ? 'rotate-180' : ''
+                            isCategoryDropdownOpen ? "rotate-180" : ""
                           }`}
                         />
                       </button>
-                      
+
                       {/* Dropdown */}
                       {isCategoryDropdownOpen && (
                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
@@ -886,30 +1109,43 @@ export default function CategoryPage() {
                             {businessTypes && businessTypes.length > 0 ? (
                               businessTypes.map((businessType) => {
                                 const businessTypeName = businessType.name;
-                                const isSelected = formData.categories.includes(businessTypeName);
+                                const isSelected =
+                                  formData.categories.includes(
+                                    businessTypeName
+                                  );
                                 return (
                                   <label
-                                    key={businessType._id || businessType.id || businessTypeName}
+                                    key={
+                                      businessType._id ||
+                                      businessType.id ||
+                                      businessTypeName
+                                    }
                                     className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer transition-colors"
                                   >
                                     <input
                                       type="checkbox"
                                       checked={isSelected}
-                                      onChange={() => handleCategoryToggle(businessTypeName)}
+                                      onChange={() =>
+                                        handleCategoryToggle(businessTypeName)
+                                      }
                                       className="w-4 h-4 text-accent border-gray-300 rounded focus:ring-accent focus:ring-2 transition-all hover:scale-110"
                                     />
-                                    <span className="text-sm text-gray-700">{businessTypeName}</span>
+                                    <span className="text-sm text-gray-700">
+                                      {businessTypeName}
+                                    </span>
                                   </label>
                                 );
                               })
                             ) : (
-                              <p className="text-sm text-gray-500 p-2">No categories available</p>
+                              <p className="text-sm text-gray-500 p-2">
+                                No categories available
+                              </p>
                             )}
                           </div>
                         </div>
                       )}
                     </div>
-                    
+
                     {/* Selected Categories Display */}
                     {formData.categories.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -935,7 +1171,10 @@ export default function CategoryPage() {
 
                   {/* Message */}
                   <div>
-                    <label htmlFor="query" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label
+                      htmlFor="query"
+                      className="block text-sm font-medium text-gray-700 mb-2"
+                    >
                       Message (Optional)
                     </label>
                     <textarea
@@ -962,11 +1201,16 @@ export default function CategoryPage() {
                     <div className="flex items-center gap-2 sm:gap-3">
                       <span className="text-base sm:text-lg">📦</span>
                       <h3 className="text-xs sm:text-sm font-semibold text-gray-900">
-                        Cart Items ({cartItems.reduce((sum, item) => sum + item.quantity, 0)} items)
+                        Cart Items (
+                        {cartItems.reduce(
+                          (sum, item) => sum + item.quantity,
+                          0
+                        )}{" "}
+                        items)
                       </h3>
                     </div>
                     <div className="flex items-center gap-2 sm:gap-3">
-                      <label 
+                      <label
                         className="flex items-center gap-1.5 sm:gap-2 cursor-pointer"
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -979,11 +1223,13 @@ export default function CategoryPage() {
                           }}
                           className="w-4 h-4 text-accent border-gray-300 rounded focus:ring-accent focus:ring-2 transition-all duration-200 hover:scale-110"
                         />
-                        <span className="text-xs text-gray-700 font-medium">Include</span>
+                        <span className="text-xs text-gray-700 font-medium">
+                          Include
+                        </span>
                       </label>
-                      <ChevronDownIcon 
+                      <ChevronDownIcon
                         className={`w-4 h-4 sm:w-5 sm:h-5 text-gray-600 transition-transform duration-300 ease-in-out ${
-                          isCartDropdownOpen ? 'rotate-180' : ''
+                          isCartDropdownOpen ? "rotate-180" : ""
                         } group-hover:text-gray-900`}
                       />
                     </div>
@@ -991,7 +1237,9 @@ export default function CategoryPage() {
 
                   <div
                     className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                      isCartDropdownOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+                      isCartDropdownOpen
+                        ? "max-h-[500px] opacity-100"
+                        : "max-h-0 opacity-0"
                     }`}
                   >
                     <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-2 border-t border-blue-200">
@@ -1001,13 +1249,17 @@ export default function CategoryPage() {
                             {cartItems.map((item, index) => (
                               <button
                                 type="button"
-                                key={index} 
+                                key={index}
                                 onClick={() => {
-                                  window.dispatchEvent(new CustomEvent('openCartDrawer'));
+                                  window.dispatchEvent(
+                                    new CustomEvent("openCartDrawer")
+                                  );
                                 }}
                                 className="w-full text-left text-xs sm:text-sm text-gray-700 flex justify-between items-center p-2 rounded-md bg-white/60 hover:bg-white transition-all duration-200 hover:shadow-sm hover:translate-x-1 active:scale-[0.98] cursor-pointer group"
                               >
-                                <span className="font-medium group-hover:text-accent transition-colors truncate pr-2">{item.productName}</span>
+                                <span className="font-medium group-hover:text-accent transition-colors truncate pr-2">
+                                  {item.productName}
+                                </span>
                                 <span className="font-semibold text-accent px-2 py-0.5 bg-accent/10 rounded-full group-hover:bg-accent/20 transition-colors flex-shrink-0">
                                   Qty: {item.quantity}
                                 </span>
@@ -1038,7 +1290,9 @@ export default function CategoryPage() {
                   className="w-full sm:w-auto min-w-[200px] bg-green-500 hover:bg-green-600 active:bg-green-700 text-white font-semibold py-3 px-8 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg active:scale-[0.98]"
                 >
                   <WhatsAppIcon className="w-5 h-5" />
-                  <span>{isSubmitting ? 'Submitting...' : 'Submit Enquiry'}</span>
+                  <span>
+                    {isSubmitting ? "Submitting..." : "Submit Enquiry"}
+                  </span>
                 </button>
               </div>
             </div>

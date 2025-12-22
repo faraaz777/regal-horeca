@@ -4,44 +4,46 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowUpRight } from "lucide-react";
+import hotel from "./hotel.webp"
+import restaurant from "./restaurant.webp"
+import cafes from "./cafes.webp"
+import bakeries from "./bakeries.webp"
+  import catering from "./image-2.webp"
+import banquets from "./banquets.webp"
 
 const categories = [
-  {
-    title: "Hotels",
-    slug: "hotels",
-    image:
-      "https://images.unsplash.com/photo-1606490203669-94bd3f0d8b5d?auto=format&fit=crop&w=1600&q=80",
-  },
+
   {
     title: "Restaurants",
     slug: "restaurants",
-    image:
-      "https://images.unsplash.com/photo-1556911220-bff31c812dba?auto=format&fit=crop&w=1200&q=80",
+    image:restaurant,
   },
   {
     title: "Catering",
     slug: "catering",
-    image:
-      "https://images.unsplash.com/photo-1616627984393-ade1843f0aac?auto=format&fit=crop&w=1200&q=80",
+    image:catering,
   },
   {
-    title: "Gifting",
-    slug: "gifting",
-    image:
-      "https://images.unsplash.com/photo-1606490203669-94bd3f0d8b5d?auto=format&fit=crop&w=1200&q=80",
+    title: "Banquets",
+    slug: "banquets",
+    image:banquets,
   },
   {
     title: "Cafes",
     slug: "cafes",
-    image:
-      "https://images.unsplash.com/photo-1541534401786-f9a9fb3c1cdf?auto=format&fit=crop&w=1200&q=80",
+    image:cafes,
   },
   {
     title: "Bakeries",
     slug: "bakeries",
-    image:
-      "https://images.unsplash.com/photo-1603808033198-937c4864c1a5?auto=format&fit=crop&w=1200&q=80",
+    image:bakeries,
   },
+  {
+    title: "Hotels",
+    slug: "hotels",
+    image:hotel,
+  },
+  
 ];
 
 
@@ -74,7 +76,7 @@ export default function OurCategories() {
             onMouseLeave={() => setHoveredIndex(null)}
           >
             {/* Card Container */}
-            <div className="relative w-full aspect-[3/4] rounded-2xl overflow-hidden">
+            <div className="relative w-full aspect-[6/10] rounded-2xl overflow-hidden">
               {/* Image with grayscale filter */}
               <Image
                 src={cat.image}

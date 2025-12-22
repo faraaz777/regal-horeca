@@ -599,7 +599,7 @@ export default function CategoryPage() {
   }
 
   return (
-    <div className="pt-[80px] sm:pt-[90px] md:pt-[100px] lg:pt-[120px] pb-10">
+    <div className=" sm:pt-0 md:pt-0 lg:pt-0  ">
       {/* Hero Section */}
       <section className="relative min-h-[250px] sm:min-h-[300px] md:min-h-[500px] lg:min-h-[700px] flex items-center justify-center overflow-hidden">
         <Image

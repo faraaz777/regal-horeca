@@ -3,7 +3,8 @@
 /**
  * Hero Component
  * 
- * Hero slider with smooth transitions and animations
+ * Full screen hero slider with premium aesthetic using Playfair Display font.
+ * Features smooth transitions, parallax effects, and elegant typography.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -99,10 +100,18 @@ export default function Hero() {
     setTouchEndX(null);
   };
 
+  // Handle scroll down
+  const handleScrollDown = () => {
+    window.scrollTo({
+      top: window.innerHeight,
+      behavior: 'smooth',
+    });
+  };
+
   return (
-    <section className="relative w-full overflow-hidden bg-black pt-[120px] md:pt-[140px]">
+    <section className="relative w-full overflow-hidden bg-black h-[85svh] md:h-[90svh]">
       <div
-        className="relative h-[70vh] sm:h-[80vh] lg:h-[85vh]"
+        className="relative w-full h-full"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -110,72 +119,81 @@ export default function Hero() {
         {slides.map((slide, idx) => (
           <div
             key={slide.id}
-            className={`absolute inset-0 transition-all duration-[1200ms] ease-out ${
-              idx === current
-                ? 'opacity-100 scale-100 z-10'
-                : 'opacity-0 scale-110 z-0'
-            }`}
+            className={`absolute inset-0 transition-all duration-[1500ms] ease-out ${idx === current
+              ? 'opacity-100 z-10'
+              : 'opacity-0 z-0'
+              }`}
           >
-            {/* Background Image with Zoom Effect */}
-            <div className="absolute inset-0">
+            {/* Background Image with Slow Zoom Effect */}
+            <div className="absolute inset-0 overflow-hidden">
               <Image
                 src={slide.image}
                 alt={slide.title}
                 fill
                 priority={idx === 0}
-                className={`object-cover transition-transform duration-[8000ms] ease-linear ${
-                  idx === current ? 'scale-110' : 'scale-100'
-                }`}
+                className={`object-cover transition-transform duration-[10000ms] ease-in-out ${idx === current ? 'scale-110' : 'scale-100'
+                  }`}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+              {/* Refined Gradient Overlay */}
+              <div className="absolute inset-0 bg-black/40 bg-gradient-to-b from-black/60 via-transparent to-black/60" />
+              <div className="absolute inset-0 bg-black/20" />
             </div>
 
-            {/* Content */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
+            {/* Content Container */}
+            <div className="absolute inset-0 flex items-center justify-center -translate-y-8 md:-translate-y-12">
+              <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 text-center flex flex-col items-center">
+
+                {/* Decorative Line */}
+                <div
+                  className={`w-[1px] h-12 bg-white/50 mb-6 transition-all duration-1000 delay-300 ${idx === current ? 'opacity-100 h-12' : 'opacity-0 h-0'
+                    }`}
+                />
+
                 <p
-                  className={`text-white/60 uppercase tracking-[0.4em] text-xs sm:text-sm mb-6 transition-all duration-1000 delay-300 transform ${
-                    idx === current
-                      ? 'translate-y-0 opacity-100'
-                      : 'translate-y-8 opacity-0'
-                  }`}
+                  className={`text-white/80 uppercase tracking-[0.3em] text-[10px] sm:text-xs mb-4 transition-all duration-1000 delay-500 transform font-medium ${idx === current
+                    ? 'translate-y-0 opacity-100'
+                    : 'translate-y-8 opacity-0'
+                    }`}
                 >
                   Premium Hospitality Solutions
                 </p>
+
                 <h1
-                  className={`text-4xl sm:text-6xl md:text-8xl font-bold text-white mb-8 leading-[1.1] transition-all duration-1000 delay-500 transform ${
-                    idx === current
-                      ? 'translate-y-0 opacity-100'
-                      : 'translate-y-12 opacity-0'
-                  }`}
+                  className={`text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-serif text-white mb-4 leading-[1.1] tracking-tight transition-all duration-1000 delay-700 transform ${idx === current
+                    ? 'translate-y-0 opacity-100'
+                    : 'translate-y-12 opacity-0'
+                    }`}
                 >
                   {slide.title}
                 </h1>
+
                 <p
-                  className={`text-white/80 text-lg md:text-xl mb-12 max-w-2xl mx-auto font-light transition-all duration-1000 delay-700 transform ${
-                    idx === current
-                      ? 'translate-y-0 opacity-100'
-                      : 'translate-y-8 opacity-0'
-                  }`}
+                  className={`text-white/90 text-lg md:text-xl mb-8 max-w-xl mx-auto font-light leading-relaxed transition-all duration-1000 delay-900 transform ${idx === current
+                    ? 'translate-y-0 opacity-100'
+                    : 'translate-y-8 opacity-0'
+                    }`}
                 >
                   {slide.subtitle}
                 </p>
+
                 <div
-                  className={`flex flex-wrap items-center justify-center gap-6 transition-all duration-1000 delay-900 transform ${
-                    idx === current
-                      ? 'translate-y-0 opacity-100'
-                      : 'translate-y-8 opacity-0'
-                  }`}
+                  className={`flex flex-col sm:flex-row items-center justify-center gap-6 transition-all duration-1000 delay-1000 transform ${idx === current
+                    ? 'translate-y-0 opacity-100'
+                    : 'translate-y-8 opacity-0'
+                    }`}
                 >
                   <Link
                     href={slide.ctaLink}
-                    className="px-10 py-5 bg-white text-black text-xs font-black uppercase tracking-[0.2em] hover:bg-accent hover:text-white transition-all duration-300 shadow-2xl"
+                    className="group relative px-8 py-3 overflow-hidden bg-white text-black transition-all duration-300 hover:bg-white/90"
                   >
-                    {slide.ctaText}
+                    <span className="relative z-10 text-xs font-bold uppercase tracking-[0.2em]">
+                      {slide.ctaText}
+                    </span>
                   </Link>
+
                   <Link
                     href="/about"
-                    className="px-10 py-5 bg-transparent border border-white/30 text-white text-xs font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all duration-300"
+                    className="group px-8 py-3 bg-transparent border border-white/30 text-white text-xs font-bold uppercase tracking-[0.2em] hover:bg-white hover:text-black transition-all duration-300"
                   >
                     Our Story
                   </Link>
@@ -185,57 +203,46 @@ export default function Hero() {
           </div>
         ))}
 
-        {/* Left Arrow */}
+        {/* Custom Navigation Arrows */}
+        <div className="absolute bottom-8 right-8 z-20 hidden md:flex gap-4">
+          <button
+            onClick={prevSlide}
+            className="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center text-white hover:bg-white hover:text-black transition-all duration-300"
+          >
+            ←
+          </button>
+          <button
+            onClick={nextSlide}
+            className="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center text-white hover:bg-white hover:text-black transition-all duration-300"
+          >
+            →
+          </button>
+        </div>
+
+        {/* Scroll Indicator */}
         <button
-          type="button"
-          onClick={prevSlide}
-          className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 inline-flex items-center justify-center rounded-full w-9 h-9 sm:w-10 sm:h-10 bg-black/35 hover:bg-black/55 backdrop-blur-md border border-white/10 transition-all duration-300 group z-20"
-          aria-label="Previous slide"
+          onClick={handleScrollDown}
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 text-white flex flex-col items-center gap-2 opacity-60 hover:opacity-100 transition-opacity duration-300 animate-bounce"
         >
-          <span className="text-white text-xl sm:text-2xl leading-none group-hover:-translate-x-0.5 transition-transform duration-300">
-            ‹
-          </span>
+          <span className="text-[10px] uppercase tracking-widest">Scroll</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 5V19M12 19L19 12M12 19L5 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </button>
 
-        {/* Right Arrow */}
-        <button
-          type="button"
-          onClick={nextSlide}
-          className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 inline-flex items-center justify-center rounded-full w-9 h-9 sm:w-10 sm:h-10 bg-black/35 hover:bg-black/55 backdrop-blur-md border border-white/10 transition-all duration-300 group z-20"
-          aria-label="Next slide"
-        >
-          <span className="text-white text-xl sm:text-2xl leading-none group-hover:translate-x-0.5 transition-transform duration-300">
-            ›
-          </span>
-        </button>
-
-        {/* Slide Navigation Dots */}
-        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-20 flex items-center gap-4">
+        {/* Slide Indicators */}
+        <div className="absolute left-8 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-4 hidden md:flex">
           {slides.map((_, idx) => (
             <button
               key={idx}
               onClick={() => goToSlide(idx)}
-              className="group py-4 px-2"
-              aria-label={`Go to slide ${idx + 1}`}
-            >
-              <div
-                className={`h-[2px] transition-all duration-500 rounded-full ${
-                  idx === current
-                    ? 'w-12 bg-white'
-                    : 'w-6 bg-white/30 group-hover:bg-white/60'
+              className={`w-1 h-8 rounded-full transition-all duration-300 ${idx === current ? 'bg-white h-12' : 'bg-white/20 hover:bg-white/40'
                 }`}
-              />
-            </button>
+              aria-label={`Go to slide ${idx + 1}`}
+            />
           ))}
         </div>
-
-        {/* Visual Indicator of Progress */}
-        <div
-          className="absolute bottom-0 left-0 h-1 bg-accent z-30 transition-all duration-[8000ms] ease-linear"
-          style={{ width: `${((current + 1) / slides.length) * 100}%` }}
-        />
       </div>
     </section>
   );
 }
-

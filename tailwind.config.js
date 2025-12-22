@@ -11,6 +11,9 @@ module.exports = {
         white: '#FFFFFF',
         black: '#000000',
         accent: '#EE4023',
+        'royal-gold': '#C5A059',
+        'rich-black': '#121212',
+        'warm-white': '#FAFAF9',
         // Legacy support - map to design system
         primary: '#000000',
         'primary-700': '#000000',
@@ -23,6 +26,7 @@ module.exports = {
       },
       fontFamily: {
         sans: ['Montserrat', 'sans-serif'],
+        serif: ['Playfair Display', 'serif'],
       },
     },
   },

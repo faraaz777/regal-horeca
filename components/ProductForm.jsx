@@ -35,25 +35,83 @@ const AVAILABLE_COLORS = [
 
 /**
  * Uploads a file to Cloudflare R2 via the API
+ * Compresses images on frontend before upload to prevent HTTP 413 errors
  */
 async function uploadToR2(file) {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  const response = await fetch('/api/upload?folder=products', {
-    method: 'POST',
-    body: formData,
-  });
-
-  const data = await response.json();
+  // Dynamically import compression library to keep bundle size small
+  const imageCompression = (await import('browser-image-compression')).default;
   
-  if (!response.ok || !data.success) {
-    const errorMessage = data.error || 'Upload failed';
-    const errorDetails = data.details ? `: ${data.details}` : '';
-    throw new Error(`${errorMessage}${errorDetails}`);
+  const MAX_INPUT_SIZE = 15 * 1024 * 1024; // 15MB - reject files larger than this
+  const MAX_OUTPUT_SIZE = 4 * 1024 * 1024; // 4MB - target compressed size
+  
+  try {
+    // Hard pre-check: Reject files larger than 15MB
+    if (file.size > MAX_INPUT_SIZE) {
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      throw new Error(`File size (${fileSizeMB}MB) exceeds the maximum allowed size of 15MB. Please choose a smaller image.`);
+    }
+    
+    // Validate file type
+    const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validImageTypes.includes(file.type)) {
+      throw new Error(`Invalid file type. Only images (JPEG, PNG, GIF, WebP) are allowed.`);
+    }
+    
+    let fileToUpload = file;
+    
+    // Compress image if it's larger than 4MB
+    if (file.size > MAX_OUTPUT_SIZE) {
+      try {
+        const compressionOptions = {
+          maxSizeMB: 4, // Target 4MB max
+          // maxWidthOrHeight omitted to prevent resizing - only compress quality
+          useWebWorker: true, // Use Web Worker for better performance
+          fileType: file.type, // Preserve original file type
+          preserveExif: false, // Remove EXIF data to reduce size
+        };
+        
+        fileToUpload = await imageCompression(file, compressionOptions);
+        
+        // Validate compressed file size before uploading
+        if (fileToUpload.size > MAX_OUTPUT_SIZE * 1.1) { // Allow 10% buffer
+          const compressedSizeMB = (fileToUpload.size / (1024 * 1024)).toFixed(2);
+          throw new Error(`Compression failed: Image is still ${compressedSizeMB}MB after compression. Please try a smaller image.`);
+        }
+      } catch (compressionError) {
+        // If compression fails, provide helpful error message
+        if (compressionError.message.includes('Compression failed')) {
+          throw compressionError;
+        }
+        throw new Error(`Image compression failed: ${compressionError.message}. Please try a different image.`);
+      }
+    }
+    
+    // Create FormData with compressed file (preserve original filename)
+    const formData = new FormData();
+    formData.append('file', fileToUpload, file.name);
+    
+    // Upload to server
+    const response = await fetch('/api/upload?folder=products', {
+      method: 'POST',
+      body: formData,
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok || !data.success) {
+      const errorMessage = data.error || 'Upload failed';
+      const errorDetails = data.details ? `: ${data.details}` : '';
+      throw new Error(`${errorMessage}${errorDetails}`);
+    }
+    
+    return data.url;
+  } catch (error) {
+    // Re-throw with clear error message
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(`Upload failed: ${String(error)}`);
   }
-
-  return data.url;
 }
 
 /**

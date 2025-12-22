@@ -69,12 +69,30 @@ export function AppProvider({ children }) {
             'Cache-Control': 'no-cache',
           },
         });
+        
+        // Check if response is OK
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch products' }));
+          console.error('Products API error:', response.status, errorData);
+          setProducts([]); // Set empty array on error
+          return;
+        }
+        
         const data = await response.json();
-        if (data.success) {
+        
+        // Handle both success and error responses
+        if (data.success && Array.isArray(data.products)) {
+          setProducts(data.products);
+        } else if (data.error) {
+          console.error('Products API returned error:', data.error, data.details);
+          setProducts([]);
+        } else {
+          console.warn('Products API returned unexpected format:', data);
           setProducts(data.products || []);
         }
       } catch (error) {
         console.error('Failed to fetch products:', error);
+        setProducts([]); // Set empty array on network error
       } finally {
         setLoading(false);
       }

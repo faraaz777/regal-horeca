@@ -54,7 +54,7 @@ export default function LoadingPage() {
           <p className="text-sm sm:text-base text-black/70">
             Premium Hospitality Supplies
           </p>
-          <h1 className="text-xl sm:text-base text-black/70">
+          <h1 className="text-xl sm:text-base text-black/70 font-extrabold">
             HAPPY BIRTHDAY RAYEES BHAI
           </h1>
         </div>

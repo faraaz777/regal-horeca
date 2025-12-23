@@ -42,6 +42,17 @@ export default function ProductCard({ product, onAdd }) {
   // State for specs reveal (handling hover/click for mobile support)
   const [specsOpen, setSpecsOpen] = useState(false);
 
+  // Detect mobile/touch device
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.matchMedia("(max-width: 768px)").matches || 'ontouchstart' in window);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // Format price
   const formatPrice = (price) => {
     if (price == null || price === 0) return 'Price on request';
@@ -99,22 +110,22 @@ export default function ProductCard({ product, onAdd }) {
     setClicked(false);
   };
 
-  // Prepare specifications for display
-  const specifications = product.specifications || [];
-  // Group specifications in pairs for table display (2 columns)
-  const specRows = [];
-  for (let i = 0; i < specifications.length; i += 2) {
-    const spec1 = specifications[i];
-    const spec2 = specifications[i + 1];
-    if (spec1) {
-      specRows.push({
-        label1: spec1.label,
-        value1: `${spec1.value}${spec1.unit ? spec1.unit : ''}`,
-        label2: spec2?.label || '',
-        value2: spec2 ? `${spec2.value}${spec2.unit ? spec2.unit : ''}` : ''
-      });
+  const toggleSpecs = (e) => {
+    if (isMobile) {
+      e.preventDefault();
+      e.stopPropagation();
+      setSpecsOpen(!specsOpen);
     }
-  }
+  };
+
+  const closeSpecs = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSpecsOpen(false);
+  };
+
+  // Prepare specifications for display - limit to top 5
+  const specifications = (product.specifications || []).slice(0, 5);
 
   return (
     <div className="product-card-wrapper">
@@ -126,17 +137,19 @@ export default function ProductCard({ product, onAdd }) {
               alt={productName}
               fill
               sizes="300px"
-              className="object-contain"
+              className="object-cover"
             />
           </Link>
-          {/* Wishlist button on top left */}
-          <button
-            onClick={handleWishlistToggle}
-            className={`product-card-wishlist ${isLiked ? 'active' : ''}`}
-            aria-label={isLiked ? 'Remove from wishlist' : 'Add to wishlist'}
-          >
-            <HeartIcon isFilled={isLiked} />
-          </button>
+          {/* Wishlist button - Hide when specs are open (on both mobile and desktop) */}
+          {!specsOpen && (
+            <button
+              onClick={handleWishlistToggle}
+              className={`product-card-wishlist ${isLiked ? 'active' : ''}`}
+              aria-label={isLiked ? 'Remove from wishlist' : 'Add to wishlist'}
+            >
+              <HeartIcon isFilled={isLiked} />
+            </button>
+          )}
         </div>
         <div className={`product-card-bottom ${clicked ? 'clicked' : ''}`}>
           <div className="product-card-left">
@@ -166,33 +179,28 @@ export default function ProductCard({ product, onAdd }) {
       </div>
       <div
         className={`product-card-inside ${specsOpen ? 'active' : ''}`}
-        onClick={() => setSpecsOpen(!specsOpen)}
-        onMouseEnter={() => setSpecsOpen(true)}
-        onMouseLeave={() => setSpecsOpen(false)}
+        onClick={toggleSpecs}
+        onMouseEnter={() => !isMobile && setSpecsOpen(true)}
+        onMouseLeave={() => !isMobile && setSpecsOpen(false)}
       >
         <div className="product-card-icon">
-          {specsOpen ? <ClearIcon /> : <InfoIcon />}
+          {/* Flip icon ONLY on mobile */}
+          {isMobile && specsOpen ? <ClearIcon /> : <InfoIcon />}
         </div>
         <div className="product-card-contents">
           {specifications.length > 0 ? (
-            <table>
-              <tbody>
-                {specRows.map((row, index) => (
-                  <React.Fragment key={index}>
-                    <tr>
-                      <th>{row.label1}</th>
-                      <th>{row.label2}</th>
-                    </tr>
-                    <tr>
-                      <td>{row.value1}</td>
-                      <td>{row.value2}</td>
-                    </tr>
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
+            <div className="product-card-specs-list">
+              {specifications.map((spec, index) => (
+                <div key={index} className="product-card-spec-item">
+                  <span className="product-card-spec-label">{spec.label}</span>
+                  <span className="product-card-spec-value">
+                    {spec.value}{spec.unit ? ` ${spec.unit}` : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
           ) : (
-            <div>
+            <div className="product-card-specs-empty">
               <p>No specifications available</p>
             </div>
           )}

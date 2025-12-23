@@ -528,6 +528,7 @@ function CategoryForm({ category, allCategories, onSave, onClose, loading }) {
     level: 'department',
     parent: null,
     tagline: '',
+    image: '',
   });
   const [error, setError] = useState('');
 
@@ -545,6 +546,7 @@ function CategoryForm({ category, allCategories, onSave, onClose, loading }) {
         level: 'department',
         parent: null,
         tagline: '',
+        image: '',
       });
     }
   }, [category]);
@@ -658,6 +660,20 @@ function CategoryForm({ category, allCategories, onSave, onClose, loading }) {
                 onChange={handleChange} 
                 className="w-full mt-1 p-2.5 sm:p-2 border border-gray-300 rounded-md shadow-sm text-base" 
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Image URL</label>
+              <input 
+                name="image" 
+                type="url"
+                value={formData.image || ''} 
+                onChange={handleChange} 
+                placeholder="https://example.com/image.jpg"
+                className="w-full mt-1 p-2.5 sm:p-2 border border-gray-300 rounded-md shadow-sm text-base" 
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Enter the full URL of the category image (e.g., from Unsplash, your CDN, or uploaded images)
+              </p>
             </div>
           </div>
           <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 p-4 border-t bg-gray-50">

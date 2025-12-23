@@ -1,0 +1,203 @@
+/* Premium Sidebar Filter Styles */
+
+.sidebar-container {
+    padding-right: 1.5rem;
+}
+
+.filter-section-title {
+    font-size: 0.920rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
+    color: #000;
+}
+
+.filter-section {
+    padding: 1.5rem 0;
+    border-bottom: 1.5px solid rgba(0, 0, 0, 0.08);
+}
+
+.filter-section:last-child {
+    border-bottom: none;
+}
+
+/* Category Navigation */
+.category-section {
+    padding-bottom: 1.5rem;
+    border-bottom: 1.5px solid rgba(0, 0, 0, 0.08);
+}
+
+.category-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.category-link {
+    display: flex;
+    align-items: center;
+    padding: 0.32rem 0;
+    color: rgba(0, 0, 0, 0.6);
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.category-link:hover {
+    color: #000;
+    padding-left: 0.5rem;
+}
+
+.category-link.active {
+    color: #EE4023;
+    font-weight: 600;
+    padding-left: 1rem;
+}
+
+.category-link.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 25%;
+    height: 50%;
+    width: 2px;
+    background-color: #EE4023;
+}
+
+/* Custom Checkbox */
+.custom-checkbox-container {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    padding: 0.28rem 0;
+    transition: all 0.2s ease;
+}
+
+.custom-checkbox-container:hover {
+    opacity: 0.8;
+}
+
+.custom-checkbox {
+    position: relative;
+    height: 18px;
+    width: 18px;
+    background-color: #fff;
+    border: 1.5px solid rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+    margin-right: 10px;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+
+.custom-checkbox-container input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+}
+
+.custom-checkbox-container input:checked~.custom-checkbox {
+    background-color: #EE4023;
+    border-color: #EE4023;
+}
+
+.custom-checkbox::after {
+    content: "";
+    position: absolute;
+    display: none;
+    left: 5px;
+    top: 1px;
+    width: 5px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.custom-checkbox-container input:checked~.custom-checkbox::after {
+    display: block;
+}
+
+/* Color Swatches */
+.color-swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+    padding-top: 0.5rem;
+}
+
+.color-swatch-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 2px;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.color-swatch-btn:hover:not(:disabled) {
+    transform: scale(1.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.color-swatch-btn.active {
+    box-shadow: 0 0 0 2px white, 0 0 0 4px #EE4023;
+    border-color: transparent;
+}
+
+.color-swatch-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Price Input Group */
+.price-input-group {
+    display: flex;
+    align-items: center;
+    background-color: #FAFAF9;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 6px;
+    padding: 6px;
+    margin-top: 0.5rem;
+}
+
+.price-field {
+    width: 50%;
+    background: transparent;
+    border: none;
+    padding: 8px 12px;
+    font-size: 0.8125rem;
+    color: #121212;
+    font-weight: 500;
+    text-align: center;
+}
+
+.price-field:focus {
+    outline: none;
+}
+
+.price-divider {
+    width: 1px;
+    height: 20px;
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Animation */
+.filter-dropdown-enter {
+    opacity: 0;
+    transform: translateY(-10px);
+}
+
+.filter-dropdown-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: all 300ms ease-out;
+}

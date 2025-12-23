@@ -22,6 +22,7 @@ import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 import { useAppContext } from '@/context/AppContext';
 import { useProductFilters } from '@/hooks/useProductFilters';
 import { PlusIcon, MinusIcon, FilterIcon, XIcon, ChevronLeftIcon } from '@/components/Icons';
+import '@/components/new/SidebarFilter.css';
 
 const ITEMS_PER_PAGE = 24;
 
@@ -31,7 +32,7 @@ const fetcher = (url) => fetch(url).then(res => res.json());
 function CatalogPageContent() {
   const { products, categories, loading: contextLoading } = useAppContext();
   const searchParams = useSearchParams();
-  
+
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [openFilterSections, setOpenFilterSections] = useState({
@@ -94,24 +95,24 @@ function CatalogPageContent() {
   // Category navigation
   const { currentCategory, parentCategory, displayCategories } = useMemo(() => {
     const findCategoryBySlug = (slug) => slug ? categories.find(c => c.slug === slug) : undefined;
-    
+
     const current = findCategoryBySlug(selectedCategorySlug);
     const parent = current?.parent ? categories.find(p => {
       const pId = p._id || p.id;
       const currentParent = current.parent?._id || current.parent;
       return pId === currentParent;
     }) : null;
-    
+
     const children = current
       ? categories.filter(c => {
-          const cParent = c.parent?._id || c.parent;
-          const currentId = current._id || current.id;
-          return cParent === currentId;
-        })
+        const cParent = c.parent?._id || c.parent;
+        const currentId = current._id || current.id;
+        return cParent === currentId;
+      })
       : categories.filter(c => {
-          const cParent = c.parent?._id || c.parent;
-          return cParent === null;
-        });
+        const cParent = c.parent?._id || c.parent;
+        return cParent === null;
+      });
 
     return {
       currentCategory: current,
@@ -120,8 +121,8 @@ function CatalogPageContent() {
     };
   }, [selectedCategorySlug, categories]);
 
-  const currentCategoryName = searchQuery 
-    ? `Search: "${searchQuery}"` 
+  const currentCategoryName = searchQuery
+    ? `Search: "${searchQuery}"`
     : (currentCategory?.name || 'All Products');
 
   // Pagination
@@ -183,24 +184,32 @@ function CatalogPageContent() {
   const FilterSection = ({ title, id, children, count }) => {
     const isOpen = openFilterSections[id] !== false;
     const hasItems = count !== undefined ? count > 0 : true;
-    
+
     if (!hasItems) return null;
 
     return (
-      <div className="py-4 border-b border-medium">
-        <button 
-          onClick={() => toggleFilterSection(id)} 
-          className="w-full flex justify-between items-center"
+      <div className="filter-section">
+        <button
+          onClick={() => toggleFilterSection(id)}
+          className="w-full flex justify-between items-center group"
         >
-          <h3 className="text-sm font-semibold uppercase tracking-wider">
+          <h3 className="filter-section-title group-hover:text-accent transition-colors">
             {title}
             {count !== undefined && count > 0 && (
-              <span className="ml-2 text-xs font-normal text-black/50">({count})</span>
+              <span className="ml-2 text-[10px] font-medium text-black/30 bg-black/5 px-1.5 py-0.5 rounded-full">
+                {count}
+              </span>
             )}
           </h3>
-          {isOpen ? <MinusIcon className="w-4 h-4" /> : <PlusIcon className="w-4 h-4" />}
+          <div className="text-black/50 group-hover:text-accent transition-colors">
+            {isOpen ? <MinusIcon className="w-3.5 h-3.5" /> : <PlusIcon className="w-3.5 h-3.5" />}
+          </div>
         </button>
-        {isOpen && <div className="pt-3">{children}</div>}
+        {isOpen && (
+          <div className="pt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+            {children}
+          </div>
+        )}
       </div>
     );
   };
@@ -251,21 +260,21 @@ function CatalogPageContent() {
     if (chips.length === 0) return null;
 
     return (
-      <div className="mb-6 flex flex-wrap gap-2 items-center">
-        <span className="text-sm font-medium text-black/70">Active Filters:</span>
+      <div className="mb-6 flex flex-wrap gap-2.5 items-center">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-black/40">Filters:</span>
         {chips.map((chip, index) => (
           <button
             key={index}
             onClick={chip.onRemove}
-            className="flex items-center gap-1 px-3 py-1 text-xs bg-black/5 hover:bg-black/10 rounded-full transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium bg-black/[0.03] hover:bg-black/[0.06] border border-black/5 rounded-full transition-all group"
           >
-            <span>{chip.label}</span>
-            <XIcon className="w-3 h-3" />
+            <span className="text-black/70 group-hover:text-black">{chip.label}</span>
+            <XIcon className="w-3 h-3 text-black/20 group-hover:text-accent transition-colors" />
           </button>
         ))}
         <button
           onClick={clearAllFilters}
-          className="px-3 py-1 text-xs text-accent hover:text-black font-semibold transition-colors"
+          className="px-2 py-1 text-[10px] uppercase tracking-widest text-accent hover:text-black font-bold transition-colors ml-1"
         >
           Clear All
         </button>
@@ -275,36 +284,39 @@ function CatalogPageContent() {
 
   // Filter Sidebar Component
   const FilterSidebar = () => (
-    <aside>
-      <div className="flex justify-between items-center mb-4 lg:hidden">
-        <h2 className="text-lg font-semibold">Filter</h2>
-        <button onClick={() => setIsFilterOpen(false)}>
+    <aside className="sidebar-container">
+      <div className="flex justify-between items-center mb-6 lg:hidden">
+        <h2 className="text-xl font-bold tracking-tight">Filters</h2>
+        <button
+          onClick={() => setIsFilterOpen(false)}
+          className="p-2 hover:bg-black/5 rounded-full transition-colors"
+        >
           <XIcon className="w-5 h-5" />
         </button>
       </div>
 
       {/* Categories */}
-      <div className="py-4 border-b border-medium">
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wider">Categories</h3>
+      <div className="category-section first:pt-0">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="filter-section-title">Categories</h3>
           {(selectedCategorySlug || hasActiveFilters) && (
             <button
               onClick={() => {
                 clearAllFilters();
                 window.location.href = '/catalog';
               }}
-              className="text-xs text-accent hover:text-black transition-colors font-semibold"
+              className="text-[10px] uppercase tracking-wider text-accent hover:text-black transition-colors font-bold"
             >
               Reset
             </button>
           )}
         </div>
-        <ul className="space-y-2 text-sm">
+        <ul className="category-list">
           {parentCategory && (
             <li>
-              <Link 
-                href={`/catalog?category=${parentCategory.slug}`} 
-                className="flex items-center text-black/70 hover:text-black font-medium transition-colors"
+              <Link
+                href={`/catalog?category=${parentCategory.slug}`}
+                className="category-link opacity-40 hover:opacity-100"
               >
                 <ChevronLeftIcon className="w-4 h-4 mr-1" />
                 {parentCategory.name}
@@ -312,14 +324,10 @@ function CatalogPageContent() {
             </li>
           )}
           {displayCategories.map(cat => (
-            <li key={cat._id || cat.id} style={{ paddingLeft: parentCategory ? '1rem' : '0' }}>
+            <li key={cat._id || cat.id}>
               <Link
                 href={`/catalog?category=${cat.slug}`}
-                className={`block transition-colors ${
-                  selectedCategorySlug === cat.slug 
-                    ? 'text-accent font-semibold' 
-                    : 'text-black/70 hover:text-black'
-                }`}
+                className={`category-link ${selectedCategorySlug === cat.slug ? 'active' : ''}`}
               >
                 {cat.name}
               </Link>
@@ -329,67 +337,60 @@ function CatalogPageContent() {
       </div>
 
       {/* Price Range */}
-      <FilterSection 
-        title="Price" 
+      <FilterSection
+        title="Price"
         id="price"
         count={facets.priceRange.min !== facets.priceRange.max ? undefined : 0}
       >
-        <div className="space-y-2">
-          <div className="text-xs text-black/60 mb-2">
-            Range: ${facets.priceRange.min} - ${facets.priceRange.max}
+        <div className="space-y-4">
+          <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-black/40">
+            <span>Min</span>
+            <span>Max</span>
           </div>
-          <div className="flex items-center gap-2">
-            <input 
-              type="number" 
-              placeholder={`Min (${facets.priceRange.min})`}
-              value={priceRange.min} 
-              onChange={e => handlePriceMinChange(e.target.value)} 
-              min={facets.priceRange.min}
-              max={facets.priceRange.max}
-              className="w-full p-2 border border-medium rounded-sm text-sm" 
+          <div className="price-input-group">
+            <input
+              type="number"
+              placeholder={facets.priceRange.min}
+              value={priceRange.min}
+              onChange={e => handlePriceMinChange(e.target.value)}
+              className="price-field"
             />
-            <span className="text-black/40">-</span>
-            <input 
-              type="number" 
-              placeholder={`Max (${facets.priceRange.max})`}
-              value={priceRange.max} 
-              onChange={e => handlePriceMaxChange(e.target.value)} 
-              min={facets.priceRange.min}
-              max={facets.priceRange.max}
-              className="w-full p-2 border border-medium rounded-sm text-sm" 
+            <div className="price-divider" />
+            <input
+              type="number"
+              placeholder={facets.priceRange.max}
+              value={priceRange.max}
+              onChange={e => handlePriceMaxChange(e.target.value)}
+              className="price-field"
             />
           </div>
         </div>
       </FilterSection>
 
-      {/* Status Filter removed - not needed in sidebar */}
-
       {/* Brand Filter */}
       {facets.brands && facets.brands.length > 0 && (
         <FilterSection title="Brand" id="brand" count={facets.brands.length}>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
+          <div className="space-y-1 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
             {facets.brands.map(brand => {
               const count = getFilterCount('brand', brand);
               const isSelected = selectedBrands.includes(brand);
               const isDisabled = count === 0 && !isSelected;
-              
+
               return (
-                <label 
-                  key={brand} 
-                  className={`flex items-center space-x-2 cursor-pointer ${
-                    isDisabled ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
+                <label
+                  key={brand}
+                  className={`custom-checkbox-container ${isDisabled ? 'opacity-30 cursor-not-allowed' : ''}`}
                 >
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     checked={isSelected}
                     onChange={() => !isDisabled && handleBrandToggle(brand)}
                     disabled={isDisabled}
-                    className="h-4 w-4 rounded border-black/20 text-accent focus:ring-accent disabled:cursor-not-allowed" 
                   />
-                  <span className="text-sm text-black/70">
+                  <span className="custom-checkbox" />
+                  <span className="text-sm font-medium text-black/70 flex justify-between w-full">
                     {brand}
-                    {count > 0 && <span className="ml-1 text-black/40">({count})</span>}
+                    {count > 0 && <span className="text-[10px] text-black/30">({count})</span>}
                   </span>
                 </label>
               );
@@ -401,28 +402,24 @@ function CatalogPageContent() {
       {/* Color Filter */}
       {facets.colors && facets.colors.length > 0 && (
         <FilterSection title="Color" id="color" count={facets.colors.length}>
-          <div className="grid grid-cols-5 gap-2">
+          <div className="color-swatch-grid">
             {facets.colors.map(color => {
               const count = getFilterCount('color', color);
               const isSelected = selectedColors.includes(color);
               const isDisabled = count === 0 && !isSelected;
-              
+
               return (
-                <button 
-                  key={color} 
+                <button
+                  key={color}
                   onClick={() => !isDisabled && handleColorToggle(color)}
                   disabled={isDisabled}
-                  className={`w-8 h-8 rounded-full border-2 transition-all ${
-                    isSelected 
-                      ? 'border-accent ring-2 ring-accent/20' 
-                      : 'border-transparent hover:border-black/20'
-                  } ${isDisabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}`}
+                  className={`color-swatch-btn ${isSelected ? 'active ring-1 ring-accent ring-offset-2' : ''} ${isDisabled ? 'opacity-20 cursor-not-allowed' : ''}`}
                   title={`${color}${count > 0 ? ` (${count})` : ''}`}
                 >
-                  <div 
-                    className="w-full h-full rounded-full border border-gray-200" 
-                    style={{ 
-                      backgroundColor: color.toLowerCase() === 'white' ? '#f8f8f8' : color.toLowerCase() 
+                  <div
+                    className="color-swatch-inner"
+                    style={{
+                      backgroundColor: color.toLowerCase() === 'white' ? '#FAFAF9' : color.toLowerCase()
                     }}
                   />
                 </button>
@@ -434,34 +431,32 @@ function CatalogPageContent() {
 
       {/* Dynamic Filters */}
       {facets.filters && Object.entries(facets.filters).map(([key, values]) => (
-        <FilterSection 
-          title={key} 
-          id={key.toLowerCase().replace(/\s+/g, '-')} 
+        <FilterSection
+          title={key}
+          id={key.toLowerCase().replace(/\s+/g, '-')}
           key={key}
           count={values.length}
         >
-          <div className="space-y-2 max-h-64 overflow-y-auto">
+          <div className="space-y-1 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
             {values.map(({ value, count: filterCount }) => {
               const isSelected = selectedFilters[key]?.includes(value) || false;
               const isDisabled = filterCount === 0 && !isSelected;
-              
+
               return (
-                <label 
-                  key={value} 
-                  className={`flex items-center space-x-2 cursor-pointer ${
-                    isDisabled ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
+                <label
+                  key={value}
+                  className={`custom-checkbox-container ${isDisabled ? 'opacity-30 cursor-not-allowed' : ''}`}
                 >
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     checked={isSelected}
                     onChange={() => !isDisabled && handleFilterToggle(key, value)}
                     disabled={isDisabled}
-                    className="h-4 w-4 rounded border-black/20 text-accent focus:ring-accent disabled:cursor-not-allowed" 
                   />
-                  <span className="text-sm text-black/70">
+                  <span className="custom-checkbox" />
+                  <span className="text-sm font-medium text-black/70 flex justify-between w-full">
                     {value}
-                    {filterCount > 0 && <span className="ml-1 text-black/40">({filterCount})</span>}
+                    {filterCount > 0 && <span className="text-[10px] text-black/30">({filterCount})</span>}
                   </span>
                 </label>
               );
@@ -469,7 +464,6 @@ function CatalogPageContent() {
           </div>
         </FilterSection>
       ))}
-
       {/* NOTE: Specifications removed from sidebar - they are for product detail page only */}
       {/* Golden Rule: filterable = filters (admin form), descriptive = specifications */}
     </aside>
@@ -482,13 +476,13 @@ function CatalogPageContent() {
       <div className="text-center mb-8">
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight">{currentCategoryName}</h1>
         <p className="text-black/60 mt-2">
-          {searchQuery 
-            ? `Found ${filteredProducts.length} result${filteredProducts.length !== 1 ? 's' : ''}` 
+          {searchQuery
+            ? `Found ${filteredProducts.length} result${filteredProducts.length !== 1 ? 's' : ''}`
             : `${filteredProducts.length} product${filteredProducts.length !== 1 ? 's' : ''}`
           }
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm border-y border-black/10 my-8 py-4 text-center text-black/70">
         <div>Express Delivery Dispatch within 24 Hours</div>
         <div className="border-x-0 md:border-x border-black/10">Easy Return, COD</div>
@@ -510,35 +504,35 @@ function CatalogPageContent() {
             </div>
           </div>
         )}
-        
+
         {/* Main Content */}
         <main className="w-full lg:w-3/4 xl:w-4/5">
           {/* Toolbar */}
           <div className="flex justify-between items-center mb-6">
-            <button 
-              onClick={() => setIsFilterOpen(true)} 
+            <button
+              onClick={() => setIsFilterOpen(true)}
               className="flex items-center gap-2 font-semibold lg:hidden"
             >
               <FilterIcon /> Filter
               {hasActiveFilters && (
                 <span className="ml-1 px-2 py-0.5 text-xs bg-accent text-white rounded-full">
-                  {Object.keys(selectedFilters).length + 
-                   selectedColors.length + 
-                   selectedBrands.length + 
-                   (priceRange.minValue || priceRange.maxValue ? 1 : 0)}
+                  {Object.keys(selectedFilters).length +
+                    selectedColors.length +
+                    selectedBrands.length +
+                    (priceRange.minValue || priceRange.maxValue ? 1 : 0)}
                 </span>
               )}
             </button>
             <div className="hidden lg:block text-sm text-black/70">
               Showing {paginatedProducts.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length}
             </div>
-            
+
             <div className="flex items-center gap-2">
               <label htmlFor="sort" className="text-sm text-black/70">Sort by:</label>
-              <select 
-                id="sort" 
-                value={sortBy} 
-                onChange={e => handleSortChange(e.target.value)} 
+              <select
+                id="sort"
+                value={sortBy}
+                onChange={e => handleSortChange(e.target.value)}
                 className="border border-black/20 rounded-sm p-2 text-sm text-black bg-white"
               >
                 <option value="newest">Date, new to old</option>
@@ -576,7 +570,7 @@ function CatalogPageContent() {
                   >
                     Previous
                   </button>
-                  
+
                   <div className="flex gap-1">
                     {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                       let pageNum;
@@ -589,23 +583,22 @@ function CatalogPageContent() {
                       } else {
                         pageNum = currentPage - 2 + i;
                       }
-                      
+
                       return (
                         <button
                           key={pageNum}
                           onClick={() => setCurrentPage(pageNum)}
-                          className={`px-3 py-2 border rounded-sm text-sm transition-colors ${
-                            currentPage === pageNum
-                              ? 'border-accent bg-accent text-white'
-                              : 'border-black/20 hover:bg-black/5'
-                          }`}
+                          className={`px-3 py-2 border rounded-sm text-sm transition-colors ${currentPage === pageNum
+                            ? 'border-accent bg-accent text-white'
+                            : 'border-black/20 hover:bg-black/5'
+                            }`}
                         >
                           {pageNum}
                         </button>
                       );
                     })}
                   </div>
-                  
+
                   <button
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
@@ -620,7 +613,7 @@ function CatalogPageContent() {
             <div className="text-center py-16">
               <h3 className="text-2xl font-semibold text-black">No Products Found</h3>
               <p className="text-black/60 mt-2">
-                {hasActiveFilters 
+                {hasActiveFilters
                   ? 'Try adjusting your filters or clearing them to see more products.'
                   : 'Try adjusting your search term or browsing categories.'
                 }
@@ -634,11 +627,11 @@ function CatalogPageContent() {
                 </button>
               )}
               {searchQuery && (
-                <Link 
-                  href="/catalog" 
-                  className="mt-4 inline-block text-accent font-medium hover:text-black transition-colors"
+                <Link
+                  href="/catalog"
+                  className="mt-4 px-6 py-2 bg-accent text-white rounded-sm hover:bg-accent/90 transition-colors inline-block"
                 >
-                  Clear Search
+                  Back to Catalog
                 </Link>
               )}
             </div>
@@ -652,13 +645,11 @@ function CatalogPageContent() {
 export default function CatalogPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-white">
-        <div className="container mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {Array.from({ length: 8 }).map((_, index) => (
-              <ProductCardSkeleton key={`skeleton-${index}`} />
-            ))}
-          </div>
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-4 md:gap-8">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <ProductCardSkeleton key={`skeleton-${index}`} />
+          ))}
         </div>
       </div>
     }>

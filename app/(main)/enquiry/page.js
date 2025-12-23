@@ -176,7 +176,7 @@ function EnquiryForm() {
   };
 
   return (
-    <div className="bg-white min-h-screen py-8 md:py-12">
+    <div className="bg-white min-h-screen py-8 md:py-12" >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
         <div className="mb-6 md:mb-8 text-center">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Enquiry Form</h1>

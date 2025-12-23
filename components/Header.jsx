@@ -409,8 +409,8 @@ function DepartmentsBar({
 
   // More dropdown links
   const moreLinks = [
-    { name: 'Contact', href: '/contact' },
-    { name: "FAQ's", href: '/faqs' },
+    { name: 'Contact', href: '/#contact' },
+    { name: "FAQ's", href: '/#faqs' },
     { name: 'Enquiry', href: '/enquiry' },
   ];
 

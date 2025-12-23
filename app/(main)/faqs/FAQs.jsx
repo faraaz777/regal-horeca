@@ -50,7 +50,7 @@ export default function FAQs() {
   };
 
   return (
-    <section className="py-12 bg-white">
+    <section className="py-12 bg-white" id="faqs">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold tracking-tight mb-4">Frequently Asked Questions</h2>

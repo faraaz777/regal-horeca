@@ -56,7 +56,7 @@ export default function LoadingPage() {
           </p>
           <h1 className="text-xl sm:text-base text-black/70">
             HAPPY BIRTHDAY RAYEES BHAI
-          </H1>
+          </h1>
         </div>
 
         {/* Loading spinner */}

@@ -28,6 +28,16 @@ import { useAppContext } from "@/context/AppContext";
 import SearchBar from "./new/SearchBar";
 import CartDrawer from "./CartDrawer";
 
+// Static departments list for navbar - ensures immediate render and consistent layout
+// This improves SEO and prevents navbar from disappearing on initial load
+const STATIC_DEPARTMENTS = [
+  { slug: 'barware', name: 'BARWARE' },
+  { slug: 'catering', name: 'CATERING' },
+  { slug: 'hotel-hospitality', name: 'HOTEL HOSPITALITY' },
+  { slug: 'kitchenware', name: 'KITCHENWARE' },
+  { slug: 'tableware', name: 'TABLEWARE' },
+];
+
 export default function Header() {
   const { wishlist, cart, getCartTotalItems, categories, businessTypes, products } = useAppContext();
   const pathname = usePathname();
@@ -52,30 +62,98 @@ export default function Header() {
     "text-sm md:text-[15px] font-semibold tracking-wide uppercase text-black hover:text-accent transition-colors relative py-4 group";
 
   // ---------- Category tree building ----------
-  const buildCategoryTree = (parentId = null) => {
-    return categories
-      .filter((cat) => {
-        const catParent = cat.parent?._id || cat.parent || null;
-        return catParent === parentId;
-      })
-      .map((cat) => ({
-        ...cat,
-        id: cat._id || cat.id,
-        children: buildCategoryTree(cat._id || cat.id),
-      }));
-  };
+  // Memoize category tree building to prevent unnecessary recalculations
+  const categoryTree = useMemo(() => {
+    const buildCategoryTree = (parentId = null) => {
+      return categories
+        .filter((cat) => {
+          const catParent = cat.parent?._id || cat.parent || null;
+          return catParent === parentId;
+        })
+        .map((cat) => ({
+          ...cat,
+          id: cat._id || cat.id,
+          children: buildCategoryTree(cat._id || cat.id),
+        }));
+    };
+    return buildCategoryTree();
+  }, [categories]);
 
-  const categoryTree = buildCategoryTree();
-  const topLevelCategories = categoryTree.filter((cat) => {
-    const catParent = cat.parent?._id || cat.parent || null;
-    return catParent === null;
-  });
+  // Memoize top level categories
+  const topLevelCategories = useMemo(() => {
+    return categoryTree.filter((cat) => {
+      const catParent = cat.parent?._id || cat.parent || null;
+      return catParent === null;
+    });
+  }, [categoryTree]);
 
-  const departments = topLevelCategories.filter(
-    (cat) => !cat.level || cat.level === "department" || cat.level === "category"
-  );
+  // Hybrid approach: Use static departments for navbar, enrich with dynamic data when available
+  // This ensures navbar appears immediately while mega-dropdowns stay dynamic
+  const departments = useMemo(() => {
+    // Helper function to normalize slugs for flexible matching
+    const normalizeSlug = (slug) => {
+      if (!slug) return '';
+      return slug.toLowerCase().replace(/[^a-z0-9]/g, '');
+    };
 
-  const rootNavMenu = {
+    // Debug: Log available category slugs (remove after debugging)
+    if (process.env.NODE_ENV === 'development' && topLevelCategories.length > 0) {
+      console.log('Available category slugs:', topLevelCategories.map(cat => ({ 
+        name: cat.name, 
+        slug: cat.slug 
+      })));
+    }
+
+    // Always return static departments for consistent navbar (5 departments max)
+    // When categories are loaded, enrich static departments with dynamic children data
+    return STATIC_DEPARTMENTS.map((staticDept) => {
+      // Try to find matching category from fetched data
+      // First try exact match, then try normalized match (handles hyphen/underscore variations)
+      const normalizedStaticSlug = normalizeSlug(staticDept.slug);
+      const normalizedStaticName = normalizeSlug(staticDept.name);
+      
+      const matchingCategory = topLevelCategories.find(
+        (cat) => {
+          const catSlug = cat.slug || '';
+          const catName = cat.name || '';
+          
+          // Try exact slug match first
+          if (catSlug === staticDept.slug || catSlug.toLowerCase() === staticDept.slug.toLowerCase()) {
+            return true;
+          }
+          // Try normalized slug match (handles hotel-hospitality vs hotelhospitality vs hotel_hospitality)
+          if (normalizeSlug(catSlug) === normalizedStaticSlug) {
+            return true;
+          }
+          // Try name-based matching as fallback (handles cases where slug differs but name matches)
+          if (normalizeSlug(catName) === normalizedStaticName) {
+            return true;
+          }
+          return false;
+        }
+      );
+      
+      if (matchingCategory) {
+        // Return enriched department with dynamic children for mega-dropdown
+        return {
+          ...matchingCategory,
+          name: matchingCategory.name.toUpperCase(), // Ensure uppercase for consistency
+          id: matchingCategory._id || matchingCategory.id,
+        };
+      }
+      
+      // Fallback: return static department (navbar will still show, link will work)
+      // Mega-dropdown won't show until category data loads
+      return {
+        ...staticDept,
+        id: staticDept.slug, // Use slug as ID for static departments
+        children: [], // Empty children until data loads
+      };
+    });
+  }, [topLevelCategories]);
+
+  // Memoize rootNavMenu to prevent unnecessary re-renders
+  const rootNavMenu = useMemo(() => ({
     id: "root",
     name: "Menu",
     children: [
@@ -103,7 +181,7 @@ export default function Header() {
         })),
       },
     ],
-  };
+  }), [categoryTree, businessTypes]);
 
   // ---------- Effects ----------
   useEffect(() => {
@@ -323,7 +401,10 @@ function DepartmentsBar({
 }) {
   if (!departments.length) return null;
 
-  const activeDept = departments.find((d) => (d._id || d.id) === activeDepartment) || null;
+  // Find active department by slug (consistent identifier) or by id (fallback)
+  const activeDept = departments.find((d) => 
+    d.slug === activeDepartment || (d._id || d.id) === activeDepartment
+  ) || null;
   const hasActiveChildren = activeDept && activeDept.children && activeDept.children.length > 0;
 
   // More dropdown links
@@ -350,15 +431,17 @@ function DepartmentsBar({
           </Link>
 
           {departments.map((dept) => {
+            // Use slug as consistent identifier (works for both static and dynamic departments)
+            const deptSlug = dept.slug;
             const id = dept._id || dept.id;
-            const isActive = activeDepartment === id;
+            const isActive = activeDepartment === deptSlug || activeDepartment === id;
 
             return (
               <div
                 key={id}
-                ref={(el) => (departmentMenuRefs.current[id] = el)}
+                ref={(el) => (departmentMenuRefs.current[deptSlug] = el)}
                 className="relative flex items-center h-full"
-                onMouseEnter={() => setActiveDepartment(id)}
+                onMouseEnter={() => setActiveDepartment(deptSlug)}
               >
                 <Link href={`/catalog?category=${dept.slug}`} className={navLinkClass}>
                   <span>{dept.name}</span>

@@ -525,8 +525,8 @@ export default function ProductDetailPage() {
               <button
                 onClick={() => setActiveTab('description')}
                 className={`px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest transition-all duration-300 ${activeTab === 'description'
-                    ? 'bg-rich-black text-white shadow-md'
-                    : 'text-black/40 hover:text-black hover:bg-black/5'
+                  ? 'bg-rich-black text-white shadow-md'
+                  : 'text-black/40 hover:text-black hover:bg-black/5'
                   }`}
               >
                 Description
@@ -562,23 +562,6 @@ export default function ProductDetailPage() {
                   <div className="text-center text-black/30 py-10">No specifications available.</div>
                 )}
 
-                {/* Features Grid below Specs */}
-                {features.length > 0 && (
-                  <div className="mt-16 pt-10 border-t border-black/5">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                      {features.map((feature, idx) => (
-                        <div key={idx} className="text-center">
-                          <div className="w-10 h-10 mx-auto bg-warm-white rounded-full flex items-center justify-center text-royal-gold mb-3">
-                            <Check size={16} strokeWidth={3} />
-                          </div>
-                          <span className="text-xs font-medium text-black/70 leading-tight block">
-                            {feature.replace(/^[^:]+:\s*/, '')}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 

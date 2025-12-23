@@ -226,43 +226,45 @@ const categoryData = {
     ],
   },
 
-  gifting: {
-    title: "Designed to Leave an Impression",
-    subtitle: "Thoughtfully Curated Premium Gifting",
+  banquets: {
+    title: "Crafted for Grand Occasions",
+    subtitle: "Refined Solutions for Banquets & Convention Centres",
     heroImage:
-      "https://images.unsplash.com/photo-1606490203669-94bd3f0d8b5d?auto=format&fit=crop&w=2000&q=80",
+      "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=2000&q=80",
     introText:
-      "Curated gifting collections by Regal—combining refined design and lasting quality for meaningful occasions.",
+      "Regal enhances large-scale celebrations and corporate gatherings with elegant, durable tableware designed for impact, consistency, and flawless presentation.",
     restaurantTypes: [
       {
-        title: "Corporate Gifts",
+        title: "Wedding Banquets",
         description:
-          "Sophisticated gifting solutions for corporate recognition and branding.",
+          "Timeless designs that complement lavish décor and unforgettable wedding celebrations.",
         image:
-          "https://images.unsplash.com/photo-1606490203669-94bd3f0d8b5d?auto=format&fit=crop&w=800&q=80",
+          "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?auto=format&fit=crop&w=800&q=80",
       },
       {
-        title: "Wedding Favors",
-        description: "Elegant keepsakes designed to elevate celebrations.",
+        title: "Convention Centres",
+        description:
+          "High-performance tableware crafted for large volumes and professional service environments.",
         image:
-          "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=800&q=80",
+          "https://images.unsplash.com/photo-1503428593586-e225b39bddfe?auto=format&fit=crop&w=800&q=80",
       },
       {
-        title: "Special Occasions",
+        title: "Corporate Events",
         description:
-          "Thoughtfully curated pieces for memorable gifting experiences.",
+          "Sleek and sophisticated solutions for conferences, meetings, and formal gatherings.",
         image:
-          "https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&w=800&q=80",
+          "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80",
       },
       {
-        title: "Gift Sets",
+        title: "Celebration Halls",
         description:
-          "Beautifully packaged collections suited for premium gifting.",
+          "Versatile collections designed to adapt seamlessly across diverse events and themes.",
         image:
-          "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=800&q=80",
+          "https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=800&q=80",
       },
     ],
   },
+  
 };
 
 // Touchpoints data for Elevating Experiences section
@@ -376,8 +378,16 @@ export default function CategoryPage() {
     businessTypes,
   } = useAppContext();
 
-  // Get current category name from the page
-  const currentCategoryName = category.title.replace("Shapes for ", "");
+  // Get current category name from businessTypes using slug
+  const currentBusinessType = useMemo(() => {
+    if (!businessTypes || businessTypes.length === 0) return null;
+    return businessTypes.find(bt => {
+      const btSlug = bt.slug || bt.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      return btSlug === slug;
+    });
+  }, [businessTypes, slug]);
+
+  const currentCategoryName = currentBusinessType?.name || "";
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -386,7 +396,7 @@ export default function CategoryPage() {
     companyName: "",
     state: "",
     query: "",
-    categories: [currentCategoryName],
+    categories: currentCategoryName ? [currentCategoryName] : [],
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -395,6 +405,34 @@ export default function CategoryPage() {
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [includeCart, setIncludeCart] = useState(true);
   const categoryDropdownRef = useRef(null);
+
+  // Update form data when businessTypes are loaded and we can find the matching businessType
+  useEffect(() => {
+    if (currentBusinessType?.name) {
+      setFormData(prev => {
+        // Only update if form hasn't been filled out and category doesn't match
+        const currentName = prev.categories[0];
+        if (currentName !== currentBusinessType.name && !prev.fullName && !prev.email && !prev.phone) {
+          return {
+            ...prev,
+            categories: [currentBusinessType.name],
+          };
+        }
+        return prev;
+      });
+    } else if (!currentBusinessType && businessTypes && businessTypes.length > 0) {
+      // Clear categories if no matching businessType is found (after businessTypes have loaded) and form is empty
+      setFormData(prev => {
+        if (!prev.fullName && !prev.email && !prev.phone && prev.categories.length > 0) {
+          return {
+            ...prev,
+            categories: [],
+          };
+        }
+        return prev;
+      });
+    }
+  }, [currentBusinessType, businessTypes]);
 
   // Close category dropdown when clicking outside
   useEffect(() => {
@@ -497,11 +535,11 @@ export default function CategoryPage() {
     setIsSubmitting(true);
 
     try {
-      // Combine selected categories with the current page category
+      // Use selected categories, or current category name if available
       const allCategories =
         formData.categories.length > 0
           ? formData.categories
-          : [category.title.replace("Shapes for ", "")];
+          : (currentCategoryName ? [currentCategoryName] : []);
 
       const enquiryData = {
         name: formData.fullName,
@@ -562,6 +600,7 @@ export default function CategoryPage() {
       const whatsappUrl = getWhatsAppBusinessLink(whatsappMessage);
       window.open(whatsappUrl, "_blank");
 
+      // Reset form with current category name (only if businessType is found)
       setFormData({
         fullName: "",
         email: "",
@@ -569,7 +608,7 @@ export default function CategoryPage() {
         companyName: "",
         state: "",
         query: "",
-        categories: [currentCategoryName],
+        categories: currentCategoryName ? [currentCategoryName] : [],
       });
 
       toast.success("Enquiry submitted successfully! Opening WhatsApp...");

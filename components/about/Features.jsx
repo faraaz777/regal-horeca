@@ -10,7 +10,7 @@ const features = [
   },
   { 
     title: "Brass & Copper", 
-    desc: "Traditional manufacturing of authentic serving ware and utensils.",
+    desc: "Traditional craftsmanship behind authentic serving ware and utensils.",
     image: "https://images.unsplash.com/photo-1615993215286-904d9c75908f?q=80&w=800&auto=format&fit=crop"
   },
   { 
@@ -43,8 +43,7 @@ export default function Features() {
           <span className="text-accent font-bold tracking-widest uppercase text-sm">What We Do</span>
           <h2 className="text-4xl font-bold text-black mt-2 mb-4">Our Expertise</h2>
           <p className="text-black/70 max-w-2xl mx-auto font-light">
-            Comprehensive solutions for the Horeca industry, from manufacturing to last-mile delivery.
-          </p>
+          Comprehensive solutions for the Horeca industry, from product sourcing to last-mile delivery.          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">

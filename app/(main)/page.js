@@ -301,9 +301,7 @@ export default function HomePage() {
           </h2>
           <div className="w-16 h-1 bg-accent mx-auto mb-8" />
           <p className="mt-4 max-w-3xl mx-auto text-white/70 text-lg leading-relaxed font-light">
-            Regal HoReCa has been a prominent manufacturer and distributor in
-            the hospitality industry, delivering quality and trust to esteemed
-            clients across national and international markets.
+          Regal HoReCa has been a prominent brand and distributor in the hospitality industry, delivering quality and trust to esteemed clients across national and international markets.
           </p>
           <Link
             href="/about"

@@ -37,8 +37,7 @@ export default function Ventures() {
           <span className="text-black font-bold tracking-widest uppercase text-sm">Our Group</span>
           <h2 className="text-4xl font-bold mt-2">Diversified Ventures</h2>
           <p className="text-black/70 mt-4 max-w-2xl mx-auto font-light">
-            Expanding excellence beyond manufacturing into real estate, hospitality, and strategic investments.
-          </p>
+          Expanding excellence beyond core operations into real estate, hospitality, and strategic investments.          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

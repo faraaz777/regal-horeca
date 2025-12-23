@@ -532,10 +532,15 @@ function FeaturedProductsSection({ department, products }) {
       <h3 className="text-xs font-bold uppercase tracking-widest text-black mb-4">
         Featured
       </h3>
-      {featuredProducts.map((product) => (
+      {featuredProducts.map((product) => {
+        const productId = product._id || product.id;
+        // Get product slug with fallback - use ID if slug is missing (API handles both)
+        const productSlug = product.slug || productId?.toString();
+        
+        return (
         <Link
-          key={product._id || product.id}
-          href={`/products/${product.slug}`}
+          key={productId}
+          href={`/products/${productSlug}`}
           className="group block"
         >
           <div className="aspect-square bg-white border border-black/5 rounded-lg overflow-hidden relative mb-3">
@@ -553,7 +558,8 @@ function FeaturedProductsSection({ department, products }) {
             {formatPrice(product.price)}
           </span>
         </Link>
-      ))}
+        );
+      })}
     </div>
   );
 }

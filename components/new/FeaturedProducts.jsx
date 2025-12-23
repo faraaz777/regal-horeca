@@ -43,6 +43,9 @@ function ProductCard({ product }) {
 
   const productId = product._id || product.id;
   const wished = isInWishlist(productId);
+  
+  // Get product slug with fallback - use ID if slug is missing (API handles both)
+  const productSlug = product.slug || productId?.toString();
 
   // Collect product images
   const images = [
@@ -56,7 +59,7 @@ function ProductCard({ product }) {
   const prevImg = () => setIndex((i) => (i === 0 ? images.length - 1 : i - 1));
 
   return (
-    <Link href={`/products/${product.slug}`} className="min-w-[220px] md:min-w-[270px] snap-start block group">
+    <Link href={`/products/${productSlug}`} className="min-w-[220px] md:min-w-[270px] snap-start block group">
       <div className="relative w-full h-[300px] md:h-[320px] bg-white rounded-xl border border-black/5 overflow-hidden transition-all duration-300">
 
         {/* MAIN IMAGE */}

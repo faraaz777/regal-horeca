@@ -40,7 +40,7 @@ export default function About() {
                 <strong className="text-black font-semibold">Regal Brass & Steelware (Regal Horeca)</strong> has been a cornerstone of the hospitality industry since 1978. 
               </p>
               <p>
-                We specialize in manufacturing bespoke kitchen solutions, bridging the gap between traditional craftsmanship—like our signature brass biryani handis—and the modern demands of 5-star commercial kitchens.
+              We specialize in delivering bespoke kitchen solutions, bridging the gap between traditional craftsmanship—like our signature brass biryani handis—and the modern demands of 5-star commercial kitchens.
               </p>
               <p>
                 With over <strong className="text-black">45 years</strong> of experience, we don't just sell products; we provide the foundation for culinary excellence, trusted by chefs and hoteliers across the nation.

@@ -23,6 +23,10 @@ export default function ProductCard({ product, onAdd }) {
 
   // Get product ID
   const productId = product._id || product.id;
+  
+  // Get product slug with fallback - use ID if slug is missing (API handles both)
+  const productSlug = product.slug || productId?.toString();
+  
   const isLiked = isInWishlist(productId);
   // ProductCard doesn't have color selection, so check for item without color variant
   const inCart = isInCart(productId, null);
@@ -127,7 +131,7 @@ export default function ProductCard({ product, onAdd }) {
     <div className="product-card-wrapper">
       <div className="product-card-container">
         <div className="product-card-top">
-          <Link href={`/products/${product.slug}`} className="block w-full h-full">
+          <Link href={`/products/${productSlug}`} className="block w-full h-full">
             <Image
               src={productImage}
               alt={productName}

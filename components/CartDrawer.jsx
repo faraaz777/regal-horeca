@@ -144,12 +144,6 @@ export default function CartDrawer({ isOpen, onClose }) {
   }, [cartItems]);
 
   const totalItems = getCartTotalItems();
-  
-  // Free shipping threshold (₹500)
-  const FREE_SHIPPING_THRESHOLD = 500;
-  const shippingProgress = Math.min((subtotal / FREE_SHIPPING_THRESHOLD) * 100, 100);
-  const isEligibleForFreeShipping = subtotal >= FREE_SHIPPING_THRESHOLD;
-  const remainingForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
 
   // Prevent body scroll when drawer is open
   useEffect(() => {
@@ -193,32 +187,6 @@ export default function CartDrawer({ isOpen, onClose }) {
           </button>
         </div>
 
-        {/* Free Shipping Banner */}
-        {cartItems.length > 0 && (
-          <div className="px-4 sm:px-5 py-2 bg-green-50 border-b border-green-100">
-            {isEligibleForFreeShipping ? (
-              <div className="text-xs sm:text-sm font-medium text-green-700">
-                ✓ You are eligible for free shipping!
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                <div className="text-xs sm:text-sm font-medium text-green-700">
-                  You are eligible for free shipping!
-                </div>
-                <div className="w-full bg-green-200 rounded-full h-1.5 sm:h-2">
-                  <div 
-                    className="bg-green-600 h-1.5 sm:h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${shippingProgress}%` }}
-                  />
-                </div>
-                <div className="text-[10px] sm:text-xs text-green-600">
-                  Add {formatPrice(remainingForFreeShipping)} more for free shipping
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Cart Content */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
@@ -236,6 +204,9 @@ export default function CartDrawer({ isOpen, onClose }) {
                 const originalPrice = product.mrp || product.originalPrice;
                 const isOnSale = originalPrice && originalPrice > itemPrice;
                 
+                // Get product slug with fallback - use ID if slug is missing (API handles both)
+                const productSlug = product.slug || productId?.toString();
+                
                 // Get stock info if available
                 const stock = product.stock || product.inStock;
                 const stockText = stock !== undefined ? `${stock} in stock` : null;
@@ -245,7 +216,7 @@ export default function CartDrawer({ isOpen, onClose }) {
                     <div className="flex gap-3 sm:gap-4">
                       {/* Product Image */}
                       <Link 
-                        href={`/products/${product.slug}`} 
+                        href={`/products/${productSlug}`} 
                         className="flex-shrink-0"
                         onClick={onClose}
                       >
@@ -263,7 +234,7 @@ export default function CartDrawer({ isOpen, onClose }) {
                       {/* Product Details */}
                       <div className="flex-1 min-w-0">
                         <Link 
-                          href={`/products/${product.slug}`}
+                          href={`/products/${productSlug}`}
                           onClick={onClose}
                         >
                           <h3 className="text-xs sm:text-sm font-semibold text-black mb-1 line-clamp-2 hover:text-accent transition-colors">

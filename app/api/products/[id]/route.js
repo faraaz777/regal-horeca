@@ -20,36 +20,56 @@ import mongoose from 'mongoose';
  * Supports both MongoDB ObjectId and slug
  */
 export async function GET(request, { params }) {
+  let id;
   try {
     await connectToDatabase();
 
-    const { id } = params;
+    id = params?.id;
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Product ID or slug is required' },
+        { status: 400 }
+      );
+    }
 
     let product = null;
 
     // Check if id is a valid MongoDB ObjectId
     const isValidObjectId = mongoose.Types.ObjectId.isValid(id);
-    
+
     if (isValidObjectId) {
       // Try to find by ID first
-      product = await Product.findById(id)
-        .populate('categoryId')
-        .populate('categoryIds', 'name slug level')
-        .populate('brandCategoryId', 'name slug level')
-        .populate('brandCategoryIds', 'name slug level')
-        .populate('relatedProductIds', 'title slug heroImage price')
-        .lean();
+      try {
+        product = await Product.findById(id)
+          .populate('categoryId')
+          .populate('categoryIds', 'name slug level')
+          .populate('brandCategoryId', 'name slug level')
+          .populate('brandCategoryIds', 'name slug level')
+          .populate('relatedProductIds', 'title slug heroImage price')
+          .lean();
+      } catch (populateError) {
+        // If populate fails, try without populate
+        console.warn('Populate failed, trying without populate:', populateError.message);
+        product = await Product.findById(id).lean();
+      }
     }
 
     // If not found by ID (or id is not a valid ObjectId), try to find by slug
     if (!product) {
-      product = await Product.findOne({ slug: id })
-        .populate('categoryId')
-        .populate('categoryIds', 'name slug level')
-        .populate('brandCategoryId', 'name slug level')
-        .populate('brandCategoryIds', 'name slug level')
-        .populate('relatedProductIds', 'title slug heroImage price')
-        .lean();
+      try {
+        product = await Product.findOne({ slug: id })
+          .populate('categoryId')
+          .populate('categoryIds', 'name slug level')
+          .populate('brandCategoryId', 'name slug level')
+          .populate('brandCategoryIds', 'name slug level')
+          .populate('relatedProductIds', 'title slug heroImage price')
+          .lean();
+      } catch (populateError) {
+        // If populate fails, try without populate
+        console.warn('Populate failed for slug lookup, trying without populate:', populateError.message);
+        product = await Product.findOne({ slug: id }).lean();
+      }
     }
 
     if (!product) {
@@ -60,33 +80,40 @@ export async function GET(request, { params }) {
     }
 
     // Normalize filters (convert old object format to array format if needed)
-    if (product.filters && !Array.isArray(product.filters)) {
-      // Convert old object format {material: [], color: [], usage: []} to new array format
-      const oldFilters = product.filters;
-      product.filters = [];
-      if (oldFilters.material && Array.isArray(oldFilters.material) && oldFilters.material.length > 0) {
-        product.filters.push({ key: 'Material', values: oldFilters.material });
-      }
-      if (oldFilters.size && Array.isArray(oldFilters.size) && oldFilters.size.length > 0) {
-        product.filters.push({ key: 'Size', values: oldFilters.size });
-      }
-      if (oldFilters.color && Array.isArray(oldFilters.color) && oldFilters.color.length > 0) {
-        product.filters.push({ key: 'Color', values: oldFilters.color });
-      }
-      if (oldFilters.usage && Array.isArray(oldFilters.usage) && oldFilters.usage.length > 0) {
-        product.filters.push({ key: 'Usage', values: oldFilters.usage });
-      }
-      // Handle any other keys
-      Object.keys(oldFilters).forEach(key => {
-        if (!['material', 'size', 'color', 'usage'].includes(key.toLowerCase()) && 
-            Array.isArray(oldFilters[key]) && oldFilters[key].length > 0) {
-          product.filters.push({ 
-            key: key.charAt(0).toUpperCase() + key.slice(1), 
-            values: oldFilters[key] 
+    try {
+      if (product.filters && !Array.isArray(product.filters)) {
+        // Convert old object format {material: [], color: [], usage: []} to new array format
+        const oldFilters = product.filters;
+        product.filters = [];
+        if (oldFilters && typeof oldFilters === 'object') {
+          if (oldFilters.material && Array.isArray(oldFilters.material) && oldFilters.material.length > 0) {
+            product.filters.push({ key: 'Material', values: oldFilters.material });
+          }
+          if (oldFilters.size && Array.isArray(oldFilters.size) && oldFilters.size.length > 0) {
+            product.filters.push({ key: 'Size', values: oldFilters.size });
+          }
+          if (oldFilters.color && Array.isArray(oldFilters.color) && oldFilters.color.length > 0) {
+            product.filters.push({ key: 'Color', values: oldFilters.color });
+          }
+          if (oldFilters.usage && Array.isArray(oldFilters.usage) && oldFilters.usage.length > 0) {
+            product.filters.push({ key: 'Usage', values: oldFilters.usage });
+          }
+          // Handle any other keys
+          Object.keys(oldFilters).forEach(key => {
+            if (!['material', 'size', 'color', 'usage'].includes(key.toLowerCase()) && 
+                Array.isArray(oldFilters[key]) && oldFilters[key].length > 0) {
+              product.filters.push({ 
+                key: key.charAt(0).toUpperCase() + key.slice(1), 
+                values: oldFilters[key] 
+              });
+            }
           });
         }
-      });
-    } else if (!product.filters) {
+      } else if (!product.filters) {
+        product.filters = [];
+      }
+    } catch (filterError) {
+      console.warn('Error normalizing filters:', filterError.message);
       product.filters = [];
     }
 
@@ -96,8 +123,24 @@ export async function GET(request, { params }) {
     });
   } catch (error) {
     console.error('Error fetching product:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Product ID/Slug:', id);
+    
+    // Provide more detailed error information
+    const errorDetails = {
+      message: error.message,
+      name: error.name,
+      ...(error.code && { code: error.code }),
+      ...(error.keyPattern && { keyPattern: error.keyPattern }),
+      ...(error.keyValue && { keyValue: error.keyValue }),
+    };
+    
     return NextResponse.json(
-      { error: 'Failed to fetch product', details: error.message },
+      { 
+        error: 'Failed to fetch product', 
+        details: error.message,
+        ...(process.env.NODE_ENV === 'development' && { fullError: errorDetails })
+      },
       { status: 500 }
     );
   }

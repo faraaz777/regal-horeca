@@ -12,14 +12,14 @@ export default function Footer() {
       <div className="max-w-screen-xl mx-auto px-4 py-12 overflow-x-hidden">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           <div>
-            <h3 className="text-xl font-bold mb-4 text-white">REGAL</h3>
+            <h3 className="text-xl font-bold mb-4 text-accent ">REGAL</h3>
             <p className="text-white/70">
               Your trusted partner in the HoReCa industry for over 45 years. Providing quality and excellence.
             </p>
           </div>
 
           <div>
-            <h4 className="font-semibold text-lg mb-4 text-white">Quick Links</h4>
+            <h4 className="font-semibold text-lg mb-4 text-accent">Quick Links</h4>
             <ul className="space-y-2">
               <li><Link href="/about" className="text-white/70 hover:text-white transition-colors">About Us</Link></li>
               <li><Link href="/catalog" className="text-white/70 hover:text-white transition-colors">Products</Link></li>
@@ -29,7 +29,7 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="font-semibold text-lg mb-4 text-white">Contact Us</h4>
+            <h4 className="font-semibold text-lg mb-4 text-accent">Contact Us</h4>
             <address className="not-italic text-white/70 space-y-2">
               <p>Begum Bazar, Hyderabad</p>
               <p>Phone: +91 12345 67890</p>
@@ -38,7 +38,7 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="font-semibold text-lg mb-4 text-white">Follow Us</h4>
+            <h4 className="font-semibold text-lg mb-4 text-accent">Follow Us</h4>
             <div className="flex space-x-4">{/* Social icons */}</div>
           </div>
         </div>

@@ -271,11 +271,8 @@ export default function HomePage() {
       </section>
 
       {/* Brands Section */}
-      <section className="py-20 bg-white border-t border-black/5">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <span className="text-xs text-gray-400 font-bold tracking-[0.3em] uppercase">Trusted Partners</span>
-          </div>
+      <section className="my-12 bg-black w-full flex justify-center items-center ">
+        <div className="container bg-black  ">
           <Brands />
         </div>
       </section>
@@ -304,9 +301,7 @@ export default function HomePage() {
           </h2>
           <div className="w-16 h-1 bg-accent mx-auto mb-8" />
           <p className="mt-4 max-w-3xl mx-auto text-white/70 text-lg leading-relaxed font-light">
-            Regal HoReCa has been a prominent manufacturer and distributor in
-            the hospitality industry, delivering quality and trust to esteemed
-            clients across national and international markets.
+          Regal HoReCa has been a prominent brand and distributor in the hospitality industry, delivering quality and trust to esteemed clients across national and international markets.
           </p>
           <Link
             href="/about"

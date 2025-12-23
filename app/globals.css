@@ -173,6 +173,16 @@ body {
   opacity: 0;
 }
 
+/* Reveal overlay animation for hospitality segments */
+@keyframes reveal-overlay {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
 /* Hide Scrollbar Utility */
 .hide-scrollbar::-webkit-scrollbar {
   display: none;

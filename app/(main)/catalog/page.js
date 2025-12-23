@@ -557,14 +557,14 @@ function CatalogPageContent() {
 
           {/* Products Grid */}
           {isLoading ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-4 md:gap-8">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-4 md:gap-6 lg:gap-6 xl:gap-8">
               {Array.from({ length: 6 }).map((_, index) => (
                 <ProductCardSkeleton key={`skeleton-${index}`} />
               ))}
             </div>
           ) : paginatedProducts.length > 0 ? (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-4 md:gap-8">
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-4 md:gap-6 lg:gap-6 xl:gap-8">
                 {paginatedProducts.map(product => (
                   <ProductCard key={product._id || product.id} product={product} />
                 ))}

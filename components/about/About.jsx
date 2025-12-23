@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import aboutimg from './IMG_5179.JPG'
 
 export default function About() {
   return (
@@ -10,17 +11,17 @@ export default function About() {
           
           {/* Left Column: Image */}
           <div className="relative animate-fade-in-left">
-            <div className="absolute top-4 -left-4 w-full h-full border-2 border-accent/30 z-0"></div>
-            <div className="relative z-10 w-full h-[500px]">
+            <div className="absolute top-2 left-0 sm:top-4 sm:-left-4 w-full h-full border-2 border-accent/30 z-0"></div>
+            <div className="relative z-10 w-full h-[300px] sm:h-[400px] md:h-[500px] lg:h-[580px]">
               <Image 
-                src="https://images.unsplash.com/photo-1581552882260-038c353f20f5?q=80&w=1200&auto=format&fit=crop" 
+                src={aboutimg} 
                 alt="Artisan crafting metalware" 
                 fill
-                className="object-cover shadow-xl"
+                className="object-cover shadow-xl rounded-sm"
               />
-            </div>
-            <div className="absolute -bottom-6 -right-6 bg-black text-white p-6 shadow-lg z-20 max-w-xs hidden lg:block">
-              <p className="italic text-lg leading-snug">"Quality is not an act, it is a habit."</p>
+            </div>  
+            <div className="absolute -bottom-4 -right-4 sm:-bottom-6 sm:-right-6 bg-black text-white p-4 sm:p-6 shadow-lg z-20 max-w-[280px] sm:max-w-xs hidden md:block">
+              <p className="italic text-base sm:text-lg leading-snug">"Quality is not an act, it is a habit."</p>
             </div>
           </div>
 

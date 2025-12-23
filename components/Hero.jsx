@@ -10,7 +10,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-
+import glassware from './glassware.png'
 const slides = [
   {
     id: 1,
@@ -25,15 +25,15 @@ const slides = [
     title: 'Precision in Every Detail',
     subtitle: 'High-performance kitchenware for the modern chef.',
     image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=2000',
-    ctaText: 'Discover Tools',
+    ctaText: 'Discover Collections',
     ctaLink: '/catalog?category=kitchenware',
   },
   {
     id: 3,
     title: 'The Art of Glassware',
     subtitle: 'Crystal-clear designs that celebrate every occasion.',
-    image: 'https://images.unsplash.com/photo-1544145945-f904253db0ad?auto=format&fit=crop&q=80&w=2000',
-    ctaText: 'Explore Drinkware',
+    image: glassware,
+    ctaText: 'Shop Collections',
     ctaLink: '/catalog?category=glassware',
   },
 ];

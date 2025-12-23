@@ -206,7 +206,7 @@ function CatalogPageContent() {
           </div>
         </button>
         {isOpen && (
-          <div className="pt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="pt-4">
             {children}
           </div>
         )}
@@ -312,7 +312,7 @@ function CatalogPageContent() {
           )}
         </div>
         <ul className="category-list">
-          {parentCategory && (
+          {parentCategory ? (
             <li>
               <Link
                 href={`/catalog?category=${parentCategory.slug}`}
@@ -320,6 +320,16 @@ function CatalogPageContent() {
               >
                 <ChevronLeftIcon className="w-4 h-4 mr-1" />
                 {parentCategory.name}
+              </Link>
+            </li>
+          ) : selectedCategorySlug && (
+            <li>
+              <Link
+                href="/catalog"
+                className="category-link opacity-40 hover:opacity-100"
+              >
+                <ChevronLeftIcon className="w-4 h-4 mr-1" />
+                All Products
               </Link>
             </li>
           )}
@@ -547,14 +557,14 @@ function CatalogPageContent() {
 
           {/* Products Grid */}
           {isLoading ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-4 md:gap-8">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-4 md:gap-6 lg:gap-6 xl:gap-8">
               {Array.from({ length: 6 }).map((_, index) => (
                 <ProductCardSkeleton key={`skeleton-${index}`} />
               ))}
             </div>
           ) : paginatedProducts.length > 0 ? (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-4 md:gap-8">
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-4 md:gap-6 lg:gap-6 xl:gap-8">
                 {paginatedProducts.map(product => (
                   <ProductCard key={product._id || product.id} product={product} />
                 ))}

@@ -44,20 +44,19 @@ export default function HomePage() {
       .slice(0, 4);
     setNewArrivals(arrivals);
 
-    const mainCats = categories
-      .filter((c) => c.level === "department")
+    const mainCats = categories.filter((c) => c.level === "department");
     setMainCategories(mainCats);
   }, [products, categories]);
 
   const scrollLeft = () => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: -320, behavior: 'smooth' });
+      scrollContainerRef.current.scrollBy({ left: -320, behavior: "smooth" });
     }
   };
 
   const scrollRight = () => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: 320, behavior: 'smooth' });
+      scrollContainerRef.current.scrollBy({ left: 320, behavior: "smooth" });
     }
   };
 
@@ -104,7 +103,9 @@ export default function HomePage() {
               className="group inline-flex items-center gap-2 border-b border-black pb-1 text-sm font-bold uppercase tracking-widest hover:text-accent hover:border-accent transition-colors"
             >
               View All Products
-              <span className="transform group-hover:translate-x-1 transition-transform">→</span>
+              <span className="transform group-hover:translate-x-1 transition-transform">
+                →
+              </span>
             </Link>
           </div>
         </div>
@@ -129,8 +130,20 @@ export default function HomePage() {
             className="hidden md:flex absolute left-4 top-[60%] -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/80 backdrop-blur-sm border border-black/10 items-center justify-center text-black hover:bg-black hover:text-white transition-all duration-300 shadow-lg opacity-0 group-hover/section:opacity-100"
             aria-label="Scroll Left"
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 19L8 12L15 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M15 19L8 12L15 5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
 
@@ -140,15 +153,28 @@ export default function HomePage() {
             className="hidden md:flex absolute right-4 top-[60%] -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/80 backdrop-blur-sm border border-black/10 items-center justify-center text-black hover:bg-black hover:text-white transition-all duration-300 shadow-lg opacity-0 group-hover/section:opacity-100"
             aria-label="Scroll Right"
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M9 5L16 12L9 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M9 5L16 12L9 19"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
 
           <div
             ref={scrollContainerRef}
-            className={`flex w-full overflow-x-auto pb-12 gap-6 snap-x snap-mandatory px-4 md:px-12 hide-scrollbar ${mainCategories.length <= 5 ? 'md:justify-center' : ''
-              }`}
+            className={`flex w-full overflow-x-auto pb-12 gap-6 snap-x snap-mandatory px-4 md:px-12 hide-scrollbar ${
+              mainCategories.length <= 5 ? "md:justify-center" : ""
+            }`}
           >
             {mainCategories.map((cat, i) => (
               <Link
@@ -191,11 +217,20 @@ export default function HomePage() {
                     {/* Arrow Icon */}
                     <div className="w-10 h-10 rounded-full border border-black/10 flex items-center justify-center group-hover:border-white/40 group-hover:bg-white/20 transition-all duration-300">
                       <svg
-                        width="20" height="20" viewBox="0 0 24 24" fill="none"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
                         className="text-black group-hover:text-white transform group-hover:-rotate-45 transition-all duration-300"
                         xmlns="http://www.w3.org/2000/svg"
                       >
-                        <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path
+                          d="M5 12H19M19 12L12 5M19 12L12 19"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                     </div>
                   </div>
@@ -207,17 +242,25 @@ export default function HomePage() {
       </section>
 
       {/* Parallax Image Section */}
-      <section className="w-full relative h-[500px] lg:h-[600px] overflow-hidden">
-        <div className="absolute inset-0 bg-fixed" style={{
-          backgroundImage: "url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=2000')",
-          backgroundSize: 'cover',
-          backgroundPosition: 'center'
-        }}>
+      <section className="w-full relative lg:h-[400px]  md:h-[500px] h-[300px] overflow-hidden">
+        <div
+          className="absolute inset-0 bg-fixed"
+          style={{
+            backgroundImage:
+              "url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=2000')",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        >
           <div className="absolute inset-0 bg-black/30" />
         </div>
         <div className="relative h-full flex flex-col items-center justify-center text-center text-white p-6">
-          <h2 className="text-4xl md:text-6xl font-serif mb-6">Excellence in Service</h2>
-          <p className="text-lg md:text-xl font-light max-w-2xl">Providing world-class hospitality solutions for over 4 decades.</p>
+          <h2 className="text-4xl md:text-6xl font-serif mb-6">
+            Excellence in Service
+          </h2>
+          <p className="text-lg md:text-xl font-light max-w-2xl">
+            Providing world-class hospitality solutions for over 4 decades.
+          </p>
         </div>
       </section>
 
@@ -226,7 +269,9 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-end mb-12 px-2 border-b border-black/10 pb-6">
             <div>
-              <span className="text-accent text-xs font-bold tracking-widest uppercase mb-2 block">Just In</span>
+              <span className="text-accent text-xs font-bold tracking-widest uppercase mb-2 block">
+                Just In
+              </span>
               <h2 className="text-3xl md:text-4xl font-serif text-black">
                 New Arrivals
               </h2>
@@ -287,10 +332,14 @@ export default function HomePage() {
       {/* About Teaser - Redesigned */}
       <section className="py-24 bg-black text-white relative overflow-hidden">
         {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10" style={{
-          backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
-          backgroundSize: '40px 40px'
-        }} />
+        <div
+          className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 2px 2px, white 1px, transparent 0)",
+            backgroundSize: "40px 40px",
+          }}
+        />
 
         <div className="container mx-auto px-4 text-center relative z-10">
           <div className="text-accent mb-6">
@@ -301,7 +350,9 @@ export default function HomePage() {
           </h2>
           <div className="w-16 h-1 bg-accent mx-auto mb-8" />
           <p className="mt-4 max-w-3xl mx-auto text-white/70 text-lg leading-relaxed font-light">
-          Regal HoReCa has been a prominent brand and distributor in the hospitality industry, delivering quality and trust to esteemed clients across national and international markets.
+            Regal HoReCa has been a prominent brand and distributor in the
+            hospitality industry, delivering quality and trust to esteemed
+            clients across national and international markets.
           </p>
           <Link
             href="/about"

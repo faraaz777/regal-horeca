@@ -1,7 +1,5 @@
 /**
- * Enquiry Form Page
- * 
- * Displays an enquiry form for users to submit inquiries about products/services.
+ * Enquiry Form Page - V3 (Restored - "Massive Visual Impact")
  */
 
 'use client';
@@ -12,6 +10,79 @@ import { WhatsAppIcon, ChevronDownIcon } from '@/components/Icons';
 import { useAppContext } from '@/context/AppContext';
 import { getWhatsAppBusinessLink } from '@/lib/utils/whatsapp';
 import toast from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// Floating Input Sub-component with Tailwind & Spring Animations
+const FloatingInput = ({ label, id, name, type = "text", value, onChange, required, isTextArea = false, rows = 4 }) => {
+  const [isFocused, setIsFocused] = useState(false);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      className="relative group w-full"
+    >
+      <div className={`
+        absolute -inset-0.5 bg-gradient-to-r from-primary to-orange-400 rounded-[22px] blur opacity-0 
+        group-focus-within:opacity-20 transition duration-500
+      `}></div>
+
+      {isTextArea ? (
+        <textarea
+          id={id}
+          name={name}
+          value={value}
+          onChange={onChange}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          required={required}
+          rows={rows}
+          className={`
+            relative w-full px-6 pt-7 pb-3 bg-white/70 backdrop-blur-xl border-2 rounded-[20px] outline-none transition-all duration-300
+            ${isFocused ? 'border-primary ring-4 ring-primary/5 bg-white' : 'border-transparent bg-white/50'}
+            placeholder-transparent text-gray-900 font-medium
+          `}
+          placeholder=" "
+        />
+      ) : (
+        <input
+          type={type}
+          id={id}
+          name={name}
+          value={value}
+          onChange={onChange}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          required={required}
+          className={`
+            relative w-full px-6 pt-7 pb-3 bg-white/70 backdrop-blur-xl border-2 rounded-[20px] outline-none transition-all duration-300
+            ${isFocused ? 'border-primary ring-4 ring-primary/5 bg-white' : 'border-transparent bg-white/50'}
+            placeholder-transparent text-gray-900 font-medium
+          `}
+          placeholder=" "
+        />
+      )}
+
+      <motion.label
+        htmlFor={id}
+        className="absolute left-6 pointer-events-none select-none"
+        animate={{
+          y: (value || isFocused) ? 8 : 22,
+          scale: (value || isFocused) ? 0.75 : 1,
+          color: isFocused ? "#EE4023" : (value ? "#666" : "#9ca3af"),
+        }}
+        initial={false}
+        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        style={{ transformOrigin: 'left top' }}
+      >
+        <span className="text-sm font-bold tracking-tight uppercase">
+          {label} {required && <span className="text-red-500">*</span>}
+        </span>
+      </motion.label>
+    </motion.div>
+  );
+};
 
 function EnquiryForm() {
   const searchParams = useSearchParams();
@@ -30,439 +101,294 @@ function EnquiryForm() {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCartDropdownOpen, setIsCartDropdownOpen] = useState(false); // Dropdown state
-  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false); // Category dropdown state
-  const categoryDropdownRef = useRef(null);
+  const [isCartOpen, setIsCartOpen] = useState(true);
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const categoryRef = useRef(null);
 
-  // Close category dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
-        setIsCategoryDropdownOpen(false);
-      }
+    const clickOutside = (e) => {
+      if (categoryRef.current && !categoryRef.current.contains(e.target)) setIsCategoryOpen(false);
     };
+    document.addEventListener('mousedown', clickOutside);
+    return () => document.removeEventListener('mousedown', clickOutside);
+  }, []);
 
-    if (isCategoryDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isCategoryDropdownOpen]);
-
-  // Get cart items with product details
   const cartItems = useMemo(() => {
-    return cart.map(cartItem => {
-      const product = products.find(p => {
-        const pid = p._id || p.id;
-        return pid?.toString() === cartItem.productId?.toString();
-      });
-      return product ? {
-        productId: cartItem.productId,
-        productName: product.title || product.name || 'Product',
-        quantity: cartItem.quantity,
-      } : null;
+    return cart.map(item => {
+      const p = products.find(prod => (prod._id || prod.id)?.toString() === item.productId?.toString());
+      return p ? { productId: item.productId, productName: p.title || p.name, quantity: item.quantity } : null;
     }).filter(Boolean);
   }, [cart, products]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const toggleCategory = (cat) => {
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      categories: prev.categories.includes(cat)
+        ? prev.categories.filter(c => c !== cat)
+        : [...prev.categories, cat]
     }));
   };
 
-  const handleCategoryToggle = (categoryName) => {
-    setFormData(prev => {
-      const currentCategories = prev.categories || [];
-      if (currentCategories.includes(categoryName)) {
-        return {
-          ...prev,
-          categories: currentCategories.filter(cat => cat !== categoryName)
-        };
-      } else {
-        return {
-          ...prev,
-          categories: [...currentCategories, categoryName]
-        };
-      }
-    });
-  };
-
-  const submitEnquiry = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!formData.name || !formData.email || !formData.phone) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
+    if (!formData.name || !formData.email || !formData.phone) return toast.error('Please fill all required fields');
 
     setIsSubmitting(true);
-
     try {
-      // Always include cart items if they exist
-      const enquiryData = {
-        ...formData,
-        cartItems: cartItems.length > 0 ? cartItems : [],
-      };
-
-      // Save enquiry to MongoDB
       const response = await fetch('/api/enquiries', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(enquiryData),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData, cartItems }),
       });
+      if (!response.ok) throw new Error('Submission failed');
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit enquiry');
-      }
-
-      // Format message for WhatsApp - always include cart items if they exist
-      let whatsappMessage = 'Hello! I would like to make an enquiry:\n\n';
-      whatsappMessage += `Name: ${formData.name}\n`;
-      whatsappMessage += `Email: ${formData.email}\n`;
-      whatsappMessage += `Phone: ${formData.phone}\n`;
-      if (formData.company) {
-        whatsappMessage += `Company: ${formData.company}\n`;
-      }
-      if (formData.state) {
-        whatsappMessage += `State: ${formData.state}\n`;
-      }
-      if (formData.categories && formData.categories.length > 0) {
-        whatsappMessage += `Categories: ${formData.categories.join(', ')}\n`;
-      }
-      
-      // Always include cart items in WhatsApp message if they exist
+      let msg = `*New Enquiry from Regal Horeca*\n\n`;
+      msg += `👤 *Customer Details*\n`;
+      msg += `• Name: ${formData.name}\n`;
+      msg += `• Phone: ${formData.phone}\n`;
+      msg += `• Location: ${formData.state}\n\n`;
+      if (formData.categories.length > 0) msg += `📂 *Focus Areas:* ${formData.categories.join(', ')}\n\n`;
       if (cartItems.length > 0) {
-        whatsappMessage += `\n📦 Products I'm interested in:\n`;
-        cartItems.forEach((item, index) => {
-          whatsappMessage += `${index + 1}. ${item.productName} (Quantity: ${item.quantity})\n`;
-        });
-        whatsappMessage += `\nTotal Items: ${cartItems.reduce((sum, item) => sum + item.quantity, 0)}\n`;
+        msg += `📦 *Products for Review:*\n`;
+        cartItems.forEach((it, i) => msg += `${i + 1}. ${it.productName} (${it.quantity})\n`);
+        msg += `\n`;
       }
-      
-      if (formData.message) {
-        whatsappMessage += `\nMessage: ${formData.message}\n`;
-      }
-      
-      // Generate WhatsApp link to business number
-      const whatsappUrl = getWhatsAppBusinessLink(whatsappMessage);
-      window.open(whatsappUrl, '_blank');
-      
-      // Reset form
-      setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        company: '',
-        state: '',
-        message: '',
-        categories: categoryParam ? [categoryParam] : [],
-      });
-      
-      toast.success('Enquiry submitted successfully! Opening WhatsApp...');
-    } catch (error) {
-      console.error('Error submitting enquiry:', error);
-      toast.error(error.message || 'Failed to submit enquiry. Please try again.');
+      if (formData.message) msg += `💬 *Message:* ${formData.message}\n`;
+
+      window.open(getWhatsAppBusinessLink(msg), '_blank');
+      setFormData({ name: '', email: '', phone: '', company: '', state: '', message: '', categories: [] });
+      toast.success('Enquiry Sent! Opening WhatsApp...');
+    } catch (err) {
+      toast.error('Failed to send enquiry. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="bg-white min-h-screen py-8 md:py-12" >
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
-        <div className="mb-6 md:mb-8 text-center">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Enquiry Form</h1>
-          <p className="text-sm sm:text-base text-gray-600">
-            Fill out the form below and we'll send your enquiry details to WhatsApp
-          </p>
-        </div>
+    <div className="relative min-h-screen bg-[#fafafa] overflow-hidden selection:bg-primary/20 selection:text-primary">
+      {/* Animated Mesh Gradient Background (Tailwind + Framer) */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <motion.div
+          animate={{
+            scale: [1, 1.2, 1],
+            x: [0, 100, 0],
+            y: [0, 50, 0],
+          }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          className="absolute -top-[20%] -left-[10%] w-[1000px] h-[1000px] bg-primary/10 rounded-full blur-[120px]"
+        />
+        <motion.div
+          animate={{
+            scale: [1.2, 1, 1.2],
+            x: [0, -100, 0],
+            y: [0, -50, 0],
+          }}
+          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+          className="absolute -bottom-[20%] -right-[10%] w-[800px] h-[800px] bg-orange-200/20 rounded-full blur-[100px]"
+        />
+      </div>
 
-        <form onSubmit={submitEnquiry} className="bg-gray-50 rounded-lg p-4 sm:p-6 md:p-8 shadow-sm">
-          <div className="space-y-6">
-            {/* Two Column Grid Layout */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-              {/* Column 1 - First 3 Fields */}
-              <div className="space-y-4 md:space-y-6">
-                {/* Name */}
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                    Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition hover:border-gray-400"
-                    placeholder="Enter your full name"
-                  />
-                </div>
+      <div className="relative z-10 max-w-6xl mx-auto px-6 py-20 lg:py-32">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-start">
 
-                {/* Email */}
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                    Email <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition hover:border-gray-400"
-                    placeholder="Enter your email address"
-                  />
-                </div>
+          {/* Left Column: Heading & Large Visuals */}
+          <div className="lg:col-span-5 space-y-12">
+            <motion.div
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+            >
+              <span className="inline-block px-4 py-1.5 bg-primary/10 text-primary text-xs font-black uppercase tracking-[3px] rounded-full mb-6">
+                Connect with us
+              </span>
+              <h1 className="text-6xl md:text-8xl font-black text-gray-900 leading-[0.9] tracking-tighter mb-8 bg-clip-text text-transparent bg-gradient-to-br from-gray-900 via-gray-800 to-gray-500">
+                Let's Make it <span className="italic font-serif text-primary block mt-4">Regal.</span>
+              </h1>
+              <p className="text-xl text-gray-500 font-medium leading-relaxed max-w-md">
+                Elevate your hospitality experience. Share your vision, and we'll bring the excellence.
+              </p>
+            </motion.div>
 
-                {/* Phone */}
-                <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-                    Phone Number <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    id="phone"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition hover:border-gray-400"
-                    placeholder="Enter your phone number"
-                  />
+            <motion.div
+              initial={{ opacity: 0, y: 100 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 1 }}
+              className="hidden lg:block relative p-8 bg-gray-900 rounded-[40px] overflow-hidden shadow-2xl"
+            >
+              <div className="absolute top-0 right-0 p-8">
+                <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center animate-pulse">
+                  <WhatsAppIcon className="w-6 h-6 text-white" />
                 </div>
               </div>
-
-              {/* Column 2 - Next 3 Fields */}
-              <div className="space-y-4 md:space-y-6">
-                {/* Company */}
-                <div>
-                  <label htmlFor="company" className="block text-sm font-medium text-gray-700 mb-2">
-                    Company Name (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    id="company"
-                    name="company"
-                    value={formData.company}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition hover:border-gray-400"
-                    placeholder="Enter your company name"
+              <h3 className="text-3xl font-black text-white mb-4">Fast Link</h3>
+              <p className="text-gray-400 font-bold text-sm tracking-widest uppercase mb-6">WhatsApp Response Time</p>
+              <div className="flex items-center gap-2">
+                <div className="h-1 lg:w-32 bg-gray-800 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: "95%" }}
+                    transition={{ delay: 1, duration: 2 }}
+                    className="h-full bg-primary"
                   />
                 </div>
+                <span className="text-primary font-black text-xs">VERY FAST</span>
+              </div>
+            </motion.div>
+          </div>
 
-                {/* State */}
-                <div>
-                  <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-2">
-                    State (Optional)
-                  </label>
-                  <input
-                    required = {true}
-                    type="text"
-                    id="state"
-                    name="state"
-                    value={formData.state}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition hover:border-gray-400"
-                    placeholder="Enter your state"
-                  />
+          {/* Right Column: The Form */}
+          <div className="lg:col-span-7">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="bg-white/40 backdrop-blur-3xl p-8 md:p-12 rounded-[50px] border border-white/50 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)]"
+            >
+              <form onSubmit={handleSubmit} className="space-y-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <FloatingInput label="Full Name" name="name" id="name" value={formData.name} onChange={handleChange} required />
+                  <FloatingInput label="Email Address" type="email" name="email" id="email" value={formData.email} onChange={handleChange} required />
+                  <FloatingInput label="WhatsApp Number" type="tel" name="phone" id="phone" value={formData.phone} onChange={handleChange} required />
+                  <FloatingInput label="State / City" name="state" id="state" value={formData.state} onChange={handleChange} required />
                 </div>
 
-                {/* Categories Multi-Select */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Categories (Optional)
+                {/* Focus Areas Selection */}
+                <div className="space-y-6" ref={categoryRef}>
+                  <label className="text-[10px] font-black uppercase tracking-[3px] text-gray-400 ml-4">
+                    What are you focusing on?
                   </label>
-                  <div className="relative" ref={categoryDropdownRef}>
+                  <div className="relative">
                     <button
                       type="button"
-                      onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-left flex items-center justify-between hover:border-gray-400 transition-colors focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                      onClick={() => setIsCategoryOpen(!isCategoryOpen)}
+                      className="w-full flex items-center justify-between p-6 bg-white/50 rounded-[24px] border border-transparent hover:border-primary/20 transition-all group"
                     >
-                      <span className="text-sm text-gray-700">
-                        {formData.categories.length > 0 
-                          ? `${formData.categories.length} categor${formData.categories.length === 1 ? 'y' : 'ies'} selected`
-                          : 'Select categories'
+                      <span className="font-bold text-gray-700">
+                        {formData.categories.length > 0
+                          ? `${formData.categories.length} Areas Selected`
+                          : "Select Categories"
                         }
                       </span>
-                      <ChevronDownIcon 
-                        className={`w-5 h-5 text-gray-500 transition-transform duration-300 ${
-                          isCategoryDropdownOpen ? 'rotate-180' : ''
-                        }`}
-                      />
+                      <ChevronDownIcon className={`w-6 h-6 text-gray-400 transition-transform duration-500 ${isCategoryOpen ? 'rotate-180' : ''}`} />
                     </button>
-                    
-                    {/* Dropdown */}
-                    {isCategoryDropdownOpen && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                        <div className="p-2 space-y-1">
-                          {businessTypes && businessTypes.length > 0 ? (
-                            businessTypes.map((businessType) => {
-                              const businessTypeName = businessType.name;
-                              const isSelected = formData.categories.includes(businessTypeName);
+
+                    <AnimatePresence>
+                      {isCategoryOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }}
+                          className="absolute z-50 top-full left-0 right-0 mt-4 p-4 bg-white rounded-[32px] shadow-2xl border border-gray-100 max-h-[300px] overflow-y-auto"
+                        >
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {businessTypes?.map((cat) => {
+                              const active = formData.categories.includes(cat.name);
                               return (
-                                <label
-                                  key={businessType._id || businessType.id || businessTypeName}
-                                  className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer transition-colors"
+                                <button
+                                  key={cat.name}
+                                  type="button"
+                                  onClick={() => toggleCategory(cat.name)}
+                                  className={`
+                                    flex items-center gap-3 p-4 rounded-[20px] transition-all
+                                    ${active ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'hover:bg-gray-50 text-gray-700'}
+                                  `}
                                 >
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => handleCategoryToggle(businessTypeName)}
-                                    className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary focus:ring-2 transition-all hover:scale-110"
-                                  />
-                                  <span className="text-sm text-gray-700">{businessTypeName}</span>
-                                </label>
+                                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${active ? 'border-none bg-white/20' : 'border-gray-200'}`}>
+                                    {active && <span className="text-[10px]">✓</span>}
+                                  </div>
+                                  <span className="text-sm font-bold">{cat.name}</span>
+                                </button>
                               );
-                            })
-                          ) : (
-                            <p className="text-sm text-gray-500 p-2">No business types available</p>
-                          )}
+                            })}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+
+                <FloatingInput label="Tell us more about your requirements" name="message" id="message" value={formData.message} onChange={handleChange} isTextArea rows={3} />
+
+                {/* Visual Cart Summary */}
+                {cartItems.length > 0 && (
+                  <motion.div
+                    layout
+                    className="p-8 bg-gray-50/50 rounded-[32px] border border-dashed border-gray-200"
+                  >
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center shadow-sm">
+                          <span className="text-xl">📦</span>
                         </div>
+                        <h4 className="text-xs font-black uppercase tracking-[2px] text-gray-400">Cart Review</h4>
                       </div>
-                    )}
-                  </div>
-                  
-                  {/* Selected Categories Display */}
-                  {formData.categories.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {formData.categories.map((catName, index) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full"
+                      <button
+                        type="button"
+                        onClick={() => setIsCartOpen(!isCartOpen)}
+                        className="text-[10px] font-black uppercase tracking-widest text-primary hover:opacity-70 transition-opacity"
+                      >
+                        {isCartOpen ? 'Minimize' : 'View All'}
+                      </button>
+                    </div>
+
+                    <AnimatePresence>
+                      {isCartOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
                         >
-                          {catName}
-                          <button
-                            type="button"
-                            onClick={() => handleCategoryToggle(catName)}
-                            className="hover:text-primary/80 transition-colors"
-                            aria-label={`Remove ${catName}`}
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                          <div className="space-y-4">
+                            {cartItems.map((item, idx) => (
+                              <motion.div
+                                key={idx}
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: idx * 0.05 }}
+                                className="flex items-center justify-between p-4 bg-white rounded-[20px] shadow-sm border border-gray-50"
+                              >
+                                <span className="text-sm font-bold text-gray-800">{item.productName}</span>
+                                <span className="text-[10px] font-black bg-primary/10 text-primary px-3 py-1 rounded-full">{item.quantity} QTY</span>
+                              </motion.div>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                )}
+
+                <div className="flex flex-col md:flex-row items-center gap-8 pt-8">
+                  <motion.button
+                    whileHover={{ scale: 1.05, translateY: -5 }}
+                    whileTap={{ scale: 0.95 }}
+                    disabled={isSubmitting}
+                    type="submit"
+                    className="w-full md:w-auto px-12 py-6 bg-primary text-white text-lg font-black tracking-tight rounded-[24px] shadow-2xl shadow-primary/40 flex items-center justify-center gap-4 group overflow-hidden relative"
+                  >
+                    <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500 ease-in-out" />
+                    <WhatsAppIcon className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+                    <span>{isSubmitting ? 'SENDING...' : 'START CONVERSATION'}</span>
+                  </motion.button>
+
+                  <button
+                    type="button"
+                    onClick={() => router.back()}
+                    className="text-xs font-black uppercase tracking-[3px] text-gray-400 hover:text-primary transition-colors flex items-center gap-2 group"
+                  >
+                    <span className="group-hover:-translate-x-1 transition-transform">←</span> Go Back
+                  </button>
                 </div>
-
-                {/* Message */}
-                <div>
-                  <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
-                    Message (Optional)
-                  </label>
-                  <textarea
-                    id="message"
-                    name="message"
-                    value={formData.message}
-                    onChange={handleChange}
-                    rows={formData.categories.length > 0 ? 3 : 5}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition resize-none hover:border-gray-400"
-                    placeholder="Tell us about your requirements..."
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Cart Items Dropdown - Full Width */}
-            {cartItems.length > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg overflow-hidden transition-all duration-300 hover:shadow-md">
-                {/* Dropdown Header */}
-                <button
-                  type="button"
-                  onClick={() => setIsCartDropdownOpen(!isCartDropdownOpen)}
-                  className="w-full flex items-center justify-between p-3 sm:p-4 hover:bg-blue-100 transition-colors duration-200 group"
-                >
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base sm:text-lg">📦</span>
-                      <h3 className="text-xs sm:text-sm font-semibold text-gray-900">
-                        Products in Cart ({cartItems.reduce((sum, item) => sum + item.quantity, 0)} items)
-                      </h3>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <span className="text-xs text-green-700 font-medium px-2 py-1 bg-green-100 rounded">
-                      ✓ Will be included
-                    </span>
-                    <ChevronDownIcon 
-                      className={`w-4 h-4 sm:w-5 sm:h-5 text-gray-600 transition-transform duration-300 ease-in-out ${
-                        isCartDropdownOpen ? 'rotate-180' : ''
-                      } group-hover:text-gray-900`}
-                    />
-                  </div>
-                </button>
-
-                {/* Dropdown Content */}
-                <div
-                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                    isCartDropdownOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
-                  }`}
-                >
-                  <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-2 border-t border-blue-200">
-                    <div className="space-y-2 sm:space-y-2.5 mt-2">
-                      {cartItems.map((item, index) => (
-                        <button
-                          type="button"
-                          key={index} 
-                          onClick={() => {
-                            // Dispatch custom event to open cart drawer
-                            window.dispatchEvent(new CustomEvent('openCartDrawer'));
-                          }}
-                          className="w-full text-left text-xs sm:text-sm text-gray-700 flex justify-between items-center p-2 rounded-md bg-white/60 hover:bg-white transition-all duration-200 hover:shadow-sm hover:translate-x-1 active:scale-[0.98] cursor-pointer group"
-                          style={{
-                            animationDelay: `${index * 50}ms`,
-                          }}
-                        >
-                          <span className="font-medium group-hover:text-primary transition-colors truncate pr-2">{item.productName}</span>
-                          <span className="font-semibold text-primary px-2 py-0.5 bg-primary/10 rounded-full group-hover:bg-primary/20 transition-colors flex-shrink-0">
-                            Qty: {item.quantity}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-xs text-green-700 mt-3 flex items-center gap-1 font-medium">
-                      <span>✓</span>
-                      These products will be included in your enquiry and WhatsApp message
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Submit Button */}
-            <div className="flex justify-center max-w-2xl mx-auto">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full sm:w-auto min-w-[200px] bg-green-500 hover:bg-green-600 active:bg-green-700 text-white font-semibold py-3 px-8 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg active:scale-[0.98]"
-              >
-                <WhatsAppIcon className="w-5 h-5" />
-                <span className="text-sm sm:text-base">
-                  {isSubmitting ? 'Submitting...' : 'Submit Enquiry'}
-                </span>
-              </button>
-            </div>
+              </form>
+            </motion.div>
           </div>
-        </form>
-
-        <div className="mt-4 sm:mt-6 text-center">
-          <button
-            onClick={() => router.back()}
-            className="text-sm sm:text-base text-gray-600 hover:text-gray-900 transition-colors py-2 px-4 hover:underline"
-          >
-            ← Go Back
-          </button>
         </div>
       </div>
     </div>
@@ -472,12 +398,15 @@ function EnquiryForm() {
 export default function EnquiryPage() {
   return (
     <Suspense fallback={
-      <div className="bg-white min-h-screen py-12 flex items-center justify-center">
-        <p className="text-gray-600">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-[#fafafa]">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+          className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full"
+        />
       </div>
     }>
       <EnquiryForm />
     </Suspense>
   );
 }
-

@@ -1,474 +1,237 @@
 'use client';
 
-/**
- * Contact Us Component
- * 
- * Uses the same enquiry form structure as whom-we-serve pages
- */
-
 import { useState, useMemo, useEffect, useRef } from 'react';
-import {  WhatsAppIcon, ChevronDownIcon } from '@/components/Icons';
+import { WhatsAppIcon, ChevronDownIcon } from '@/components/Icons';
 import { useAppContext } from '@/context/AppContext';
 import { getWhatsAppBusinessLink } from '@/lib/utils/whatsapp';
 import toast from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// V5 Compact & Crisp Floating Input
+const FloatingInput = ({ label, id, name, type = "text", value, onChange, required, isTextArea = false, rows = 2 }) => {
+  const [isFocused, setIsFocused] = useState(false);
+
+  return (
+    <div className="relative w-full">
+      {isTextArea ? (
+        <textarea
+          id={id}
+          name={name}
+          value={value}
+          onChange={onChange}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          required={required}
+          rows={rows}
+          className={`
+            relative w-full px-4 pt-5 pb-2 bg-white border-2 rounded-xl outline-none transition-all duration-200
+            ${isFocused ? 'border-primary ring-2 ring-primary/5' : 'border-gray-200'}
+            placeholder-transparent text-gray-900 text-sm font-semibold
+          `}
+          placeholder=" "
+        />
+      ) : (
+        <input
+          type={type}
+          id={id}
+          name={name}
+          value={value}
+          onChange={onChange}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          required={required}
+          className={`
+            relative w-full px-4 pt-5 pb-2 bg-white border-2 rounded-xl outline-none transition-all duration-200
+            ${isFocused ? 'border-primary ring-2 ring-primary/5' : 'border-gray-200'}
+            placeholder-transparent text-gray-900 text-sm font-semibold
+          `}
+          placeholder=" "
+        />
+      )}
+
+      <motion.label
+        htmlFor={id}
+        className="absolute left-4 pointer-events-none select-none"
+        animate={{
+          y: (value || isFocused) ? 6 : 16,
+          scale: (value || isFocused) ? 0.75 : 1,
+          color: isFocused ? "#EE4023" : (value ? "#666" : "#9ca3af"),
+        }}
+        initial={false}
+        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+        style={{ transformOrigin: 'left top' }}
+      >
+        <span className="text-[10px] font-black tracking-tight uppercase">
+          {label} {required && <span className="text-red-500">*</span>}
+        </span>
+      </motion.label>
+    </div>
+  );
+};
 
 export default function ContactUs() {
   const { cart, products, businessTypes } = useAppContext();
-  
+
   const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    companyName: '',
-    state: '',
-    query: '',
-    categories: [],
+    fullName: '', email: '', phone: '', companyName: '', state: '', query: '', categories: [],
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCartDropdownOpen, setIsCartDropdownOpen] = useState(false);
-  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [includeCart, setIncludeCart] = useState(true);
-  const categoryDropdownRef = useRef(null);
+  const categoryRef = useRef(null);
 
-  // Close category dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
-        setIsCategoryDropdownOpen(false);
-      }
+    const clickOutside = (e) => {
+      if (categoryRef.current && !categoryRef.current.contains(e.target)) setIsCategoryOpen(false);
     };
+    document.addEventListener('mousedown', clickOutside);
+    return () => document.removeEventListener('mousedown', clickOutside);
+  }, []);
 
-    if (isCategoryDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isCategoryDropdownOpen]);
-
-  // Get cart items with product details
   const cartItems = useMemo(() => {
-    return cart.map(cartItem => {
-      const product = products.find(p => {
-        const pid = p._id || p.id;
-        return pid?.toString() === cartItem.productId?.toString();
-      });
-      return product ? {
-        productId: cartItem.productId,
-        productName: product.title || product.name || 'Product',
-        quantity: cartItem.quantity,
-      } : null;
+    return cart.map(item => {
+      const p = products.find(prod => (prod._id || prod.id)?.toString() === item.productId?.toString());
+      return p ? { productId: item.productId, productName: p.title || p.name, quantity: item.quantity } : null;
     }).filter(Boolean);
   }, [cart, products]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const toggleCategory = (cat) => {
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      categories: prev.categories.includes(cat)
+        ? prev.categories.filter(c => c !== cat)
+        : [...prev.categories, cat]
     }));
   };
 
-  const handleCategoryToggle = (categoryName) => {
-    setFormData(prev => {
-      const currentCategories = prev.categories || [];
-      if (currentCategories.includes(categoryName)) {
-        return {
-          ...prev,
-          categories: currentCategories.filter(cat => cat !== categoryName)
-        };
-      } else {
-        return {
-          ...prev,
-          categories: [...currentCategories, categoryName]
-        };
-      }
-    });
-  };
-
-  const submitEnquiry = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!formData.fullName || !formData.email || !formData.phone || !formData.state) {
-      toast.error('Please fill in all required fields');
-      return;
+      return toast.error('Required fields missing');
     }
 
     setIsSubmitting(true);
-
     try {
       const enquiryData = {
-        name: formData.fullName,
-        email: formData.email,
-        phone: formData.phone,
-        company: formData.companyName,
-        state: formData.state,
-        message: formData.query,
-        categories: formData.categories,
-        cartItems: includeCart && cartItems.length > 0 ? cartItems : [],
+        name: formData.fullName, email: formData.email, phone: formData.phone,
+        company: formData.companyName, state: formData.state, message: formData.query,
+        categories: formData.categories, cartItems: includeCart && cartItems.length > 0 ? cartItems : [],
       };
 
       const response = await fetch('/api/enquiries', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(enquiryData),
       });
 
-      const data = await response.json();
+      if (!response.ok) throw new Error('Submission failed');
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit enquiry');
-      }
-
-      let whatsappMessage = 'Hello! I would like to make an enquiry:\n\n';
-      whatsappMessage += `Name: ${formData.fullName}\n`;
-      whatsappMessage += `Email: ${formData.email}\n`;
-      whatsappMessage += `Phone: ${formData.phone}\n`;
-      if (formData.companyName) {
-        whatsappMessage += `Company: ${formData.companyName}\n`;
-      }
-      whatsappMessage += `State: ${formData.state}\n`;
-      if (formData.categories.length > 0) {
-        whatsappMessage += `Categories: ${formData.categories.join(', ')}\n`;
-      }
-      
+      let msg = `*New Request*\n👤 *Client:* ${formData.fullName}\n📞 *Phone:* ${formData.phone}\n📍 *City:* ${formData.state}\n\n`;
+      if (formData.categories.length > 0) msg += `📂 *Areas:* ${formData.categories.join(', ')}\n\n`;
       if (includeCart && cartItems.length > 0) {
-        whatsappMessage += `\n📦 Products I'm interested in:\n`;
-        cartItems.forEach((item, index) => {
-          whatsappMessage += `${index + 1}. ${item.productName} (Quantity: ${item.quantity})\n`;
-        });
-        whatsappMessage += `\nTotal Items: ${cartItems.reduce((sum, item) => sum + item.quantity, 0)}\n`;
+        msg += `📦 *Products Review:*\n`;
+        cartItems.forEach((it, i) => msg += `${i + 1}. ${it.productName} (${it.quantity})\n`);
+        msg += `\n`;
       }
-      
-      if (formData.query) {
-        whatsappMessage += `\nMessage: ${formData.query}\n`;
-      }
-      
-      // Generate WhatsApp link to business number
-      const whatsappUrl = getWhatsAppBusinessLink(whatsappMessage);
-      window.open(whatsappUrl, '_blank');
-      
-      // Reset form
-      setFormData({
-        fullName: '',
-        email: '',
-        phone: '',
-        companyName: '',
-        state: '',
-        query: '',
-        categories: [],
-      });
-      
-      toast.success('Enquiry submitted successfully! Opening WhatsApp...');
-    } catch (error) {
-      console.error('Error submitting enquiry:', error);
-      toast.error(error.message || 'Failed to submit enquiry. Please try again.');
+      if (formData.query) msg += `💬 *Msg:* ${formData.query}\n`;
+
+      window.open(getWhatsAppBusinessLink(msg), '_blank');
+      setFormData({ fullName: '', email: '', phone: '', companyName: '', state: '', query: '', categories: [] });
+      toast.success('Opening WhatsApp...');
+    } catch (err) {
+      toast.error('Submission failed.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <section className="py-12 bg-gray-50">
-      <div className="container mx-auto px-4">
-        <div className="max-w-3xl mx-auto">
-          {/* Contact Us Form - Centered */}
-          <div>
-            <div className="mb-6 text-center">
-              <h2 className="text-3xl font-bold tracking-tight mb-4">Contact Us</h2>
-              <p className="text-black/70">
-                Have questions? We'd love to hear from you. Fill out the form below and we'll send your enquiry details to WhatsApp.
-              </p>
-            </div>
-            <form onSubmit={submitEnquiry} className="bg-white rounded-lg p-6 md:p-8 shadow-sm border-2 ">
-            <div className="space-y-6">
-              {/* Two Column Grid Layout */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Column 1 - Contact Details */}
-                <div className="space-y-6">
-                  {/* Name */}
-                  <div>
-                    <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">
-                      Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      id="fullName"
-                      name="fullName"
-                      value={formData.fullName}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition hover:border-gray-400"
-                      placeholder="Enter your full name"
-                    />
-                  </div>
+    <section className="relative py-12 lg:py-16 bg-gray-100 overflow-hidden font-sans">
+      <div className="container relative z-10 mx-auto px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-10">
+            <motion.h2 initial={{ opacity: 0, y: -10 }} whileInView={{ opacity: 1, y: 0 }} className="text-3xl lg:text-5xl font-black text-gray-900 tracking-tighter mb-2">
+              Start Your <span className="font-serif italic text-primary">Regal</span> Journey.
+            </motion.h2>
+            <p className="text-xs lg:text-sm text-gray-500 font-bold uppercase tracking-[0.2em]">Contact Us</p>
+          </div>
 
-                  {/* Email */}
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                      Email <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition hover:border-gray-400"
-                      placeholder="Enter your email address"
-                    />
-                  </div>
-
-                  {/* Phone */}
-                  <div>
-                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone Number <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      id="phone"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition hover:border-gray-400"
-                      placeholder="Enter your phone number"
-                    />
-                  </div>
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="bg-white p-6 lg:p-10 rounded-[24px] shadow-2xl border border-gray-100 max-w-2xl mx-auto"
+          >
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                <div className="space-y-4">
+                  <FloatingInput label="Full Name" id="fullName" name="fullName" value={formData.fullName} onChange={handleChange} required />
+                  <FloatingInput label="Email address" type="email" id="email" name="email" value={formData.email} onChange={handleChange} required />
+                  <FloatingInput label="WhatsApp phone" type="tel" id="phone" name="phone" value={formData.phone} onChange={handleChange} required />
                 </div>
 
-                {/* Column 2 - Additional Details */}
-                <div className="space-y-6">
-                  {/* Company & State - Side by Side */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Company */}
-                    <div>
-                      <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 mb-2">
-                        Company (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        id="companyName"
-                        name="companyName"
-                        value={formData.companyName}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition hover:border-gray-400"
-                        placeholder="Company name"
-                      />
-                    </div>
+                <div className="space-y-4">
+                  <FloatingInput label="Company name (optional)" id="companyName" name="companyName" value={formData.companyName} onChange={handleChange} />
+                  <FloatingInput label="State / City" id="state" name="state" value={formData.state} onChange={handleChange} required />
 
-                    {/* State */}
-                    <div>
-                      <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-2">
-                        State <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        id="state"
-                        name="state"
-                        value={formData.state}
-                        onChange={handleChange}
-                        required
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition hover:border-gray-400"
-                        placeholder="Your state"
-                      />
-                    </div>
-                  </div>
+                  <div className="relative" ref={categoryRef}>
+                    <button type="button" onClick={() => setIsCategoryOpen(!isCategoryOpen)} className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-xl border-2 border-transparent hover:border-primary/10 transition-all text-left">
+                      <span className={`text-[11px] font-black uppercase tracking-tight ${formData.categories.length > 0 ? "text-gray-900" : "text-gray-400"}`}>
+                        {formData.categories.length > 0 ? `${formData.categories.length} Topics Selected` : "Focus Categories"}
+                      </span>
+                      <ChevronDownIcon className={`w-4 h-4 transition-transform duration-300 ${isCategoryOpen ? 'rotate-180' : ''}`} />
+                    </button>
 
-                  {/* Categories Multi-Select */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Categories (Optional)
-                    </label>
-                    <div className="relative" ref={categoryDropdownRef}>
-                      <button
-                        type="button"
-                        onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-left flex items-center justify-between hover:border-gray-400 transition-colors focus:ring-2 focus:ring-accent focus:border-transparent outline-none"
-                      >
-                        <span className="text-sm text-gray-700">
-                          {formData.categories.length > 0 
-                            ? `${formData.categories.length} categor${formData.categories.length === 1 ? 'y' : 'ies'} selected`
-                            : 'Select categories'
-                          }
-                        </span>
-                        <ChevronDownIcon 
-                          className={`w-5 h-5 text-gray-500 transition-transform duration-300 ${
-                            isCategoryDropdownOpen ? 'rotate-180' : ''
-                          }`}
-                        />
-                      </button>
-                      
-                      {/* Dropdown */}
-                      {isCategoryDropdownOpen && (
-                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                          <div className="p-2 space-y-1">
-                            {businessTypes && businessTypes.length > 0 ? (
-                              businessTypes.map((businessType) => {
-                                const businessTypeName = businessType.name;
-                                const isSelected = formData.categories.includes(businessTypeName);
-                                return (
-                                  <label
-                                    key={businessType._id || businessType.id || businessTypeName}
-                                    className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer transition-colors"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={isSelected}
-                                      onChange={() => handleCategoryToggle(businessTypeName)}
-                                      className="w-4 h-4 text-accent border-gray-300 rounded focus:ring-accent focus:ring-2 transition-all hover:scale-110"
-                                    />
-                                    <span className="text-sm text-gray-700">{businessTypeName}</span>
-                                  </label>
-                                );
-                              })
-                            ) : (
-                              <p className="text-sm text-gray-500 p-2">No categories available</p>
-                            )}
+                    <AnimatePresence>
+                      {isCategoryOpen && (
+                        <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 5 }} className="absolute z-50 bottom-full inset-x-0 mb-2 p-2 bg-white rounded-2xl shadow-2xl border border-gray-200 max-h-[160px] overflow-y-auto custom-scrollbar">
+                          <div className="grid grid-cols-1 gap-1">
+                            {businessTypes?.map((cat) => {
+                              const active = formData.categories.includes(cat.name);
+                              return (
+                                <button key={cat.name} type="button" onClick={() => toggleCategory(cat.name)} className={`flex items-center gap-2 p-3 rounded-lg transition-all text-left ${active ? 'bg-primary text-white' : 'hover:bg-gray-50 text-gray-700'}`}>
+                                  <div className={`w-3 h-3 rounded-full border flex items-center justify-center ${active ? 'bg-white border-none' : 'border-gray-300'}`}>{active && <span className="text-[7px] text-primary font-bold">✓</span>}</div>
+                                  <span className="text-[10px] font-bold uppercase tracking-tight">{cat.name}</span>
+                                </button>
+                              );
+                            })}
                           </div>
-                        </div>
+                        </motion.div>
                       )}
-                    </div>
-                    
-                    {/* Selected Categories Display */}
-                    {formData.categories.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {formData.categories.map((catName, index) => (
-                          <span
-                            key={index}
-                            className="inline-flex items-center gap-1 px-2 py-1 bg-accent/10 text-accent text-xs rounded-full"
-                          >
-                            {catName}
-                            <button
-                              type="button"
-                              onClick={() => handleCategoryToggle(catName)}
-                              className="hover:text-accent/80 transition-colors"
-                              aria-label={`Remove ${catName}`}
-                            >
-                              ×
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Message */}
-                  <div>
-                    <label htmlFor="query" className="block text-sm font-medium text-gray-700 mb-2">
-                      Message (Optional)
-                    </label>
-                    <textarea
-                      id="query"
-                      name="query"
-                      value={formData.query}
-                      onChange={handleChange}
-                      rows={formData.categories.length > 0 ? 3 : 4}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition resize-none hover:border-gray-400"
-                      placeholder="Tell us about your requirements..."
-                    />
+                    </AnimatePresence>
                   </div>
                 </div>
               </div>
 
-              {/* Cart Items Dropdown - Full Width */}
-              {cartItems.length > 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg overflow-hidden transition-all duration-300 hover:shadow-md">
-                  <button
-                    type="button"
-                    onClick={() => setIsCartDropdownOpen(!isCartDropdownOpen)}
-                    className="w-full flex items-center justify-between p-3 sm:p-4 hover:bg-blue-100 transition-colors duration-200 group"
-                  >
-                    <div className="flex items-center gap-2 sm:gap-3">
-                      <span className="text-base sm:text-lg">📦</span>
-                      <h3 className="text-xs sm:text-sm font-semibold text-gray-900">
-                        Cart Items ({cartItems.reduce((sum, item) => sum + item.quantity, 0)} items)
-                      </h3>
-                    </div>
-                    <div className="flex items-center gap-2 sm:gap-3">
-                      <label 
-                        className="flex items-center gap-1.5 sm:gap-2 cursor-pointer"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={includeCart}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            setIncludeCart(e.target.checked);
-                          }}
-                          className="w-4 h-4 text-accent border-gray-300 rounded focus:ring-accent focus:ring-2 transition-all duration-200 hover:scale-110"
-                        />
-                        <span className="text-xs text-gray-700 font-medium">Include</span>
-                      </label>
-                      <ChevronDownIcon 
-                        className={`w-4 h-4 sm:w-5 sm:h-5 text-gray-600 transition-transform duration-300 ease-in-out ${
-                          isCartDropdownOpen ? 'rotate-180' : ''
-                        } group-hover:text-gray-900`}
-                      />
-                    </div>
-                  </button>
+              <FloatingInput label="Requirements" id="query" name="query" value={formData.query} onChange={handleChange} isTextArea rows={2} />
 
-                  <div
-                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                      isCartDropdownOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
-                    }`}
-                  >
-                    <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-2 border-t border-blue-200">
-                      {includeCart ? (
-                        <>
-                          <div className="space-y-2 sm:space-y-2.5 mt-2">
-                            {cartItems.map((item, index) => (
-                              <button
-                                type="button"
-                                key={index} 
-                                onClick={() => {
-                                  window.dispatchEvent(new CustomEvent('openCartDrawer'));
-                                }}
-                                className="w-full text-left text-xs sm:text-sm text-gray-700 flex justify-between items-center p-2 rounded-md bg-white/60 hover:bg-white transition-all duration-200 hover:shadow-sm hover:translate-x-1 active:scale-[0.98] cursor-pointer group"
-                              >
-                                <span className="font-medium group-hover:text-accent transition-colors truncate pr-2">{item.productName}</span>
-                                <span className="font-semibold text-accent px-2 py-0.5 bg-accent/10 rounded-full group-hover:bg-accent/20 transition-colors flex-shrink-0">
-                                  Qty: {item.quantity}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                          <p className="text-xs text-green-700 mt-3 flex items-center gap-1 font-medium">
-                            <span>✓</span>
-                            These items will be included in your enquiry
-                          </p>
-                        </>
-                      ) : (
-                        <p className="text-xs text-gray-600 mt-2 flex items-center gap-1">
-                          <span>ℹ</span>
-                          Cart items will not be included in your enquiry
-                        </p>
-                      )}
-                    </div>
+              {cartItems.length > 0 && (
+                <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">📦</span>
+                    <div className="text-left"><h4 className="text-[8px] font-black uppercase tracking-widest text-blue-900">Sync</h4><p className="text-[10px] font-black text-blue-900">{cartItems.length} ITEMS</p></div>
                   </div>
+                  <label className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-100 cursor-pointer">
+                    <input type="checkbox" checked={includeCart} onChange={(e) => setIncludeCart(e.target.checked)} className="w-3.5 h-3.5 accent-primary" />
+                    <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">Include</span>
+                  </label>
                 </div>
               )}
 
-              {/* Submit Button */}
-              <div className="flex justify-center">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full sm:w-auto min-w-[200px] bg-green-500 hover:bg-green-600 active:bg-green-700 text-white font-semibold py-3 px-8 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg active:scale-[0.98]"
-                >
+              <div className="flex justify-center pt-2">
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} disabled={isSubmitting} type="submit" className="w-full px-10 py-4 bg-gray-900 text-white text-xs font-black tracking-[0.2em] rounded-xl shadow-xl flex items-center justify-center gap-3 transition-colors hover:bg-black uppercase">
                   <WhatsAppIcon className="w-5 h-5" />
-                  <span>{isSubmitting ? 'Submitting...' : 'Submit Enquiry'}</span>
-                </button>
+                  <span>START CONVERSATION</span>
+                </motion.button>
               </div>
-            </div>
-          </form>
-          </div>
+            </form>
+          </motion.div>
         </div>
       </div>
     </section>

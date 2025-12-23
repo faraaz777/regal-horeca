@@ -206,7 +206,7 @@ function CatalogPageContent() {
           </div>
         </button>
         {isOpen && (
-          <div className="pt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="pt-4">
             {children}
           </div>
         )}
@@ -312,7 +312,7 @@ function CatalogPageContent() {
           )}
         </div>
         <ul className="category-list">
-          {parentCategory && (
+          {parentCategory ? (
             <li>
               <Link
                 href={`/catalog?category=${parentCategory.slug}`}
@@ -320,6 +320,16 @@ function CatalogPageContent() {
               >
                 <ChevronLeftIcon className="w-4 h-4 mr-1" />
                 {parentCategory.name}
+              </Link>
+            </li>
+          ) : selectedCategorySlug && (
+            <li>
+              <Link
+                href="/catalog"
+                className="category-link opacity-40 hover:opacity-100"
+              >
+                <ChevronLeftIcon className="w-4 h-4 mr-1" />
+                All Products
               </Link>
             </li>
           )}

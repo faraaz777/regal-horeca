@@ -18,7 +18,7 @@ export default function LoadingPage() {
     const handleLoad = () => {
       setTimeout(() => {
         setIsLoading(false);
-      }, 5000); // Show for 1.5 seconds minimum
+      }, 1000); // Show for 1.5 seconds minimum
     };
 
     if (document.readyState === 'complete') {

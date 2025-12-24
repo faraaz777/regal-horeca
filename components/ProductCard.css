@@ -1,9 +1,8 @@
 .product-card-wrapper {
-  width: 100%;
-  max-width: 100%;
+  width: 270px;
   height: 400px;
   background: white;
-  margin: 0;
+  margin: auto;
   position: relative;
   overflow: hidden;
   border-radius: 10px;
@@ -142,12 +141,12 @@
 }
 
 .product-card-buy svg {
-  color: #000000;
+  color: #254053;
   transition: transform 0.5s;
 }
 
 .product-card-buy:hover {
-  background: #EE4023;
+  background: #92879B;
 }
 
 .product-card-buy:hover svg {
@@ -157,7 +156,7 @@
 
 .product-card-right {
   width: 50%;
-  background: #EE4023;
+  background: #92879B;
   color: white;
   height: 200%;
   overflow: hidden;
@@ -219,7 +218,7 @@
   min-width: 60px;
   border-right: solid thin rgba(255, 255, 255, 0.3);
   height: 50%;
-  background: #000000;
+  background: #BC3B59;
   transition: transform 0.5s, background 0.5s;
   display: flex;
   align-items: center;
@@ -232,7 +231,7 @@
 }
 
 .product-card-remove:hover {
-  background: #121212;
+  background: #9B2847;
 }
 
 .product-card-remove:hover svg {
@@ -251,7 +250,7 @@
 
 .product-card-inside {
   z-index: 9;
-  background: #000000;
+  background: #92879B;
   width: 140px;
   height: 140px;
   position: absolute;
@@ -403,11 +402,6 @@
     height: auto;
     min-height: 280px;
     aspect-ratio: 3/4;
-    transform: scale(1);
-  }
-
-  .product-card-wrapper:hover {
-    transform: scale(1);
   }
 
   .product-card-top-link {
@@ -439,25 +433,6 @@
   .product-card-remove svg {
     width: 20px;
     height: 20px;
-  }
-}
-
-/* Tablet adjustments */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .product-card-wrapper {
-    height: 380px;
-    transform: scale(0.97);
-  }
-
-  .product-card-wrapper:hover {
-    transform: scale(1);
-  }
-}
-
-/* Large screen adjustments */
-@media (min-width: 1280px) {
-  .product-card-wrapper {
-    height: 400px;
   }
 }
 

@@ -20,6 +20,7 @@ import ProductCard from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 import ProductGallery from '@/components/ProductGallery';
 import AiAssistant from '@/components/AiAssistant';
+import ReactMarkdown from 'react-markdown';
 import toast from 'react-hot-toast';
 
 export default function ProductDetailPage() {
@@ -572,10 +573,12 @@ export default function ProductDetailPage() {
                   <h3 className="font-serif italic text-2xl text-royal-gold mb-2">The Experience</h3>
                   <div className="w-12 h-0.5 bg-royal-gold/30 mx-auto mt-4"></div>
                 </div>
-                <div className="prose prose-lg prose-p:text-black/60 prose-p:leading-loose text-center">
-                  <p>
-                    {product.description || 'No description available for this product.'}
-                  </p>
+                <div className="prose prose-lg prose-p:text-black/60 prose-p:leading-loose prose-headings:text-black prose-strong:text-black prose-ul:text-black prose-li:text-black/60 text-center max-w-none">
+                  {product.description ? (
+                    <ReactMarkdown>{product.description}</ReactMarkdown>
+                  ) : (
+                    <p>No description available for this product.</p>
+                  )}
                 </div>
               </div>
             )}

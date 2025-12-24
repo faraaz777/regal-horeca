@@ -221,12 +221,12 @@ export default function HomePage() {
                   ref={(el) => (categoryRefs.current[i] = el)}
                   data-index={i}
                   className={`flex-none snap-center group relative w-[280px] h-[420px] rounded-[100px] border bg-white overflow-hidden transition-all duration-500 ${isActive
-                      ? "border-accent shadow-2xl scale-[1.02] md:scale-100"
-                      : "border-black/10 hover:border-accent hover:shadow-2xl"
+                    ? "border-accent shadow-2xl scale-[1.02] md:border-black/10 md:shadow-none md:scale-100 md:hover:border-accent md:hover:shadow-2xl"
+                    : "border-black/10 hover:border-accent hover:shadow-2xl"
                     }`}
                 >
                   {/* Hover Background Fill */}
-                  <div className={`absolute inset-0 bg-accent origin-bottom transition-transform duration-500 ease-in-out z-0 ${isActive ? "scale-y-100" : "scale-y-0 group-hover:scale-y-100"
+                  <div className={`absolute inset-0 bg-accent origin-bottom transition-transform duration-500 ease-in-out z-0 ${isActive ? "scale-y-100 md:scale-y-0" : "scale-y-0 group-hover:scale-y-100"
                     }`} />
 
                   <div className="relative z-10 w-full h-full flex flex-col items-center">
@@ -239,7 +239,7 @@ export default function HomePage() {
                             alt={cat.name}
                             fill
                             sizes="280px"
-                            className={`object-cover transition-transform duration-700 ${isActive ? "scale-110" : "group-hover:scale-110"
+                            className={`object-cover transition-transform duration-700 ${isActive ? "scale-110 md:scale-100" : "scale-100 group-hover:scale-110"
                               }`}
                           />
                         ) : (
@@ -252,26 +252,26 @@ export default function HomePage() {
 
                     {/* Content - Bottom Half */}
                     <div className="w-full h-[45%] flex flex-col items-center justify-center p-6 text-center">
-                      <span className={`text-xs font-bold tracking-[0.25em] uppercase mb-2 transition-colors duration-300 ${isActive ? "text-white/80" : "text-accent group-hover:text-white/80"
+                      <span className={`text-xs font-bold tracking-[0.25em] uppercase mb-2 transition-colors duration-300 ${isActive ? "text-white/80 md:text-accent" : "text-accent group-hover:text-white/80"
                         }`}>
                         Collection
                       </span>
-                      <h3 className={`text-2xl font-serif mb-6 transition-colors duration-300 ${isActive ? "text-white" : "text-black group-hover:text-white"
+                      <h3 className={`text-2xl font-serif mb-6 transition-colors duration-300 ${isActive ? "text-white md:text-black" : "text-black group-hover:text-white"
                         }`}>
                         {cat.name}
                       </h3>
 
                       {/* Arrow Icon */}
                       <div className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all duration-300 ${isActive
-                          ? "border-white/40 bg-white/20"
-                          : "border-black/10 group-hover:border-white/40 group-hover:bg-white/20"
+                        ? "border-white/40 bg-white/20 md:border-black/10 md:bg-transparent"
+                        : "border-black/10 group-hover:border-white/40 group-hover:bg-white/20"
                         }`}>
                         <svg
                           width="20"
                           height="20"
                           viewBox="0 0 24 24"
                           fill="none"
-                          className={`transform transition-all duration-300 ${isActive ? "text-white -rotate-45" : "text-black group-hover:text-white group-hover:-rotate-45"
+                          className={`transform transition-all duration-300 ${isActive ? "text-white -rotate-45 md:text-black md:rotate-0" : "text-black group-hover:text-white group-hover:-rotate-45"
                             }`}
                           xmlns="http://www.w3.org/2000/svg"
                         >
@@ -294,7 +294,7 @@ export default function HomePage() {
       </section>
 
       {/* Parallax Image Section */}
-      <section className="w-full relative lg:h-[400px]  md:h-[500px] h-[300px] overflow-hidden">
+      <section className="w-full relative lg:h-[500px] md:h-[550px] h-[400px] overflow-hidden">
         <div
           className="absolute inset-0 bg-fixed"
           style={{
@@ -304,14 +304,19 @@ export default function HomePage() {
             backgroundPosition: "center",
           }}
         >
-          <div className="absolute inset-0 bg-black/30" />
+          <div className="absolute inset-0 bg-black/50" />
         </div>
-        <div className="relative h-full flex flex-col items-center justify-center text-center text-white p-6">
-          <h2 className="text-4xl md:text-6xl font-serif mb-6">
-            Excellence in Service
+        <div className="relative h-full flex flex-col items-center justify-center text-center text-white px-6 max-w-5xl mx-auto">
+          <span className="text-accent text-xs md:text-sm font-bold tracking-[0.3em] uppercase mb-4 block">
+            Trusted by Industry Leaders
+          </span>
+          <h2 className="text-4xl md:text-7xl lg:text-8xl font-bold mb-6 tracking-tight leading-[1.1]">
+            Excellence in
+            <span className="block text-accent mt-2">Every Detail</span>
           </h2>
-          <p className="text-lg md:text-xl font-light max-w-2xl">
-            Providing world-class hospitality solutions for over 4 decades.
+          <div className="w-24 h-1 bg-accent mx-auto mb-8" />
+          <p className="text-base md:text-xl lg:text-2xl font-light max-w-3xl leading-relaxed text-white/90">
+            From <strong className="text-white font-semibold">Paradise</strong> to <strong className="text-white font-semibold">Le Meridien</strong>, from <strong className="text-white font-semibold">ITC Kohenur</strong> to <strong className="text-white font-semibold">Ramoji Film City</strong> — Regal equips the finest.
           </p>
         </div>
       </section>
@@ -382,7 +387,7 @@ export default function HomePage() {
       </section>
 
       {/* About Teaser - Redesigned */}
-      <section className="py-24 bg-black text-white relative overflow-hidden">
+      <section className="py-12 md:py-16 lg:py-20 bg-black text-white relative overflow-hidden">
         {/* Background Pattern */}
         <div
           className="absolute inset-0 opacity-10"
@@ -393,25 +398,49 @@ export default function HomePage() {
           }}
         />
 
-        <div className="container mx-auto px-4 text-center relative z-10">
-          <div className="text-accent mb-6">
-            <span className="text-5xl md:text-7xl font-serif">45+</span>
+        <div className="container mx-auto px-4 relative z-10">
+          {/* Main Content */}
+          <div className="text-center mb-6 md:mb-10">
+            <div className="text-accent mb-2 md:mb-4">
+              <span className="text-4xl md:text-7xl lg:text-8xl font-black tracking-tighter italic">45+</span>
+            </div>
+            <h2 className="text-2xl md:text-5xl lg:text-6xl font-bold mb-3 md:mb-6 tracking-tight leading-tight">
+              Years of <span className="italic font-serif">Unmatched</span>
+              <span className="block text-accent mt-1 italic font-serif">Legacy & Trust</span>
+            </h2>
+            <div className="w-16 md:w-20 h-0.5 md:h-1 bg-accent mx-auto mb-3 md:mb-6" />
+            <p className="max-w-3xl mx-auto text-white/80 text-sm md:text-lg lg:text-xl leading-relaxed font-light px-2">
+              Regal Brass & Steelware powers hospitality excellence across India. <br className="hidden md:block" />
+              <strong className="text-white font-semibold">250+ dedicated professionals.</strong> <strong className="text-white font-semibold">6,000+ premium products.</strong> <br className="hidden md:block" />
+              Distributing <strong className="text-white font-semibold italic">Ariane, Pasabahce, Ocean, Hawkins, Prestige</strong> and more.
+            </p>
           </div>
-          <h2 className="text-3xl md:text-5xl font-serif mb-8 tracking-tight">
-            Years of Excellence
-          </h2>
-          <div className="w-16 h-1 bg-accent mx-auto mb-8" />
-          <p className="mt-4 max-w-3xl mx-auto text-white/70 text-lg leading-relaxed font-light">
-            Regal HoReCa has been a prominent brand and distributor in the
-            hospitality industry, delivering quality and trust to esteemed
-            clients across national and international markets.
-          </p>
-          <Link
-            href="/about"
-            className="mt-12 inline-block px-8 py-4 border border-white text-white font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-all duration-300"
-          >
-            Our Story
-          </Link>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-3 gap-3 md:gap-6 max-w-4xl mx-auto mb-6 md:mb-8">
+            <div className="text-center p-3 md:p-5 border border-white/10 hover:border-accent transition-colors duration-300">
+              <p className="text-xl md:text-3xl font-bold text-accent mb-0.5 md:mb-1 italic">250+</p>
+              <p className="text-[9px] md:text-sm uppercase tracking-wider md:tracking-widest text-white/60 font-semibold">Team Members</p>
+            </div>
+            <div className="text-center p-3 md:p-5 border border-white/10 hover:border-accent transition-colors duration-300">
+              <p className="text-xl md:text-3xl font-bold text-accent mb-0.5 md:mb-1 italic">6,000+</p>
+              <p className="text-[9px] md:text-sm uppercase tracking-wider md:tracking-widest text-white/60 font-semibold">Products</p>
+            </div>
+            <div className="text-center p-3 md:p-5 border border-white/10 hover:border-accent transition-colors duration-300">
+              <p className="text-xl md:text-3xl font-bold text-accent mb-0.5 md:mb-1 italic">Pan-India</p>
+              <p className="text-[9px] md:text-sm uppercase tracking-wider md:tracking-widest text-white/60 font-semibold">Reach</p>
+            </div>
+          </div>
+
+          {/* CTA */}
+          <div className="text-center">
+            <Link
+              href="/about"
+              className="inline-block px-6 py-3 md:px-8 md:py-4 border-2 border-accent bg-accent text-black font-bold uppercase tracking-widest hover:bg-transparent hover:text-accent transition-all duration-300 text-[10px] md:text-sm"
+            >
+              Discover Our Story
+            </Link>
+          </div>
         </div>
       </section>
 

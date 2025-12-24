@@ -13,12 +13,12 @@ export default function ProductCard({ product, onAdd }) {
   // Get product images - combine heroImage and gallery
   const getProductImages = () => {
     const images = [];
-    
+
     // Add heroImage first if it exists
     if (product.heroImage) {
       images.push(product.heroImage);
     }
-    
+
     // Add gallery images if they exist
     if (product.gallery && Array.isArray(product.gallery) && product.gallery.length > 0) {
       // Filter out duplicates (in case heroImage is also in gallery)
@@ -28,7 +28,7 @@ export default function ProductCard({ product, onAdd }) {
         }
       });
     }
-    
+
     // Fallback to other possible image fields
     if (images.length === 0) {
       if (product.images && Array.isArray(product.images) && product.images.length > 0) {
@@ -39,7 +39,7 @@ export default function ProductCard({ product, onAdd }) {
         images.push('/placeholder-product.jpg');
       }
     }
-    
+
     return images;
   };
 
@@ -215,8 +215,8 @@ export default function ProductCard({ product, onAdd }) {
                     setCurrentImageIndex(index);
                   }}
                   className={`transition-all duration-200 rounded-full ${index === currentImageIndex
-                      ? 'w-2 h-2 bg-black'
-                      : 'w-2 h-2 bg-white/80 hover:bg-white'
+                    ? 'w-2 h-2 bg-black'
+                    : 'w-2 h-2 bg-white/80 hover:bg-white'
                     }`}
                   aria-label={`View image ${index + 1}`}
                 />
@@ -233,8 +233,8 @@ export default function ProductCard({ product, onAdd }) {
                     setCurrentImageIndex(index);
                   }}
                   className={`transition-all duration-200 rounded-full ${index === currentImageIndex
-                      ? 'w-2 h-2 bg-black'
-                      : 'w-2 h-2 bg-white/80'
+                    ? 'w-2 h-2 bg-black'
+                    : 'w-2 h-2 bg-white/80'
                     }`}
                   aria-label={`View image ${index + 1}`}
                 />
@@ -255,26 +255,55 @@ export default function ProductCard({ product, onAdd }) {
       </div>
 
       {/* Content - Center Aligned, Separated from Image */}
-      <div className="flex-1 flex flex-col px-4 py-5 text-center">
-        {/* Brand/Category - Refined Typography */}
+      <div className="flex-1 flex flex-col px-4 py-3.5 text-center">
+        {/* Brand/Category */}
         {(brand || category) && (
-          <p className="text-xs text-black/70 font-medium mb-2 uppercase tracking-wider">
-            {brand && category ? `${brand} • ${category}` : brand || category}
-          </p>
+          <div className="inline-flex items-center gap-2 mb-2 justify-center">
+            <span className="h-px w-4 bg-accent/40"></span>
+            <span className="text-xs font-bold text-accent uppercase tracking-[0.2em]">
+              {brand && category ? `${brand} • ${category}` : brand || category}
+            </span>
+          </div>
         )}
 
-        {/* Product Name - Enhanced Typography */}
+        {/* Product Name - Larger and Bold */}
         <Link href={`/products/${productSlug}`}>
-          <h3 className="text-[15px] font-semibold text-black mb-3 line-clamp-2 hover:text-accent transition-colors leading-snug tracking-tight">
+          <h3 className="text-base font-bold text-black mb-2 line-clamp-2 hover:text-accent transition-colors leading-snug">
             {productName}
           </h3>
         </Link>
 
-        {/* Price Section - Bold and Prominent */}
-        <div className="flex items-center justify-center mt-auto pt-2">
-          <span className="text-xl font-bold text-black tracking-tight">
-            {formatPrice(product.price || 0)}
-          </span>
+        {/* Price Section - Compact and Clean */}
+        <div className="flex flex-col items-center gap-1 mt-auto">
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <span className="text-sm font-bold text-black">
+              {formatPrice(product.price || 0)}
+            </span>
+            {(() => {
+              // Calculate original price: use originalPrice if exists, otherwise calculate as price * 1.2
+              const originalPrice = product.originalPrice && product.originalPrice > product.price
+                ? product.originalPrice
+                : (product.price ? product.price * 1.2 : null);
+
+              // Only show if we have a valid original price that's higher than current price
+              if (originalPrice && originalPrice > product.price) {
+                const discount = Math.round(((originalPrice - product.price) / originalPrice) * 100);
+                return (
+                  <>
+                    <span className="text-[11px] text-black/40 line-through font-normal">
+                      {formatPrice(originalPrice)}
+                    </span>
+                    {discount > 0 && (
+                      <span className="text-[11px] font-semibold text-accent">
+                        {discount}% off
+                      </span>
+                    )}
+                  </>
+                );
+              }
+              return null;
+            })()}
+          </div>
         </div>
       </div>
     </div>

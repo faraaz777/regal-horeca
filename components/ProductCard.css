@@ -280,9 +280,14 @@
   height: 80%;
 }
 
-.product-card-inside:hover .product-card-icon,
-.product-card-inside.active .product-card-icon {
+.product-card-inside:hover .product-card-icon {
+  opacity: 0 !important;
+  visibility: hidden;
+}
+
+.product-card-inside.active:not(:hover) .product-card-icon {
   opacity: 1;
+  visibility: visible;
   right: 15px;
   top: 15px;
   transform: scale(1.1);

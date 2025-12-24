@@ -280,12 +280,15 @@
   height: 80%;
 }
 
-.product-card-inside:hover .product-card-icon {
-  opacity: 0 !important;
-  visibility: hidden;
+/* Hide icon on hover - Desktop only */
+@media (hover: hover) and (pointer: fine) {
+  .product-card-inside:hover .product-card-icon {
+    opacity: 0 !important;
+    visibility: hidden;
+  }
 }
 
-.product-card-inside.active:not(:hover) .product-card-icon {
+.product-card-inside.active .product-card-icon {
   opacity: 1;
   visibility: visible;
   right: 15px;

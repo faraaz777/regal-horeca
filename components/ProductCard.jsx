@@ -183,7 +183,16 @@ export default function ProductCard({ product, onAdd }) {
         onMouseEnter={() => !isMobile && setSpecsOpen(true)}
         onMouseLeave={() => !isMobile && setSpecsOpen(false)}
       >
-        <div className="product-card-icon">
+        <div 
+          className="product-card-icon"
+          onClick={(e) => {
+            if (isMobile && specsOpen) {
+              e.preventDefault();
+              e.stopPropagation();
+              setSpecsOpen(false);
+            }
+          }}
+        >
           {/* Flip icon ONLY on mobile */}
           {isMobile && specsOpen ? <ClearIcon /> : <InfoIcon />}
         </div>

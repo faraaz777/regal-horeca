@@ -112,6 +112,10 @@ export default function ProductCard({ product, onAdd }) {
 
   const toggleSpecs = (e) => {
     if (isMobile) {
+      // Don't toggle if clicking the close icon (x)
+      if (e.target.closest('.product-card-icon') && specsOpen) {
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
       setSpecsOpen(!specsOpen);
@@ -179,7 +183,13 @@ export default function ProductCard({ product, onAdd }) {
       </div>
       <div
         className={`product-card-inside ${specsOpen ? 'active' : ''}`}
-        onClick={toggleSpecs}
+        onClick={(e) => {
+          // Don't toggle if clicking the icon when it's the 'x' (close button)
+          if (isMobile && specsOpen && e.target.closest('.product-card-icon')) {
+            return;
+          }
+          toggleSpecs(e);
+        }}
         onMouseEnter={() => !isMobile && setSpecsOpen(true)}
         onMouseLeave={() => !isMobile && setSpecsOpen(false)}
       >
@@ -192,6 +202,7 @@ export default function ProductCard({ product, onAdd }) {
               setSpecsOpen(false);
             }
           }}
+          style={{ cursor: 'pointer' }}
         >
           {/* Flip icon ONLY on mobile */}
           {isMobile && specsOpen ? <ClearIcon /> : <InfoIcon />}

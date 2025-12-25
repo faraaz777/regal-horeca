@@ -53,8 +53,8 @@ export default function AdminLayout({ children }) {
     isAuthenticated ? '/api/enquiries?limit=1&skip=0&status=new' : null,
     fetcher,
     {
-      revalidateOnFocus: true,
-      refreshInterval: 60000, // Refresh every minute
+      revalidateOnFocus: false, // Disable auto-refresh on focus to reduce DB load
+      refreshInterval: 300000, // Refresh every 5 minutes (reduced from 1 minute)
     }
   );
 

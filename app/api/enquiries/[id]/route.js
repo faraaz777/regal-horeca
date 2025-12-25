@@ -183,3 +183,42 @@ export async function PUT(request, { params }) {
   }
 }
 
+/**
+ * DELETE /api/enquiries/[id]
+ * Delete an enquiry and all related data
+ */
+export async function DELETE(request, { params }) {
+  try {
+    await connectToDatabase();
+
+    const { id } = params;
+
+    // Delete enquiry items first (foreign key constraint)
+    await EnquiryItem.deleteMany({ enquiryId: id });
+    
+    // Delete enquiry messages
+    await EnquiryMessage.deleteMany({ enquiryId: id });
+    
+    // Delete the enquiry itself
+    const enquiry = await Enquiry.findByIdAndDelete(id);
+
+    if (!enquiry) {
+      return NextResponse.json(
+        { error: 'Enquiry not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Enquiry deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting enquiry:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete enquiry', details: error.message },
+      { status: 500 }
+    );
+  }
+}
+

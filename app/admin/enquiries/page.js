@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
-import { SearchIcon, FilterIcon, EyeIcon, PhoneIcon, MailIcon, WhatsAppIcon, ClockIcon, ChevronDownIcon } from '@/components/Icons';
+import { SearchIcon, FilterIcon, EyeIcon, PhoneIcon, MailIcon, WhatsAppIcon, ClockIcon, ChevronDownIcon, TrashIcon } from '@/components/Icons';
 import { getWhatsAppCustomerLink } from '@/lib/utils/whatsapp';
 
 const ITEMS_PER_PAGE = 20;
@@ -112,6 +112,29 @@ export default function AdminEnquiriesPage() {
 
     return () => clearTimeout(timer);
   }, [searchTerm, statusFilter, priorityFilter]);
+
+  // Handle delete enquiry
+  const handleDeleteEnquiry = async (enquiryId, enquiryIdDisplay) => {
+    if (!confirm(`Are you sure you want to delete enquiry ${enquiryIdDisplay || enquiryId}? This action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/enquiries/${enquiryId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete enquiry');
+      }
+      
+      toast.success('Enquiry deleted successfully');
+      mutate(); // Refresh the list
+    } catch (error) {
+      toast.error('Failed to delete enquiry');
+      console.error(error);
+    }
+  };
 
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
   const startItem = total > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0;
@@ -364,6 +387,13 @@ export default function AdminEnquiriesPage() {
                                   <WhatsAppIcon className="w-5 h-5" />
                                 </a>
                               )}
+                              <button
+                                onClick={() => handleDeleteEnquiry(enquiry._id, enquiry.enquiryId)}
+                                className="text-red-600 hover:text-red-700 p-1.5 rounded hover:bg-red-50 transition-colors"
+                                title="Delete Enquiry"
+                              >
+                                <TrashIcon className="w-5 h-5" />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -479,6 +509,14 @@ export default function AdminEnquiriesPage() {
                               WhatsApp
                             </a>
                           )}
+                          <button
+                            onClick={() => handleDeleteEnquiry(enquiry._id, enquiry.enquiryId)}
+                            className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm font-medium flex items-center justify-center gap-2"
+                            title="Delete Enquiry"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                            Delete
+                          </button>
                         </div>
                       </div>
                     )}

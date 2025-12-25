@@ -157,7 +157,7 @@ export default function ContactUs() {
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-10">
             <motion.h2 initial={{ opacity: 0, y: -10 }} whileInView={{ opacity: 1, y: 0 }} className="text-3xl lg:text-5xl font-black text-gray-900 tracking-tighter mb-2">
-              Start Your <span className="font-serif italic text-primary">Regal</span> Journey.
+              Start Your <span className="font-serif italic text-accent">Regal</span> Journey.
             </motion.h2>
             <p className="text-xs lg:text-sm text-gray-500 font-bold uppercase tracking-[0.2em]">Contact Us</p>
           </div>

@@ -495,7 +495,7 @@ function CatalogPageContent() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm border-y border-black/10 my-8 py-4 text-center text-black/70">
         <div>Express Delivery Dispatch within 24 Hours</div>
-        <div className="border-x-0 md:border-x border-black/10">Easy Return, COD</div>
+        <div className="border-x-0 md:border-x border-black/10">Easy Return</div>
         <div>100% Sustainable Packaging</div>
       </div>
 

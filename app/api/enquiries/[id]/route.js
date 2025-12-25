@@ -22,10 +22,16 @@ export async function GET(request, { params }) {
 
     const { id } = params;
 
-    // Get enquiry with customer details
-    const enquiry = await Enquiry.findById(id)
-      .populate('customerId')
-      .lean();
+    // Get enquiry with customer details - handle populate failure gracefully
+    let enquiry;
+    try {
+      enquiry = await Enquiry.findById(id)
+        .populate('customerId')
+        .lean();
+    } catch (populateError) {
+      // If populate fails, try without populate
+      enquiry = await Enquiry.findById(id).lean();
+    }
 
     if (!enquiry) {
       return NextResponse.json(
@@ -34,10 +40,16 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Get enquiry items (cart products)
-    const enquiryItems = await EnquiryItem.find({ enquiryId: id })
-      .populate('productId', 'title heroImage slug price')
-      .lean();
+    // Get enquiry items (cart products) - handle populate failure gracefully
+    let enquiryItems = [];
+    try {
+      enquiryItems = await EnquiryItem.find({ enquiryId: id })
+        .populate('productId', 'title heroImage slug price')
+        .lean();
+    } catch (populateError) {
+      // If populate fails, try without populate
+      enquiryItems = await EnquiryItem.find({ enquiryId: id }).lean();
+    }
 
     // Get communication log
     const messages = await EnquiryMessage.find({ enquiryId: id })
@@ -47,9 +59,12 @@ export async function GET(request, { params }) {
     // Get customer's total enquiries count
     let customerEnquiriesCount = 0;
     if (enquiry.customerId) {
-      customerEnquiriesCount = await Enquiry.countDocuments({
-        customerId: enquiry.customerId._id || enquiry.customerId
-      });
+      const customerIdValue = enquiry.customerId?._id || enquiry.customerId;
+      if (customerIdValue) {
+        customerEnquiriesCount = await Enquiry.countDocuments({
+          customerId: customerIdValue
+        });
+      }
     }
 
     // Get related enquiries - by customerId (primary) or phone (fallback for legacy data)
@@ -59,18 +74,28 @@ export async function GET(request, { params }) {
 
     // Build query: prioritize customerId, fallback to phone matching
     if (enquiry.customerId) {
-      relatedEnquiriesQuery.customerId = enquiry.customerId._id || enquiry.customerId;
+      const customerIdValue = enquiry.customerId?._id || enquiry.customerId;
+      if (customerIdValue) {
+        relatedEnquiriesQuery.customerId = customerIdValue;
+      }
     } else if (enquiry.phone) {
       // Fallback: find by normalized phone for legacy enquiries without customerId
       const normalizedPhone = normalizePhone(enquiry.phone);
-      relatedEnquiriesQuery.phone = normalizedPhone;
+      // Only add phone query if normalization returned a valid value
+      if (normalizedPhone && normalizedPhone.length > 0) {
+        relatedEnquiriesQuery.phone = normalizedPhone;
+      }
     }
 
-    const relatedEnquiries = await Enquiry.find(relatedEnquiriesQuery)
-      .select('enquiryId source type status createdAt phone name')
-      .sort({ createdAt: -1 })
-      .limit(20)
-      .lean();
+    // Only query if we have a valid condition
+    let relatedEnquiries = [];
+    if (relatedEnquiriesQuery.customerId || relatedEnquiriesQuery.phone) {
+      relatedEnquiries = await Enquiry.find(relatedEnquiriesQuery)
+        .select('enquiryId source type status createdAt phone name')
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .lean();
+    }
 
     return NextResponse.json({
       success: true,

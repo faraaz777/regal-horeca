@@ -1,57 +1,97 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { HeartIcon, ShoppingCartIcon, InfoIcon, DoneIcon, ClearIcon } from './Icons';
+import { HeartIcon, ShoppingCartIcon } from './Icons';
 import { useAppContext } from '@/context/AppContext';
 import toast from 'react-hot-toast';
-import './ProductCard.css';
 
 export default function ProductCard({ product, onAdd }) {
   const { addToWishlist, removeFromWishlist, isInWishlist, addToCart, removeFromCart, isInCart } = useAppContext();
 
-  // Get product image - support multiple field names
-  const productImage =
-    product.heroImage ||
-    product.image ||
-    (product.images && product.images[0]) ||
-    '/placeholder-product.jpg';
+  // Get product images - combine heroImage and gallery
+  const getProductImages = () => {
+    const images = [];
+
+    // Add heroImage first if it exists
+    if (product.heroImage) {
+      images.push(product.heroImage);
+    }
+
+    // Add gallery images if they exist
+    if (product.gallery && Array.isArray(product.gallery) && product.gallery.length > 0) {
+      // Filter out duplicates (in case heroImage is also in gallery)
+      product.gallery.forEach(img => {
+        if (img && !images.includes(img)) {
+          images.push(img);
+        }
+      });
+    }
+
+    // Fallback to other possible image fields
+    if (images.length === 0) {
+      if (product.images && Array.isArray(product.images) && product.images.length > 0) {
+        images.push(...product.images);
+      } else if (product.image) {
+        images.push(product.image);
+      } else {
+        images.push('/placeholder-product.jpg');
+      }
+    }
+
+    return images;
+  };
+
+  const productImages = getProductImages();
+
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
+  const imageContainerRef = useRef(null);
+  const productImage = productImages[currentImageIndex];
+
+  // Swipe detection for mobile
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe && productImages.length > 1) {
+      handleImageChange('next');
+    }
+    if (isRightSwipe && productImages.length > 1) {
+      handleImageChange('prev');
+    }
+  };
 
   // Get product name/title
   const productName = product.title || product.name || 'Product';
 
   // Get product ID
   const productId = product._id || product.id;
-  
+
   // Get product slug with fallback - use ID if slug is missing (API handles both)
   const productSlug = product.slug || productId?.toString();
-  
+
   const isLiked = isInWishlist(productId);
-  // ProductCard doesn't have color selection, so check for item without color variant
   const inCart = isInCart(productId, null);
 
-  // State for clicked animation
-  const [clicked, setClicked] = useState(false);
-
-  // Sync clicked state with cart state
-  useEffect(() => {
-    setClicked(inCart);
-  }, [inCart]);
-
-  // State for specs reveal (handling hover/click for mobile support)
-  const [specsOpen, setSpecsOpen] = useState(false);
-
-  // Detect mobile/touch device
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.matchMedia("(max-width: 768px)").matches || 'ontouchstart' in window);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  // Get brand and category
+  const brand = product.brand || product.brandCategory?.name || '';
+  const category = product.category?.name || product.categoryName || '';
 
   // Format price
   const formatPrice = (price) => {
@@ -64,14 +104,6 @@ export default function ProductCard({ product, onAdd }) {
     })
       .format(price)
       .replace('₹', '₹');
-  };
-
-  const handleAdd = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (onAdd) {
-      onAdd(product);
-    }
   };
 
   const handleWishlistToggle = (e) => {
@@ -92,118 +124,186 @@ export default function ProductCard({ product, onAdd }) {
     if (inCart) {
       removeFromCart(productId, null);
       toast.success('Removed from cart!');
-      setClicked(false);
     } else {
       addToCart(productId, 1, {
         price: product.price
       });
       toast.success('Added to cart!');
-      setClicked(true);
     }
   };
 
-  const handleRemoveFromCart = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    removeFromCart(productId, null);
-    toast.success('Removed from cart!');
-    setClicked(false);
-  };
-
-  const toggleSpecs = (e) => {
-    if (isMobile) {
-      e.preventDefault();
-      e.stopPropagation();
-      setSpecsOpen(!specsOpen);
+  const handleImageChange = (direction) => {
+    if (direction === 'prev') {
+      setCurrentImageIndex((prev) => (prev === 0 ? productImages.length - 1 : prev - 1));
+    } else {
+      setCurrentImageIndex((prev) => (prev === productImages.length - 1 ? 0 : prev + 1));
     }
   };
-
-  const closeSpecs = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setSpecsOpen(false);
-  };
-
-  // Prepare specifications for display - limit to top 5
-  const specifications = (product.specifications || []).slice(0, 5);
 
   return (
-    <div className="product-card-wrapper">
-      <div className="product-card-container">
-        <div className="product-card-top">
-          <Link href={`/products/${productSlug}`} className="block w-full h-full">
-            <Image
-              src={productImage}
-              alt={productName}
-              fill
-              sizes="300px"
-              className="object-cover"
-            />
-          </Link>
-          {/* Wishlist button - Hide when specs are open (on both mobile and desktop) */}
-          {!specsOpen && (
-            <button
-              onClick={handleWishlistToggle}
-              className={`product-card-wishlist ${isLiked ? 'active' : ''}`}
-              aria-label={isLiked ? 'Remove from wishlist' : 'Add to wishlist'}
-            >
-              <HeartIcon isFilled={isLiked} />
-            </button>
-          )}
-        </div>
-        <div className={`product-card-bottom ${clicked ? 'clicked' : ''}`}>
-          <div className="product-card-left">
-            <div className="product-card-details">
-              <h1>{productName}</h1>
-              <p>{formatPrice(product.price)}</p>
-            </div>
-            <div className="product-card-buy" onClick={handleAddToCart}>
-              <ShoppingCartIcon />
-            </div>
-          </div>
-          <div className="product-card-right">
-            <div className="product-card-remove-wrapper">
-              <div className="product-card-done">
-                <DoneIcon />
-              </div>
-              <div className="product-card-remove" onClick={handleRemoveFromCart}>
-                <ClearIcon />
-              </div>
-            </div>
-            <div className="product-card-details">
-              <h1>{productName}</h1>
-              <p>Added to your cart</p>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="bg-white rounded-lg overflow-hidden flex flex-col h-full">
+      {/* Image Container - Separated with rounded corners */}
       <div
-        className={`product-card-inside ${specsOpen ? 'active' : ''}`}
-        onClick={toggleSpecs}
-        onMouseEnter={() => !isMobile && setSpecsOpen(true)}
-        onMouseLeave={() => !isMobile && setSpecsOpen(false)}
+        ref={imageContainerRef}
+        className="group relative w-full aspect-square overflow-hidden bg-gray-50 rounded-lg"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
       >
-        <div className="product-card-icon">
-          {/* Flip icon ONLY on mobile */}
-          {isMobile && specsOpen ? <ClearIcon /> : <InfoIcon />}
-        </div>
-        <div className="product-card-contents">
-          {specifications.length > 0 ? (
-            <div className="product-card-specs-list">
-              {specifications.map((spec, index) => (
-                <div key={index} className="product-card-spec-item">
-                  <span className="product-card-spec-label">{spec.label}</span>
-                  <span className="product-card-spec-value">
-                    {spec.value}{spec.unit ? ` ${spec.unit}` : ''}
-                  </span>
-                </div>
+        <Link href={`/products/${productSlug}`} className="block w-full h-full">
+          <Image
+            src={productImage}
+            alt={productName}
+            fill
+            sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            className="object-cover"
+          />
+        </Link>
+
+        {/* Wishlist Button - Top Right */}
+        <button
+          onClick={handleWishlistToggle}
+          className="absolute top-3 right-3 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-all duration-200 z-10"
+          aria-label={isLiked ? 'Remove from wishlist' : 'Add to wishlist'}
+        >
+          <HeartIcon isFilled={isLiked} />
+        </button>
+
+        {/* Image Navigation Arrows - Show on hover for desktop, hidden on mobile */}
+        {productImages.length > 1 && (
+          <>
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleImageChange('prev');
+              }}
+              className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full items-center justify-center shadow-md transition-all duration-200 z-10 opacity-0 group-hover:opacity-100"
+              aria-label="Previous image"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15 18L9 12L15 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleImageChange('next');
+              }}
+              className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full items-center justify-center shadow-md transition-all duration-200 z-10 opacity-0 group-hover:opacity-100"
+              aria-label="Next image"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </>
+        )}
+
+        {/* Image Carousel Indicators - Bottom Center on desktop (hover), Bottom Left on mobile (always visible) */}
+        {productImages.length > 1 && (
+          <>
+            {/* Desktop - Bottom Center, show on hover */}
+            <div className="hidden md:flex absolute bottom-3 left-1/2 -translate-x-1/2 gap-1.5 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              {productImages.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setCurrentImageIndex(index);
+                  }}
+                  className={`transition-all duration-200 rounded-full ${index === currentImageIndex
+                    ? 'w-2 h-2 bg-black'
+                    : 'w-2 h-2 bg-white/80 hover:bg-white'
+                    }`}
+                  aria-label={`View image ${index + 1}`}
+                />
               ))}
             </div>
-          ) : (
-            <div className="product-card-specs-empty">
-              <p>No specifications available</p>
+            {/* Mobile - Bottom Left, always visible */}
+            <div className="flex md:hidden absolute bottom-3 left-3 gap-1.5 z-10">
+              {productImages.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setCurrentImageIndex(index);
+                  }}
+                  className={`transition-all duration-200 rounded-full ${index === currentImageIndex
+                    ? 'w-2 h-2 bg-black'
+                    : 'w-2 h-2 bg-white/80'
+                    }`}
+                  aria-label={`View image ${index + 1}`}
+                />
+              ))}
             </div>
-          )}
+          </>
+        )}
+
+        {/* Shopping Cart Button - Bottom Right */}
+        <button
+          onClick={handleAddToCart}
+          className={`absolute bottom-3 right-3 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-all duration-200 z-10 ${inCart ? 'ring-2 ring-accent' : ''
+            }`}
+          aria-label={inCart ? 'Remove from cart' : 'Add to cart'}
+        >
+          <ShoppingCartIcon />
+        </button>
+      </div>
+
+      {/* Content - Center Aligned, Separated from Image */}
+      <div className="flex-1 flex flex-col px-4 py-3.5 text-center">
+        {/* Brand/Category */}
+        {(brand || category) && (
+          <div className="inline-flex items-center gap-2 mb-2 justify-center">
+            <span className="h-px w-4 bg-accent/40"></span>
+            <span className="text-xs font-bold text-accent uppercase tracking-[0.2em]">
+              {brand && category ? `${brand} • ${category}` : brand || category}
+            </span>
+          </div>
+        )}
+
+        {/* Product Name - Larger and Bold */}
+        <Link href={`/products/${productSlug}`}>
+          <h3 className="text-base font-bold text-black mb-2 line-clamp-2 hover:text-accent transition-colors leading-snug">
+            {productName}
+          </h3>
+        </Link>
+
+        {/* Price Section - Compact and Clean */}
+        <div className="flex flex-col items-center gap-1 mt-auto">
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <span className="text-sm font-bold text-black">
+              {formatPrice(product.price || 0)}
+            </span>
+            {(() => {
+              // Calculate original price: use originalPrice if exists, otherwise calculate as price * 1.2
+              const originalPrice = product.originalPrice && product.originalPrice > product.price
+                ? product.originalPrice
+                : (product.price ? product.price * 1.2 : null);
+
+              // Only show if we have a valid original price that's higher than current price
+              if (originalPrice && originalPrice > product.price) {
+                const discount = Math.round(((originalPrice - product.price) / originalPrice) * 100);
+                return (
+                  <>
+                    <span className="text-[11px] text-black/40 line-through font-normal">
+                      {formatPrice(originalPrice)}
+                    </span>
+                    {discount > 0 && (
+                      <span className="text-[11px] font-semibold text-accent">
+                        {discount}% off
+                      </span>
+                    )}
+                  </>
+                );
+              }
+              return null;
+            })()}
+          </div>
         </div>
       </div>
     </div>

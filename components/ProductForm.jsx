@@ -440,6 +440,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
     summary: '',
     description: '',
     price: 0,
+    originalPrice: null,
     businessTypeSlugs: [],
     heroImage: '',
     gallery: [],
@@ -1561,6 +1562,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
       ...formData,
       brandCategoryId: updatedBrandCategoryId || formData.brandCategoryId,
       price: Number(formData.price),
+      originalPrice: formData.originalPrice && Number(formData.originalPrice) > 0 ? Number(formData.originalPrice) : null,
       tags,
       categoryIds,
       brandCategoryIds,
@@ -1764,6 +1766,23 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
                   min="0" 
                   placeholder="0"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">
+                  Original Price (₹) <span className="text-gray-500 text-xs font-normal">(Optional - for showing discount)</span>
+                </label>
+                <input 
+                  type="number" 
+                  name="originalPrice" 
+                  value={formData.originalPrice || ''} 
+                  onChange={handleChange} 
+                  className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors" 
+                  min="0" 
+                  placeholder="Leave empty to auto-calculate (20% higher)"
+                />
+                {formData.originalPrice && formData.price && formData.originalPrice <= formData.price && (
+                  <p className="mt-1 text-xs text-red-600">Original price must be higher than current price</p>
+                )}
               </div>
               <div className="flex items-center space-x-2 pt-2">
                 <input 

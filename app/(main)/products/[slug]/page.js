@@ -20,6 +20,7 @@ import ProductCard from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 import ProductGallery from '@/components/ProductGallery';
 import AiAssistant from '@/components/AiAssistant';
+import ReactMarkdown from 'react-markdown';
 import toast from 'react-hot-toast';
 
 export default function ProductDetailPage() {
@@ -336,16 +337,30 @@ export default function ProductDetailPage() {
                 <span className="font-serif italic text-4xl text-rich-black">
                   {formatPrice(product.price)}
                 </span>
-                {product.price && (
-                  <>
-                    <span className="text-base text-black/30 line-through decoration-1">
-                      {formatPrice(product.price * 1.2)}
-                    </span>
-                    <span className="ml-auto flex items-center gap-1.5 text-[10px] font-bold text-white bg-royal-gold px-2.5 py-1 rounded-sm uppercase tracking-wider">
-                      Premium Offer
-                    </span>
-                  </>
-                )}
+                {(() => {
+                  // Calculate original price: use originalPrice if exists, otherwise calculate as price * 1.2
+                  const originalPrice = product.originalPrice && product.originalPrice > product.price 
+                    ? product.originalPrice 
+                    : (product.price ? product.price * 1.2 : null);
+                  
+                  // Only show if we have a valid original price that's higher than current price
+                  if (originalPrice && originalPrice > product.price) {
+                    const discount = Math.round(((originalPrice - product.price) / originalPrice) * 100);
+                    return (
+                      <>
+                        <span className="text-base text-black/30 line-through decoration-1">
+                          {formatPrice(originalPrice)}
+                        </span>
+                        {discount >= 20 && (
+                          <span className="ml-auto flex items-center gap-1.5 text-[10px] font-bold text-white bg-royal-gold px-2.5 py-1 rounded-sm uppercase tracking-wider">
+                            Premium Offer
+                          </span>
+                        )}
+                      </>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
 
               {/* Removed Highlights Block from here as requested - moving to Tabs */}
@@ -572,10 +587,12 @@ export default function ProductDetailPage() {
                   <h3 className="font-serif italic text-2xl text-royal-gold mb-2">The Experience</h3>
                   <div className="w-12 h-0.5 bg-royal-gold/30 mx-auto mt-4"></div>
                 </div>
-                <div className="prose prose-lg prose-p:text-black/60 prose-p:leading-loose text-center">
-                  <p>
-                    {product.description || 'No description available for this product.'}
-                  </p>
+                <div className="prose prose-lg prose-p:text-black/60 prose-p:leading-loose prose-headings:text-black prose-strong:text-black prose-ul:text-black prose-li:text-black/60 text-center max-w-none">
+                  {product.description ? (
+                    <ReactMarkdown>{product.description}</ReactMarkdown>
+                  ) : (
+                    <p>No description available for this product.</p>
+                  )}
                 </div>
               </div>
             )}

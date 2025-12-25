@@ -507,7 +507,7 @@ export default function ProductDetailPage() {
                       if (navigator.share) {
                         navigator.share({
                           title: product.title,
-                          text: product.description,
+                          text: product.summary,
                           url: window.location.href,
                         });
                       }

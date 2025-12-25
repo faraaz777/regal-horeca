@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import FeatureCard from './FeatureCard';
+import whychooseus1 from "../components/images/whyimage1.png"
+import whychooseus2 from "../components/images/whyimage2.png"
 
 // Icon Components
 const AwardIcon = ({ className = 'w-6 h-6' }) => (
@@ -36,7 +38,7 @@ const features = [
     title: '45 Years of Legacy',
     description: 'A reliable, pan-India hospitality supply brand with nearly half a century of unmatched industry expertise.',
     icon: <AwardIcon className="w-6 h-6" />,
-    imageUrl: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=1200'
+    imageUrl: whychooseus1,
   },
   {
     id: 2,
@@ -61,11 +63,11 @@ const features = [
   }
 ];
 
-const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1584132967334-10e028bd69f7?auto=format&fit=crop&q=80&w=1200';
+const DEFAULT_IMAGE = whychooseus2;
 
 export default function WhyChooseUs() {
   const [activeId, setActiveId] = useState(null);
-
+2
   const activeFeature = features.find(f => f.id === activeId);
 
   return (

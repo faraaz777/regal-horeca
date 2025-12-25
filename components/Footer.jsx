@@ -33,7 +33,7 @@ export default function Footer() {
             <address className="not-italic text-white/70 space-y-2">
               <p>15-5, Afzal Gunj, Mahaboob Gunj, 696ASHOKBAZARAFZALGUNJ, Hyderabad, Telangana 500012</p>
               <p>Phone: +91 70939 13311</p>
-              <p>Email: sales@regal.com</p>
+              <p>Email: regalmetals@rediffmail.com</p>
             </address>
           </div>
 

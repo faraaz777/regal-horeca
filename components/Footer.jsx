@@ -31,8 +31,8 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold text-lg mb-4 text-accent">Contact Us</h4>
             <address className="not-italic text-white/70 space-y-2">
-              <p>Begum Bazar, Hyderabad</p>
-              <p>Phone: +91 12345 67890</p>
+              <p>15-5, Afzal Gunj, Mahaboob Gunj, 696ASHOKBAZARAFZALGUNJ, Hyderabad, Telangana 500012</p>
+              <p>Phone: +91 70939 13311</p>
               <p>Email: sales@regal.com</p>
             </address>
           </div>

@@ -20,6 +20,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import useSWR from 'swr';
 import { Menu, X } from 'lucide-react';
+import PasswordModal from '@/components/admin/PasswordModal';
 
 // SWR fetcher for enquiry counts
 const fetcher = async (url) => {
@@ -32,15 +33,44 @@ const fetcher = async (url) => {
 
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   // Sidebar closed by default on mobile, open on desktop
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
-  // Set sidebar open on desktop by default
+  // Check authentication status
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      const authStatus = sessionStorage.getItem('admin-auth');
+      setIsAuthenticated(authStatus === 'true');
+      setIsCheckingAuth(false);
       setIsSidebarOpen(window.innerWidth >= 1024);
     }
   }, []);
+
+  const handleAuthSuccess = () => {
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('admin-auth');
+      setIsAuthenticated(false);
+    }
+  };
+
+  // Show password modal if not authenticated
+  if (isCheckingAuth) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-100">
+        <div className="text-gray-600">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <PasswordModal onSuccess={handleAuthSuccess} />;
+  }
 
   // Fetch new enquiries count
   const { data: enquiriesData } = useSWR(
@@ -175,6 +205,16 @@ export default function AdminLayout({ children }) {
             </span>
           </Link>
         </nav>
+
+        {/* Logout Button */}
+        <div className="mt-auto pt-4 border-t border-gray-700">
+          <button
+            onClick={handleLogout}
+            className="w-full text-left px-4 py-3 rounded-lg text-base font-medium text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
+          >
+            Logout
+          </button>
+        </div>
 
       </aside>
       <main className={`flex-1 pt-16 sm:pt-6 lg:pt-8 p-4 sm:p-6 lg:p-8 overflow-y-auto transition-all duration-300 ${isSidebarOpen ? 'lg:ml-64' : 'lg:ml-0'}`}>

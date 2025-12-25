@@ -48,6 +48,18 @@ export default function AdminLayout({ children }) {
     }
   }, []);
 
+  // Fetch new enquiries count - MUST be called before early returns (Rules of Hooks)
+  const { data: enquiriesData } = useSWR(
+    isAuthenticated ? '/api/enquiries?limit=1&skip=0&status=new' : null,
+    fetcher,
+    {
+      revalidateOnFocus: true,
+      refreshInterval: 60000, // Refresh every minute
+    }
+  );
+
+  const newEnquiriesCount = enquiriesData?.statusCounts?.new || 0;
+
   const handleAuthSuccess = () => {
     setIsAuthenticated(true);
   };
@@ -71,18 +83,6 @@ export default function AdminLayout({ children }) {
   if (!isAuthenticated) {
     return <PasswordModal onSuccess={handleAuthSuccess} />;
   }
-
-  // Fetch new enquiries count
-  const { data: enquiriesData } = useSWR(
-    '/api/enquiries?limit=1&skip=0&status=new',
-    fetcher,
-    {
-      revalidateOnFocus: true,
-      refreshInterval: 60000, // Refresh every minute
-    }
-  );
-
-  const newEnquiriesCount = enquiriesData?.statusCounts?.new || 0;
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);

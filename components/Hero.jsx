@@ -11,12 +11,16 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import glassware from './glassware.png'
+import heroimg1 from "../components/images/luxurybg4.png"
+import heroimg2 from "../components/images/photo.png"
+
+
 const slides = [
   {
     id: 1,
     title: 'Elevate Your Dining Experience',
     subtitle: 'Premium tableware crafted for modern hospitality living.',
-    image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=2000',
+    image: heroimg1,
     ctaText: 'Shop Collections',
     ctaLink: '/catalog',
   },
@@ -24,7 +28,7 @@ const slides = [
     id: 2,
     title: 'Precision in Every Detail',
     subtitle: 'High-performance kitchenware for the modern chef.',
-    image: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=2000',
+    image: heroimg2,
     ctaText: 'Discover Collections',
     ctaLink: '/catalog?category=kitchenware',
   },

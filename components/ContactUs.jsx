@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { WhatsAppIcon, ChevronDownIcon } from '@/components/Icons';
 import { useAppContext } from '@/context/AppContext';
-import { getWhatsAppBusinessLink } from '@/lib/utils/whatsapp';
+import { getWhatsAppBusinessLink, openWhatsAppLink } from '@/lib/utils/whatsapp';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -141,7 +141,7 @@ export default function ContactUs() {
       }
       if (formData.query) msg += `💬 *Msg:* ${formData.query}\n`;
 
-      window.open(getWhatsAppBusinessLink(msg), '_blank');
+      openWhatsAppLink(getWhatsAppBusinessLink(msg));
       setFormData({ fullName: '', email: '', phone: '', companyName: '', state: '', query: '', categories: [] });
       toast.success('Opening WhatsApp...');
     } catch (err) {

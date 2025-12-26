@@ -13,7 +13,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { WhatsAppIcon, ChevronDownIcon } from "@/components/Icons";
 import { useAppContext } from "@/context/AppContext";
-import { getWhatsAppBusinessLink } from "@/lib/utils/whatsapp";
+import { getWhatsAppBusinessLink, openWhatsAppLink } from "@/lib/utils/whatsapp";
 import toast from "react-hot-toast";
 import hotelImage from "./images/hotelH.png";
 import partnersImage from "./images/Picture1.png";
@@ -659,7 +659,7 @@ export default function CategoryPage() {
       }
 
       const whatsappUrl = getWhatsAppBusinessLink(whatsappMessage);
-      window.open(whatsappUrl, "_blank");
+      openWhatsAppLink(whatsappUrl);
 
       // Reset form with current category name (only if businessType is found)
       setFormData({

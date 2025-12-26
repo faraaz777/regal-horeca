@@ -8,7 +8,7 @@ import { useState, Suspense, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { WhatsAppIcon, ChevronDownIcon } from '@/components/Icons';
 import { useAppContext } from '@/context/AppContext';
-import { getWhatsAppBusinessLink } from '@/lib/utils/whatsapp';
+import { getWhatsAppBusinessLink, openWhatsAppLink } from '@/lib/utils/whatsapp';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -160,7 +160,7 @@ function EnquiryForm() {
       }
       if (formData.message) msg += `💬 *Message:* ${formData.message}\n`;
 
-      window.open(getWhatsAppBusinessLink(msg), '_blank');
+      openWhatsAppLink(getWhatsAppBusinessLink(msg));
       setFormData({ name: '', email: '', phone: '', company: '', state: '', message: '', categories: [] });
       toast.success('Enquiry Sent! Opening WhatsApp...');
     } catch (err) {

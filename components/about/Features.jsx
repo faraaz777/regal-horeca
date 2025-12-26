@@ -1,17 +1,18 @@
 'use client';
 
 import Image from 'next/image';
+import Logo from "@/components/images/regalstore.png";
 
 const features = [
   { 
     title: "Commercial Cookware", 
     desc: "Heavy-duty pots, pans, and handis designed for high-volume kitchens.",
-    image: "https://images.unsplash.com/photo-1556910103-1c02745a30bf?q=80&w=800&auto=format&fit=crop"
+    image: "https://images.unsplash.com/photo-1588279102558-dabc7b32d9b1?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
   },
   { 
     title: "Brass & Copper", 
     desc: "Traditional craftsmanship behind authentic serving ware and utensils.",
-    image: "https://images.unsplash.com/photo-1615993215286-904d9c75908f?q=80&w=800&auto=format&fit=crop"
+    image: "https://images.unsplash.com/photo-1652960018678-1f19799996c5?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
   },
   { 
     title: "Hotelware Supplies", 
@@ -26,7 +27,7 @@ const features = [
   { 
     title: "Retail Presence", 
     desc: "Accessible stores in Begum Bazar and Afzalgunj.",
-    image: "https://images.unsplash.com/photo-1604719312566-b7cb0463283a?q=80&w=800&auto=format&fit=crop"
+    image: Logo,
   },
   { 
     title: "Global Distribution", 

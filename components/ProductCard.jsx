@@ -163,10 +163,10 @@ export default function ProductCard({ product, onAdd }) {
         {/* Wishlist Button - Top Right - Heart Only, No Background */}
         <button
           onClick={handleWishlistToggle}
-          className="absolute top-3 right-3 flex items-center justify-center hover:scale-110 transition-all duration-200 z-10 text-black"
+          className="absolute top-3 right-3 flex items-center justify-center hover:scale-110 transition-all duration-200 z-10 text-accent"
           aria-label={isLiked ? 'Remove from wishlist' : 'Add to wishlist'}
         >
-          <HeartIcon isFilled={isLiked} className="w-6 h-6" />
+          <HeartIcon isFilled={isLiked} className="w-5 h-5" />
         </button>
 
         {/* Image Navigation Arrows - Show on hover for desktop, hidden on mobile */}

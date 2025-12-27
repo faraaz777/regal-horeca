@@ -39,7 +39,7 @@ const STATIC_DEPARTMENTS = [
 ];
 
 export default function Header() {
-  const { wishlist, cart, getCartTotalItems, categories, businessTypes, products } = useAppContext();
+  const { wishlist, cart, getCartTotalItems, categories, businessTypes } = useAppContext();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -55,6 +55,7 @@ export default function Header() {
   const [lastScrollY, setLastScrollY] = useState(0);
   const [activeDepartment, setActiveDepartment] = useState(null);
   const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
+  const [departmentProducts, setDepartmentProducts] = useState({});
 
   const departmentMenuRefs = useRef({});
 
@@ -239,6 +240,39 @@ export default function Header() {
     };
   }, [activeDepartment, activeDesktopMenu]);
 
+  // Fetch featured products for active department
+  useEffect(() => {
+    if (!activeDepartment) {
+      setDepartmentProducts({});
+      return;
+    }
+
+    // Find the department object
+    const dept = departments.find((d) => 
+      d.slug === activeDepartment || (d._id || d.id) === activeDepartment
+    );
+
+    if (!dept || !dept.slug) return;
+
+    // Fetch featured products for this department
+    async function fetchDepartmentProducts() {
+      try {
+        const response = await fetch(`/api/products?category=${dept.slug}&featured=true&limit=10`);
+        const data = await response.json();
+        if (data.success && data.products) {
+          setDepartmentProducts(prev => ({
+            ...prev,
+            [dept.slug]: data.products
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to fetch department products:', error);
+      }
+    }
+
+    fetchDepartmentProducts();
+  }, [activeDepartment, departments]);
+
   // ---------- Handlers ----------
   const handleNavForward = (menu) => {
     setNavStack((prev) => [
@@ -345,7 +379,7 @@ export default function Header() {
               departmentMenuRefs={departmentMenuRefs}
               activeDepartment={activeDepartment}
               setActiveDepartment={setActiveDepartment}
-              products={products}
+              departmentProducts={departmentProducts}
               navLinkClass={navLinkClass}
               isMoreDropdownOpen={isMoreDropdownOpen}
               setIsMoreDropdownOpen={setIsMoreDropdownOpen}
@@ -394,7 +428,7 @@ function DepartmentsBar({
   departmentMenuRefs,
   activeDepartment,
   setActiveDepartment,
-  products,
+  departmentProducts,
   navLinkClass,
   isMoreDropdownOpen,
   setIsMoreDropdownOpen,
@@ -406,6 +440,9 @@ function DepartmentsBar({
     d.slug === activeDepartment || (d._id || d.id) === activeDepartment
   ) || null;
   const hasActiveChildren = activeDept && activeDept.children && activeDept.children.length > 0;
+
+  // Get products for active department
+  const activeDeptProducts = activeDept?.slug ? (departmentProducts[activeDept.slug] || []) : [];
 
   // More dropdown links
   const moreLinks = [
@@ -555,7 +592,7 @@ function DepartmentsBar({
 
                 {/* Featured Section on Right */}
                 <div className="w-[240px] shrink-0 border-l border-black/10 pl-8">
-                  <FeaturedProductsSection department={activeDept} products={[]} />
+                  <FeaturedProductsSection department={activeDept} products={activeDeptProducts} />
                 </div>
               </div>
             </div>

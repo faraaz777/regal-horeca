@@ -591,7 +591,7 @@ function DepartmentsBar({
                 </div>
 
                 {/* Featured Section on Right */}
-                <div className="w-[240px] shrink-0 border-l border-black/10 pl-8">
+                <div className="w-[180px] shrink-0 border-l border-black/10 pl-6">
                   <FeaturedProductsSection department={activeDept} products={activeDeptProducts} />
                 </div>
               </div>
@@ -604,37 +604,17 @@ function DepartmentsBar({
 }
 
 function FeaturedProductsSection({ department, products }) {
-  // Get products for this department (featured first, then by category)
+  // Products are already filtered by category from API, so just prioritize featured
   const featuredProducts = useMemo(() => {
     if (!products || products.length === 0) return [];
 
-    // Collect all category IDs in this department tree
-    const getAllCategoryIds = (cat) => {
-      const ids = [cat._id || cat.id];
-      if (cat.children && cat.children.length > 0) {
-        cat.children.forEach(child => {
-          ids.push(...getAllCategoryIds(child));
-        });
-      }
-      return ids;
-    };
+    // Prioritize featured products, then show others
+    const featured = products.filter(p => p.featured);
+    const others = products.filter(p => !p.featured);
 
-    const deptCategoryIds = getAllCategoryIds(department).map(id => id?.toString());
-
-    // Filter products that belong to this department
-    let deptProducts = products.filter((p) => {
-      const pCategoryId = p.categoryId?._id || p.categoryId;
-      if (!pCategoryId) return false;
-      return deptCategoryIds.includes(pCategoryId?.toString());
-    });
-
-    // Prioritize featured products
-    const featured = deptProducts.filter(p => p.featured);
-    const others = deptProducts.filter(p => !p.featured);
-
-    // Show only 1 featured product
+    // Show only 1 product (featured first, then others)
     return [...featured, ...others].slice(0, 1);
-  }, [department, products]);
+  }, [products]);
 
   if (featuredProducts.length === 0) return null;
 
@@ -649,7 +629,7 @@ function FeaturedProductsSection({ department, products }) {
 
   return (
     <div>
-      <h3 className="text-xs font-bold uppercase tracking-widest text-black mb-4">
+      <h3 className="text-[10px] font-bold uppercase tracking-widest text-black mb-2">
         Featured
       </h3>
       {featuredProducts.map((product) => {
@@ -663,18 +643,19 @@ function FeaturedProductsSection({ department, products }) {
           href={`/products/${productSlug}`}
           className="group block"
         >
-          <div className="aspect-square bg-white border border-black/5 rounded-lg overflow-hidden relative mb-3">
+          <div className="aspect-square bg-white border border-black/5 rounded-md overflow-hidden relative mb-2 max-w-[140px]">
             <Image
               src={product.heroImage || product.images?.[0] || '/placeholder.png'}
               alt={product.title}
               fill
               className="object-cover group-hover:scale-105 transition-transform duration-500"
+              sizes="140px"
             />
           </div>
-          <h4 className="text-xs font-medium uppercase tracking-wide text-black group-hover:text-accent mb-1 transition-colors line-clamp-2">
+          <h4 className="text-[10px] font-medium uppercase tracking-wide text-black group-hover:text-accent mb-0.5 transition-colors line-clamp-2 leading-tight">
             {product.title}
           </h4>
-          <span className="text-xs font-bold text-accent">
+          <span className="text-[10px] font-bold text-accent">
             {formatPrice(product.price)}
           </span>
         </Link>

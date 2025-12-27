@@ -628,7 +628,7 @@ function FeaturedProductsSection({ department, products }) {
         >
           <div className="aspect-square bg-white border border-black/5 rounded-lg overflow-hidden relative mb-3">
             <Image
-              src={product.image || product.images?.[0] || '/placeholder.png'}
+              src={product.heroImage || product.images?.[0] || '/placeholder.png'}
               alt={product.title}
               fill
               className="object-cover group-hover:scale-105 transition-transform duration-500"

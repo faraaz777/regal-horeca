@@ -36,6 +36,8 @@ const nextConfig = {
     formats: ['image/avif', 'image/webp'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    // Cache optimized images for 60 seconds minimum
+    minimumCacheTTL: 60,
   },
   
   // Environment variables that should be available on the client side
@@ -47,6 +49,37 @@ const nextConfig = {
   // Production headers for security and performance
   async headers() {
     return [
+      // Static assets - long-term caching (1 year)
+      {
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable'
+          },
+        ],
+      },
+      // Next.js image optimization cache
+      {
+        source: '/_next/image',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable'
+          },
+        ],
+      },
+      // Public assets (images, fonts, etc.)
+      {
+        source: '/images/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable'
+          },
+        ],
+      },
+      // General security headers for all routes
       {
         source: '/:path*',
         headers: [

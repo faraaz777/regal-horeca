@@ -42,10 +42,21 @@ export async function GET(request) {
     const searchQuery = searchParams.get('search');
     const featured = searchParams.get('featured');
     const status = searchParams.get('status');
+    // Note: Facets are calculated from the filtered set, so we don't include
+    // price, colors, brands, filters params here - those are for the products query
+    // Facets show what's available AFTER context filters (category, business, search)
 
     // Build base query (same as products route)
     const query = {};
     const andConditions = [];
+
+    // Text search - must be at root level
+    let useTextSearch = false;
+    let textSearchQuery = null;
+    if (searchQuery && searchQuery.trim()) {
+      useTextSearch = true;
+      textSearchQuery = { $text: { $search: searchQuery.trim() } };
+    }
 
     // Category filter
     if (categorySlug) {
@@ -62,32 +73,30 @@ export async function GET(request) {
 
     // Business type filter
     if (businessSlug) {
-      query.businessTypeSlugs = businessSlug;
+      andConditions.push({
+        businessTypeSlugs: businessSlug
+      });
     }
 
     // Featured filter
     if (featured === 'true') {
-      query.featured = true;
+      andConditions.push({ featured: true });
     }
 
     // Status filter (for base query, but we'll still calculate all statuses in facets)
     if (status) {
-      query.status = status;
+      andConditions.push({ status: status });
     }
 
-    // Search filter
-    if (searchQuery) {
-      andConditions.push({
-        $or: [
-          { title: { $regex: searchQuery, $options: 'i' } },
-          { brand: { $regex: searchQuery, $options: 'i' } },
-          { tags: { $in: [new RegExp(searchQuery, 'i')] } },
-        ]
-      });
-    }
-
-    // Combine all conditions
-    if (andConditions.length > 0) {
+    // Combine conditions
+    // If using text search, combine with $and
+    if (useTextSearch) {
+      if (andConditions.length > 0) {
+        query.$and = [textSearchQuery, ...andConditions];
+      } else {
+        Object.assign(query, textSearchQuery);
+      }
+    } else if (andConditions.length > 0) {
       query.$and = andConditions;
     }
 
@@ -186,7 +195,7 @@ export async function GET(request) {
       },
     }, {
       headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
       },
     });
   } catch (error) {

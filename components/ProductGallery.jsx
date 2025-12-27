@@ -42,6 +42,7 @@ export default function ProductGallery({ images, title, isPremium = false, featu
               alt={`${title} view ${selectedIndex + 1}`}
               fill
               priority
+              sizes="(max-width: 768px) 100vw, 50vw"
               className="object-contain p-10 transition-transform duration-700 group-hover:scale-110"
             />
           </motion.div>

@@ -555,7 +555,7 @@ function DepartmentsBar({
 
                 {/* Featured Section on Right */}
                 <div className="w-[240px] shrink-0 border-l border-black/10 pl-8">
-                  <FeaturedProductsSection department={activeDept} products={products} />
+                  <FeaturedProductsSection department={activeDept} products={[]} />
                 </div>
               </div>
             </div>

@@ -57,48 +57,11 @@ export function AppProvider({ children }) {
     }
   }, []);
 
-  // Fetch products from API - reduced limit for better performance
+  // Products are now loaded per-page for better scalability
+  // Keeping products state empty here for backward compatibility
+  // Individual pages/components will fetch products as needed
   useEffect(() => {
-    async function fetchProducts() {
-      try {
-        // Reduced limit from 1000 to 100 - use pagination when needed
-        // Add cache: 'no-store' to prevent caching in production
-        const response = await fetch('/api/products?limit=100', {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-          },
-        });
-        
-        // Check if response is OK
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch products' }));
-          console.error('Products API error:', response.status, errorData);
-          setProducts([]); // Set empty array on error
-          return;
-        }
-        
-        const data = await response.json();
-        
-        // Handle both success and error responses
-        if (data.success && Array.isArray(data.products)) {
-          setProducts(data.products);
-        } else if (data.error) {
-          console.error('Products API returned error:', data.error, data.details);
-          setProducts([]);
-        } else {
-          console.warn('Products API returned unexpected format:', data);
-          setProducts(data.products || []);
-        }
-      } catch (error) {
-        console.error('Failed to fetch products:', error);
-        setProducts([]); // Set empty array on network error
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchProducts();
+    setLoading(false);
   }, []);
 
   // Fetch categories from API
@@ -106,10 +69,7 @@ export function AppProvider({ children }) {
     async function fetchCategories() {
       try {
         const response = await fetch('/api/categories?tree=true', {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-          },
+          next: { revalidate: 3600 }, // Revalidate every hour
         });
         const data = await response.json();
         if (data.success) {
@@ -139,10 +99,7 @@ export function AppProvider({ children }) {
     async function fetchBrands() {
       try {
         const response = await fetch('/api/brands?tree=true', {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-          },
+          next: { revalidate: 3600 }, // Revalidate every hour
         });
         const data = await response.json();
         if (data.success) {
@@ -366,17 +323,11 @@ export function AppProvider({ children }) {
     }));
   };
 
-  // Refresh products from API - reduced limit
+  // Refresh products - now just a placeholder for backward compatibility
+  // Individual pages handle their own product fetching
   const refreshProducts = useCallback(async () => {
-    try {
-      const response = await fetch('/api/products?limit=100');
-      const data = await response.json();
-      if (data.success) {
-        setProducts(data.products || []);
-      }
-    } catch (error) {
-      console.error('Failed to refresh products:', error);
-    }
+    // No-op: products are fetched per-page now
+    console.log('refreshProducts called - products are now fetched per-page');
   }, []);
 
   // Refresh categories from API

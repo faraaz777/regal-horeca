@@ -26,7 +26,7 @@ import { showToast } from '@/lib/utils/toast';
 import { apiClient, ApiError } from '@/lib/utils/apiClient';
 
 export default function AdminAddProductPage() {
-  const { products, refreshProducts } = useAppContext();
+  const { refreshProducts } = useAppContext();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

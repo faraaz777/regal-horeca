@@ -23,32 +23,49 @@ import WhyChooseUs from "@/components/WhyChooseUs";
 import Locations from "@/components/about/Locations";
 
 export default function HomePage() {
-  const { products, categories, loading } = useAppContext();
+  const { categories } = useAppContext();
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [newArrivals, setNewArrivals] = useState([]);
   const [mainCategories, setMainCategories] = useState([]);
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
   const scrollContainerRef = useRef(null);
   const categoryRefs = useRef([]);
 
-  // Filter featured products, new arrivals & main categories
+  // Fetch featured products and new arrivals directly from API
   useEffect(() => {
-    const featured = products.filter((p) => p.featured).slice(0, 4);
-    setFeaturedProducts(featured);
+    async function fetchHomeProducts() {
+      try {
+        setLoading(true);
+        
+        // Fetch featured products
+        const featuredResponse = await fetch('/api/products?featured=true&limit=4');
+        const featuredData = await featuredResponse.json();
+        if (featuredData.success) {
+          setFeaturedProducts(featuredData.products || []);
+        }
 
-    // Get new arrivals sorted by createdAt (newest first)
-    const arrivals = [...products]
-      .sort((a, b) => {
-        const dateA = new Date(a.createdAt || a.created_at || 0);
-        const dateB = new Date(b.createdAt || b.created_at || 0);
-        return dateB - dateA;
-      })
-      .slice(0, 4);
-    setNewArrivals(arrivals);
+        // Fetch new arrivals (API already sorts by createdAt descending - newest first)
+        const arrivalsResponse = await fetch('/api/products?limit=4');
+        const arrivalsData = await arrivalsResponse.json();
+        if (arrivalsData.success) {
+          setNewArrivals(arrivalsData.products || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch home products:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
 
+    fetchHomeProducts();
+  }, []);
+
+  // Set main categories
+  useEffect(() => {
     const mainCats = categories.filter((c) => c.level === "department");
     setMainCategories(mainCats);
-  }, [products, categories]);
+  }, [categories]);
 
   // Intersection Observer for mobile categories animation
   useEffect(() => {

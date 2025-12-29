@@ -121,7 +121,7 @@ export default function SearchBar({ className = "", placeholder = "What are you 
     setSelectedIndex(-1);
 
     timeoutRef.current = setTimeout(async () => {
-      if (!isMountedRef.current) return;
+        if (!isMountedRef.current) return;
 
       try {
         const params = new URLSearchParams({
@@ -148,7 +148,7 @@ export default function SearchBar({ className = "", placeholder = "What are you 
             // Exact title match gets highest priority
             if (aTitle === queryLower && bTitle !== queryLower) return -1;
             if (bTitle === queryLower && aTitle !== queryLower) return 1;
-            
+
             // Title starts with query
             if (aTitle.startsWith(queryLower) && !bTitle.startsWith(queryLower)) return -1;
             if (bTitle.startsWith(queryLower) && !aTitle.startsWith(queryLower)) return 1;
@@ -173,8 +173,8 @@ export default function SearchBar({ className = "", placeholder = "What are you 
           setSearchResults([]);
         }
       } finally {
-        if (isMountedRef.current) {
-          setIsSearching(false);
+      if (isMountedRef.current) {
+        setIsSearching(false);
         }
       }
     }, DEBOUNCE_DELAY);

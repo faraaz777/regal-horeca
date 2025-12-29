@@ -154,7 +154,7 @@ export async function GET(request) {
                 v.trim().charAt(0).toUpperCase() + v.trim().slice(1).toLowerCase()
               );
               
-              andConditions.push({
+      andConditions.push({
                 filters: {
                   $elemMatch: {
                     key: normalizedKey,
@@ -173,7 +173,7 @@ export async function GET(request) {
     // Combine conditions
     // If using text search, combine with $and
     if (useTextSearch) {
-      if (andConditions.length > 0) {
+    if (andConditions.length > 0) {
         query.$and = [textSearchQuery, ...andConditions];
       } else {
         Object.assign(query, textSearchQuery);

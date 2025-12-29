@@ -108,6 +108,8 @@ export default function AdminDashboardPage() {
                       src={product.heroImage}
                       alt={product.title}
                       fill
+                      sizes="48px"
+                      unoptimized
                       className="rounded-md object-cover"
                       loading="lazy"
                     />

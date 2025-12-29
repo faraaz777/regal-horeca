@@ -61,7 +61,7 @@ export function AppProvider({ children }) {
   // Keeping products state empty here for backward compatibility
   // Individual pages/components will fetch products as needed
   useEffect(() => {
-    setLoading(false);
+        setLoading(false);
   }, []);
 
   // Fetch categories from API

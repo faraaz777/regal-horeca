@@ -38,6 +38,7 @@ export default function Hero() {
           src="https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?q=80&w=2070&auto=format&fit=crop"
           alt="Luxury Hospitality Kitchenware"
           fill
+          sizes="100vw"
           className="object-cover scale-105"
           priority
         />

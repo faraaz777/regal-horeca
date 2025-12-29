@@ -407,6 +407,8 @@ export default function AdminProductsPage() {
                                   src={product.heroImage} 
                                   alt={product.title} 
                                   fill
+                                  sizes="40px"
+                                  unoptimized
                                   className="rounded-md object-cover"
                                   loading="lazy"
                                   placeholder="blur"
@@ -515,6 +517,8 @@ export default function AdminProductsPage() {
                             src={product.heroImage} 
                             alt={product.title} 
                             fill
+                            sizes="64px"
+                            unoptimized
                             className="rounded-md object-cover"
                             loading="lazy"
                             placeholder="blur"

@@ -2292,6 +2292,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
                           alt="Hero preview" 
                           width={150} 
                           height={150}
+                          unoptimized
                           className="h-32 w-32 object-cover rounded-lg shadow-md border-2 border-gray-200" 
                         />
                       </div>
@@ -2317,6 +2318,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
                             alt="Gallery preview" 
                             width={96} 
                             height={96}
+                            unoptimized
                             className="h-24 w-24 object-cover rounded-lg shadow-sm border-2 border-gray-200" 
                           />
                           <button

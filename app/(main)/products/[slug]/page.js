@@ -27,7 +27,7 @@ export default function ProductDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const { slug } = params;
-  const { isInWishlist, addToWishlist, removeFromWishlist, addToCart, removeFromCart, isInCart, products, loading: contextLoading, categories } = useAppContext();
+  const { isInWishlist, addToWishlist, removeFromWishlist, addToCart, removeFromCart, isInCart, categories } = useAppContext();
   const { handleEnquiry } = useEnquiry();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -37,6 +37,7 @@ export default function ProductDetailPage() {
   const [selectedSize, setSelectedSize] = useState('');
   const [showCaptureModal, setShowCaptureModal] = useState(false);
   const [pendingEnquiry, setPendingEnquiry] = useState(null);
+  const [relatedProducts, setRelatedProducts] = useState([]);
 
   // Detect if this is a business context (from URL param or product has businessTypeSlugs)
   const isBusinessContext = searchParams?.get('business') ||
@@ -71,6 +72,40 @@ export default function ProductDetailPage() {
       fetchProduct();
     }
   }, [slug]);
+
+  // Fetch related products - MUST be before early returns to follow Rules of Hooks
+  useEffect(() => {
+    if (product?.relatedProductIds && product.relatedProductIds.length > 0) {
+      async function fetchRelated() {
+        try {
+          const productIds = product.relatedProductIds
+            .map(id => id._id || id)
+            .filter(Boolean)
+            .slice(0, 4);
+          
+          if (productIds.length === 0) {
+            setRelatedProducts([]);
+            return;
+          }
+          
+          const promises = productIds.map(id => 
+            fetch(`/api/products/${id}`).then(res => res.json())
+          );
+          const results = await Promise.all(promises);
+          const fetched = results
+            .filter(r => r.success && r.product)
+            .map(r => r.product);
+          setRelatedProducts(fetched);
+        } catch (error) {
+          console.error('Failed to fetch related products:', error);
+          setRelatedProducts([]);
+        }
+      }
+      fetchRelated();
+    } else {
+      setRelatedProducts([]);
+    }
+  }, [product]);
 
   if (loading) {
     return (
@@ -144,13 +179,6 @@ export default function ProductDetailPage() {
   };
 
   const categoryPath = getCategoryPath();
-  const relatedProducts = products.filter(p => {
-    const pid = p._id || p.id;
-    return product.relatedProductIds?.some(rid => {
-      const ridStr = rid._id?.toString() || rid.toString();
-      return ridStr === pid?.toString();
-    });
-  }).slice(0, 4);
 
   const handleWishlistToggle = () => {
     if (isLiked) {
@@ -600,7 +628,7 @@ export default function ProductDetailPage() {
         </div>
 
         {/* Related Section */}
-        {contextLoading ? null : relatedProducts.length > 0 && (
+        {relatedProducts.length > 0 && (
           <div className="mt-32 pt-16 border-t border-black/5">
             <div className="flex items-center justify-between mb-12">
               <h2 className="text-xl sm:text-2xl font-light text-rich-black uppercase tracking-widest">You May Also Like</h2>

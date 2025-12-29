@@ -14,13 +14,12 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import useSWR from 'swr';
 import ProductCard from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 import { useAppContext } from '@/context/AppContext';
-import { useProductFilters } from '@/hooks/useProductFilters';
 import { PlusIcon, MinusIcon, FilterIcon, XIcon, ChevronLeftIcon } from '@/components/Icons';
 import '@/components/new/SidebarFilter.css';
 
@@ -30,8 +29,9 @@ const ITEMS_PER_PAGE = 24;
 const fetcher = (url) => fetch(url).then(res => res.json());
 
 function CatalogPageContent() {
-  const { products, categories, loading: contextLoading } = useAppContext();
+  const { categories } = useAppContext();
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -41,31 +41,157 @@ function CatalogPageContent() {
     brand: true,
   });
 
-  // Get context filters from URL
+  // Get all filters from URL (server-side filtering)
   const selectedCategorySlug = searchParams.get('category') || '';
   const selectedBusinessSlug = searchParams.get('business') || '';
   const searchQuery = searchParams.get('search') || '';
+  const priceMin = searchParams.get('priceMin') || '';
+  const priceMax = searchParams.get('priceMax') || '';
+  const colorsParam = searchParams.get('colors') || '';
+  const brandsParam = searchParams.get('brands') || '';
+  const filtersParam = searchParams.get('filters') || '';
+  const sortBy = searchParams.get('sortBy') || 'newest';
 
-  // Use custom filter hook
-  // NOTE: specs removed - they are for product detail page only, not sidebar filtering
-  // NOTE: status removed - not needed in sidebar
-  const {
-    priceRange,
-    selectedColors,
-    selectedBrands,
-    selectedFilters,
-    sortBy,
-    contextFilteredProducts,
-    filteredProducts,
-    handlePriceMinChange,
-    handlePriceMaxChange,
-    handleColorToggle,
-    handleBrandToggle,
-    handleFilterToggle,
-    handleSortChange,
-    clearAllFilters,
-    hasActiveFilters,
-  } = useProductFilters(products, categories);
+  // Parse filter arrays
+  const selectedColors = useMemo(() => 
+    colorsParam ? colorsParam.split(',').filter(Boolean) : [], 
+    [colorsParam]
+  );
+  const selectedBrands = useMemo(() => 
+    brandsParam ? brandsParam.split(',').filter(Boolean) : [], 
+    [brandsParam]
+  );
+  const selectedFilters = useMemo(() => {
+    if (!filtersParam) return {};
+    try {
+      const parsed = JSON.parse(decodeURIComponent(filtersParam));
+      return typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }, [filtersParam]);
+
+  // Build API params with ALL filters for server-side filtering
+  const productsParams = useMemo(() => {
+    const params = new URLSearchParams();
+    if (selectedCategorySlug) params.set('category', selectedCategorySlug);
+    if (selectedBusinessSlug) params.set('business', selectedBusinessSlug);
+    if (searchQuery) params.set('search', searchQuery);
+    if (priceMin) params.set('priceMin', priceMin);
+    if (priceMax) params.set('priceMax', priceMax);
+    if (selectedColors.length > 0) params.set('colors', selectedColors.join(','));
+    if (selectedBrands.length > 0) params.set('brands', selectedBrands.join(','));
+    if (Object.keys(selectedFilters).length > 0) {
+      params.set('filters', encodeURIComponent(JSON.stringify(selectedFilters)));
+    }
+    if (sortBy && sortBy !== 'newest') params.set('sortBy', sortBy);
+    params.set('page', String(currentPage));
+    params.set('limit', String(ITEMS_PER_PAGE));
+    return params;
+  }, [selectedCategorySlug, selectedBusinessSlug, searchQuery, priceMin, priceMax, selectedColors, selectedBrands, selectedFilters, sortBy, currentPage]);
+
+  // Fetch products from API with server-side filtering and pagination
+  const { data: productsData, isLoading: productsLoading } = useSWR(
+    `/api/products?${productsParams.toString()}`,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60000, // Cache for 1 minute
+    }
+  );
+
+  const products = productsData?.products || [];
+  const pagination = productsData?.pagination || { total: 0, page: 1, totalPages: 1 };
+  const contextLoading = productsLoading;
+
+  // Filter handlers - only update URL, no client-side filtering
+  const handlePriceMinChange = useCallback((value) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set('priceMin', value);
+    else params.delete('priceMin');
+    router.push(`/catalog?${params.toString()}`, { scroll: false });
+  }, [searchParams, router]);
+
+  const handlePriceMaxChange = useCallback((value) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set('priceMax', value);
+    else params.delete('priceMax');
+    router.push(`/catalog?${params.toString()}`, { scroll: false });
+  }, [searchParams, router]);
+
+  const handleColorToggle = useCallback((color) => {
+    const params = new URLSearchParams(searchParams.toString());
+    const newColors = selectedColors.includes(color)
+      ? selectedColors.filter(c => c !== color)
+      : [...selectedColors, color];
+    if (newColors.length > 0) params.set('colors', newColors.join(','));
+    else params.delete('colors');
+    router.push(`/catalog?${params.toString()}`, { scroll: false });
+  }, [selectedColors, searchParams, router]);
+
+  const handleBrandToggle = useCallback((brand) => {
+    const params = new URLSearchParams(searchParams.toString());
+    const newBrands = selectedBrands.includes(brand)
+      ? selectedBrands.filter(b => b !== brand)
+      : [...selectedBrands, brand];
+    if (newBrands.length > 0) params.set('brands', newBrands.join(','));
+    else params.delete('brands');
+    router.push(`/catalog?${params.toString()}`, { scroll: false });
+  }, [selectedBrands, searchParams, router]);
+
+  const handleFilterToggle = useCallback((filterKey, value) => {
+    const params = new URLSearchParams(searchParams.toString());
+    const current = selectedFilters[filterKey] || [];
+    const updated = current.includes(value)
+      ? current.filter(v => v !== value)
+      : [...current, value];
+    const newFilters = { ...selectedFilters, [filterKey]: updated };
+    // Remove empty arrays
+    Object.keys(newFilters).forEach(key => {
+      if (newFilters[key].length === 0) {
+        delete newFilters[key];
+      }
+    });
+    if (Object.keys(newFilters).length > 0) {
+      params.set('filters', encodeURIComponent(JSON.stringify(newFilters)));
+    } else {
+      params.delete('filters');
+    }
+    router.push(`/catalog?${params.toString()}`, { scroll: false });
+  }, [selectedFilters, searchParams, router]);
+
+  const handleSortChange = useCallback((newSort) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (newSort && newSort !== 'newest') params.set('sortBy', newSort);
+    else params.delete('sortBy');
+    router.push(`/catalog?${params.toString()}`, { scroll: false });
+  }, [searchParams, router]);
+
+  const clearAllFilters = useCallback(() => {
+    const params = new URLSearchParams();
+    if (selectedCategorySlug) params.set('category', selectedCategorySlug);
+    if (selectedBusinessSlug) params.set('business', selectedBusinessSlug);
+    if (searchQuery) params.set('search', searchQuery);
+    router.push(`/catalog?${params.toString()}`, { scroll: false });
+  }, [selectedCategorySlug, selectedBusinessSlug, searchQuery, router]);
+
+  const hasActiveFilters = useMemo(() => {
+    return !!(
+      priceMin ||
+      priceMax ||
+      selectedColors.length > 0 ||
+      selectedBrands.length > 0 ||
+      Object.keys(selectedFilters).length > 0
+    );
+  }, [priceMin, priceMax, selectedColors, selectedBrands, selectedFilters]);
+
+  // Price range for display
+  const priceRange = useMemo(() => ({
+    min: priceMin,
+    max: priceMax,
+    minValue: priceMin,
+    maxValue: priceMax,
+  }), [priceMin, priceMax]);
 
   // Fetch facets from backend API
   const facetsParams = new URLSearchParams();
@@ -125,17 +251,40 @@ function CatalogPageContent() {
     ? `Search: "${searchQuery}"`
     : (currentCategory?.name || 'All Products');
 
-  // Pagination
-  const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
-  const paginatedProducts = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredProducts.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredProducts, currentPage]);
+  // Server-side pagination - get from API response
+  const totalPages = pagination.totalPages || 1;
+  const totalProducts = pagination.total || 0;
+  const paginatedProducts = products; // Products are already paginated from API
 
-  // Reset page when filters change
+  // Reset page to 1 when filters change (but keep current page if just changing page)
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedCategorySlug, selectedBusinessSlug, searchQuery, selectedColors, selectedBrands, selectedFilters, priceRange.minValue, priceRange.maxValue]);
+  }, [selectedCategorySlug, selectedBusinessSlug, searchQuery, selectedColors, selectedBrands, selectedFilters, priceMin, priceMax, sortBy]);
+
+  // Update currentPage when URL page param changes
+  useEffect(() => {
+    const pageParam = searchParams.get('page');
+    if (pageParam) {
+      const pageNum = parseInt(pageParam);
+      if (!isNaN(pageNum) && pageNum > 0) {
+        setCurrentPage(pageNum);
+      }
+    } else {
+      setCurrentPage(1);
+    }
+  }, [searchParams]);
+
+  // Page change handler - updates URL
+  const handlePageChange = useCallback((newPage) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (newPage > 1) {
+      params.set('page', String(newPage));
+    } else {
+      params.delete('page');
+    }
+    router.push(`/catalog?${params.toString()}`, { scroll: false });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [searchParams, router]);
 
   // Close mobile filter on route change
   useEffect(() => {
@@ -163,22 +312,20 @@ function CatalogPageContent() {
     setOpenFilterSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
-  // Calculate filter counts (how many products would match if this filter is applied)
+  // Calculate filter counts from facets API (server-side calculated)
   const getFilterCount = useCallback((filterType, value) => {
-    // This is a simplified count - in production, you'd want to calculate this more accurately
-    // by checking how many products match when this filter is added
+    // Filter counts come from facets API which calculates them server-side
+    // This is just a fallback - facets should provide the counts
     if (filterType === 'color') {
-      return contextFilteredProducts.filter(p => {
-        const productColors = p.colorVariants?.map(cv => cv.colorName) || [];
-        return productColors.includes(value);
-      }).length;
+      const colorFacet = facets.colors?.find(c => c === value);
+      return colorFacet ? 1 : 0; // Facets API should provide counts
     }
     if (filterType === 'brand') {
-      return contextFilteredProducts.filter(p => p.brand?.trim() === value).length;
+      const brandFacet = facets.brands?.find(b => b === value);
+      return brandFacet ? 1 : 0; // Facets API should provide counts
     }
-    // Status removed - not in sidebar
     return 0;
-  }, [contextFilteredProducts]);
+  }, [facets]);
 
   // Filter Section Component
   const FilterSection = ({ title, id, children, count }) => {
@@ -487,8 +634,8 @@ function CatalogPageContent() {
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight">{currentCategoryName}</h1>
         <p className="text-black/60 mt-2">
           {searchQuery
-            ? `Found ${filteredProducts.length} result${filteredProducts.length !== 1 ? 's' : ''}`
-            : `${filteredProducts.length} product${filteredProducts.length !== 1 ? 's' : ''}`
+            ? `Found ${totalProducts} result${totalProducts !== 1 ? 's' : ''}`
+            : `${totalProducts} product${totalProducts !== 1 ? 's' : ''}`
           }
         </p>
       </div>
@@ -534,7 +681,7 @@ function CatalogPageContent() {
               )}
             </button>
             <div className="hidden lg:block text-sm text-black/70">
-              Showing {paginatedProducts.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length}
+              Showing {paginatedProducts.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0} - {Math.min(currentPage * ITEMS_PER_PAGE, totalProducts)} of {totalProducts}
             </div>
 
             <div className="flex items-center gap-2">
@@ -574,7 +721,7 @@ function CatalogPageContent() {
               {totalPages > 1 && (
                 <div className="mt-12 flex justify-center items-center gap-2">
                   <button
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    onClick={() => handlePageChange(currentPage - 1)}
                     disabled={currentPage === 1}
                     className="px-4 py-2 border border-black/20 rounded-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-black/5 transition-colors"
                   >
@@ -597,7 +744,7 @@ function CatalogPageContent() {
                       return (
                         <button
                           key={pageNum}
-                          onClick={() => setCurrentPage(pageNum)}
+                          onClick={() => handlePageChange(pageNum)}
                           className={`px-3 py-2 border rounded-sm text-sm transition-colors ${currentPage === pageNum
                             ? 'border-accent bg-accent text-white'
                             : 'border-black/20 hover:bg-black/5'
@@ -610,7 +757,7 @@ function CatalogPageContent() {
                   </div>
 
                   <button
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    onClick={() => handlePageChange(currentPage + 1)}
                     disabled={currentPage === totalPages}
                     className="px-4 py-2 border border-black/20 rounded-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-black/5 transition-colors"
                   >

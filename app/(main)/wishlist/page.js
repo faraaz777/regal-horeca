@@ -6,20 +6,45 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppContext } from '@/context/AppContext';
 import ProductCard from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 
 export default function WishlistPage() {
-  const { wishlist, products, loading } = useAppContext();
+  const { wishlist } = useAppContext();
+  const [wishlistProducts, setWishlistProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const wishlistProducts = useMemo(() => {
-    return products.filter(p => {
-      const pid = p._id || p.id;
-      return wishlist.includes(pid?.toString());
-    });
-  }, [wishlist, products]);
+  useEffect(() => {
+    async function fetchWishlistProducts() {
+      if (wishlist.length === 0) {
+        setWishlistProducts([]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        // Fetch products by IDs
+        const promises = wishlist.map(id => 
+          fetch(`/api/products/${id}`).then(res => res.json())
+        );
+        const results = await Promise.all(promises);
+        const fetched = results
+          .filter(r => r.success && r.product)
+          .map(r => r.product);
+        setWishlistProducts(fetched);
+      } catch (error) {
+        console.error('Failed to fetch wishlist products:', error);
+        setWishlistProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchWishlistProducts();
+  }, [wishlist]);
 
   return (
     <div className="container mx-auto px-4 py-8">

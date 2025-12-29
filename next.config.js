@@ -33,11 +33,12 @@ const nextConfig = {
       },
     ],
     // Optimize images in production
-    formats: ['image/avif', 'image/webp'],
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
-    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    // Cache optimized images for 60 seconds minimum
-    minimumCacheTTL: 60,
+    // Reduced sizes/formats to minimize Vercel image optimization usage
+    formats: ['image/webp'], // Removed AVIF to cut formats in half
+    deviceSizes: [640, 1200, 1920], // Reduced from 8 to 3 essential sizes
+    imageSizes: [256, 384], // Reduced from 8 to 2 essential sizes
+    // Cache optimized images for 1 year (images don't change)
+    minimumCacheTTL: 31536000,
   },
   
   // Environment variables that should be available on the client side

@@ -24,28 +24,55 @@ export const revalidate = 0;
  * Query parameters:
  * - category: Filter by category slug
  * - business: Filter by business type slug
- * - search: Search in title, brand, tags
+ * - search: Search query (uses MongoDB $text search)
  * - featured: Filter featured products (true/false)
  * - status: Filter by status
- * - limit: Limit results (default: 100)
- * - skip: Skip results for pagination
+ * - priceMin: Minimum price
+ * - priceMax: Maximum price
+ * - colors: Comma-separated color names
+ * - brands: Comma-separated brand names
+ * - filters: JSON string of dynamic filters { "Material": ["Porcelain"], "Size": ["Large"] }
+ * - sortBy: Sort order (newest, price-asc, price-desc)
+ * - page: Page number (default: 1)
+ * - limit: Items per page (default: 24)
  */
 export async function GET(request) {
   try {
     await connectToDatabase();
 
     const { searchParams } = new URL(request.url);
+    
+    // Context filters
     const categorySlug = searchParams.get('category');
     const businessSlug = searchParams.get('business');
     const searchQuery = searchParams.get('search');
     const featured = searchParams.get('featured');
     const status = searchParams.get('status');
-    const limit = parseInt(searchParams.get('limit') || '100');
-    const skip = parseInt(searchParams.get('skip') || '0');
+    
+    // User filters
+    const priceMin = searchParams.get('priceMin');
+    const priceMax = searchParams.get('priceMax');
+    const colorsParam = searchParams.get('colors');
+    const brandsParam = searchParams.get('brands');
+    const filtersParam = searchParams.get('filters');
+    const sortBy = searchParams.get('sortBy') || 'newest';
+    
+    // Pagination
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '24');
+    const skip = (page - 1) * limit;
 
-    // Build query
+    // Build query - MongoDB $text must be at root level, so we handle it separately
     const query = {};
     const andConditions = [];
+    let useTextSearch = false;
+    let textSearchQuery = null;
+
+    // Text search - must be at root level, cannot be in $and
+    if (searchQuery && searchQuery.trim()) {
+      useTextSearch = true;
+      textSearchQuery = { $text: { $search: searchQuery.trim() } };
+    }
 
     // Category filter - use cached category tree
     if (categorySlug) {
@@ -62,42 +89,148 @@ export async function GET(request) {
 
     // Business type filter
     if (businessSlug) {
-      query.businessTypeSlugs = businessSlug;
+      andConditions.push({
+        businessTypeSlugs: businessSlug
+      });
     }
 
     // Featured filter
     if (featured === 'true') {
-      query.featured = true;
+      andConditions.push({ featured: true });
     }
 
     // Status filter
     if (status) {
-      query.status = status;
+      andConditions.push({ status: status });
     }
 
-    // Search filter
-    if (searchQuery) {
+    // Price filter - combine min and max into single condition
+    const priceConditions = {};
+    if (priceMin) {
+      const min = parseFloat(priceMin);
+      if (!isNaN(min)) {
+        priceConditions.$gte = min;
+      }
+    }
+    if (priceMax) {
+      const max = parseFloat(priceMax);
+      if (!isNaN(max)) {
+        priceConditions.$lte = max;
+      }
+    }
+    if (Object.keys(priceConditions).length > 0) {
+      andConditions.push({ price: priceConditions });
+    }
+
+    // Brand filter
+    if (brandsParam) {
+      const brands = brandsParam.split(',').map(b => b.trim()).filter(Boolean);
+      if (brands.length > 0) {
+        andConditions.push({ brand: { $in: brands } });
+      }
+    }
+
+    // Color filter
+    if (colorsParam) {
+      const colors = colorsParam.split(',').map(c => c.trim()).filter(Boolean);
+      if (colors.length > 0) {
+        andConditions.push({
+          'colorVariants.colorName': { $in: colors }
+        });
+      }
+    }
+
+    // Dynamic filters (from admin form)
+    if (filtersParam) {
+      try {
+        const filters = JSON.parse(decodeURIComponent(filtersParam));
+        if (typeof filters === 'object' && filters !== null) {
+          Object.entries(filters).forEach(([filterKey, filterValues]) => {
+            if (Array.isArray(filterValues) && filterValues.length > 0) {
+              // Normalize filter key (capitalize first letter)
+              const normalizedKey = filterKey.trim().charAt(0).toUpperCase() + filterKey.trim().slice(1).toLowerCase();
+              // Normalize values
+              const normalizedValues = filterValues.map(v => 
+                v.trim().charAt(0).toUpperCase() + v.trim().slice(1).toLowerCase()
+              );
+              
       andConditions.push({
-        $or: [
-          { title: { $regex: searchQuery, $options: 'i' } },
-          { brand: { $regex: searchQuery, $options: 'i' } },
-          { tags: { $in: [new RegExp(searchQuery, 'i')] } },
-        ]
-      });
+                filters: {
+                  $elemMatch: {
+                    key: normalizedKey,
+                    values: { $in: normalizedValues }
+                  }
+                }
+              });
+            }
+          });
+        }
+      } catch (error) {
+        console.warn('Failed to parse filters param:', error);
+      }
     }
 
-    // Combine all conditions
+    // Combine conditions
+    // If using text search, combine with $and
+    if (useTextSearch) {
     if (andConditions.length > 0) {
+        query.$and = [textSearchQuery, ...andConditions];
+      } else {
+        Object.assign(query, textSearchQuery);
+      }
+    } else if (andConditions.length > 0) {
       query.$and = andConditions;
     }
 
+    // Build sort object
+    let sortObject = {};
+    switch (sortBy) {
+      case 'price-asc':
+        sortObject = { price: 1 };
+        break;
+      case 'price-desc':
+        sortObject = { price: -1 };
+        break;
+      case 'newest':
+      default:
+        // If using text search, sort by text score first, then by date
+        if (useTextSearch) {
+          sortObject = { score: { $meta: 'textScore' }, createdAt: -1 };
+        } else {
+          sortObject = { createdAt: -1 };
+        }
+        break;
+    }
+
     // Execute query
-    let products = await Product.find(query)
+    // For list views, select only needed fields to reduce payload size
+    // For detail views (limit=1 or specific ID), fetch full document
+    const isListQuery = limit > 1 && !searchParams.get('id');
+    const selectFields = isListQuery 
+      ? 'title slug heroImage price brand categoryId featured status createdAt sku tags colorVariants filters'
+      : undefined; // undefined = fetch all fields
+    
+    let queryBuilder = Product.find(query);
+    
+    // Add text score projection if using text search
+    if (useTextSearch) {
+      // For text search, we need to add score projection
+      // select() can be called multiple times - fields are additive
+      if (selectFields) {
+        queryBuilder = queryBuilder.select(selectFields);
+      }
+      // Add text score (must be added separately)
+      queryBuilder = queryBuilder.select({ score: { $meta: 'textScore' } });
+    } else if (selectFields) {
+      queryBuilder = queryBuilder.select(selectFields);
+    }
+    
+    let products = await queryBuilder
       .populate('categoryId', 'name slug level')
       .populate('categoryIds', 'name slug level')
       .populate('brandCategoryId', 'name slug level')
       .populate('brandCategoryIds', 'name slug level')
-      .sort({ createdAt: -1 })
+      .sort(sortObject)
       .limit(limit)
       .skip(skip)
       .lean();
@@ -137,16 +270,25 @@ export async function GET(request) {
     });
 
     const total = await Product.countDocuments(query);
+    const totalPages = Math.ceil(total / limit);
 
     return NextResponse.json({
       success: true,
       products,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+      // Keep backward compatibility
       total,
-      limit,
       skip,
     }, {
       headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
       },
     });
   } catch (error) {

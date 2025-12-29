@@ -16,7 +16,7 @@ const MAX_RESULTS = 6;
 export default function SearchBar({ className = "", placeholder = "What are you looking for" }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { categories, products, loading } = useAppContext();
+  const { categories } = useAppContext();
 
   const [query, setQuery] = useState("");
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
@@ -102,7 +102,7 @@ export default function SearchBar({ className = "", placeholder = "What are you 
     return score;
   }, []);
 
-  // Handle Search logic with debouncing and relevance scoring
+  // Handle Search logic with server-side API call
   useEffect(() => {
     // Clear previous timeout
     if (timeoutRef.current) {
@@ -117,67 +117,65 @@ export default function SearchBar({ className = "", placeholder = "What are you 
       return;
     }
 
-    // Don't search if products are still loading or empty
-    if (loading || !products || products.length === 0) {
-      setSearchResults([]);
-      setIsSearching(false);
-      return;
-    }
-
     setIsSearching(true);
     setSelectedIndex(-1);
 
-      timeoutRef.current = setTimeout(() => {
+    timeoutRef.current = setTimeout(async () => {
         if (!isMountedRef.current) return;
 
-        const queryLower = query.toLowerCase().trim();
+      try {
+        const params = new URLSearchParams({
+          search: query.trim(),
+          limit: String(MAX_RESULTS),
+        });
         
-        // Filter products by category if selected
-        let filteredProducts = products;
         if (selectedCategoryObj) {
-          const categoryId = selectedCategoryObj._id || selectedCategoryObj.id;
-          filteredProducts = products.filter(product => {
-            const productCategoryId = product.categoryId || product.category?._id;
-            return productCategoryId?.toString() === categoryId?.toString();
-          });
+          params.set('category', selectedCategoryObj.slug);
         }
 
-        // Search across multiple fields with relevance scoring
-        const matched = filteredProducts
-          .map(product => {
-          const title = (product.title || product.name || "").toLowerCase();
-          const sku = (product.sku || "").toLowerCase();
-          const brand = (product.brand || "").toLowerCase();
-          const description = (product.description || "").toLowerCase();
-          const summary = (product.summary || "").toLowerCase();
-          const categoryName = (product.category?.name || "").toLowerCase();
-          const tags = (product.tags || []).map(t => t.toLowerCase());
+        const response = await fetch(`/api/products?${params.toString()}`);
+        const data = await response.json();
+        
+        if (isMountedRef.current && data.success) {
+          // Sort results by relevance (title matches first, then brand, etc.)
+          const sortedResults = (data.products || []).sort((a, b) => {
+            const queryLower = query.toLowerCase().trim();
+            const aTitle = (a.title || '').toLowerCase();
+            const bTitle = (b.title || '').toLowerCase();
+            const aBrand = (a.brand || '').toLowerCase();
+            const bBrand = (b.brand || '').toLowerCase();
+            
+            // Exact title match gets highest priority
+            if (aTitle === queryLower && bTitle !== queryLower) return -1;
+            if (bTitle === queryLower && aTitle !== queryLower) return 1;
 
-          // Check if product matches search query
-          const matches = 
-            title.includes(queryLower) ||
-            sku.includes(queryLower) ||
-            brand.includes(queryLower) ||
-            description.includes(queryLower) ||
-            summary.includes(queryLower) ||
-            categoryName.includes(queryLower) ||
-            tags.some(tag => tag.includes(queryLower));
-
-          if (!matches) return null;
-
-          // Calculate relevance score
-          const score = calculateRelevance(product, queryLower);
-          return { product, score };
-        })
-        .filter(item => item !== null)
-        .sort((a, b) => b.score - a.score) // Sort by relevance
-        .slice(0, MAX_RESULTS)
-        .map(item => item.product);
-
+            // Title starts with query
+            if (aTitle.startsWith(queryLower) && !bTitle.startsWith(queryLower)) return -1;
+            if (bTitle.startsWith(queryLower) && !aTitle.startsWith(queryLower)) return 1;
+            
+            // Title contains query
+            if (aTitle.includes(queryLower) && !bTitle.includes(queryLower)) return -1;
+            if (bTitle.includes(queryLower) && !aTitle.includes(queryLower)) return 1;
+            
+            // Brand match
+            if (aBrand.includes(queryLower) && !bBrand.includes(queryLower)) return -1;
+            if (bBrand.includes(queryLower) && !aBrand.includes(queryLower)) return 1;
+            
+            return 0;
+          });
+          
+          setSearchResults(sortedResults);
+          setShowResults(true);
+        }
+      } catch (error) {
+        console.error('Search error:', error);
+        if (isMountedRef.current) {
+          setSearchResults([]);
+        }
+      } finally {
       if (isMountedRef.current) {
-        setSearchResults(matched);
-        setShowResults(true);
         setIsSearching(false);
+        }
       }
     }, DEBOUNCE_DELAY);
 
@@ -186,7 +184,7 @@ export default function SearchBar({ className = "", placeholder = "What are you 
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [query, products, loading, selectedCategoryObj, calculateRelevance]);
+  }, [query, selectedCategoryObj]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -555,21 +553,6 @@ export default function SearchBar({ className = "", placeholder = "What are you 
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </>
-              ) : loading ? (
-                <div className="py-8 flex flex-col items-center justify-center">
-                  <Loader2 className="w-6 h-6 text-accent animate-spin mb-2" />
-                  <span className="text-xs text-black/40 font-medium">Loading products...</span>
-                </div>
-              ) : products.length === 0 ? (
-                <div className="py-8 flex flex-col items-center justify-center text-center px-4">
-                  <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                    <Package className="w-6 h-6 text-black/10" />
-                  </div>
-                  <h3 className="text-sm font-bold text-black mb-1">No products available</h3>
-                  <p className="text-xs text-black/40 max-w-[200px] leading-relaxed">
-                    Products are being loaded. Please try again in a moment.
-                  </p>
-                </div>
               ) : (
                 <div className="py-12 flex flex-col items-center justify-center text-center px-4">
                   <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">

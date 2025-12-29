@@ -17,6 +17,7 @@ export default function About() {
                 src={aboutimg} 
                 alt="Artisan crafting metalware" 
                 fill
+                sizes="(max-width: 768px) 100vw, 50vw"
                 className="object-cover shadow-xl rounded-sm"
               />
             </div>  

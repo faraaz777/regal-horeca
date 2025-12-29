@@ -39,7 +39,7 @@ const STATIC_DEPARTMENTS = [
 ];
 
 export default function Header() {
-  const { wishlist, cart, getCartTotalItems, categories, businessTypes, products } = useAppContext();
+  const { wishlist, cart, getCartTotalItems, categories, businessTypes } = useAppContext();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -55,6 +55,7 @@ export default function Header() {
   const [lastScrollY, setLastScrollY] = useState(0);
   const [activeDepartment, setActiveDepartment] = useState(null);
   const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
+  const [departmentProducts, setDepartmentProducts] = useState({});
 
   const departmentMenuRefs = useRef({});
 
@@ -232,6 +233,39 @@ export default function Header() {
     };
   }, [activeDepartment, activeDesktopMenu]);
 
+  // Fetch featured products for active department
+  useEffect(() => {
+    if (!activeDepartment) {
+      setDepartmentProducts({});
+      return;
+    }
+
+    // Find the department object
+    const dept = departments.find((d) => 
+      d.slug === activeDepartment || (d._id || d.id) === activeDepartment
+    );
+
+    if (!dept || !dept.slug) return;
+
+    // Fetch featured products for this department
+    async function fetchDepartmentProducts() {
+      try {
+        const response = await fetch(`/api/products?category=${dept.slug}&featured=true&limit=10`);
+        const data = await response.json();
+        if (data.success && data.products) {
+          setDepartmentProducts(prev => ({
+            ...prev,
+            [dept.slug]: data.products
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to fetch department products:', error);
+      }
+    }
+
+    fetchDepartmentProducts();
+  }, [activeDepartment, departments]);
+
   // ---------- Handlers ----------
   const handleNavForward = (menu) => {
     setNavStack((prev) => [
@@ -338,7 +372,7 @@ export default function Header() {
               departmentMenuRefs={departmentMenuRefs}
               activeDepartment={activeDepartment}
               setActiveDepartment={setActiveDepartment}
-              products={products}
+              departmentProducts={departmentProducts}
               navLinkClass={navLinkClass}
               isMoreDropdownOpen={isMoreDropdownOpen}
               setIsMoreDropdownOpen={setIsMoreDropdownOpen}
@@ -387,7 +421,7 @@ function DepartmentsBar({
   departmentMenuRefs,
   activeDepartment,
   setActiveDepartment,
-  products,
+  departmentProducts,
   navLinkClass,
   isMoreDropdownOpen,
   setIsMoreDropdownOpen,
@@ -399,6 +433,9 @@ function DepartmentsBar({
     d.slug === activeDepartment || (d._id || d.id) === activeDepartment
   ) || null;
   const hasActiveChildren = activeDept && activeDept.children && activeDept.children.length > 0;
+
+  // Get products for active department
+  const activeDeptProducts = activeDept?.slug ? (departmentProducts[activeDept.slug] || []) : [];
 
   // More dropdown links
   const moreLinks = [
@@ -547,8 +584,8 @@ function DepartmentsBar({
                 </div>
 
                 {/* Featured Section on Right */}
-                <div className="w-[240px] shrink-0 border-l border-black/10 pl-8">
-                  <FeaturedProductsSection department={activeDept} products={products} />
+                <div className="w-[180px] shrink-0 border-l border-black/10 pl-6">
+                  <FeaturedProductsSection department={activeDept} products={activeDeptProducts} />
                 </div>
               </div>
             </div>
@@ -560,37 +597,17 @@ function DepartmentsBar({
 }
 
 function FeaturedProductsSection({ department, products }) {
-  // Get products for this department (featured first, then by category)
+  // Products are already filtered by category from API, so just prioritize featured
   const featuredProducts = useMemo(() => {
     if (!products || products.length === 0) return [];
 
-    // Collect all category IDs in this department tree
-    const getAllCategoryIds = (cat) => {
-      const ids = [cat._id || cat.id];
-      if (cat.children && cat.children.length > 0) {
-        cat.children.forEach(child => {
-          ids.push(...getAllCategoryIds(child));
-        });
-      }
-      return ids;
-    };
+    // Prioritize featured products, then show others
+    const featured = products.filter(p => p.featured);
+    const others = products.filter(p => !p.featured);
 
-    const deptCategoryIds = getAllCategoryIds(department).map(id => id?.toString());
-
-    // Filter products that belong to this department
-    let deptProducts = products.filter((p) => {
-      const pCategoryId = p.categoryId?._id || p.categoryId;
-      if (!pCategoryId) return false;
-      return deptCategoryIds.includes(pCategoryId?.toString());
-    });
-
-    // Prioritize featured products
-    const featured = deptProducts.filter(p => p.featured);
-    const others = deptProducts.filter(p => !p.featured);
-
-    // Show only 1 featured product
+    // Show only 1 product (featured first, then others)
     return [...featured, ...others].slice(0, 1);
-  }, [department, products]);
+  }, [products]);
 
   if (featuredProducts.length === 0) return null;
 
@@ -605,7 +622,7 @@ function FeaturedProductsSection({ department, products }) {
 
   return (
     <div>
-      <h3 className="text-xs font-bold uppercase tracking-widest text-black mb-4">
+      <h3 className="text-[10px] font-bold uppercase tracking-widest text-black mb-2">
         Featured
       </h3>
       {featuredProducts.map((product) => {
@@ -619,18 +636,19 @@ function FeaturedProductsSection({ department, products }) {
           href={`/products/${productSlug}`}
           className="group block"
         >
-          <div className="aspect-square bg-white border border-black/5 rounded-lg overflow-hidden relative mb-3">
+          <div className="aspect-square bg-white border border-black/5 rounded-md overflow-hidden relative mb-2 max-w-[140px]">
             <Image
               src={product.heroImage || product.images?.[0] || '/placeholder.png'}
               alt={product.title}
               fill
               className="object-cover group-hover:scale-105 transition-transform duration-500"
+              sizes="140px"
             />
           </div>
-          <h4 className="text-xs font-medium uppercase tracking-wide text-black group-hover:text-accent mb-1 transition-colors line-clamp-2">
+          <h4 className="text-[10px] font-medium uppercase tracking-wide text-black group-hover:text-accent mb-0.5 transition-colors line-clamp-2 leading-tight">
             {product.title}
           </h4>
-          <span className="text-xs font-bold text-accent">
+          <span className="text-[10px] font-bold text-accent">
             {formatPrice(product.price)}
           </span>
         </Link>

@@ -88,7 +88,8 @@ function EnquiryForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const categoryParam = searchParams.get('category') || '';
-  const { cart, products, businessTypes } = useAppContext();
+  const { cart, businessTypes } = useAppContext();
+  const [products, setProducts] = useState([]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -112,6 +113,34 @@ function EnquiryForm() {
     document.addEventListener('mousedown', clickOutside);
     return () => document.removeEventListener('mousedown', clickOutside);
   }, []);
+
+  // Fetch products for cart items
+  useEffect(() => {
+    if (cart.length > 0) {
+      async function fetchCartProducts() {
+        const productIds = cart.map(item => item.productId).filter(Boolean);
+        if (productIds.length === 0) {
+          setProducts([]);
+          return;
+        }
+        try {
+          const promises = productIds.map(id => 
+            fetch(`/api/products/${id}`).then(res => res.json())
+          );
+          const results = await Promise.all(promises);
+          const fetched = results
+            .filter(r => r.success && r.product)
+            .map(r => r.product);
+          setProducts(fetched);
+        } catch (error) {
+          console.error('Failed to fetch cart products:', error);
+        }
+      }
+      fetchCartProducts();
+    } else {
+      setProducts([]);
+    }
+  }, [cart]);
 
   const cartItems = useMemo(() => {
     return cart.map(item => {

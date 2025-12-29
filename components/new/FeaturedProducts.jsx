@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAppContext } from "@/context/AppContext";
@@ -137,11 +137,28 @@ function SliderArrow({ side, onClick }) {
    ⭐ FEATURED PRODUCTS (DEFAULT EXPORT)
 --------------------------------------------------- */
 export default function FeaturedProducts({ limit = null }) {
-  const { products, loading } = useAppContext();
   const router = useRouter();
   const scrollRef = useRef(null);
+  const [featured, setFeatured] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  let featured = products.filter((p) => p.featured === true);
+  useEffect(() => {
+    async function fetchFeatured() {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/products?featured=true&limit=8');
+        const data = await response.json();
+        if (data.success) {
+          setFeatured(data.products || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch featured products:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchFeatured();
+  }, []);
   if (limit) featured = featured.slice(0, limit);
 
   const scrollLeft = () => scrollRef.current?.scrollBy({ left: -400, behavior: "smooth" });
@@ -187,14 +204,28 @@ export default function FeaturedProducts({ limit = null }) {
    ⭐ NEW ARRIVALS (NAMED EXPORT)
 --------------------------------------------------- */
 export function NewArrivals({ limit = 8 }) {
-  const { products, loading } = useAppContext();
   const router = useRouter();
   const scrollRef = useRef(null);
+  const [newArrivals, setNewArrivals] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  let newArrivals = [...products].sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-  );
-  newArrivals = newArrivals.slice(0, limit);
+  useEffect(() => {
+    async function fetchNewArrivals() {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/products?limit=${limit}`);
+        const data = await response.json();
+        if (data.success) {
+          setNewArrivals(data.products || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch new arrivals:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchNewArrivals();
+  }, [limit]);
 
   const scrollLeft = () => scrollRef.current?.scrollBy({ left: -400, behavior: "smooth" });
   const scrollRight = () => scrollRef.current?.scrollBy({ left: 400, behavior: "smooth" });

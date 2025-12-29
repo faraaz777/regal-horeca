@@ -18,11 +18,13 @@ import LightCaptureModal, { getSavedLeadProfile } from './LightCaptureModal';
 import toast from 'react-hot-toast';
 
 export default function CartDrawer({ isOpen, onClose }) {
-  const { cart, products, loading, updateCartQuantity, removeFromCart, getCartTotalItems } = useAppContext();
+  const { cart, updateCartQuantity, removeFromCart, getCartTotalItems } = useAppContext();
   const { handleEnquiry } = useEnquiry();
   const [showCaptureModal, setShowCaptureModal] = useState(false);
   const [pendingEnquiry, setPendingEnquiry] = useState(null);
   const [savedProfile, setSavedProfile] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Check for saved profile when drawer opens
   useEffect(() => {
@@ -31,6 +33,42 @@ export default function CartDrawer({ isOpen, onClose }) {
       setSavedProfile(profile);
     }
   }, [isOpen]);
+
+  // Fetch products for cart items when drawer opens
+  useEffect(() => {
+    if (isOpen && cart.length > 0) {
+      async function fetchCartProducts() {
+        try {
+          setLoading(true);
+          // Fetch products by IDs
+          const productIds = cart.map(item => item.productId).filter(Boolean);
+          if (productIds.length === 0) {
+            setProducts([]);
+            return;
+          }
+
+          // Fetch each product (could be optimized with a batch endpoint)
+          const productPromises = productIds.map(id => 
+            fetch(`/api/products/${id}`).then(res => res.json())
+          );
+          const productResults = await Promise.all(productPromises);
+          const fetchedProducts = productResults
+            .filter(result => result.success && result.product)
+            .map(result => result.product);
+          
+          setProducts(fetchedProducts);
+        } catch (error) {
+          console.error('Failed to fetch cart products:', error);
+          setProducts([]);
+        } finally {
+          setLoading(false);
+        }
+      }
+      fetchCartProducts();
+    } else {
+      setProducts([]);
+    }
+  }, [isOpen, cart]);
 
   const cartItems = useMemo(() => {
     return cart.map(cartItem => {

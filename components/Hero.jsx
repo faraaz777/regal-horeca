@@ -134,6 +134,7 @@ export default function Hero() {
                 src={slide.image}
                 alt={slide.title}
                 fill
+                sizes="100vw"
                 priority={idx === 0}
                 className={`object-cover transition-transform duration-[10000ms] ease-in-out ${idx === current ? 'scale-110' : 'scale-100'
                   }`}

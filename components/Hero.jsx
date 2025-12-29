@@ -226,7 +226,7 @@ export default function Hero() {
         {/* Scroll Indicator */}
         <button
           onClick={handleScrollDown}
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 text-white flex flex-col items-center gap-2 opacity-60 hover:opacity-100 transition-opacity duration-300 animate-bounce"
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 text-white flex flex-col items-center gap-2 opacity-60 hover:opacity-100 transition-opacity duration-300 animate-bounce md:bottom-6"
         >
           <span className="text-[10px] uppercase tracking-widest">Scroll</span>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -234,8 +234,21 @@ export default function Hero() {
           </svg>
         </button>
 
-        {/* Slide Indicators */}
-        <div className="absolute left-8 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-4 hidden md:flex">
+        {/* Slide Indicators - Mobile: Bottom, Desktop: Left */}
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20 flex flex-row gap-3 md:hidden">
+          {slides.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => goToSlide(idx)}
+              className={`w-8 h-1 rounded-full transition-all duration-300 ${idx === current ? 'bg-white w-12' : 'bg-white/20 hover:bg-white/40'
+                }`}
+              aria-label={`Go to slide ${idx + 1}`}
+            />
+          ))}
+        </div>
+        
+        {/* Slide Indicators - Desktop: Left Side */}
+        <div className="absolute left-8 top-1/2 -translate-y-1/2 z-20 hidden md:flex flex-col gap-4">
           {slides.map((_, idx) => (
             <button
               key={idx}

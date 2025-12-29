@@ -96,13 +96,6 @@ export default function Header() {
       return slug.toLowerCase().replace(/[^a-z0-9]/g, '');
     };
 
-    // Debug: Log available category slugs (remove after debugging)
-    if (process.env.NODE_ENV === 'development' && topLevelCategories.length > 0) {
-      console.log('Available category slugs:', topLevelCategories.map(cat => ({ 
-        name: cat.name, 
-        slug: cat.slug 
-      })));
-    }
 
     // Always return static departments for consistent navbar (5 departments max)
     // When categories are loaded, enrich static departments with dynamic children data

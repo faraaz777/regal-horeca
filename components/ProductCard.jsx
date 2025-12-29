@@ -150,7 +150,7 @@ export default function ProductCard({ product, onAdd }) {
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        <Link href={`/products/${productSlug}`} className="block w-full h-full">
+        <Link href={`/products/${productSlug}`} className="block w-full h-full relative">
           <Image
             src={productImage}
             alt={productName}

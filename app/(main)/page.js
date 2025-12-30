@@ -337,7 +337,7 @@ export default function HomePage() {
       {/* New Arrivals Section */}
       <section className="py-20 bg-white hover:bg-gray-50 transition-colors duration-700">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-end mb-12 px-2 border-b border-black/10 pb-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 px-2 border-b border-black/10 pb-6">
             <div>
               <span className="text-accent text-xs font-bold tracking-widest uppercase mb-2 block">
                 Just In

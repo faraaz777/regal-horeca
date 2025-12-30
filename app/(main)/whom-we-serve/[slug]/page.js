@@ -230,7 +230,7 @@ const categoryData = {
     title: "Crafted for Grand Occasions",
     subtitle: "Refined Solutions for Banquets & Convention Centres",
     heroImage:
-      "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=2000&q=80",
+      "https://images.unsplash.com/photo-1746549855902-0028190ed877?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     introText:
       "Regal enhances large-scale celebrations and corporate gatherings with elegant, durable tableware designed for impact, consistency, and flawless presentation.",
     restaurantTypes: [

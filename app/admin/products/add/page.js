@@ -17,19 +17,51 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import useSWR from 'swr';
 import { useAppContext } from '@/context/AppContext';
 import ProductForm from '@/components/ProductForm';
 import { showToast } from '@/lib/utils/toast';
 import { apiClient, ApiError } from '@/lib/utils/apiClient';
 
+// SWR fetcher function
+const fetcher = (url) => fetch(url).then(res => res.json());
+
 export default function AdminAddProductPage() {
-  const { refreshProducts } = useAppContext();
+  const { refreshProducts, categories } = useAppContext();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+
+  // Fetch products based on selected category
+  // If category is selected, fetch products in that category
+  // Otherwise, fetch latest 200 products
+  const productsUrl = useMemo(() => {
+    if (selectedCategoryId && categories.length > 0) {
+      // Find category slug from ID
+      const category = categories.find(c => {
+        const cId = c._id || c.id;
+        return cId?.toString() === selectedCategoryId?.toString();
+      });
+      
+      if (category?.slug) {
+        // Fetch products filtered by category slug
+        return `/api/products?limit=200&category=${category.slug}`;
+      }
+    }
+    // Fetch latest 200 products when no category selected
+    return '/api/products?limit=200&sortBy=newest';
+  }, [selectedCategoryId, categories]);
+
+  const { data: productsData } = useSWR(productsUrl, fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 300000, // Cache for 5 minutes
+  });
+
+  const products = productsData?.products || [];
 
   const handleSave = async (productData) => {
     const toastId = showToast.loading('Creating product...');
@@ -85,6 +117,7 @@ export default function AdminAddProductPage() {
         allProducts={products}
         onSave={handleSave}
         onCancel={handleCancel}
+        onCategoryChange={setSelectedCategoryId}
       />
     </div>
   );

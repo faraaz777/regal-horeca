@@ -426,7 +426,7 @@ const FormSection = ({ title, children }) => (
   </div>
 );
 
-export default function ProductForm({ product, allProducts, onSave, onCancel }) {
+export default function ProductForm({ product, allProducts, onSave, onCancel, onCategoryChange }) {
   const { categories, brands, businessTypes } = useAppContext();
   
   const [formData, setFormData] = useState({
@@ -808,18 +808,27 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
     // Set categoryId to the most specific level selected
     // Priority: type > subcategory > category > department
     // This ensures products are assigned to the most specific category available
+    let finalCategoryId = null;
     if (id) {
       // When selecting a category, set categoryId to that category
+      finalCategoryId = id;
       setFormData({ ...formData, categoryId: id });
     } else {
       // If clearing a selection, find the most specific remaining level
       // Check from most specific to least specific
       const mostSpecificLevel = ['type', 'subcategory', 'category', 'department'].find(l => newSelection[l]);
       if (mostSpecificLevel) {
-        setFormData({ ...formData, categoryId: newSelection[mostSpecificLevel] });
+        finalCategoryId = newSelection[mostSpecificLevel];
+        setFormData({ ...formData, categoryId: finalCategoryId });
       } else {
+        finalCategoryId = null;
         setFormData({ ...formData, categoryId: '' });
       }
+    }
+    
+    // Notify parent component of category change for dynamic product fetching
+    if (onCategoryChange) {
+      onCategoryChange(finalCategoryId);
     }
   };
 
@@ -1161,6 +1170,15 @@ export default function ProductForm({ product, allProducts, onSave, onCancel }) 
       
       return false;
     });
+    
+    // Fallback: If filtered pool is empty, show all products (except current)
+    // This ensures users can still select related products even if category filter is too strict
+    if (candidatePool.length === 0 && allProducts.length > 0) {
+      candidatePool = allProducts.filter(p => {
+        const pid = p._id || p.id;
+        return pid?.toString() !== currentProductId?.toString();
+      });
+    }
     
     // Get current tags (normalized)
     const currentTags = formData.tagsInput 

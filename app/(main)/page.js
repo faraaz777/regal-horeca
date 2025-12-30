@@ -10,6 +10,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import useSWR from "swr";
 import { useAppContext } from "@/context/AppContext";
 import ProductCard from "@/components/ProductCard";
 import ProductCardSkeleton from "@/components/ProductCardSkeleton";
@@ -22,44 +23,39 @@ import Numbers from "@/components/Numbers";
 import WhyChooseUs from "@/components/WhyChooseUs";
 import Locations from "@/components/about/Locations";
 
+// SWR fetcher function
+const fetcher = (url) => fetch(url).then(res => res.json());
+
 export default function HomePage() {
   const { categories } = useAppContext();
-  const [featuredProducts, setFeaturedProducts] = useState([]);
-  const [newArrivals, setNewArrivals] = useState([]);
+  
+  // Use SWR for caching - caches for 5 minutes
+  const { data: featuredData, isLoading: featuredLoading } = useSWR(
+    '/api/products?featured=true&limit=4',
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 300000, // Cache for 5 minutes
+    }
+  );
+  
+  const { data: arrivalsData, isLoading: arrivalsLoading } = useSWR(
+    '/api/products?limit=4',
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 300000, // Cache for 5 minutes
+    }
+  );
+  
+  const featuredProducts = featuredData?.products || [];
+  const newArrivals = arrivalsData?.products || [];
+  const loading = featuredLoading || arrivalsLoading;
+  
   const [mainCategories, setMainCategories] = useState([]);
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
   const scrollContainerRef = useRef(null);
   const categoryRefs = useRef([]);
-
-  // Fetch featured products and new arrivals directly from API
-  useEffect(() => {
-    async function fetchHomeProducts() {
-      try {
-        setLoading(true);
-        
-        // Fetch featured products
-        const featuredResponse = await fetch('/api/products?featured=true&limit=4');
-        const featuredData = await featuredResponse.json();
-        if (featuredData.success) {
-          setFeaturedProducts(featuredData.products || []);
-        }
-
-        // Fetch new arrivals (API already sorts by createdAt descending - newest first)
-        const arrivalsResponse = await fetch('/api/products?limit=4');
-        const arrivalsData = await arrivalsResponse.json();
-        if (arrivalsData.success) {
-          setNewArrivals(arrivalsData.products || []);
-        }
-      } catch (error) {
-        console.error('Failed to fetch home products:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchHomeProducts();
-  }, []);
 
   // Set main categories
   useEffect(() => {

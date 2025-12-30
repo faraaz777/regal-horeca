@@ -227,7 +227,7 @@ export default function Hero() {
         {/* Scroll Indicator */}
         <button
           onClick={handleScrollDown}
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 text-white flex flex-col items-center gap-2 opacity-60 hover:opacity-100 transition-opacity duration-300 animate-bounce md:bottom-6"
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 text-white hidden md:flex flex-col items-center gap-2 opacity-60 hover:opacity-100 transition-opacity duration-300 animate-bounce"
         >
           <span className="text-[10px] uppercase tracking-widest">Scroll</span>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

@@ -335,13 +335,17 @@ export default function HomePage() {
       </section>
 
       {/* New Arrivals Section */}
-      <section className="py-20 bg-white hover:bg-gray-50 transition-colors duration-700">
+      <section className="py-6 bg-white hover:bg-gray-50 transition-colors duration-700">
         <div className="container mx-auto px-4">
+<<<<<<< HEAD
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 px-2 border-b border-black/10 pb-6">
+=======
+          <div className="flex flex-col md:flex-row justify-between items-start mb-12 px-2 border-b border-black/10 pb-6">
+>>>>>>> ba8cb7f9c6930517ae33f0aa98b4376103c00d2f
             <div>
               <span className="text-accent text-xs font-bold tracking-widest uppercase mb-2 block">
                 Just In
-              </span>
+              </span> 
               <h2 className="text-3xl md:text-4xl font-serif text-black">
                 New Arrivals
               </h2>

@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Category from '@/lib/models/Category';
 import { clearCategoryCache } from '@/lib/utils/categoryCache';
+import { revalidateHomepage } from '@/lib/utils/revalidate';
 
 /**
  * GET /api/categories/[id]
@@ -92,6 +93,9 @@ export async function PUT(request, { params }) {
     // Clear category cache since structure changed
     clearCategoryCache();
 
+    // Revalidate homepage to update cached categories
+    revalidateHomepage();
+
     return NextResponse.json({
       success: true,
       category: await Category.findById(id).populate('parent').lean(),
@@ -139,6 +143,9 @@ export async function DELETE(request, { params }) {
 
     // Clear category cache since structure changed
     clearCategoryCache();
+
+    // Revalidate homepage to update cached categories
+    revalidateHomepage();
 
     return NextResponse.json({
       success: true,

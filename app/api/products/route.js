@@ -14,6 +14,7 @@ import Category from '@/lib/models/Category';
 import Brand from '@/lib/models/Brand';
 import { generateUniqueSlug } from '@/lib/utils/slug';
 import { getCategoryIdsWithChildren } from '@/lib/utils/categoryCache';
+import { revalidateHomepage } from '@/lib/utils/revalidate';
 
 // Force dynamic rendering to prevent caching issues in production
 export const dynamic = 'force-dynamic';
@@ -446,6 +447,9 @@ export async function POST(request) {
     // Create product
     const product = new Product(productData);
     await product.save();
+
+    // Revalidate homepage to update cached products
+    revalidateHomepage();
 
     return NextResponse.json({
       success: true,

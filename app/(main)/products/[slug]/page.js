@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { HeartIcon, PlusIcon, MinusIcon, WhatsAppIcon, ShoppingCartIcon } from '@/components/Icons';
-import { ArrowRight, Check, Truck, ShieldCheck, Share2 } from 'lucide-react';
+import {  Check, Truck, ShieldCheck, Share2 } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { getWhatsAppBusinessLink } from '@/lib/utils/whatsapp';
 import { useEnquiry, createEnquiryAndRedirect } from '@/lib/hooks/useEnquiry';
@@ -19,7 +19,6 @@ import LightCaptureModal from '@/components/LightCaptureModal';
 import ProductCard from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 import ProductGallery from '@/components/ProductGallery';
-import AiAssistant from '@/components/AiAssistant';
 import ReactMarkdown from 'react-markdown';
 import toast from 'react-hot-toast';
 
@@ -650,7 +649,6 @@ export default function ProductDetailPage() {
         )}
       </main>
 
-      <AiAssistant productContext={productContextString} />
 
       {/* Light Capture Modal */}
       <LightCaptureModal

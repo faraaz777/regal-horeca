@@ -4,7 +4,6 @@
  * Company information, history, and details about Regal Horeca
  */
 
-'use client';
 
 import Hero from '@/components/about/Hero';
 import Stats from '@/components/about/Stats';

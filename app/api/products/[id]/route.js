@@ -13,6 +13,7 @@ import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
 import { deleteFromR2 } from '@/lib/utils/r2Upload';
 import { generateUniqueSlug } from '@/lib/utils/slug';
+import { revalidateHomepage } from '@/lib/utils/revalidate';
 import mongoose from 'mongoose';
 
 /**
@@ -288,6 +289,9 @@ export async function PUT(request, { params }) {
     Object.assign(product, updateData);
     await product.save();
 
+    // Revalidate homepage to update cached products
+    revalidateHomepage();
+
     return NextResponse.json({
       success: true,
       product: await Product.findById(id)
@@ -347,6 +351,9 @@ export async function DELETE(request, { params }) {
 
     // Delete product from database
     await Product.findByIdAndDelete(id);
+
+    // Revalidate homepage to update cached products
+    revalidateHomepage();
 
     return NextResponse.json({
       success: true,

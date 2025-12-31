@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Category from '@/lib/models/Category';
 import { clearCategoryCache } from '@/lib/utils/categoryCache';
+import { revalidateHomepage } from '@/lib/utils/revalidate';
 
 // Force dynamic rendering to prevent caching issues in production
 export const dynamic = 'force-dynamic';
@@ -122,6 +123,9 @@ export async function POST(request) {
 
     // Clear category cache since structure changed
     clearCategoryCache();
+
+    // Revalidate homepage to update cached categories
+    revalidateHomepage();
 
     return NextResponse.json({
       success: true,

@@ -740,6 +740,11 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         }
       }
       
+      // Extract related product IDs - handle both populated objects and plain IDs
+      const relatedProductIds = (product.relatedProductIds || []).map(rp => 
+        (rp?._id || rp)?.toString()
+      ).filter(Boolean);
+      
       setFormData({
         ...product,
         categoryId: categoryId?.toString() || '',
@@ -749,6 +754,13 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         tagsInput: (product.tags || []).join(', '),
         filters: filters,
         availableSizes: product.availableSizes || '',
+        // Ensure these fields are properly initialized
+        gallery: product.gallery || [],
+        specifications: product.specifications || [],
+        summary: product.summary || '',
+        description: product.description || '',
+        businessTypeSlugs: product.businessTypeSlugs || [],
+        relatedProductIds: relatedProductIds,
       });
 
       if (categoryId && categories.length > 0) {

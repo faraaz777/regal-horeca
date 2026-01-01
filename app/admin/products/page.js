@@ -105,9 +105,34 @@ export default function AdminProductsPage() {
     router.push('/admin/products/add');
   };
     
-  const handleEditProduct = (product) => {
-    setEditingProduct(product);
-    setIsEditModalOpen(true);
+  const handleEditProduct = async (product) => {
+    const productId = product._id || product.id;
+    if (!productId) {
+      showToast.error('Product ID not found');
+      return;
+    }
+
+    // Fetch full product data with all fields
+    const toastId = showToast.loading('Loading product details...');
+    setLoading(true);
+    
+    try {
+      const response = await fetch(`/api/products/${productId}`);
+      const data = await response.json();
+      
+      if (data.success && data.product) {
+        setEditingProduct(data.product);
+        setIsEditModalOpen(true);
+      } else {
+        showToast.error(data.error || 'Failed to load product details');
+      }
+    } catch (error) {
+      console.error('Error fetching product:', error);
+      showToast.error('Failed to load product details');
+    } finally {
+      toast.dismiss(toastId);
+      setLoading(false);
+    }
   };
 
   const handleDeleteProduct = async (productId) => {

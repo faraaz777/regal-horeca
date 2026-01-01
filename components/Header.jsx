@@ -11,6 +11,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import useSWR from 'swr';
 import Logo from "./new/regalLogo.png";
 import Link from "next/link";
 import Image from "next/image";
@@ -20,13 +21,24 @@ import {
   MenuIcon,
   XIcon,
   ChevronDownIcon,
-  ChevronRightIcon,
   SearchIcon,
   ShoppingCartIcon,
 } from "./Icons";
 import { useAppContext } from "@/context/AppContext";
 import SearchBar from "./new/SearchBar";
 import CartDrawer from "./CartDrawer";
+
+// SWR fetcher function
+const fetcher = async (url) => {
+  const res = await fetch(url);
+  if (!res.ok) {
+    const error = new Error('An error occurred while fetching the data.');
+    error.info = await res.json();
+    error.status = res.status;
+    throw error;
+  }
+  return res.json();
+};
 
 // Static departments list for navbar - ensures immediate render and consistent layout
 // This improves SEO and prevents navbar from disappearing on initial load
@@ -233,38 +245,40 @@ export default function Header() {
     };
   }, [activeDepartment, activeDesktopMenu]);
 
-  // Fetch featured products for active department
-  useEffect(() => {
-    if (!activeDepartment) {
-      setDepartmentProducts({});
-      return;
-    }
-
-    // Find the department object
-    const dept = departments.find((d) => 
+  // Find active department for SWR key
+  const activeDept = useMemo(() => {
+    if (!activeDepartment) return null;
+    return departments.find((d) => 
       d.slug === activeDepartment || (d._id || d.id) === activeDepartment
     );
-
-    if (!dept || !dept.slug) return;
-
-    // Fetch featured products for this department
-    async function fetchDepartmentProducts() {
-      try {
-        const response = await fetch(`/api/products?category=${dept.slug}&featured=true&limit=10`);
-        const data = await response.json();
-        if (data.success && data.products) {
-          setDepartmentProducts(prev => ({
-            ...prev,
-            [dept.slug]: data.products
-          }));
-        }
-      } catch (error) {
-        console.error('Failed to fetch department products:', error);
-      }
-    }
-
-    fetchDepartmentProducts();
   }, [activeDepartment, departments]);
+
+  // Use SWR for fetching featured products with caching and deduplication
+  const { data: productsData, error: productsError, isLoading: productsLoading } = useSWR(
+    activeDept?.slug ? `/api/products?category=${activeDept.slug}&featured=true&limit=10` : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 60000, // Cache for 1 minute
+      onError: (error) => {
+        console.error('Failed to fetch department products:', error);
+      },
+    }
+  );
+
+  // Update department products state when data changes
+  useEffect(() => {
+    if (activeDept?.slug && productsData?.success && productsData?.products) {
+      setDepartmentProducts(prev => ({
+        ...prev,
+        [activeDept.slug]: productsData.products
+      }));
+    } else if (!activeDept) {
+      // Clear products when no active department
+      setDepartmentProducts({});
+    }
+  }, [activeDept?.slug, productsData]);
 
   // ---------- Handlers ----------
   const handleNavForward = (menu) => {
@@ -376,6 +390,8 @@ export default function Header() {
               navLinkClass={navLinkClass}
               isMoreDropdownOpen={isMoreDropdownOpen}
               setIsMoreDropdownOpen={setIsMoreDropdownOpen}
+              productsLoading={productsLoading}
+              productsError={productsError}
             />
           </div>
 
@@ -425,6 +441,8 @@ function DepartmentsBar({
   navLinkClass,
   isMoreDropdownOpen,
   setIsMoreDropdownOpen,
+  productsLoading,
+  productsError,
 }) {
   if (!departments.length) return null;
 
@@ -585,7 +603,12 @@ function DepartmentsBar({
 
                 {/* Featured Section on Right */}
                 <div className="w-[180px] shrink-0 border-l border-black/10 pl-6">
-                  <FeaturedProductsSection department={activeDept} products={activeDeptProducts} />
+                  <FeaturedProductsSection 
+                    department={activeDept} 
+                    products={activeDeptProducts}
+                    isLoading={productsLoading}
+                    error={productsError}
+                  />
                 </div>
               </div>
             </div>
@@ -596,20 +619,45 @@ function DepartmentsBar({
   );
 }
 
-function FeaturedProductsSection({ department, products }) {
-  // Products are already filtered by category from API, so just prioritize featured
-  const featuredProducts = useMemo(() => {
-    if (!products || products.length === 0) return [];
-
-    // Prioritize featured products, then show others
-    const featured = products.filter(p => p.featured);
-    const others = products.filter(p => !p.featured);
-
-    // Show only 1 product (featured first, then others)
-    return [...featured, ...others].slice(0, 1);
+function FeaturedProductsSection({ department, products, isLoading, error }) {
+  // API already filters by featured=true, so just take first product
+  // No need for redundant client-side filtering
+  const featuredProduct = useMemo(() => {
+    if (!products || products.length === 0) return null;
+    // API already returns only featured products, so just take the first one
+    return products[0];
   }, [products]);
 
-  if (featuredProducts.length === 0) return null;
+  // Loading state
+  if (isLoading) {
+    return (
+      <div>
+        <h3 className="text-[10px] font-bold uppercase tracking-widest text-black mb-2">
+          Featured
+        </h3>
+        <div className="aspect-square bg-gray-100 border border-black/5 rounded-md overflow-hidden relative mb-2 max-w-[140px] animate-pulse" />
+        <div className="h-3 bg-gray-100 rounded mb-1 animate-pulse" />
+        <div className="h-3 bg-gray-100 rounded w-2/3 animate-pulse" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div>
+        <h3 className="text-[10px] font-bold uppercase tracking-widest text-black mb-2">
+          Featured
+        </h3>
+        <div className="text-[9px] text-gray-400">
+          Unable to load
+        </div>
+      </div>
+    );
+  }
+
+  // No products state
+  if (!featuredProduct) return null;
 
   const formatPrice = (price) => {
     if (price == null) return 'Price on request';
@@ -620,40 +668,34 @@ function FeaturedProductsSection({ department, products }) {
     }).format(price).replace('₹', '₹ ');
   };
 
+  const productId = featuredProduct._id || featuredProduct.id;
+  const productSlug = featuredProduct.slug || productId?.toString();
+
   return (
     <div>
       <h3 className="text-[10px] font-bold uppercase tracking-widest text-black mb-2">
         Featured
       </h3>
-      {featuredProducts.map((product) => {
-        const productId = product._id || product.id;
-        // Get product slug with fallback - use ID if slug is missing (API handles both)
-        const productSlug = product.slug || productId?.toString();
-        
-        return (
-        <Link
-          key={productId}
-          href={`/products/${productSlug}`}
-          className="group block"
-        >
-          <div className="aspect-square bg-white border border-black/5 rounded-md overflow-hidden relative mb-2 max-w-[140px]">
-            <Image
-              src={product.heroImage || product.images?.[0] || '/placeholder.png'}
-              alt={product.title}
-              fill
-              className="object-cover group-hover:scale-105 transition-transform duration-500"
-              sizes="140px"
-            />
-          </div>
-          <h4 className="text-[10px] font-medium uppercase tracking-wide text-black group-hover:text-accent mb-0.5 transition-colors line-clamp-2 leading-tight">
-            {product.title}
-          </h4>
-          <span className="text-[10px] font-bold text-accent">
-            {formatPrice(product.price)}
-          </span>
-        </Link>
-        );
-      })}
+      <Link
+        href={`/products/${productSlug}`}
+        className="group block"
+      >
+        <div className="aspect-square bg-white border border-black/5 rounded-md overflow-hidden relative mb-2 max-w-[140px]">
+          <Image
+            src={featuredProduct.heroImage || featuredProduct.images?.[0] || '/placeholder.png'}
+            alt={featuredProduct.title}
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-500"
+            sizes="140px"
+          />
+        </div>
+        <h4 className="text-[10px] font-medium uppercase tracking-wide text-black group-hover:text-accent mb-0.5 transition-colors line-clamp-2 leading-tight">
+          {featuredProduct.title}
+        </h4>
+        <span className="text-[10px] font-bold text-accent">
+          {formatPrice(featuredProduct.price)}
+        </span>
+      </Link>
     </div>
   );
 }

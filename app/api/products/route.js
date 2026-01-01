@@ -16,9 +16,9 @@ import { generateUniqueSlug } from '@/lib/utils/slug';
 import { getCategoryIdsWithChildren } from '@/lib/utils/categoryCache';
 import { revalidateHomepage } from '@/lib/utils/revalidate';
 
-// Force dynamic rendering to prevent caching issues in production
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// Allow caching with revalidation for better performance
+// Revalidate every 5 minutes (300 seconds)
+export const revalidate = 300;
 
 /**
  * GET /api/products
@@ -290,6 +290,7 @@ export async function GET(request) {
     }, {
       headers: {
         'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        'CDN-Cache-Control': 'public, s-maxage=300',
       },
     });
   } catch (error) {

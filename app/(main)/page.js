@@ -26,6 +26,10 @@ export const metadata = {
   keywords: 'hospitality supplies, hotel equipment, restaurant supplies, HoReCa, commercial kitchen equipment, tableware, kitchenware',
 };
 
+// Enable ISR (Incremental Static Regeneration) - revalidate every 5 minutes
+// This allows the page to be statically generated and cached, then revalidated periodically
+export const revalidate = 300;
+
 export default async function HomePage() {
   // Fetch data server-side in parallel
   let featuredProducts = [];

@@ -13,9 +13,9 @@ import Category from '@/lib/models/Category';
 import { clearCategoryCache } from '@/lib/utils/categoryCache';
 import { revalidateHomepage } from '@/lib/utils/revalidate';
 
-// Force dynamic rendering to prevent caching issues in production
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// Allow caching with revalidation - categories change less frequently
+// Revalidate every hour (3600 seconds)
+export const revalidate = 3600;
 
 /**
  * GET /api/categories
@@ -41,9 +41,8 @@ export async function GET(request) {
         categories: tree,
       }, {
         headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
+          'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200',
+          'CDN-Cache-Control': 'public, s-maxage=3600',
         },
       });
     }
@@ -77,9 +76,8 @@ export async function GET(request) {
       categories,
     }, {
       headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200',
+        'CDN-Cache-Control': 'public, s-maxage=3600',
       },
     });
   } catch (error) {

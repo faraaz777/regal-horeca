@@ -1,64 +1,93 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import Image from 'next/image';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import glassware from '@/components/images/glassware.png'
-import heroimg1 from "../components/images/hero.png"
-import heroimg2 from "../components/images/photo.png"
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import MainBannerCard from './MainBannerCard';
+import SmallBannerCard from './SmallBannerCard';
+import heroimg1 from './images/hero.png';
+import heroimg2 from './images/photo.png';
+import glassware from './images/glassware.png';
 
-const slides = [
+// Main large banner data (left side)
+const MAIN_BANNERS = [
   {
     id: 1,
-    image: heroimg1,
-    alt: 'Hero banner 1',
+    title: 'Premium',
+    subtitle: 'Hospitality Supplies',
+    description: 'Discover our curated collection of premium tableware, kitchenware, and equipment designed for excellence.',
+    badge: '100% Natural',
+    badgeColor: 'bg-yellow-400 text-yellow-900',
+    imageUrl: heroimg1,
+    bgColor: 'bg-blue-50',
+    accentColor: 'text-yellow-400',
+    shopUrl: '/catalog',
+    learnMoreUrl: '/about',
   },
   {
     id: 2,
-    image: heroimg2,
-    alt: 'Hero banner 2',
+    title: 'Quality',
+    subtitle: 'You Can Trust',
+    description: 'Over 45 years of excellence in providing premium hospitality supplies to hotels, restaurants, and cafés across India.',
+    badge: '100% Natural',
+    badgeColor: 'bg-yellow-400 text-yellow-900',
+    imageUrl: heroimg2,
+    bgColor: 'bg-blue-50',
+    accentColor: 'text-yellow-400',
+    shopUrl: '/catalog',
+    learnMoreUrl: '/about',
   },
   {
     id: 3,
-    image: glassware,
-    alt: 'Hero banner 3',
+    title: 'Excellence',
+    subtitle: 'In Every Detail',
+    description: 'From tableware to kitchen equipment, we provide everything you need for a world-class hospitality experience.',
+    badge: '100% Natural',
+    badgeColor: 'bg-yellow-400 text-yellow-900',
+    imageUrl: glassware,
+    bgColor: 'bg-blue-50',
+    accentColor: 'text-yellow-400',
+    shopUrl: '/catalog',
+    learnMoreUrl: '/about',
   },
 ];
 
-export default function Hero() {
-  const [current, setCurrent] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+// Small banner data (right side - stacked)
+const SMALL_BANNERS = [
+  {
+    id: 1,
+    title: 'Fruits & Vegetables',
+    discount: '20% Off',
+    saleLabel: 'SALE',
+    imageUrl: heroimg2,
+    bgColor: 'bg-green-50',
+    shopUrl: '/catalog?category=fruits-vegetables',
+  },
+  {
+    id: 2,
+    title: 'Baked Products',
+    discount: '15% Off',
+    saleLabel: 'SALE',
+    imageUrl: glassware,
+    bgColor: 'bg-pink-50',
+    shopUrl: '/catalog?category=baked-products',
+  },
+];
+
+export default function Hero({ mainBanners = MAIN_BANNERS, smallBanners = SMALL_BANNERS }) {
+  const [activeSlide, setActiveSlide] = useState(0);
   const [touchStartX, setTouchStartX] = useState(null);
   const [touchEndX, setTouchEndX] = useState(null);
 
-  const nextSlide = useCallback(() => {
-    if (isTransitioning) return;
-    setIsTransitioning(true);
-    setCurrent((prev) => (prev + 1) % slides.length);
-    setTimeout(() => setIsTransitioning(false), 600);
-  }, [isTransitioning]);
+  const nextSlide = () => setActiveSlide((prev) => (prev + 1) % mainBanners.length);
+  const prevSlide = () => setActiveSlide((prev) => (prev - 1 + mainBanners.length) % mainBanners.length);
 
-  const prevSlide = useCallback(() => {
-    if (isTransitioning) return;
-    setIsTransitioning(true);
-    setCurrent((prev) => (prev - 1 + slides.length) % slides.length);
-    setTimeout(() => setIsTransitioning(false), 600);
-  }, [isTransitioning]);
-
-  const goToSlide = useCallback((index) => {
-    if (isTransitioning) return;
-    setIsTransitioning(true);
-    setCurrent(index);
-    setTimeout(() => setIsTransitioning(false), 600);
-  }, [isTransitioning]);
-
-  // Auto-play
+  // Auto-slide every 10 seconds
   useEffect(() => {
-    const timer = setInterval(nextSlide, 8000);
+    const timer = setInterval(nextSlide, 10000);
     return () => clearInterval(timer);
-  }, [nextSlide]);
+  }, []);
 
-  // Swipe handlers (mobile)
+  // Swipe handlers for mobile
   const onTouchStart = (e) => {
     setTouchStartX(e.touches[0].clientX);
     setTouchEndX(null);
@@ -75,10 +104,8 @@ export default function Hero() {
 
     if (Math.abs(diff) > 50) {
       if (diff > 0) {
-        // swipe left
         nextSlide();
       } else {
-        // swipe right
         prevSlide();
       }
     }
@@ -88,61 +115,63 @@ export default function Hero() {
   };
 
   return (
-    <section className="relative w-full overflow-hidden px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
-      <div
-        className="relative w-full h-[300px] sm:h-[350px] md:h-[400px] lg:h-[450px] rounded-2xl md:rounded-3xl overflow-hidden group"
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-      >
-        {slides.map((slide, idx) => (
-          <div
-            key={slide.id}
-            className={`absolute inset-0 transition-opacity duration-1000 ease-out ${
-              idx === current ? 'opacity-100 z-10' : 'opacity-0 z-0'
-            }`}
-          >
-            <Image
-              src={slide.image}
-              alt={slide.alt}
-              fill
-              sizes="100vw"
-              priority={idx === 0}
-              className="object-cover"
-            />
+    <section className="relative w-screen overflow-hidden bg-orange-50/30">
+      {/* Fixed height container - never changes */}
+      <div className="relative w-full h-[500px] sm:h-[550px] md:h-[600px] lg:h-[650px] xl:h-[700px]">
+        {/* Container with max-width and padding */}
+        <div className="relative w-full max-w-7xl mx-auto h-full px-3 sm:px-4 md:px-6 lg:px-8">
+          {/* Grid layout: Large banner left, two small banners right */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-3 sm:gap-4 md:gap-5 h-full">
+            
+            {/* Large Left Banner */}
+            <div 
+              className="relative h-full rounded-xl sm:rounded-2xl overflow-hidden shadow-lg"
+              onTouchStart={onTouchStart}
+              onTouchMove={onTouchMove}
+              onTouchEnd={onTouchEnd}
+            >
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeSlide}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ 
+                    duration: 1.2, 
+                    ease: [0.25, 0.46, 0.45, 0.94]
+                  }}
+                  className="w-full h-full"
+                >
+                  <MainBannerCard data={mainBanners[activeSlide]} />
+                </motion.div>
+              </AnimatePresence>
+
+              {/* Pagination Dots - Yellow for active, white for inactive */}
+              <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-3 z-20">
+                {mainBanners.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveSlide(i)}
+                    className="group p-1"
+                    aria-label={`Go to slide ${i + 1}`}
+                  >
+                    <div className={`h-2 w-2 rounded-full transition-all duration-500 ease-in-out ${
+                      activeSlide === i ? 'bg-yellow-400 w-8 shadow-md' : 'bg-white w-2 group-hover:bg-yellow-200'
+                    }`} />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Right Column - Two Small Banners Stacked */}
+            <div className="flex flex-col gap-3 sm:gap-4 md:gap-5 h-full">
+              {smallBanners.map((banner, index) => (
+                <div key={banner.id} className="flex-1 min-h-0">
+                  <SmallBannerCard data={banner} />
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
-
-        {/* Navigation Arrows */}
-        <button
-          onClick={prevSlide}
-          className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-2 bg-white/80 hover:bg-white backdrop-blur-sm rounded-full shadow-lg transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95"
-          aria-label="Previous slide"
-        >
-          <ChevronLeft className="w-5 h-5 text-gray-900" />
-        </button>
-        <button
-          onClick={nextSlide}
-          className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-2 bg-white/80 hover:bg-white backdrop-blur-sm rounded-full shadow-lg transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95"
-          aria-label="Next slide"
-        >
-          <ChevronRight className="w-5 h-5 text-gray-900" />
-        </button>
-
-        {/* Dot Indicators */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
-          {slides.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={() => goToSlide(idx)}
-              className={`transition-all duration-300 rounded-full ${
-                idx === current
-                  ? 'w-8 h-2 bg-white'
-                  : 'w-2 h-2 bg-white/50 hover:bg-white/70'
-              }`}
-              aria-label={`Go to slide ${idx + 1}`}
-            />
-          ))}
         </div>
       </div>
     </section>

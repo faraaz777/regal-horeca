@@ -147,7 +147,7 @@ export default async function HomePage() {
           <div className="absolute inset-0 bg-black/50" />
         </div>
         <div className="relative h-full flex flex-col items-center justify-center text-center text-white px-6 max-w-5xl mx-auto">
-          <span className="text-accent text-xs md:text-sm font-bold tracking-[0.3em] uppercase mb-4 block">
+          <span className="text-white text-xs md:text-sm font-bold tracking-[0.3em] uppercase mb-4 block">
             Trusted by Industry Leaders
           </span>
           <h2 className="text-4xl md:text-7xl lg:text-8xl font-bold mb-6 tracking-tight leading-[1.1]">
@@ -156,8 +156,9 @@ export default async function HomePage() {
           </h2>
           <div className="w-24 h-1 bg-accent mx-auto mb-8" />
           <p className="text-base md:text-xl lg:text-2xl font-light max-w-3xl leading-relaxed text-white/90">
-            From <strong className="text-white font-semibold">Paradise</strong> to <strong className="text-white font-semibold">Le Meridien</strong>, from <strong className="text-white font-semibold">ITC Kohenur</strong> to <strong className="text-white font-semibold">Ramoji Film City</strong> — Regal equips the finest.
-          </p>
+  Trusted by leading hospitality spaces across regions <br />— Regal equips the finest.
+</p>
+
         </div>
       </section>
 

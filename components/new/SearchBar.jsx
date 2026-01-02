@@ -239,8 +239,9 @@ export default function SearchBar({ className = "", placeholder = "What are you 
         } else if (e.key === "Enter" && selectedIndex >= 0) {
           e.preventDefault();
           const product = searchResults[selectedIndex];
-          if (product?.slug) {
-            router.push(`/product/${product.slug}`);
+          const productSlug = product?.slug || product?._id || product?.id;
+          if (productSlug) {
+            router.push(`/products/${productSlug}`);
             setShowResults(false);
             setSelectedIndex(-1);
           }
@@ -472,12 +473,14 @@ export default function SearchBar({ className = "", placeholder = "What are you 
                       const productImage = product.heroImage || product.images?.[0]?.url || product.images?.[0];
                       const isSelected = selectedIndex === index;
                       const hasImageError = imageErrors.has(productId);
+                      // Always use slug for navigation - fallback to ID only if slug is missing
+                      const productSlug = product.slug ? product.slug : (productId?.toString() || '');
 
                       return (
                         <Link
                           key={productId}
                           data-result-index={index}
-                          href={`/product/${product.slug || productId}`}
+                          href={`/products/${productSlug}`}
                           onClick={handleResultClick}
                           className={`flex items-center gap-4 p-2.5 rounded-xl transition-all group ${
                             isSelected 

@@ -17,6 +17,7 @@ import Numbers from "@/components/Numbers";
 import WhyChooseUs from "@/components/WhyChooseUs";
 import Locations from "@/components/about/Locations";
 import CategoriesSection from "@/components/CategoriesSection";
+import CircularCategories from "@/components/CircularCategories";
 import { flattenCategories } from "@/lib/utils/categoryUtils";
 
 // Metadata for SEO
@@ -88,6 +89,9 @@ export default async function HomePage() {
     <div>
       {/* Hero Slider Section */}
       <Hero />
+
+      {/* Circular Categories Section */}
+      <CircularCategories categories={categories} />
 
       {/* Featured Products Section */}
       <section className="py-20 bg-white">

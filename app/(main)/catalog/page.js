@@ -299,7 +299,8 @@ function CatalogPageContent() {
         Object.keys(facets.filters).forEach(key => {
           const sectionId = key.toLowerCase().replace(/\s+/g, '-');
           if (newSections[sectionId] === undefined) {
-            newSections[sectionId] = true;
+            // Size filter should be closed by default
+            newSections[sectionId] = key.toLowerCase() !== 'size';
           }
         });
         return newSections;

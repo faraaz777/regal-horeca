@@ -88,9 +88,9 @@ export default function Hero() {
   };
 
   return (
-    <section className="relative w-full overflow-hidden px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+    <section className="relative w-full overflow-hidden">
       <div
-        className="relative w-full h-[300px] sm:h-[350px] md:h-[400px] lg:h-[450px] rounded-2xl md:rounded-3xl overflow-hidden group"
+        className="relative w-full aspect-[21/9] sm:aspect-[21/8] md:aspect-[21/7] lg:aspect-[21/6] overflow-hidden group"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -109,6 +109,7 @@ export default function Hero() {
               sizes="100vw"
               priority={idx === 0}
               className="object-cover"
+              style={{ objectPosition: 'center center' }}
             />
           </div>
         ))}

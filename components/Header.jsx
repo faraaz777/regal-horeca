@@ -15,7 +15,8 @@ import useSWR from 'swr';
 import Logo from "./new/regalLogo.png";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   HeartIcon,
   MenuIcon,
@@ -51,10 +52,9 @@ const STATIC_DEPARTMENTS = [
 ];
 
 export default function Header() {
-  const { wishlist, cart, getCartTotalItems, categories, businessTypes } = useAppContext();
+  const { wishlist, getCartTotalItems, categories, businessTypes } = useAppContext();
   const pathname = usePathname();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -67,12 +67,13 @@ export default function Header() {
   const [lastScrollY, setLastScrollY] = useState(0);
   const [activeDepartment, setActiveDepartment] = useState(null);
   const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
+  const [isAllCategoriesDropdownOpen, setIsAllCategoriesDropdownOpen] = useState(false);
   const [departmentProducts, setDepartmentProducts] = useState({});
 
   const departmentMenuRefs = useRef({});
 
   const navLinkClass =
-    "text-sm md:text-[15px] font-semibold tracking-wide uppercase text-black hover:text-accent transition-colors relative py-4 group";
+    "text-xs md:text-sm font-medium tracking-wide uppercase text-black hover:text-accent transition-colors relative py-2.5 group";
 
   // ---------- Category tree building ----------
   // Memoize category tree building to prevent unnecessary recalculations
@@ -307,7 +308,7 @@ export default function Header() {
 
   return (
     <>
-      <div className="h-[72px] lg:h-[136px] w-full bg-white relative z-0" aria-hidden="true" />
+      <div className="h-[80px] lg:h-[115px] w-full bg-white relative z-0" aria-hidden="true" />
       <header
         className={`bg-white fixed top-0 left-0 right-0 z-40 border-b border-black/5 transition-transform duration-300 ease-out ${isHeaderVisible ? "translate-y-0" : "-translate-y-full"
           }`}
@@ -315,7 +316,7 @@ export default function Header() {
         <div className="container mx-auto px-4 lg:px-8">
 
           {/* DESKTOP + MOBILE TOP ROW */}
-          <div className="flex items-center justify-between py-4 lg:py-5 gap-4">
+          <div className="flex items-center justify-between py-2 lg:py-2.5 gap-4">
 
             {/* LEFT: Logo */}
             <div className="flex items-center shrink-0">
@@ -333,7 +334,7 @@ export default function Header() {
                   src={Logo}
                   alt="Regal HoReCa"
                   priority
-                  className="h-8 md:h-10 w-auto object-contain"
+                  className="h-7 md:h-8 w-auto object-contain"
                 />
               </Link>
             </div>
@@ -355,8 +356,8 @@ export default function Header() {
               </button>
 
               {/* Wishlist */}
-              <Link href="/wishlist" className="relative p-2 text-black hover:text-accent transition-colors group">
-                <HeartIcon className="w-5 h-5 md:w-6 md:h-6" />
+              <Link href="/wishlist" className="relative p-1.5 text-black hover:text-accent transition-colors group">
+                <HeartIcon className="w-5 h-5 md:w-5 md:h-5" />
                 {wishlist.length > 0 && (
                   <span className="absolute top-0 right-0 bg-accent text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold shadow-sm">
                     {wishlist.length}
@@ -367,9 +368,9 @@ export default function Header() {
               {/* Cart */}
               <button
                 onClick={() => setIsCartOpen(true)}
-                className="relative p-2 text-black hover:text-accent transition-colors"
+                className="relative p-1.5 text-black hover:text-accent transition-colors"
               >
-                <ShoppingCartIcon className="w-5 h-5 md:w-6 md:h-6" />
+                <ShoppingCartIcon className="w-5 h-5 md:w-5 md:h-5" />
                 {getCartTotalItems() > 0 && (
                   <span className="absolute top-0 right-0 bg-accent text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold shadow-sm">
                     {getCartTotalItems()}
@@ -390,6 +391,9 @@ export default function Header() {
               navLinkClass={navLinkClass}
               isMoreDropdownOpen={isMoreDropdownOpen}
               setIsMoreDropdownOpen={setIsMoreDropdownOpen}
+              isAllCategoriesDropdownOpen={isAllCategoriesDropdownOpen}
+              setIsAllCategoriesDropdownOpen={setIsAllCategoriesDropdownOpen}
+              topLevelCategories={topLevelCategories}
               productsLoading={productsLoading}
               productsError={productsError}
             />
@@ -441,6 +445,9 @@ function DepartmentsBar({
   navLinkClass,
   isMoreDropdownOpen,
   setIsMoreDropdownOpen,
+  isAllCategoriesDropdownOpen,
+  setIsAllCategoriesDropdownOpen,
+  topLevelCategories,
   productsLoading,
   productsError,
 }) {
@@ -469,6 +476,7 @@ function DepartmentsBar({
         onMouseLeave={() => {
           setActiveDepartment(null);
           setIsMoreDropdownOpen(false);
+          setIsAllCategoriesDropdownOpen(false);
         }}
       >
         <nav className="flex justify-center gap-8 xl:gap-12">
@@ -477,6 +485,54 @@ function DepartmentsBar({
             <span>Home</span>
             <span className="absolute bottom-[-1px] left-0 w-0 h-[2px] bg-accent transition-all duration-300 group-hover:w-full"></span>
           </Link>
+
+          {/* All Categories Dropdown */}
+          <div
+            className="relative flex items-center h-full"
+            onMouseEnter={() => setIsAllCategoriesDropdownOpen(true)}
+            onMouseLeave={() => setIsAllCategoriesDropdownOpen(false)}
+          >
+            <Link href="/catalog" className={`${navLinkClass} flex items-center gap-1.5`}>
+              <MenuIcon className="w-4 h-4 pb-0.5" />
+              <span>All Categories</span>
+              <span className={`absolute bottom-[-1px] left-0 h-[2px] bg-accent transition-all duration-300 ${isAllCategoriesDropdownOpen ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
+            </Link>
+
+            {/* Category Dropdown Menu */}
+            <AnimatePresence>
+              {isAllCategoriesDropdownOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="absolute top-[calc(100%+0px)] left-0 -translate-x-1/2 w-[240px] max-h-[400px] bg-white border border-black/5 rounded-xl shadow-2xl z-[60] overflow-hidden"
+                >
+                  <div className="overflow-y-auto max-h-[400px] custom-scrollbar p-1">
+                    <Link
+                      href="/catalog"
+                      className="block w-full text-left px-4 py-3 text-sm transition-colors rounded-lg text-black/70 hover:bg-gray-50 hover:text-black"
+                    >
+                      All Categories
+                    </Link>
+
+                    {topLevelCategories && topLevelCategories.length > 0 ? (
+                      topLevelCategories.map((category) => (
+                        <Link
+                          key={category._id || category.id}
+                          href={`/catalog?category=${category.slug}`}
+                          className="block w-full text-left px-4 py-3 text-sm transition-colors rounded-lg text-black/70 hover:bg-gray-50 hover:text-black"
+                        >
+                          {category.name}
+                        </Link>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-black/40">No categories</div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           {departments.map((dept) => {
             // Use slug as consistent identifier (works for both static and dynamic departments)
@@ -578,7 +634,7 @@ function DepartmentsBar({
                     >
                       <Link
                         href={`/catalog?category=${childCat.slug}`}
-                        className="block text-xs font-bold uppercase tracking-wide text-black hover:text-accent pb-2 border-b border-black/5 min-h-[2.5rem] line-clamp-2"
+                        className="block text-xs font-semibold uppercase tracking-wide text-black hover:text-accent pb-2 border-b border-black/5 min-h-[1.5rem] line-clamp-2"
                         title={childCat.name}
                       >
                         {childCat.name}

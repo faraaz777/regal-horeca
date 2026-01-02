@@ -1367,11 +1367,28 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     if (name === 'key') {
       newFilters[index] = { ...newFilters[index], key: value };
     } else if (name === 'values') {
-      // Split comma-separated values
-      const values = value.split(',').map(v => v.trim()).filter(Boolean);
-      newFilters[index] = { ...newFilters[index], values };
+      // Store as string during editing to allow natural comma typing
+      newFilters[index] = { 
+        ...newFilters[index], 
+        values: value // Store raw string temporarily
+      };
     }
     setFormData({ ...formData, filters: newFilters });
+  };
+
+  // Convert string values to array when user leaves the field
+  const handleFilterBlur = (index) => {
+    const newFilters = [...(formData.filters || [])];
+    const filter = newFilters[index];
+    
+    if (typeof filter.values === 'string') {
+      const valuesArray = filter.values.split(',').map(v => v.trim()).filter(Boolean);
+      newFilters[index] = { 
+        ...newFilters[index], 
+        values: valuesArray // Convert to array (same format as before)
+      };
+      setFormData({ ...formData, filters: newFilters });
+    }
   };
 
   const addFilter = () => {
@@ -1581,12 +1598,18 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
 
     // Process filters - filter out empty ones and ensure values are arrays
     const filters = (formData.filters || [])
-      .filter(f => f.key && f.key.trim() && f.values && f.values.length > 0)
-      .map(f => ({
-        key: f.key.trim(),
-        values: Array.isArray(f.values) ? f.values.filter(v => v && v.trim()) : []
-      }))
-      .filter(f => f.values.length > 0);
+      .map(f => {
+        // Convert string to array if needed (in case blur didn't fire)
+        let values = f.values;
+        if (typeof values === 'string') {
+          values = values.split(',').map(v => v.trim()).filter(Boolean);
+        }
+        return {
+          key: f.key?.trim(),
+          values: Array.isArray(values) ? values.filter(v => v && v.trim()) : []
+        };
+      })
+      .filter(f => f.key && f.key.trim() && f.values.length > 0);
 
     const finalProduct = {
       ...formData,
@@ -2384,8 +2407,13 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     <input 
                       name="values" 
                       placeholder="Values (comma-separated)" 
-                      value={Array.isArray(filter.values) ? filter.values.join(', ') : filter.values || ''} 
-                      onChange={e => handleFilterChange(index, e)} 
+                      value={typeof filter.values === 'string' 
+                        ? filter.values 
+                        : Array.isArray(filter.values) 
+                          ? filter.values.join(', ') 
+                          : ''} 
+                      onChange={e => handleFilterChange(index, e)}
+                      onBlur={() => handleFilterBlur(index)}
                       className="md:col-span-8 p-2.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary focus:border-primary" 
                     />
                     <button 

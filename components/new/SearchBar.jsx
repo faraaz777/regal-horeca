@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X, Package, ArrowRight, Loader2 } from "lucide-react";
-import { ChevronDownIcon } from "@/components/Icons";
 import { useAppContext } from "@/context/AppContext";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
@@ -19,16 +18,12 @@ export default function SearchBar({ className = "", placeholder = "What are you 
   const { categories } = useAppContext();
 
   const [query, setQuery] = useState("");
-  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [searchResults, setSearchResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [imageErrors, setImageErrors] = useState(new Set());
 
-  const dropdownRef = useRef(null);
-  const buttonRef = useRef(null);
   const searchBarRef = useRef(null);
   const resultsRef = useRef(null);
   const inputRef = useRef(null);
@@ -50,24 +45,7 @@ export default function SearchBar({ className = "", placeholder = "What are you 
   useEffect(() => {
     const existing = searchParams.get("search") || "";
     setQuery(existing);
-
-    // Set selected category based on URL
-    const categoryParam = searchParams.get("category");
-    if (categoryParam && categories.length > 0) {
-      const category = categories.find(c => c.slug === categoryParam);
-      if (category) {
-        setSelectedCategory(category.name);
-      }
-    } else {
-      setSelectedCategory("All Categories");
-    }
-  }, [searchParams, categories]);
-
-  // Get selected category object
-  const selectedCategoryObj = useMemo(() => {
-    if (selectedCategory === "All Categories") return null;
-    return categories.find(c => c.name === selectedCategory);
-  }, [selectedCategory, categories]);
+  }, [searchParams]);
 
   // Relevance scoring function
   const calculateRelevance = useCallback((product, queryLower) => {
@@ -128,10 +106,6 @@ export default function SearchBar({ className = "", placeholder = "What are you 
           search: query.trim(),
           limit: String(MAX_RESULTS),
         });
-        
-        if (selectedCategoryObj) {
-          params.set('category', selectedCategoryObj.slug);
-        }
 
         const response = await fetch(`/api/products?${params.toString()}`);
         const data = await response.json();
@@ -184,20 +158,11 @@ export default function SearchBar({ className = "", placeholder = "What are you 
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [query, selectedCategoryObj]);
+  }, [query]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target) &&
-        buttonRef.current &&
-        !buttonRef.current.contains(event.target)
-      ) {
-        setIsCategoryDropdownOpen(false);
-      }
-
       if (
         searchBarRef.current && 
         !searchBarRef.current.contains(event.target) &&
@@ -218,14 +183,6 @@ export default function SearchBar({ className = "", placeholder = "What are you 
   // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Don't interfere with category dropdown
-      if (isCategoryDropdownOpen) {
-        if (e.key === "Escape") {
-          setIsCategoryDropdownOpen(false);
-        }
-        return;
-      }
-
       // Handle search results navigation
       if (showResults && searchResults.length > 0) {
         if (e.key === "ArrowDown") {
@@ -252,14 +209,13 @@ export default function SearchBar({ className = "", placeholder = "What are you 
         }
       } else if (e.key === "Escape") {
         setShowResults(false);
-        setIsCategoryDropdownOpen(false);
         setSelectedIndex(-1);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showResults, searchResults, selectedIndex, isCategoryDropdownOpen, router]);
+  }, [showResults, searchResults, selectedIndex, router]);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -273,12 +229,6 @@ export default function SearchBar({ className = "", placeholder = "What are you 
     }
   }, [selectedIndex]);
 
-  // Get top-level categories (no parent)
-  const topLevelCategories = categories.filter(cat => {
-    const parent = cat.parent?._id || cat.parent;
-    return !parent;
-  });
-
   const handleSubmit = (e) => {
     if (e) e.preventDefault();
     const trimmed = query.trim();
@@ -290,25 +240,6 @@ export default function SearchBar({ className = "", placeholder = "What are you 
     newParams.delete("category");
 
     router.push(`/catalog?${newParams.toString()}`);
-    setSelectedCategory("All Categories");
-  };
-
-  const handleCategorySelect = (category) => {
-    if (category === null) {
-      const newParams = new URLSearchParams(searchParams.toString());
-      newParams.delete("category");
-      router.push(`/catalog?${newParams.toString()}`);
-      setSelectedCategory("All Categories");
-    } else {
-      const newParams = new URLSearchParams(searchParams.toString());
-      newParams.set("category", category.slug);
-      newParams.delete("search");
-      router.push(`/catalog?${newParams.toString()}`);
-      setSelectedCategory(category.name);
-      setQuery("");
-    }
-    setIsCategoryDropdownOpen(false);
-    setShowResults(false);
   };
 
   const clearSearch = () => {
@@ -332,71 +263,12 @@ export default function SearchBar({ className = "", placeholder = "What are you 
   return (
     <div ref={searchBarRef} className={`relative w-full ${className}`}>
       <form onSubmit={handleSubmit} className="w-full">
-        <div className="relative flex items-center rounded-lg border border-black/5 bg-gray-50 hover:border-black/20 focus-within:border-accent focus-within:bg-white focus-within:ring-1 focus-within:ring-accent transition-all duration-300">
+        <div className="relative flex items-center rounded-md border-2 border-accent bg-white hover:border-accent/80 focus-within:border-accent focus-within:ring-1 focus-within:ring-accent transition-all duration-300">
 
-          {/* All Categories Dropdown Button */}
-          <div className="relative">
-            <button
-              ref={buttonRef}
-              type="button"
-              onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-              className="flex items-center gap-2 pl-4 pr-3 py-3 text-black hover:text-accent text-sm font-bold uppercase tracking-wider transition-colors outline-none whitespace-nowrap"
-            >
-              <span>{selectedCategory}</span>
-              <ChevronDownIcon className={`w-3.5 h-3.5 text-black/40 transition-transform duration-200 ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {/* Category Dropdown Menu */}
-            <AnimatePresence>
-              {isCategoryDropdownOpen && (
-                <motion.div
-                  ref={dropdownRef}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute top-[calc(100%+8px)] left-0 w-[240px] max-h-[400px] bg-white border border-black/5 rounded-xl shadow-2xl z-[60] overflow-hidden"
-                >
-                  <div className="overflow-y-auto max-h-[400px] custom-scrollbar p-1">
-                    <button
-                      type="button"
-                      onClick={() => handleCategorySelect(null)}
-                      className={`w-full text-left px-4 py-3 text-sm transition-colors rounded-lg ${selectedCategory === "All Categories"
-                        ? "bg-accent text-white font-medium"
-                        : "text-black/70 hover:bg-gray-50 hover:text-black"
-                        }`}
-                    >
-                      All Categories
-                    </button>
-
-                    {topLevelCategories.length > 0 ? (
-                      topLevelCategories.map((category) => (
-                        <button
-                          key={category._id || category.id}
-                          type="button"
-                          onClick={() => handleCategorySelect(category)}
-                          className={`w-full text-left px-4 py-3 text-sm transition-colors rounded-lg ${selectedCategory === category.name
-                            ? "bg-accent text-white font-medium"
-                            : "text-black/70 hover:bg-gray-50 hover:text-black"
-                            }`}
-                        >
-                          {category.name}
-                        </button>
-                      ))
-                    ) : (
-                      <div className="px-4 py-3 text-sm text-black/40">No categories</div>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Elegant Vertical Divider */}
-          <div className="h-5 w-px bg-black/10 mx-1" />
 
           {/* Search Input Section */}
-          <div className="flex items-center flex-1 px-3 py-2">
-            <Search className={`w-4 h-4 mr-3 transition-colors ${isSearching ? 'text-accent animate-pulse' : 'text-black/30'}`} />
+          <div className="flex items-center flex-1 px-2.5 py-1.5">
+            <Search className={`w-3.5 h-3.5 mr-2 transition-colors ${isSearching ? 'text-accent animate-pulse' : 'text-black/30'}`} />
             <input
               ref={inputRef}
               type="text"
@@ -409,7 +281,7 @@ export default function SearchBar({ className = "", placeholder = "What are you 
                 }
               }}
               onFocus={() => query.trim() && !loading && products.length > 0 && setShowResults(true)}
-              className="flex-1 bg-transparent outline-none text-sm placeholder:text-black/30 text-black tracking-wide"
+              className="flex-1 bg-transparent outline-none text-xs placeholder:text-black/70 text-black"
               aria-label="Search products"
               aria-autocomplete="list"
               aria-expanded={showResults && query.trim() ? "true" : "false"}
@@ -421,15 +293,15 @@ export default function SearchBar({ className = "", placeholder = "What are you 
               <button
                 type="button"
                 onClick={clearSearch}
-                className="p-1 hover:bg-black/5 rounded-full transition-colors mr-1"
+                className="p-0.5 hover:bg-black/5 rounded-full transition-colors mr-1"
               >
-                <X className="w-3.5 h-3.5 text-black/40" />
+                <X className="w-3 h-3 text-black/40" />
               </button>
             )}
 
             <button
               type="submit"
-              className="ml-2 bg-accent text-white px-5 py-2 rounded-md text-[11px] font-bold uppercase tracking-[0.2em] hover:bg-accent/90 transition-all shadow-sm shadow-accent/20 active:scale-95"
+              className="ml-1.5 bg-accent text-white px-3 py-1 rounded text-[10px] font-semibold uppercase tracking-wide hover:bg-accent/90 transition-all active:scale-95"
             >
               Search
             </button>
@@ -565,11 +437,6 @@ export default function SearchBar({ className = "", placeholder = "What are you 
                   <p className="text-xs text-black/40 max-w-[200px] leading-relaxed">
                     We couldn't find any products matching "{query}". Try a different term or check your spelling.
                   </p>
-                  {selectedCategoryObj && (
-                    <p className="text-xs text-black/30 mt-2">
-                      Currently filtering by: <span className="font-medium">{selectedCategory}</span>
-                    </p>
-                  )}
                 </div>
               )}
             </div>

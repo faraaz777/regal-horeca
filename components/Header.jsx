@@ -73,7 +73,7 @@ export default function Header() {
   const departmentMenuRefs = useRef({});
 
   const navLinkClass =
-    "text-xs md:text-sm font-medium tracking-wide uppercase text-black hover:text-accent transition-colors relative py-2.5 group";
+    "text-xs md:text-xs font-medium tracking-wide uppercase text-black hover:text-accent transition-colors relative py-2.5 group whitespace-nowrap flex-shrink-0";
 
   // ---------- Category tree building ----------
   // Memoize category tree building to prevent unnecessary recalculations
@@ -340,7 +340,7 @@ export default function Header() {
             </div>
 
             {/* CENTER: Search Bar - DESKTOP ONLY */}
-            <div className="hidden lg:flex flex-1 justify-center max-w-2xl px-8">
+            <div className="hidden lg:flex flex-1 justify-center max-w-2xl px-8 py-2.5">
               <SearchBar className="w-full" />
             </div>
 
@@ -479,7 +479,7 @@ function DepartmentsBar({
           setIsAllCategoriesDropdownOpen(false);
         }}
       >
-        <nav className="flex justify-center gap-8 xl:gap-12">
+        <nav className="flex flex-nowrap justify-center gap-4 md:gap-4 lg:gap-4 xl:gap-12 overflow-x-auto hide-scrollbar">
           {/* Home Link */}
           <Link href="/" className={navLinkClass}>
             <span>Home</span>
@@ -492,10 +492,10 @@ function DepartmentsBar({
             onMouseEnter={() => setIsAllCategoriesDropdownOpen(true)}
             onMouseLeave={() => setIsAllCategoriesDropdownOpen(false)}
           >
-            <Link href="/catalog" className={`${navLinkClass} flex items-center gap-1.5`}>
+            <Link href="/catalog" className={`${navLinkClass} flex items-center gap-1.5 bg-accent text-white px-3 py-1.5 hover:text-white`}>
               <MenuIcon className="w-4 h-4 pb-0.5" />
               <span>All Categories</span>
-              <span className={`absolute bottom-[-1px] left-0 h-[2px] bg-accent transition-all duration-300 ${isAllCategoriesDropdownOpen ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
+              <span className={`absolute bottom-[-1px] left-0 h-[2px] bg-white transition-all duration-300 ${isAllCategoriesDropdownOpen ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
             </Link>
 
             {/* Category Dropdown Menu */}

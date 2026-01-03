@@ -394,22 +394,6 @@ export default function SearchBar({ className = "", placeholder = "What are you 
                               <span className="text-[11px] text-black/40 font-medium">
                                 {product.category?.name || "Uncategorized"}
                               </span>
-                              {product.price && (
-                                <>
-                                  <span className="w-1 h-1 rounded-full bg-black/10" />
-                                  <span className="text-[11px] font-bold text-black/70">
-                                    AED {typeof product.price === 'number' ? product.price.toFixed(2) : product.price}
-                                  </span>
-                                </>
-                              )}
-                              {product.sku && (
-                                <>
-                                  <span className="w-1 h-1 rounded-full bg-black/10" />
-                                  <span className="text-[10px] text-black/30 font-mono">
-                                    SKU: {product.sku}
-                                  </span>
-                                </>
-                              )}
                             </div>
                           </div>
                           <div className={`opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 ${isSelected ? 'opacity-100 translate-x-0' : ''}`}>

@@ -55,7 +55,7 @@ export default function SearchBar({ className = "", placeholder = "What are you 
     const brand = (product.brand || "").toLowerCase();
     const description = (product.description || "").toLowerCase();
     const summary = (product.summary || "").toLowerCase();
-    const categoryName = (product.category?.name || "").toLowerCase();
+    const categoryName = (product.categoryId?.name || "").toLowerCase();
     const tags = (product.tags || []).map(t => t.toLowerCase());
 
     // Exact matches get highest score
@@ -392,7 +392,7 @@ export default function SearchBar({ className = "", placeholder = "What are you 
                                 </>
                               )}
                               <span className="text-[11px] text-black/40 font-medium">
-                                {product.category?.name || "Uncategorized"}
+                                {product.categoryId?.name || "Uncategorized"}
                               </span>
                             </div>
                           </div>

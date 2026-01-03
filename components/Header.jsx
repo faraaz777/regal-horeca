@@ -103,9 +103,15 @@ export default function Header() {
 
   // Use actual departments from database (top-level categories)
   // Filter by level === "department" if level field exists, otherwise use all top-level categories
+  // Fallback to static departments if no dynamic departments found
   const departments = useMemo(() => {
     if (!topLevelCategories || topLevelCategories.length === 0) {
-      return [];
+      // Fallback to static departments if no categories loaded
+      return STATIC_DEPARTMENTS.map((dept) => ({
+        ...dept,
+        id: dept.slug,
+        children: [],
+      }));
     }
     
     // Filter by level if it exists, otherwise use all top-level categories
@@ -117,6 +123,16 @@ export default function Header() {
       // Otherwise, show all top-level categories as departments
       return true;
     });
+    
+    // If no departments found after filtering, fallback to all top-level categories
+    if (filtered.length === 0) {
+      // Use all top-level categories as departments
+      return topLevelCategories.map((cat) => ({
+        ...cat,
+        name: cat.name.toUpperCase(),
+        id: cat._id || cat.id,
+      }));
+    }
     
     // Ensure uppercase names for consistency
     return filtered.map((cat) => ({
@@ -418,7 +434,8 @@ function DepartmentsBar({
   productsLoading,
   productsError,
 }) {
-  if (!departments.length) return null;
+  // Always show the department bar, even if empty (will show Home, About, More, All Categories)
+  // if (!departments.length) return null;
 
   // Find active department by slug (consistent identifier) or by id (fallback)
   const activeDept = departments.find((d) => 

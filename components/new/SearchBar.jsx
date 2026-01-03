@@ -280,7 +280,7 @@ export default function SearchBar({ className = "", placeholder = "What are you 
                   setShowResults(true);
                 }
               }}
-              onFocus={() => query.trim() && !loading && products.length > 0 && setShowResults(true)}
+              onFocus={() => query.trim() && searchResults.length > 0 && setShowResults(true)}
               className="flex-1 bg-transparent outline-none text-xs placeholder:text-black/70 text-black"
               aria-label="Search products"
               aria-autocomplete="list"

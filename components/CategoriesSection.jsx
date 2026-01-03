@@ -64,14 +64,14 @@ export default function CategoriesSection({ categories }) {
   }
 
   return (
-    <section className="py-20 px-4 bg-gray-50 relative border-t border-black/5">
+    <section className="py-8 px-4 bg-gray-50 relative border-t border-black/5">
       <div className="max-w-full mx-auto relative group/section">
-        <div className="text-center mb-16">
+        <div className="text-center mb-8 ">
           <span className="text-xs font-bold tracking-[0.2em] text-accent uppercase mb-3 block">
-            Discover Our Collections
+            Curated Excellence
           </span>
           <h2 className="text-4xl md:text-5xl font-serif text-black mb-6">
-            Curated Excellence
+            Discover Our Collections
           </h2>
           <div className="w-24 h-1 bg-black/5 mx-auto rounded-full" />
         </div>

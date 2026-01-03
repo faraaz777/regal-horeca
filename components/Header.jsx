@@ -73,7 +73,7 @@ export default function Header() {
   const departmentMenuRefs = useRef({});
 
   const navLinkClass =
-    "text-xs md:text-xs font-medium tracking-wide uppercase text-black hover:text-accent transition-colors relative py-2.5 group whitespace-nowrap flex-shrink-0";
+    "text-xs md:text-xs font-semibold tracking-wide uppercase text-black hover:text-accent transition-colors relative py-2.5 group whitespace-nowrap flex-shrink-0";
 
   // ---------- Category tree building ----------
   // Memoize category tree building to prevent unnecessary recalculations
@@ -83,7 +83,7 @@ export default function Header() {
         .filter((cat) => {
           const catParent = cat.parent?._id || cat.parent || null;
           return catParent === parentId;
-        })
+        })  
         .map((cat) => ({
           ...cat,
           id: cat._id || cat.id,
@@ -101,62 +101,29 @@ export default function Header() {
     });
   }, [categoryTree]);
 
-  // Hybrid approach: Use static departments for navbar, enrich with dynamic data when available
-  // This ensures navbar appears immediately while mega-dropdowns stay dynamic
+  // Use actual departments from database (top-level categories)
+  // Filter by level === "department" if level field exists, otherwise use all top-level categories
   const departments = useMemo(() => {
-    // Helper function to normalize slugs for flexible matching
-    const normalizeSlug = (slug) => {
-      if (!slug) return '';
-      return slug.toLowerCase().replace(/[^a-z0-9]/g, '');
-    };
-
-
-    // Always return static departments for consistent navbar (5 departments max)
-    // When categories are loaded, enrich static departments with dynamic children data
-    return STATIC_DEPARTMENTS.map((staticDept) => {
-      // Try to find matching category from fetched data
-      // First try exact match, then try normalized match (handles hyphen/underscore variations)
-      const normalizedStaticSlug = normalizeSlug(staticDept.slug);
-      const normalizedStaticName = normalizeSlug(staticDept.name);
-      
-      const matchingCategory = topLevelCategories.find(
-        (cat) => {
-          const catSlug = cat.slug || '';
-          const catName = cat.name || '';
-          
-          // Try exact slug match first
-          if (catSlug === staticDept.slug || catSlug.toLowerCase() === staticDept.slug.toLowerCase()) {
-            return true;
-          }
-          // Try normalized slug match (handles hotel-hospitality vs hotelhospitality vs hotel_hospitality)
-          if (normalizeSlug(catSlug) === normalizedStaticSlug) {
-            return true;
-          }
-          // Try name-based matching as fallback (handles cases where slug differs but name matches)
-          if (normalizeSlug(catName) === normalizedStaticName) {
-            return true;
-          }
-          return false;
-        }
-      );
-      
-      if (matchingCategory) {
-        // Return enriched department with dynamic children for mega-dropdown
-        return {
-          ...matchingCategory,
-          name: matchingCategory.name.toUpperCase(), // Ensure uppercase for consistency
-          id: matchingCategory._id || matchingCategory.id,
-        };
+    if (!topLevelCategories || topLevelCategories.length === 0) {
+      return [];
+    }
+    
+    // Filter by level if it exists, otherwise use all top-level categories
+    const filtered = topLevelCategories.filter((cat) => {
+      // If level field exists, only show departments
+      if (cat.level !== undefined) {
+        return cat.level === 'department';
       }
-      
-      // Fallback: return static department (navbar will still show, link will work)
-      // Mega-dropdown won't show until category data loads
-      return {
-        ...staticDept,
-        id: staticDept.slug, // Use slug as ID for static departments
-        children: [], // Empty children until data loads
-      };
+      // Otherwise, show all top-level categories as departments
+      return true;
     });
+    
+    // Ensure uppercase names for consistency
+    return filtered.map((cat) => ({
+      ...cat,
+      name: cat.name.toUpperCase(),
+      id: cat._id || cat.id,
+    }));
   }, [topLevelCategories]);
 
   // Memoize rootNavMenu to prevent unnecessary re-renders
@@ -492,47 +459,47 @@ function DepartmentsBar({
             onMouseEnter={() => setIsAllCategoriesDropdownOpen(true)}
             onMouseLeave={() => setIsAllCategoriesDropdownOpen(false)}
           >
-            <Link href="/catalog" className={`${navLinkClass} flex items-center gap-1.5 bg-accent text-white px-3 py-1.5 hover:text-white`}>
+            <Link href="/catalog" className={`${navLinkClass} flex items-center gap-1.5 bg-accent text-white font-semibold px-3 py-1.5 hover:text-white `}>
               <MenuIcon className="w-4 h-4 pb-0.5" />
               <span>All Categories</span>
-              <span className={`absolute bottom-[-1px] left-0 h-[2px] bg-white transition-all duration-300 ${isAllCategoriesDropdownOpen ? 'w-full' : 'w-0 group-hover:w-full'}`}></span>
+              <ChevronDownIcon className={`w-3 h-3 transition-transform ${isAllCategoriesDropdownOpen ? 'rotate-180' : ''}`} />
             </Link>
 
-            {/* Category Dropdown Menu */}
+          </div>
+            {/* All Categories Dropdown - Positioned directly below the button */}
             <AnimatePresence>
               {isAllCategoriesDropdownOpen && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="absolute top-[calc(100%+0px)] left-0 -translate-x-1/2 w-[240px] max-h-[400px] bg-white border border-black/5 rounded-xl shadow-2xl z-[60] overflow-hidden"
+                  transition={{ duration: 0.25, ease: "easeOut" }}
+                  onMouseEnter={() => setIsAllCategoriesDropdownOpen(true)}
+                  onMouseLeave={() => setIsAllCategoriesDropdownOpen(false)}
+                  className="absolute top-full  sm:left-20  lg:left-20 xl:left-60 w-[280px] bg-white z-[100] shadow-2xl border border-black/10 rounded-lg overflow-hidden"
                 >
-                  <div className="overflow-y-auto max-h-[400px] custom-scrollbar p-1">
-                    <Link
-                      href="/catalog"
-                      className="block w-full text-left px-4 py-3 text-sm transition-colors rounded-lg text-black/70 hover:bg-gray-50 hover:text-black"
-                    >
-                      All Categories
-                    </Link>
-
-                    {topLevelCategories && topLevelCategories.length > 0 ? (
-                      topLevelCategories.map((category) => (
+                  <div className="py-3">
+                    {departments && departments.length > 0 ? (
+                      departments.map((dept) => (
                         <Link
-                          key={category._id || category.id}
-                          href={`/catalog?category=${category.slug}`}
-                          className="block w-full text-left px-4 py-3 text-sm transition-colors rounded-lg text-black/70 hover:bg-gray-50 hover:text-black"
+                          key={dept._id || dept.id || dept.slug}
+                          href={`/catalog?category=${dept.slug}`}
+                          className="flex items-center gap-4 px-5 py-3 text-sm font-medium text-black/80 hover:bg-gray-100 hover:text-accent transition-colors"
                         >
-                          {category.name}
+                          <span className="whitespace-nowrap">
+                            {dept.name}
+                          </span>
                         </Link>
                       ))
                     ) : (
-                      <div className="px-4 py-3 text-sm text-black/40">No categories</div>
+                      <div className="px-5 py-3 text-sm text-black/40">
+                        No departments
+                      </div>
                     )}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
 
           {departments.map((dept) => {
             // Use slug as consistent identifier (works for both static and dynamic departments)

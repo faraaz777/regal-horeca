@@ -94,7 +94,7 @@ export default async function HomePage() {
       <CircularCategories categories={categories} />
 
       {/* Featured Products Section */}
-      <section className="py-20 bg-white">
+      <section className="py-12 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-serif text-black mb-4">
@@ -120,7 +120,7 @@ export default async function HomePage() {
             )}
           </div>
 
-          <div className="flex justify-center mt-16">
+          <div className="flex justify-center mt-12">
             <Link
               href="/catalog"
               className="group inline-flex items-center gap-2 border-b border-black pb-1 text-sm font-bold uppercase tracking-widest hover:text-accent hover:border-accent transition-colors"

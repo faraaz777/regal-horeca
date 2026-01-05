@@ -317,7 +317,7 @@ export default function Header() {
                   src={Logo}
                   alt="Regal HoReCa"
                   priority
-                  className="h-7 md:h-8 w-auto object-contain"
+                  className="h-10 md:h-12  w-auto object-contain"
                 />
               </Link>
             </div>
@@ -453,6 +453,42 @@ function DepartmentsBar({
     { name: 'Enquiry', href: '/enquiry' },
   ];
 
+  // Ref for More button to position dropdown
+  const moreButtonRef = useRef(null);
+  const [dropdownRight, setDropdownRight] = useState(0);
+
+  // Ref for All Categories button to position dropdown
+  const allCategoriesButtonRef = useRef(null);
+  const [allCategoriesDropdownLeft, setAllCategoriesDropdownLeft] = useState(0);
+
+  // Calculate More dropdown position
+  useEffect(() => {
+    if (isMoreDropdownOpen && moreButtonRef.current) {
+      const buttonRect = moreButtonRef.current.getBoundingClientRect();
+      const container = moreButtonRef.current.closest('.w-full.relative');
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        // Calculate distance from right edge of container to right edge of button
+        const rightOffset = containerRect.right - buttonRect.right;
+        setDropdownRight(rightOffset);
+      }
+    }
+  }, [isMoreDropdownOpen]);
+
+  // Calculate All Categories dropdown position
+  useEffect(() => {
+    if (isAllCategoriesDropdownOpen && allCategoriesButtonRef.current) {
+      const buttonRect = allCategoriesButtonRef.current.getBoundingClientRect();
+      const container = allCategoriesButtonRef.current.closest('.w-full.relative');
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        // Calculate distance from left edge of container to left edge of button
+        const leftOffset = buttonRect.left - containerRect.left;
+        setAllCategoriesDropdownLeft(leftOffset);
+      }
+    }
+  }, [isAllCategoriesDropdownOpen]);
+
   return (
     <>
       <div
@@ -472,6 +508,7 @@ function DepartmentsBar({
 
           {/* All Categories Dropdown */}
           <div
+            ref={allCategoriesButtonRef}
             className="relative flex items-center h-full"
             onMouseEnter={() => setIsAllCategoriesDropdownOpen(true)}
             onMouseLeave={() => setIsAllCategoriesDropdownOpen(false)}
@@ -481,42 +518,7 @@ function DepartmentsBar({
               <span>All Categories</span>
               <ChevronDownIcon className={`w-3 h-3 transition-transform ${isAllCategoriesDropdownOpen ? 'rotate-180' : ''}`} />
             </Link>
-
           </div>
-            {/* All Categories Dropdown - Positioned directly below the button */}
-            <AnimatePresence>
-              {isAllCategoriesDropdownOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  transition={{ duration: 0.25, ease: "easeOut" }}
-                  onMouseEnter={() => setIsAllCategoriesDropdownOpen(true)}
-                  onMouseLeave={() => setIsAllCategoriesDropdownOpen(false)}
-                  className="absolute top-full  sm:left-20  lg:left-20 xl:left-60 w-[280px] bg-white z-[100] shadow-2xl border border-black/10 rounded-lg overflow-hidden"
-                >
-                  <div className="py-3">
-                    {departments && departments.length > 0 ? (
-                      departments.map((dept) => (
-                        <Link
-                          key={dept._id || dept.id || dept.slug}
-                          href={`/catalog?category=${dept.slug}`}
-                          className="flex items-center gap-4 px-5 py-3 text-sm font-medium text-black/80 hover:bg-gray-100 hover:text-accent transition-colors"
-                        >
-                          <span className="whitespace-nowrap">
-                            {dept.name}
-                          </span>
-                        </Link>
-                      ))
-                    ) : (
-                      <div className="px-5 py-3 text-sm text-black/40">
-                        No departments
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
 
           {departments.map((dept) => {
             // Use slug as consistent identifier (works for both static and dynamic departments)
@@ -549,6 +551,7 @@ function DepartmentsBar({
 
           {/* More Dropdown */}
           <div
+            ref={moreButtonRef}
             className="relative flex items-center"
             onMouseEnter={() => setIsMoreDropdownOpen(true)}
             onMouseLeave={() => setIsMoreDropdownOpen(false)}
@@ -560,23 +563,74 @@ function DepartmentsBar({
                 className={`absolute bottom-[-1px] left-0 h-[2px] bg-accent transition-all duration-300 ${isMoreDropdownOpen ? 'w-full' : 'w-0 group-hover:w-full'}`}
               />
             </button>
-
-            {/* Simple Dropdown for More */}
-            {isMoreDropdownOpen && (
-              <div className="absolute top-full right-0 mt-0 w-48 bg-white border border-black/10 shadow-lg rounded-b-lg overflow-hidden py-2 z-50">
-                {moreLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="block px-6 py-3 text-xs font-bold uppercase tracking-widest text-black/70 hover:bg-gray-50 hover:text-accent transition-colors"
-                  >
-                    {link.name}
-                  </Link>
-                ))}
-              </div>
-            )}
           </div>
         </nav>
+
+        {/* All Categories Dropdown - Positioned directly below the button */}
+        <AnimatePresence>
+          {isAllCategoriesDropdownOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              onMouseEnter={() => setIsAllCategoriesDropdownOpen(true)}
+              onMouseLeave={() => setIsAllCategoriesDropdownOpen(false)}
+              className="absolute top-full mt-[2px] w-[280px] bg-white z-[100] shadow-2xl border border-black/10 rounded-lg overflow-hidden"
+              style={{
+                left: `${allCategoriesDropdownLeft}px`
+              }}
+            >
+              <div className="py-3">
+                {departments && departments.length > 0 ? (
+                  departments.map((dept) => (
+                    <Link
+                      key={dept._id || dept.id || dept.slug}
+                      href={`/catalog?category=${dept.slug}`}
+                      className="flex items-center gap-4 px-5 py-3 text-sm font-medium text-black/80 hover:bg-gray-100 hover:text-accent transition-colors"
+                    >
+                      <span className="whitespace-nowrap">
+                        {dept.name}
+                      </span>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="px-5 py-3 text-sm text-black/40">
+                    No departments
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* More Dropdown - Positioned outside nav, below the More button */}
+        <AnimatePresence>
+          {isMoreDropdownOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              onMouseEnter={() => setIsMoreDropdownOpen(true)}
+              onMouseLeave={() => setIsMoreDropdownOpen(false)}
+              className="absolute top-full mt-1 w-48 bg-white border border-black/10 shadow-lg rounded-lg overflow-hidden py-2 z-[100]"
+              style={{
+                right: `${dropdownRight}px`
+              }}
+            >
+              {moreLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="block px-6 py-3 text-xs font-bold uppercase tracking-widest text-black/70 hover:bg-gray-50 hover:text-accent transition-colors"
+                >
+                  {link.name}
+                </Link>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* SHARED CENTERED MEGA DROPDOWN */}
         <div

@@ -263,7 +263,7 @@ export default function SearchBar({ className = "", placeholder = "What are you 
   return (
     <div ref={searchBarRef} className={`relative w-full ${className}`}>
       <form onSubmit={handleSubmit} className="w-full">
-        <div className="relative flex items-center rounded-md border-2 border-accent bg-white hover:border-accent/80 focus-within:border-accent focus-within:ring-1 focus-within:ring-accent transition-all duration-300">
+        <div className="relative flex items-center rounded-md border-2 shadow-sm bg-white hover:border-accent/80 focus-within:border-accent focus-within:ring-1 focus-within:ring-accent transition-all duration-300">
 
 
           {/* Search Input Section */}

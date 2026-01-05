@@ -35,14 +35,14 @@ async function fetchCatalogData(searchParamsObj) {
   if (category) params.set('category', category);
   if (business) params.set('business', business);
   if (search) params.set('search', search);
-  if (priceMin) params.set('priceMin', priceMin);
-  if (priceMax) params.set('priceMax', priceMax);
+    if (priceMin) params.set('priceMin', priceMin);
+    if (priceMax) params.set('priceMax', priceMax);
   if (colors) params.set('colors', colors);
   if (brands) params.set('brands', brands);
   if (filters) params.set('filters', filters);
-  if (sortBy && sortBy !== 'newest') params.set('sortBy', sortBy);
+    if (sortBy && sortBy !== 'newest') params.set('sortBy', sortBy);
   params.set('page', page);
-  params.set('limit', String(ITEMS_PER_PAGE));
+    params.set('limit', String(ITEMS_PER_PAGE));
   params.set('includeFacets', 'true'); // Request facets in same call
 
   try {
@@ -76,12 +76,27 @@ async function fetchCatalogData(searchParamsObj) {
   }
 }
 
+/**
+ * Serialize data to ensure all MongoDB objects are converted to plain objects
+ * This is required when passing data from Server Components to Client Components
+ */
+function serializeData(data) {
+  return JSON.parse(JSON.stringify(data));
+}
+
 export default async function CatalogPage({ searchParams }) {
   // Fetch categories and catalog data in parallel
   const [categories, catalogData] = await Promise.all([
     getCategoriesFlat(),
     fetchCatalogData(searchParams),
   ]);
+
+  // Serialize all data to ensure MongoDB ObjectIds are converted to strings
+  // This prevents "Objects with toJSON methods" warnings
+  const serializedCategories = serializeData(categories);
+  const serializedProducts = serializeData(catalogData.products);
+  const serializedFacets = catalogData.facets ? serializeData(catalogData.facets) : null;
+  const serializedPagination = serializeData(catalogData.pagination);
 
   return (
     <Suspense fallback={
@@ -94,10 +109,10 @@ export default async function CatalogPage({ searchParams }) {
       </div>
     }>
       <CatalogContent
-        initialProducts={catalogData.products}
-        initialFacets={catalogData.facets}
-        initialPagination={catalogData.pagination}
-        categories={categories}
+        initialProducts={serializedProducts}
+        initialFacets={serializedFacets}
+        initialPagination={serializedPagination}
+        categories={serializedCategories}
         isLoading={false}
       />
     </Suspense>

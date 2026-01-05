@@ -102,7 +102,8 @@ export async function GET(request) {
     }
 
     // Build products query (includes user filters)
-    const productsQuery = { ...facetsQuery };
+    // Copy base conditions from facets query
+    const productsQuery = {};
     const productsAndConditions = [...facetsAndConditions];
 
     // Price filter

@@ -31,14 +31,23 @@ import CartDrawer from "./CartDrawer";
 
 // SWR fetcher function
 const fetcher = async (url) => {
-  const res = await fetch(url);
-  if (!res.ok) {
-    const error = new Error('An error occurred while fetching the data.');
-    error.info = await res.json();
-    error.status = res.status;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      const error = new Error(`Failed to fetch: ${url}`);
+      try {
+        error.info = await res.json();
+      } catch {
+        error.info = { error: `HTTP ${res.status}` };
+      }
+      error.status = res.status;
+      throw error;
+    }
+    return res.json();
+  } catch (error) {
+    console.error('Fetcher error:', error);
     throw error;
   }
-  return res.json();
 };
 
 // Static departments list for navbar - ensures immediate render and consistent layout
@@ -117,6 +126,9 @@ export default function Header() {
           name: dept.name.toUpperCase(),
         })) 
       }, // Use static departments as immediate fallback
+      onError: (error) => {
+        console.error('Failed to fetch departments:', error);
+      },
     }
   );
 

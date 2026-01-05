@@ -25,8 +25,26 @@ import '@/components/new/SidebarFilter.css';
 
 const ITEMS_PER_PAGE = 24;
 
-// Fetcher for SWR
-const fetcher = (url) => fetch(url).then(res => res.json());
+// Fetcher for SWR with error handling
+const fetcher = async (url) => {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      const error = new Error(`Failed to fetch: ${url}`);
+      try {
+        error.info = await res.json();
+      } catch {
+        error.info = { error: `HTTP ${res.status}` };
+      }
+      error.status = res.status;
+      throw error;
+    }
+    return res.json();
+  } catch (error) {
+    console.error('Fetcher error:', error);
+    throw error;
+  }
+};
 
 // Fallback data for faster initial render
 const EMPTY_FACETS = {
@@ -133,7 +151,7 @@ function CatalogPageContent() {
   }, [selectedCategorySlug, selectedBusinessSlug, searchQuery, priceMin, priceMax, selectedColors, selectedBrands, selectedFilters, sortBy, currentPage]);
 
   // Fetch products and facets from combined API endpoint (single request = faster)
-  const { data: catalogData, isLoading: catalogLoading } = useSWR(
+  const { data: catalogData, error: catalogError, isLoading: catalogLoading } = useSWR(
     `/api/products/with-facets?${productsParams.toString()}`,
     fetcher,
     {
@@ -145,6 +163,9 @@ function CatalogPageContent() {
         pagination: { total: 0, page: 1, totalPages: 1 },
         facets: EMPTY_FACETS,
       }, // Immediate fallback for faster render
+      onError: (error) => {
+        console.error('Failed to fetch catalog data:', error);
+      },
     }
   );
 

@@ -20,86 +20,6 @@ import { revalidateHomepage } from '@/lib/utils/revalidate';
 // Revalidate every 5 minutes (300 seconds)
 export const revalidate = 300;
 
-const PREDEFINED_COLORS = [
-  'Blue', 'Green', 'Red', 'Yellow', 'Purple', 'Orange', 
-  'Pink', 'Brown', 'Gray', 'Black', 'White', 'Silver'
-];
-
-/**
- * Calculate facets from products
- * Facets show available filter options based on the filtered product set
- */
-function calculateFacets(products) {
-  const colors = new Set();
-  const brands = new Set();
-  const filters = {};
-  let minPrice = Infinity;
-  let maxPrice = -Infinity;
-
-  products.forEach(product => {
-    // Colors
-    if (product.colorVariants && Array.isArray(product.colorVariants)) {
-      product.colorVariants.forEach(cv => {
-        if (cv.colorName && PREDEFINED_COLORS.includes(cv.colorName)) {
-          colors.add(cv.colorName);
-        }
-      });
-    }
-
-    // Brands
-    if (product.brand && product.brand.trim()) {
-      brands.add(product.brand.trim());
-    }
-
-    // Dynamic filters (from admin form)
-    if (product.filters && Array.isArray(product.filters)) {
-      product.filters.forEach(filter => {
-        if (filter.key && filter.values && Array.isArray(filter.values)) {
-          const normalizedKey = filter.key.trim().charAt(0).toUpperCase() + filter.key.trim().slice(1).toLowerCase();
-          if (!filters[normalizedKey]) {
-            filters[normalizedKey] = {};
-          }
-          filter.values.forEach(value => {
-            if (value && value.trim()) {
-              const normalizedValue = value.trim().charAt(0).toUpperCase() + value.trim().slice(1).toLowerCase();
-              filters[normalizedKey][normalizedValue] = (filters[normalizedKey][normalizedValue] || 0) + 1;
-            }
-          });
-        }
-      });
-    }
-
-    // Price range
-    if (typeof product.price === 'number' && product.price >= 0) {
-      minPrice = Math.min(minPrice, product.price);
-      maxPrice = Math.max(maxPrice, product.price);
-    }
-  });
-
-  // Convert sets to sorted arrays
-  const colorsArray = Array.from(colors).sort();
-  const brandsArray = Array.from(brands).sort();
-
-  // Convert filter objects to arrays with counts
-  const filtersWithCounts = {};
-  Object.keys(filters).forEach(key => {
-    filtersWithCounts[key] = Object.entries(filters[key])
-      .map(([value, count]) => ({ value, count }))
-      .sort((a, b) => a.value.localeCompare(b.value));
-  });
-
-  return {
-    colors: colorsArray,
-    brands: brandsArray,
-    filters: filtersWithCounts,
-    priceRange: {
-      min: minPrice === Infinity ? 0 : Math.floor(minPrice),
-      max: maxPrice === -Infinity ? 0 : Math.ceil(maxPrice),
-    },
-    totalProducts: products.length,
-  };
-}
-
 /**
  * GET /api/products
  * Query parameters:
@@ -116,7 +36,6 @@ function calculateFacets(products) {
  * - sortBy: Sort order (newest, price-asc, price-desc)
  * - page: Page number (default: 1)
  * - limit: Items per page (default: 24)
- * - includeFacets: Include facets in response (true/false, default: false)
  */
 export async function GET(request) {
   try {
@@ -143,9 +62,6 @@ export async function GET(request) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '24');
     const skip = (page - 1) * limit;
-    
-    // Facets option
-    const includeFacets = searchParams.get('includeFacets') === 'true';
 
     // Build query - MongoDB $text must be at root level, so we handle it separately
     const query = {};
@@ -189,30 +105,6 @@ export async function GET(request) {
       andConditions.push({ status: status });
     }
 
-    // Calculate facets from base query (before user filters)
-    // Facets should show what's available after context filters (category, business, search)
-    // but before user filters (price, colors, brands, filters)
-    let facets = null;
-    if (includeFacets) {
-      // Build base query for facets (only context filters, no user filters)
-      const baseQueryForFacets = {};
-      if (useTextSearch) {
-        if (andConditions.length > 0) {
-          baseQueryForFacets.$and = [textSearchQuery, ...andConditions];
-        } else {
-          Object.assign(baseQueryForFacets, textSearchQuery);
-        }
-      } else if (andConditions.length > 0) {
-        baseQueryForFacets.$and = andConditions;
-      }
-      
-      const productsForFacets = await Product.find(baseQueryForFacets)
-        .select('colorVariants brand filters price')
-        .lean();
-      facets = calculateFacets(productsForFacets);
-    }
-
-    // Now add user filters to the main query
     // Price filter - combine min and max into single condition
     const priceConditions = {};
     if (priceMin) {
@@ -381,7 +273,7 @@ export async function GET(request) {
     const total = await Product.countDocuments(query);
     const totalPages = Math.ceil(total / limit);
 
-    const response = {
+    return NextResponse.json({
       success: true,
       products,
       pagination: {
@@ -395,14 +287,7 @@ export async function GET(request) {
       // Keep backward compatibility
       total,
       skip,
-    };
-
-    // Include facets if requested
-    if (facets) {
-      response.facets = facets;
-    }
-
-    return NextResponse.json(response, {
+    }, {
       headers: {
         'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
         'CDN-Cache-Control': 'public, s-maxage=300',

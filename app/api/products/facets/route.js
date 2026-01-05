@@ -29,8 +29,8 @@ const PREDEFINED_COLORS = [
   'Pink', 'Brown', 'Gray', 'Black', 'White', 'Silver'
 ];
 
-// ISR: Revalidate every 5 minutes (300 seconds) - same as products route
-export const revalidate = 300;
+// Mark route as dynamic to prevent static generation
+export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   try {

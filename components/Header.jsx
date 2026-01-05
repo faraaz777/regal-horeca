@@ -31,23 +31,14 @@ import CartDrawer from "./CartDrawer";
 
 // SWR fetcher function
 const fetcher = async (url) => {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) {
-      const error = new Error(`Failed to fetch: ${url}`);
-      try {
-        error.info = await res.json();
-      } catch {
-        error.info = { error: `HTTP ${res.status}` };
-      }
-      error.status = res.status;
-      throw error;
-    }
-    return res.json();
-  } catch (error) {
-    console.error('Fetcher error:', error);
+  const res = await fetch(url);
+  if (!res.ok) {
+    const error = new Error('An error occurred while fetching the data.');
+    error.info = await res.json();
+    error.status = res.status;
     throw error;
   }
+  return res.json();
 };
 
 // Static departments list for navbar - ensures immediate render and consistent layout
@@ -110,67 +101,46 @@ export default function Header() {
     });
   }, [categoryTree]);
 
-  // Fetch departments directly with SWR (ISR optimized) for faster initial load
-  const { data: departmentsData, error: departmentsError } = useSWR(
-    '/api/departments',
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      dedupingInterval: 60000, // Cache for 1 minute client-side
-      fallbackData: { 
-        success: true, 
-        departments: STATIC_DEPARTMENTS.map((dept) => ({
-          ...dept,
-          id: dept.slug,
-          name: dept.name.toUpperCase(),
-        })) 
-      }, // Use static departments as immediate fallback
-      onError: (error) => {
-        console.error('Failed to fetch departments:', error);
-      },
-    }
-  );
-
-  // Use departments from SWR with fallback chain: SWR → AppContext → Static
+  // Use actual departments from database (top-level categories)
+  // Filter by level === "department" if level field exists, otherwise use all top-level categories
+  // Fallback to static departments if no dynamic departments found
   const departments = useMemo(() => {
-    // Priority 1: Use SWR data if available
-    if (departmentsData?.success && departmentsData.departments?.length > 0) {
-      return departmentsData.departments;
+    if (!topLevelCategories || topLevelCategories.length === 0) {
+      // Fallback to static departments if no categories loaded
+      return STATIC_DEPARTMENTS.map((dept) => ({
+        ...dept,
+        id: dept.slug,
+        children: [],
+      }));
     }
     
-    // Priority 2: Fallback to AppContext categories if SWR hasn't loaded yet
-    if (topLevelCategories && topLevelCategories.length > 0) {
-      const filtered = topLevelCategories.filter((cat) => {
-        if (cat.level !== undefined) {
-          return cat.level === 'department';
-        }
-        return true;
-      });
-      
-      if (filtered.length === 0) {
-        return topLevelCategories.map((cat) => ({
-          ...cat,
-          name: cat.name.toUpperCase(),
-          id: cat._id || cat.id,
-        }));
+    // Filter by level if it exists, otherwise use all top-level categories
+    const filtered = topLevelCategories.filter((cat) => {
+      // If level field exists, only show departments
+      if (cat.level !== undefined) {
+        return cat.level === 'department';
       }
-      
-      return filtered.map((cat) => ({
+      // Otherwise, show all top-level categories as departments
+      return true;
+    });
+    
+    // If no departments found after filtering, fallback to all top-level categories
+    if (filtered.length === 0) {
+      // Use all top-level categories as departments
+      return topLevelCategories.map((cat) => ({
         ...cat,
         name: cat.name.toUpperCase(),
         id: cat._id || cat.id,
       }));
     }
     
-    // Priority 3: Final fallback to static departments
-    return STATIC_DEPARTMENTS.map((dept) => ({
-      ...dept,
-      id: dept.slug,
-      name: dept.name.toUpperCase(),
-      children: [],
+    // Ensure uppercase names for consistency
+    return filtered.map((cat) => ({
+      ...cat,
+      name: cat.name.toUpperCase(),
+      id: cat._id || cat.id,
     }));
-  }, [departmentsData, topLevelCategories]);
+  }, [topLevelCategories]);
 
   // Memoize rootNavMenu to prevent unnecessary re-renders
   const rootNavMenu = useMemo(() => ({

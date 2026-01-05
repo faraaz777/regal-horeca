@@ -53,6 +53,7 @@ const FloatingInput = ({ label, id, name, type = "text", value, onChange, requir
           value={value}
           onChange={onChange}
           onFocus={() => setIsFocused(true)}
+          
           onBlur={() => setIsFocused(false)}
           required={required}
           className={`

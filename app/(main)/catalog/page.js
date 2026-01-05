@@ -28,8 +28,22 @@ const ITEMS_PER_PAGE = 24;
 // Fetcher for SWR
 const fetcher = (url) => fetch(url).then(res => res.json());
 
+// Fallback data for faster initial render
+const EMPTY_FACETS = {
+  colors: [],
+  brands: [],
+  filters: {},
+  priceRange: { min: 0, max: 0 },
+  totalProducts: 0,
+};
+
+const EMPTY_PRODUCTS_DATA = {
+  products: [],
+  pagination: { total: 0, page: 1, totalPages: 1 },
+};
+
 function CatalogPageContent() {
-  const { categories } = useAppContext();
+  const { categories: contextCategories } = useAppContext();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -71,6 +85,34 @@ function CatalogPageContent() {
     }
   }, [filtersParam]);
 
+  // Pre-fetch categories with SWR for faster initial load (don't wait for AppContext)
+  const { data: categoriesData } = useSWR(
+    '/api/categories?tree=true',
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60000, // Cache for 1 minute
+    }
+  );
+
+  // Use SWR categories if available, fallback to AppContext
+  const categories = useMemo(() => {
+    if (categoriesData?.success && categoriesData.categories) {
+      const flattenCategories = (cats) => {
+        let result = [];
+        cats.forEach(cat => {
+          result.push(cat);
+          if (cat.children && cat.children.length > 0) {
+            result = result.concat(flattenCategories(cat.children));
+          }
+        });
+        return result;
+      };
+      return flattenCategories(categoriesData.categories || []);
+    }
+    return contextCategories; // Fallback to AppContext
+  }, [categoriesData, contextCategories]);
+
   // Build API params with ALL filters for server-side filtering
   const productsParams = useMemo(() => {
     const params = new URLSearchParams();
@@ -90,19 +132,25 @@ function CatalogPageContent() {
     return params;
   }, [selectedCategorySlug, selectedBusinessSlug, searchQuery, priceMin, priceMax, selectedColors, selectedBrands, selectedFilters, sortBy, currentPage]);
 
-  // Fetch products from API with server-side filtering and pagination
-  const { data: productsData, isLoading: productsLoading } = useSWR(
-    `/api/products?${productsParams.toString()}`,
+  // Fetch products and facets from combined API endpoint (single request = faster)
+  const { data: catalogData, isLoading: catalogLoading } = useSWR(
+    `/api/products/with-facets?${productsParams.toString()}`,
     fetcher,
     {
       revalidateOnFocus: false,
       dedupingInterval: 60000, // Cache for 1 minute
+      fallbackData: {
+        success: true,
+        products: [],
+        pagination: { total: 0, page: 1, totalPages: 1 },
+        facets: EMPTY_FACETS,
+      }, // Immediate fallback for faster render
     }
   );
 
-  const products = productsData?.products || [];
-  const pagination = productsData?.pagination || { total: 0, page: 1, totalPages: 1 };
-  const contextLoading = productsLoading;
+  const products = catalogData?.products || [];
+  const pagination = catalogData?.pagination || { total: 0, page: 1, totalPages: 1 };
+  const contextLoading = catalogLoading;
 
   // Filter handlers - only update URL, no client-side filtering
   const handlePriceMinChange = useCallback((value) => {
@@ -193,30 +241,8 @@ function CatalogPageContent() {
     maxValue: priceMax,
   }), [priceMin, priceMax]);
 
-  // Fetch facets from backend API
-  const facetsParams = new URLSearchParams();
-  if (selectedCategorySlug) facetsParams.set('category', selectedCategorySlug);
-  if (selectedBusinessSlug) facetsParams.set('business', selectedBusinessSlug);
-  if (searchQuery) facetsParams.set('search', searchQuery);
-
-  const { data: facetsData, isLoading: facetsLoading } = useSWR(
-    `/api/products/facets?${facetsParams.toString()}`,
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 60000, // Cache for 1 minute
-    }
-  );
-
-  const facets = facetsData?.facets || {
-    colors: [],
-    brands: [],
-    filters: {},
-    // specs removed - specifications are for product detail page only, not sidebar
-    // statuses removed - not needed in sidebar
-    priceRange: { min: 0, max: 0 },
-    totalProducts: 0,
-  };
+  // Facets are now included in the combined catalogData response
+  const facets = catalogData?.facets || EMPTY_FACETS;
 
   // Category navigation
   const { currentCategory, parentCategory, displayCategories } = useMemo(() => {
@@ -627,7 +653,7 @@ function CatalogPageContent() {
     </aside>
   );
 
-  const isLoading = contextLoading || facetsLoading;
+  const isLoading = contextLoading;
 
   return (
     <div className="container mx-auto px-4 py-8">

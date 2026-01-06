@@ -22,12 +22,19 @@ import {
   MenuIcon,
   XIcon,
   ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   SearchIcon,
   ShoppingCartIcon,
+  InfoIcon,
+  UserIcon,
+  PhoneIcon,
 } from "./Icons";
 import { useAppContext } from "@/context/AppContext";
 import SearchBar from "./new/SearchBar";
 import CartDrawer from "./CartDrawer";
+import LightCaptureModal, { updateSavedLeadProfile } from "./LightCaptureModal";
+import toast from 'react-hot-toast';
 
 // SWR fetcher function
 const fetcher = async (url) => {
@@ -58,6 +65,7 @@ export default function Header() {
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [activeDesktopMenu, setActiveDesktopMenu] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
@@ -404,10 +412,31 @@ export default function Header() {
         toggleAccordion={toggleAccordion}
         handleNavForward={handleNavForward}
         handleNavBack={handleNavBack}
+        departments={departments}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        handleSearchSubmit={handleSearchSubmit}
+        onProfileClick={() => {
+          setIsMenuOpen(false);
+          setIsProfileModalOpen(true);
+        }}
       />
 
       {/* Cart Drawer */}
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+
+      {/* Profile Modal */}
+      <LightCaptureModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        onSubmit={async ({ phone, name, userType }) => {
+          // Save profile
+          updateSavedLeadProfile({ phone, name, userType });
+          setIsProfileModalOpen(false);
+          toast.success('Profile updated successfully!');
+        }}
+        defaultUserType="unknown"
+      />
     </>
   );
 }
@@ -747,7 +776,39 @@ function MobileSearchBar({ isMobileSearchOpen, searchQuery, setSearchQuery, hand
   );
 }
 
-function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cartTotalItems, onCartClick, openAccordions, toggleAccordion, handleNavForward, handleNavBack }) {
+// Category Icons for Mobile Menu
+const CategoryIcon = ({ categorySlug, className = "w-5 h-5" }) => {
+  const icons = {
+    'tableware': (
+      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+      </svg>
+    ),
+    'kitchenware': (
+      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+      </svg>
+    ),
+    'hotel-hospitality': (
+      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+      </svg>
+    ),
+    'catering': (
+      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+      </svg>
+    ),
+    'barware': (
+      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    ),
+  };
+  return icons[categorySlug] || icons['tableware'];
+};
+
+function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cartTotalItems, onCartClick, openAccordions, toggleAccordion, handleNavForward, handleNavBack, departments, searchQuery, setSearchQuery, handleSearchSubmit, router, onProfileClick }) {
   const currentMenu = navStack[navStack.length - 1] || {};
 
   return (
@@ -763,82 +824,230 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
       >
         {/* Mobile Menu Header */}
         <div className="flex items-center justify-between px-4 h-16 border-b border-gray-100 flex-shrink-0">
-          <Link href="/" onClick={() => setIsMenuOpen(false)}>
-            <Image src={Logo} alt="Regal" width={100} height={40} className="h-8 w-auto object-contain" />
-          </Link>
+          <div className="flex items-center gap-2">
+            <Image src={Logo} alt="Regal" width={80} height={32} className="h-6 w-auto object-contain" />
+            <span className="text-lg font-bold text-black">Regal</span>
+          </div>
           <button onClick={() => setIsMenuOpen(false)} className="p-2 text-black/60 hover:text-black">
             <XIcon className="w-6 h-6" />
           </button>
         </div>
 
-        {/* Menu Content */}
-        <div className="flex-1 overflow-y-auto">
-          {navStack.length > 1 && (
-            <button
-              onClick={handleNavBack}
-              className="flex items-center gap-2 px-4 py-3 w-full text-left text-sm font-semibold text-black/60 hover:bg-gray-50 border-b border-gray-50"
+        {/* Search Bar */}
+        <div className="px-4 py-4 border-b border-gray-300">
+          <form onSubmit={handleSearchSubmit} className="relative">
+            <div className="relative">
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none z-10" />
+              <input
+                type="text"
+                placeholder="What are you looking for?"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-11 pr-24 py-3 border-2 border-orange-200 rounded-lg text-xs text-black placeholder:text-gray-400 placeholder:text-xs bg-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all shadow-sm"
+              />
+              <button
+                type="submit"
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-accent text-white px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider hover:bg-red-600 active:bg-red-700 transition-all duration-200 shadow-sm hover:shadow-md whitespace-nowrap"
+              >
+                SEARCH
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* Quick Links */}
+        <div className="border-b border-gray-300">
+          <div className="flex">
+            <Link
+              href="/wishlist"
+              onClick={() => setIsMenuOpen(false)}
+              className="flex-1 flex items-center justify-center gap-2 py-4 px-4 text-sm font-medium text-black hover:bg-gray-50 transition-colors border-r border-gray-300 relative"
             >
-              <ChevronLeftIcon className="w-4 h-4" />
-              Back to {navStack[navStack.length - 2]?.name || "Menu"}
+              <div className="relative">
+                <HeartIcon className="w-5 h-5 text-gray-700" />
+                {wishlist.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-accent text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                    {wishlist.length}
+                  </span>
+                )}
+              </div>
+              <span>Wishlist</span>
+            </Link>
+            <button
+              onClick={() => {
+                setIsMenuOpen(false);
+                onCartClick();
+              }}
+              className="flex-1 flex items-center justify-center gap-2 py-4 px-4 text-sm font-medium text-black hover:bg-gray-50 transition-colors relative"
+            >
+              <div className="relative">
+                <ShoppingCartIcon className="w-5 h-5 text-gray-700" />
+                {cartTotalItems > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-accent text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                    {cartTotalItems}
+                  </span>
+                )}
+              </div>
+              <span>My Cart</span>
             </button>
-          )}
-
-          <div className="py-2">
-            {currentMenu.children && currentMenu.children.map((item) => {
-              const hasChildren = item.children && item.children.length > 0;
-              const isServe = item.slug === "serve";
-
-              if (hasChildren && !isServe) {
-                // Accordion for deep trees
-                return (
-                  <div key={item.id} className="border-b border-gray-50/50">
-                    <button
-                      onClick={() => toggleAccordion(item.id)}
-                      className="flex items-center justify-between w-full px-5 py-3 text-left"
-                    >
-                      <span className="text-[15px] font-medium text-black uppercase tracking-wide">{item.name}</span>
-                      <ChevronDownIcon
-                        className={`w-4 h-4 text-black/40 transition-transform ${openAccordions[item.id] ? 'rotate-180' : ''}`}
-                      />
-                    </button>
-                    {openAccordions[item.id] && (
-                      <div className="bg-gray-50 px-5 py-2 space-y-2">
-                        {item.children.map(sub => (
-                          <Link
-                            key={sub.id}
-                            href={`/catalog?category=${sub.slug}`}
-                            onClick={() => setIsMenuOpen(false)}
-                            className="block py-2 text-sm text-gray-600 hover:text-accent pl-2 border-l-2 border-transparent hover:border-accent"
-                          >
-                            {sub.name}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              }
-
-              return (
-                <Link
-                  key={item.id}
-                  href={item.slug}
-                  onClick={() => setIsMenuOpen(false)}
-                  className="flex items-center justify-between px-5 py-3 text-[15px] font-medium text-black hover:bg-gray-50 border-b border-gray-50/50 uppercase tracking-wide"
-                >
-                  {item.name}
-                </Link>
-              )
-            })}
-            {/* Static Links for Root */}
-            {navStack.length === 1 && (
-              <>
-                <Link href="/about" onClick={() => setIsMenuOpen(false)} className="block px-5 py-3 text-[15px] font-medium text-black hover:bg-gray-50 border-b border-gray-50/50 uppercase tracking-wide">About Us</Link>
-                <Link href="/contact" onClick={() => setIsMenuOpen(false)} className="block px-5 py-3 text-[15px] font-medium text-black hover:bg-gray-50 border-b border-gray-50/50 uppercase tracking-wide">Contact</Link>
-              </>
-            )}
           </div>
         </div>
+
+        {/* Menu Content */}
+        <div className="flex-1 overflow-y-auto">
+          {navStack.length > 1 ? (
+            <>
+              <button
+                onClick={handleNavBack}
+                className="flex items-center gap-2 px-4 py-3 w-full text-left text-sm font-semibold text-black/60 hover:bg-gray-50 border-b border-gray-50"
+              >
+                <ChevronLeftIcon className="w-4 h-4" />
+                Back to {navStack[navStack.length - 2]?.name || "Menu"}
+              </button>
+              <div className="py-2">
+                {currentMenu.children && currentMenu.children.map((item) => {
+                  const hasChildren = item.children && item.children.length > 0;
+                  const isServe = item.slug === "serve";
+
+                  if (hasChildren && !isServe) {
+                    return (
+                      <div key={item.id} className="border-b border-gray-50/50">
+                        <button
+                          onClick={() => toggleAccordion(item.id)}
+                          className="flex items-center justify-between w-full px-5 py-3 text-left"
+                        >
+                          <span className="text-[15px] font-medium text-black uppercase tracking-wide">{item.name}</span>
+                          <ChevronDownIcon
+                            className={`w-4 h-4 text-black/40 transition-transform ${openAccordions[item.id] ? 'rotate-180' : ''}`}
+                          />
+                        </button>
+                        {openAccordions[item.id] && (
+                          <div className="bg-gray-50 px-5 py-2 space-y-2">
+                            {item.children.map(sub => (
+                              <Link
+                                key={sub.id}
+                                href={`/catalog?category=${sub.slug}`}
+                                onClick={() => setIsMenuOpen(false)}
+                                className="block py-2 text-sm text-gray-600 hover:text-accent pl-2 border-l-2 border-transparent hover:border-accent"
+                              >
+                                {sub.name}
+                              </Link>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <Link
+                      key={item.id}
+                      href={item.slug}
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center justify-between px-5 py-3 text-[15px] font-medium text-black hover:bg-gray-50 border-b border-gray-50/50 uppercase tracking-wide"
+                    >
+                      {item.name}
+                    </Link>
+                  )
+                })}
+              </div>
+            </>
+          ) : (
+            <div className="py-2">
+              {/* Home Link */}
+              <Link
+                href="/"
+                onClick={() => setIsMenuOpen(false)}
+                className="flex items-center gap-3 px-5 py-3 text-[15px] font-medium text-black hover:bg-gray-50 border-b border-gray-50/50"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                <span>Home</span>
+              </Link>
+
+              {/* Shop by Category Section */}
+              {departments && departments.length > 0 && (
+                <>
+                  <div className="px-5 py-3 border-b border-gray-50/50">
+                    <h3 className="text-xs font-bold text-black uppercase tracking-widest">SHOP BY CATEGORY</h3>
+                  </div>
+                  {departments.map((dept) => {
+                    const deptSlug = dept.slug;
+                    const hasChildren = dept.children && dept.children.length > 0;
+                    
+                    if (hasChildren) {
+                      return (
+                        <button
+                          key={dept._id || dept.id || deptSlug}
+                          onClick={() => {
+                            handleNavForward({
+                              id: dept._id || dept.id,
+                              name: dept.name,
+                              children: dept.children,
+                            });
+                          }}
+                          className="flex items-center justify-between w-full px-5 py-3 text-left hover:bg-gray-50 border-b border-gray-50/50"
+                        >
+                          <div className="flex items-center gap-3">
+                            <CategoryIcon categorySlug={deptSlug} className="w-5 h-5 text-black/60" />
+                            <span className="text-[15px] font-medium text-black uppercase">{dept.name}</span>
+                          </div>
+                          <ChevronRightIcon className="w-4 h-4 text-black/40" />
+                        </button>
+                      );
+                    }
+                    
+                    return (
+                      <Link
+                        key={dept._id || dept.id || deptSlug}
+                        href={`/catalog?category=${deptSlug}`}
+                        onClick={() => setIsMenuOpen(false)}
+                        className="flex items-center justify-between w-full px-5 py-3 text-left hover:bg-gray-50 border-b border-gray-50/50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <CategoryIcon categorySlug={deptSlug} className="w-5 h-5 text-black/60" />
+                          <span className="text-[15px] font-medium text-black">{dept.name}</span>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </>
+              )}
+
+              {/* About Us */}
+              <Link
+                href="/about"
+                onClick={() => setIsMenuOpen(false)}
+                className="flex items-center gap-3 px-5 py-3 text-[15px] font-medium text-black hover:bg-gray-50 border-b border-gray-50/50"
+              >
+                <InfoIcon className="w-5 h-5 text-black/60" />
+                <span>About Us</span>
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Action Buttons */}
+        {navStack.length === 1 && (
+          <div className="border-t border-gray-100 p-4 flex gap-2">
+            <button
+              onClick={onProfileClick}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 text-black text-sm font-medium rounded-md hover:bg-gray-100 transition-colors"
+            >
+              <UserIcon className="w-5 h-5" />
+              <span>Profile</span>
+            </button>
+            <Link
+              href="/#contact"
+              onClick={() => setIsMenuOpen(false)}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 text-black text-sm font-medium rounded-md hover:bg-gray-100 transition-colors"
+            >
+              <PhoneIcon className="w-5 h-5" />
+              <span>Contact</span>
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

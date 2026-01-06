@@ -181,7 +181,7 @@ export default function ContactUs() {
   };
 
   return (
-    <section className="relative py-12 lg:py-16 bg-gray-100 overflow-hidden font-sans">
+    <section id="contact" className="relative py-12 lg:py-16 bg-gray-100 overflow-hidden font-sans">
       <div className="container relative z-10 mx-auto px-4">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-10">

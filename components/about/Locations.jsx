@@ -4,7 +4,7 @@ import { MapPin, Mail } from 'lucide-react';
 
 export default function Locations() {
   return (
-    <section id="contact" className="py-24 bg-white">
+    <section id="visit-us" className="py-24 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h2 className="text-4xl font-bold text-black">Visit Us</h2>

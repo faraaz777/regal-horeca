@@ -566,20 +566,41 @@ function CatalogPageContent() {
               const isSelected = selectedColors.includes(color);
               const isDisabled = count === 0 && !isSelected;
 
+              // Color mapping to hex values
+              const getColorHex = (colorName) => {
+                const colorMap = {
+                  'blue': '#3B82F6',
+                  'green': '#10B981',
+                  'red': '#EF4444',
+                  'yellow': '#F59E0B',
+                  'purple': '#8B5CF6',
+                  'orange': '#F97316',
+                  'pink': '#EC4899',
+                  'brown': '#92400E',
+                  'gray': '#6B7280',
+                  'grey': '#6B7280',
+                  'black': '#121212',
+                  'white': '#FAFAF9',
+                  'silver': '#9CA3AF',
+                };
+                return colorMap[colorName.toLowerCase()] || '#CCCCCC';
+              };
+
               return (
                 <button
                   key={color}
                   onClick={() => !isDisabled && handleColorToggle(color)}
                   disabled={isDisabled}
-                  className={`color-swatch-btn ${isSelected ? 'active ring-1 ring-accent ring-offset-2' : ''} ${isDisabled ? 'opacity-20 cursor-not-allowed' : ''}`}
+                  className={`color-swatch-btn ${isSelected ? 'active' : ''} ${isDisabled ? 'opacity-20 cursor-not-allowed' : ''}`}
                   title={`${color}${count > 0 ? ` (${count})` : ''}`}
                 >
                   <div
-                    className="color-swatch-inner"
+                    className="color-swatch-circle"
                     style={{
-                      backgroundColor: color.toLowerCase() === 'white' ? '#FAFAF9' : color.toLowerCase()
+                      backgroundColor: getColorHex(color)
                     }}
                   />
+                  <span className="color-swatch-label">{color}</span>
                 </button>
               );
             })}
@@ -649,7 +670,7 @@ function CatalogPageContent() {
 
       <div className="flex flex-col lg:flex-row gap-12">
         {/* Filter Sidebar */}
-        <div className="hidden lg:block w-1/4 xl:w-1/5">
+        <div className="hidden lg:block w-1/4 xl:w-1/5 border-r border-black/10">
           <FilterSidebar />
         </div>
 

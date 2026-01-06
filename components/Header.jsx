@@ -429,7 +429,7 @@ function DepartmentsBar({
   productsLoading,
   productsError,
 }) {
-  // Always show the department bar, even if empty (will show Home, About, More, All Categories)
+  // Always show the department bar, even if empty (will show Home, About, More)
   // if (!departments.length) return null;
 
   // Find active department by slug (consistent identifier) or by id (fallback)
@@ -452,11 +452,6 @@ function DepartmentsBar({
   const moreButtonRef = useRef(null);
   const [dropdownRight, setDropdownRight] = useState(0);
 
-  // Ref for All Categories button to position dropdown
-  const allCategoriesButtonRef = useRef(null);
-  const [allCategoriesDropdownLeft, setAllCategoriesDropdownLeft] = useState(0);
-  const [isAllCategoriesDropdownOpen, setIsAllCategoriesDropdownOpen] = useState(false);
-
   // Calculate More dropdown position
   useEffect(() => {
     if (isMoreDropdownOpen && moreButtonRef.current) {
@@ -471,20 +466,6 @@ function DepartmentsBar({
     }
   }, [isMoreDropdownOpen]);
 
-  // Calculate All Categories dropdown position
-  useEffect(() => {
-    if (isAllCategoriesDropdownOpen && allCategoriesButtonRef.current) {
-      const buttonRect = allCategoriesButtonRef.current.getBoundingClientRect();
-      const container = allCategoriesButtonRef.current.closest('.w-full.relative');
-      if (container) {
-        const containerRect = container.getBoundingClientRect();
-        // Calculate distance from left edge of container to left edge of button
-        const leftOffset = buttonRect.left - containerRect.left;
-        setAllCategoriesDropdownLeft(leftOffset);
-      }
-    }
-  }, [isAllCategoriesDropdownOpen]);
-
   return (
     <>
       <div
@@ -492,7 +473,6 @@ function DepartmentsBar({
         onMouseLeave={() => {
           setActiveDepartment(null);
           setIsMoreDropdownOpen(false);
-          setIsAllCategoriesDropdownOpen(false);
         }}
       >
         <nav className="flex flex-nowrap justify-center gap-4 md:gap-4 lg:gap-4 xl:gap-12 overflow-x-auto hide-scrollbar">
@@ -501,20 +481,6 @@ function DepartmentsBar({
             <span>Home</span>
             <span className="absolute bottom-[-1px] left-0 w-0 h-[2px] bg-accent transition-all duration-300 group-hover:w-full"></span>
           </Link>
-
-          {/* All Categories Dropdown */}
-          <div
-            ref={allCategoriesButtonRef}
-            className="relative flex items-center h-full"
-            onMouseEnter={() => setIsAllCategoriesDropdownOpen(true)}
-            onMouseLeave={() => setIsAllCategoriesDropdownOpen(false)}
-          >
-            <Link href="/catalog" className={`${navLinkClass} flex items-center gap-1.5 bg-accent text-white font-semibold px-3 py-1.5 hover:text-white `}>
-              <MenuIcon className="w-4 h-4 pb-0.5" />
-              <span>All Categories</span>
-              <ChevronDownIcon className={`w-3 h-3 transition-transform ${isAllCategoriesDropdownOpen ? 'rotate-180' : ''}`} />
-            </Link>
-          </div>
 
           {departments.map((dept) => {
             // Use slug as consistent identifier (works for both static and dynamic departments)
@@ -561,44 +527,6 @@ function DepartmentsBar({
             </button>
           </div>
         </nav>
-
-        {/* All Categories Dropdown - Positioned directly below the button */}
-        <AnimatePresence>
-          {isAllCategoriesDropdownOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              onMouseEnter={() => setIsAllCategoriesDropdownOpen(true)}
-              onMouseLeave={() => setIsAllCategoriesDropdownOpen(false)}
-              className="absolute top-full mt-[2px] w-[280px] bg-white z-[100] shadow-2xl border border-black/10 rounded-lg overflow-hidden"
-              style={{
-                left: `${allCategoriesDropdownLeft}px`
-              }}
-            >
-              <div className="py-3">
-                {departments && departments.length > 0 ? (
-                  departments.map((dept) => (
-                    <Link
-                      key={dept._id || dept.id || dept.slug}
-                      href={`/catalog?category=${dept.slug}`}
-                      className="flex items-center gap-4 px-5 py-3 text-sm font-medium text-black/80 hover:bg-gray-100 hover:text-accent transition-colors"
-                    >
-                      <span className="whitespace-nowrap">
-                        {dept.name}
-                      </span>
-                    </Link>
-                  ))
-                ) : (
-                  <div className="px-5 py-3 text-sm text-black/40">
-                    No departments
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* More Dropdown - Positioned outside nav, below the More button */}
         <AnimatePresence>

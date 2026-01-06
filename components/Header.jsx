@@ -824,10 +824,9 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
       >
         {/* Mobile Menu Header */}
         <div className="flex items-center justify-between px-4 h-16 border-b border-gray-100 flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <Image src={Logo} alt="Regal" width={80} height={32} className="h-6 w-auto object-contain" />
-            <span className="text-lg font-bold text-black">Regal</span>
-          </div>
+          <Link href="/" onClick={() => setIsMenuOpen(false)}>
+            <Image src={Logo} alt="Regal" width={100} height={40} className="h-8 w-auto object-contain" />
+          </Link>
           <button onClick={() => setIsMenuOpen(false)} className="p-2 text-black/60 hover:text-black">
             <XIcon className="w-6 h-6" />
           </button>

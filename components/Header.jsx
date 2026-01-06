@@ -67,7 +67,6 @@ export default function Header() {
   const [lastScrollY, setLastScrollY] = useState(0);
   const [activeDepartment, setActiveDepartment] = useState(null);
   const [isMoreDropdownOpen, setIsMoreDropdownOpen] = useState(false);
-  const [isAllCategoriesDropdownOpen, setIsAllCategoriesDropdownOpen] = useState(false);
   const [departmentProducts, setDepartmentProducts] = useState({});
 
   const departmentMenuRefs = useRef({});
@@ -374,8 +373,6 @@ export default function Header() {
               navLinkClass={navLinkClass}
               isMoreDropdownOpen={isMoreDropdownOpen}
               setIsMoreDropdownOpen={setIsMoreDropdownOpen}
-              isAllCategoriesDropdownOpen={isAllCategoriesDropdownOpen}
-              setIsAllCategoriesDropdownOpen={setIsAllCategoriesDropdownOpen}
               topLevelCategories={topLevelCategories}
               productsLoading={productsLoading}
               productsError={productsError}
@@ -428,8 +425,6 @@ function DepartmentsBar({
   navLinkClass,
   isMoreDropdownOpen,
   setIsMoreDropdownOpen,
-  isAllCategoriesDropdownOpen,
-  setIsAllCategoriesDropdownOpen,
   topLevelCategories,
   productsLoading,
   productsError,
@@ -460,7 +455,6 @@ function DepartmentsBar({
         onMouseLeave={() => {
           setActiveDepartment(null);
           setIsMoreDropdownOpen(false);
-          setIsAllCategoriesDropdownOpen(false);
         }}
       >
         <nav className="flex flex-nowrap justify-center gap-4 md:gap-4 lg:gap-4 xl:gap-12 overflow-x-auto hide-scrollbar">
@@ -469,54 +463,6 @@ function DepartmentsBar({
             <span>Home</span>
             <span className="absolute bottom-[-1px] left-0 w-0 h-[2px] bg-accent transition-all duration-300 group-hover:w-full"></span>
           </Link>
-
-          {/* All Categories Dropdown */}
-          <div
-            className="relative flex items-center h-full"
-            onMouseEnter={() => setIsAllCategoriesDropdownOpen(true)}
-            onMouseLeave={() => setIsAllCategoriesDropdownOpen(false)}
-          >
-            <Link href="/catalog" className={`${navLinkClass} flex items-center gap-1.5 bg-accent text-white font-semibold px-3 py-1.5 hover:text-white `}>
-              <MenuIcon className="w-4 h-4 pb-0.5" />
-              <span>All Categories</span>
-              <ChevronDownIcon className={`w-3 h-3 transition-transform ${isAllCategoriesDropdownOpen ? 'rotate-180' : ''}`} />
-            </Link>
-
-          </div>
-            {/* All Categories Dropdown - Positioned directly below the button */}
-            <AnimatePresence>
-              {isAllCategoriesDropdownOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  transition={{ duration: 0.25, ease: "easeOut" }}
-                  onMouseEnter={() => setIsAllCategoriesDropdownOpen(true)}
-                  onMouseLeave={() => setIsAllCategoriesDropdownOpen(false)}
-                  className="absolute top-full  sm:left-20  lg:left-20 xl:left-60 w-[280px] bg-white z-[100] shadow-2xl border border-black/10 rounded-lg overflow-hidden"
-                >
-                  <div className="py-3">
-                    {departments && departments.length > 0 ? (
-                      departments.map((dept) => (
-                        <Link
-                          key={dept._id || dept.id || dept.slug}
-                          href={`/catalog?category=${dept.slug}`}
-                          className="flex items-center gap-4 px-5 py-3 text-sm font-medium text-black/80 hover:bg-gray-100 hover:text-accent transition-colors"
-                        >
-                          <span className="whitespace-nowrap">
-                            {dept.name}
-                          </span>
-                        </Link>
-                      ))
-                    ) : (
-                      <div className="px-5 py-3 text-sm text-black/40">
-                        No departments
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
 
           {departments.map((dept) => {
             // Use slug as consistent identifier (works for both static and dynamic departments)

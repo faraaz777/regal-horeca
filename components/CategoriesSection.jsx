@@ -64,13 +64,13 @@ export default function CategoriesSection({ categories }) {
   }
 
   return (
-    <section className="py-8 px-4 bg-gray-50 relative border-t border-black/5">
-      <div className="max-w-full mx-auto relative group/section">
-        <div className="text-center mb-8 ">
+    <section className="py-6 md:py-8 bg-gray-50 relative border-t border-black/5">
+      <div className="w-full mx-auto relative group/section">
+        <div className="text-center mb-6 md:mb-8 px-4">
           <span className="text-xs font-bold tracking-[0.2em] text-accent uppercase mb-3 block">
             Curated Excellence
           </span>
-          <h2 className="text-4xl md:text-5xl font-serif text-black mb-6">
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-serif text-black mb-4 md:mb-6">
             Discover Our Collections
           </h2>
           <div className="w-24 h-1 bg-black/5 mx-auto rounded-full" />
@@ -124,8 +124,9 @@ export default function CategoriesSection({ categories }) {
 
         <div
           ref={scrollContainerRef}
-          className={`flex w-full overflow-x-auto pb-12 gap-6 snap-x snap-mandatory px-4 md:px-12 hide-scrollbar ${mainCategories.length <= 5 ? "md:justify-center" : ""
+          className={`flex w-full overflow-x-auto pb-8 md:pb-12 gap-4 md:gap-6 snap-x snap-mandatory pl-4 pr-8 md:px-12 hide-scrollbar ${mainCategories.length <= 5 ? "md:justify-center" : ""
             }`}
+          style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {mainCategories.map((cat, i) => {
             const isActive = activeCategoryIndex === i;
@@ -135,9 +136,9 @@ export default function CategoriesSection({ categories }) {
                 href={`/catalog?category=${cat.slug}`}
                 ref={(el) => (categoryRefs.current[i] = el)}
                 data-index={i}
-                className={`flex-none snap-center group relative w-[280px] h-[420px] rounded-[100px] border bg-white overflow-hidden transition-all duration-500 ${isActive
-                  ? "border-accent shadow-2xl scale-[1.02] md:border-black/10 md:shadow-none md:scale-100 md:hover:border-accent md:hover:shadow-2xl"
-                  : "border-black/10 hover:border-accent hover:shadow-2xl"
+                className={`flex-none snap-center group relative w-[260px] md:w-[280px] h-[400px] md:h-[420px] rounded-[100px] border-2 bg-white overflow-hidden transition-all duration-500 ${isActive
+                  ? "border-accent shadow-2xl scale-[1.02] md:border-2 md:border-black/10 md:shadow-none md:scale-100 md:hover:border-accent md:hover:shadow-2xl"
+                  : "border-2 border-black/10 hover:border-accent hover:shadow-2xl"
                   }`}
               >
                 {/* Hover Background Fill */}

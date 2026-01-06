@@ -208,7 +208,7 @@ export async function GET(request) {
     // For detail views (limit=1 or specific ID), fetch full document
     const isListQuery = limit > 1 && !searchParams.get('id');
     const selectFields = isListQuery 
-      ? 'title slug heroImage price brand categoryId featured status createdAt sku tags colorVariants filters'
+      ? 'title slug heroImage gallery price brand categoryId featured status createdAt sku tags colorVariants filters'
       : undefined; // undefined = fetch all fields
     
     let queryBuilder = Product.find(query);

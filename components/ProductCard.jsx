@@ -45,36 +45,74 @@ export default function ProductCard({ product, onAdd }) {
 
   const productImages = getProductImages();
 
+  // Debug: Log image detection
+  useEffect(() => {
+    if (productImages.length > 1) {
+      console.log('Product has multiple images:', {
+        productId: product._id || product.id,
+        title: product.title,
+        heroImage: product.heroImage,
+        gallery: product.gallery,
+        totalImages: productImages.length,
+        images: productImages
+      });
+    }
+  }, [productImages.length, product._id, product.id, product.title, product.heroImage, product.gallery]);
+
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
+  const [isHovered, setIsHovered] = useState(false);
   const imageContainerRef = useRef(null);
+  const hoverIntervalRef = useRef(null);
   const productImage = productImages[currentImageIndex];
 
   // Swipe detection for mobile
   const minSwipeDistance = 50;
 
   const onTouchStart = (e) => {
+    // Only handle if product has multiple images
+    if (productImages.length <= 1) return;
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
   };
 
   const onTouchMove = (e) => {
+    // Only handle if product has multiple images
+    if (productImages.length <= 1) return;
     setTouchEnd(e.targetTouches[0].clientX);
   };
 
-  const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
+  const onTouchEnd = (e) => {
+    // Only handle if product has multiple images
+    if (productImages.length <= 1) {
+      setTouchStart(null);
+      setTouchEnd(null);
+      return;
+    }
+    
+    if (!touchStart || !touchEnd) {
+      setTouchStart(null);
+      setTouchEnd(null);
+      return;
+    }
+    
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
 
-    if (isLeftSwipe && productImages.length > 1) {
+    if (isLeftSwipe) {
+      e.preventDefault();
       handleImageChange('next');
     }
-    if (isRightSwipe && productImages.length > 1) {
+    if (isRightSwipe) {
+      e.preventDefault();
       handleImageChange('prev');
     }
+    
+    // Reset touch state
+    setTouchStart(null);
+    setTouchEnd(null);
   };
 
   // Get product name/title
@@ -140,30 +178,85 @@ export default function ProductCard({ product, onAdd }) {
     }
   };
 
+  // Auto-cycle images on hover (desktop only)
+  useEffect(() => {
+    if (isHovered && productImages.length > 1 && typeof window !== 'undefined' && window.innerWidth >= 768) {
+      hoverIntervalRef.current = setInterval(() => {
+        setCurrentImageIndex((prev) => (prev === productImages.length - 1 ? 0 : prev + 1));
+      }, 2000); // Change image every 2 seconds
+    } else {
+      if (hoverIntervalRef.current) {
+        clearInterval(hoverIntervalRef.current);
+        hoverIntervalRef.current = null;
+      }
+    }
+    return () => {
+      if (hoverIntervalRef.current) {
+        clearInterval(hoverIntervalRef.current);
+      }
+    };
+  }, [isHovered, productImages.length]);
+
   return (
     <div className="bg-white overflow-hidden flex flex-col h-full">
       {/* Image Container - Separated with rounded corners */}
       <div
         ref={imageContainerRef}
-        className="group relative w-full aspect-square overflow-hidden bg-gray-50 rounded-none"
+        className="group relative w-full aspect-square overflow-hidden bg-gray-50 rounded-none select-none"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
-        <Link href={`/products/${productSlug}`} className="block w-full h-full relative">
-          <Image
-            src={productImage}
-            alt={productName}
-            fill
-            sizes="384px"
-            className="object-cover"
+        <Image
+          src={productImage}
+          alt={productName}
+          fill
+          sizes="384px"
+          className="object-cover select-none pointer-events-none"
+          draggable={false}
+        />
+        {/* Clickable overlay for navigation - only captures clicks, not touches */}
+        {productImages.length <= 1 && (
+          <Link 
+            href={`/products/${productSlug}`}
+            className="absolute inset-0 z-10"
+            onClick={(e) => {
+              // Don't navigate if clicking on a button
+              if (e.target.closest('button')) {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }}
           />
-        </Link>
+        )}
+        {/* For products with multiple images, handle click navigation manually */}
+        {productImages.length > 1 && (
+          <div 
+            className="absolute inset-0 z-10 cursor-pointer"
+            onClick={(e) => {
+              // Don't navigate if clicking on a button or during swipe
+              if (e.target.closest('button')) {
+                return;
+              }
+              // Check if this was a swipe (not a click)
+              if (touchStart !== null && touchEnd !== null) {
+                const distance = Math.abs(touchStart - touchEnd);
+                if (distance > minSwipeDistance) {
+                  return; // It was a swipe, don't navigate
+                }
+              }
+              // It was a click, navigate to product page
+              window.location.href = `/products/${productSlug}`;
+            }}
+          />
+        )}
 
         {/* Wishlist Button - Top Right - Heart Only, No Background */}
         <button
           onClick={handleWishlistToggle}
-          className="absolute top-3 right-3 flex items-center justify-center hover:scale-110 transition-all duration-200 z-10 text-accent"
+          className="absolute top-3 right-3 flex items-center justify-center hover:scale-110 transition-all duration-200 z-30 text-accent pointer-events-auto"
           aria-label={isLiked ? 'Remove from wishlist' : 'Add to wishlist'}
         >
           <HeartIcon isFilled={isLiked} className="w-5 h-5" />
@@ -178,7 +271,7 @@ export default function ProductCard({ product, onAdd }) {
                 e.stopPropagation();
                 handleImageChange('prev');
               }}
-              className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full items-center justify-center shadow-md transition-all duration-200 z-10 opacity-0 group-hover:opacity-100"
+              className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/90 hover:bg-white rounded-full items-center justify-center shadow-lg transition-all duration-200 z-30 opacity-0 group-hover:opacity-100 pointer-events-auto"
               aria-label="Previous image"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -191,7 +284,7 @@ export default function ProductCard({ product, onAdd }) {
                 e.stopPropagation();
                 handleImageChange('next');
               }}
-              className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full items-center justify-center shadow-md transition-all duration-200 z-10 opacity-0 group-hover:opacity-100"
+              className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/90 hover:bg-white rounded-full items-center justify-center shadow-lg transition-all duration-200 z-30 opacity-0 group-hover:opacity-100 pointer-events-auto"
               aria-label="Next image"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -205,7 +298,7 @@ export default function ProductCard({ product, onAdd }) {
         {productImages.length > 1 && (
           <>
             {/* Desktop - Bottom Center, show on hover */}
-            <div className="hidden md:flex absolute bottom-3 left-1/2 -translate-x-1/2 gap-1.5 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <div className="hidden md:flex absolute bottom-3 left-1/2 -translate-x-1/2 gap-1.5 z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-auto">
               {productImages.map((_, index) => (
                 <button
                   key={index}
@@ -215,15 +308,15 @@ export default function ProductCard({ product, onAdd }) {
                     setCurrentImageIndex(index);
                   }}
                   className={`transition-all duration-200 rounded-full ${index === currentImageIndex
-                    ? 'w-2 h-2 bg-black'
-                    : 'w-2 h-2 bg-white/80 hover:bg-white'
+                    ? 'w-2.5 h-2.5 bg-black'
+                    : 'w-2 h-2 bg-white/90 hover:bg-white border border-black/40'
                     }`}
                   aria-label={`View image ${index + 1}`}
                 />
               ))}
             </div>
             {/* Mobile - Bottom Left, always visible */}
-            <div className="flex md:hidden absolute bottom-3 left-3 gap-1.5 z-10">
+            <div className="flex md:hidden absolute bottom-3 left-3 gap-1.5 z-30 pointer-events-auto">
               {productImages.map((_, index) => (
                 <button
                   key={index}
@@ -233,8 +326,8 @@ export default function ProductCard({ product, onAdd }) {
                     setCurrentImageIndex(index);
                   }}
                   className={`transition-all duration-200 rounded-full ${index === currentImageIndex
-                    ? 'w-2 h-2 bg-black'
-                    : 'w-2 h-2 bg-white/80'
+                    ? 'w-2.5 h-2.5 bg-black'
+                    : 'w-2 h-2 bg-white/90 border border-black/40'
                     }`}
                   aria-label={`View image ${index + 1}`}
                 />
@@ -246,7 +339,7 @@ export default function ProductCard({ product, onAdd }) {
         {/* Shopping Cart Button - Bottom Right */}
         <button
           onClick={handleAddToCart}
-          className={`absolute bottom-3 right-3 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-all duration-200 z-10 ${inCart ? 'ring-2 ring-accent' : ''
+          className={`absolute bottom-3 right-3 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-all duration-200 z-30 pointer-events-auto ${inCart ? 'ring-2 ring-accent' : ''
             }`}
           aria-label={inCart ? 'Remove from cart' : 'Add to cart'}
         >

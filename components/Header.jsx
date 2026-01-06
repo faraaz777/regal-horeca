@@ -298,9 +298,9 @@ export default function Header() {
 
   return (
     <>
-      <div className="h-[80px] lg:h-[115px] w-full bg-white relative z-0" aria-hidden="true" />
+      <div className="h-16 lg:h-[115px] w-full bg-white relative z-0" aria-hidden="true" />
       <header
-        className={`bg-white fixed top-0 left-0 right-0 z-40 border-b border-black/5 transition-transform duration-300 ease-out ${isHeaderVisible ? "translate-y-0" : "-translate-y-full"
+        className={`bg-white fixed top-0 left-0 right-0 z-40  border-b  border-black/5 transition-transform duration-300 ease-out ${isHeaderVisible ? "translate-y-0" : "-translate-y-full"
           }`}
       >
         <div className="container mx-auto px-4 lg:px-8">

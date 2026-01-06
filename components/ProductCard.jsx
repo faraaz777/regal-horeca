@@ -141,11 +141,11 @@ export default function ProductCard({ product, onAdd }) {
   };
 
   return (
-    <div className="bg-white rounded-lg overflow-hidden flex flex-col h-full">
+    <div className="bg-white overflow-hidden flex flex-col h-full">
       {/* Image Container - Separated with rounded corners */}
       <div
         ref={imageContainerRef}
-        className="group relative w-full aspect-square overflow-hidden bg-gray-50 rounded-lg"
+        className="group relative w-full aspect-square overflow-hidden bg-gray-50 rounded-none"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -276,9 +276,15 @@ export default function ProductCard({ product, onAdd }) {
         {/* Price Section - Compact and Clean */}
         <div className="flex flex-col items-center gap-1 mt-auto">
           <div className="flex items-center justify-center gap-2 flex-wrap">
-            <span className="text-sm font-bold text-black">
-              {formatPrice(product.price || 0)}
-            </span>
+            {(() => {
+              const formattedPrice = formatPrice(product.price || 0);
+              const isPriceOnRequest = formattedPrice === 'Price on request';
+              return (
+                <span className={`text-sm ${isPriceOnRequest ? 'font-serif italic' : 'font-bold'} text-black`}>
+                  {formattedPrice}
+                </span>
+              );
+            })()}
             {(() => {
               // Calculate original price: use originalPrice if exists, otherwise calculate as price * 1.2
               const originalPrice = product.originalPrice && product.originalPrice > product.price

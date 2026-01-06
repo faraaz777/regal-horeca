@@ -14,7 +14,6 @@ import ContactUs from "@/components/ContactUs";
 import FAQs from "@/app/(main)/faqs/FAQs";
 import Hero from "@/components/Hero";
 import Numbers from "@/components/Numbers";
-import WhyChooseUs from "@/components/WhyChooseUs";
 import Locations from "@/components/about/Locations";
 import CategoriesSection from "@/components/CategoriesSection";
 import CircularCategories from "@/components/CircularCategories";
@@ -284,8 +283,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Why Choose Us Section */}
-      <WhyChooseUs />
 
       {/* Numbers/Stats Section */}
       <Numbers />

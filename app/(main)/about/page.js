@@ -11,6 +11,7 @@ import About from '@/components/about/About';
 import Features from '@/components/about/Features';
 import Partners from '@/components/about/Partners';
 import Ventures from '@/components/about/Ventures';
+import WhyChooseUs from '@/components/WhyChooseUs';
 import Locations from '@/components/about/Locations';
 
 export default function AboutPage() {
@@ -22,6 +23,7 @@ export default function AboutPage() {
       <Features />
       <Partners />
       <Ventures />
+      <WhyChooseUs />
       <Locations />
     </div>
   );

@@ -460,18 +460,18 @@ export default function ProductDetailPage() {
                 })()}
               </div>
 
-              {/* NEW CTA LAYOUT - Distinct Actions */}
+              {/* NEW CTA LAYOUT - All on One Line */}
               <div className="mt-4 pt-6 border-t border-black/5">
-                <div className="grid grid-cols-[auto_1fr] gap-3 mb-3">
-                  {/* Quantity - Distinct Block */}
-                  <div className="flex items-center bg-white border border-black/10 h-14 w-28">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  {/* Quantity - Left */}
+                  <div className="flex items-center bg-white border border-black/10 h-14 w-24 sm:w-28 rounded flex-shrink-0">
                     <button
                       onClick={() => handleQuantityChange(-1)}
                       className="w-8 h-full flex items-center justify-center text-black/30 hover:text-black transition-colors"
                     >
                       <MinusIcon className="w-3 h-3" />
                     </button>
-                    <span className="flex-1 text-center font-semibold text-rich-black">{quantity}</span>
+                    <span className="flex-1 text-center font-semibold text-rich-black text-sm">{quantity}</span>
                     <button
                       onClick={() => handleQuantityChange(1)}
                       className="w-8 h-full flex items-center justify-center text-black/30 hover:text-black transition-colors"
@@ -480,38 +480,42 @@ export default function ProductDetailPage() {
                     </button>
                   </div>
 
-                  {/* Add to Cart - Primary Brand Color */}
+                  {/* Add to Cart - Center (Primary) - Always Accent Color */}
                   <button
                     onClick={handleAddToCart}
-                    className={`h-14 transition-all duration-300 flex items-center justify-center gap-3 font-bold tracking-widest uppercase text-xs sm:text-sm ${inCart
-                      ? 'bg-rich-black text-white hover:bg-black'
-                      : 'bg-accent text-white hover:bg-red-600 shadow-lg shadow-accent/20'
-                      }`}
+                    className="flex-1 h-14 min-w-0 transition-all duration-300 flex items-center justify-center gap-1.5 sm:gap-3 font-bold tracking-widest uppercase text-[10px] sm:text-xs md:text-sm px-2 sm:px-4 bg-accent text-white hover:bg-red-600 shadow-lg shadow-accent/20"
                   >
-                    <ShoppingCartIcon size={18} />
-                    {inCart ? 'In Your Cart' : 'Add to Collection'}
+                    <ShoppingCartIcon className="w-3.5 h-3.5 sm:w-[18px] sm:h-[18px] flex-shrink-0" />
+                    <span className="truncate">Add to Collection</span>
                   </button>
+
+                  {/* Favorite Button - Right with Tooltip */}
+                  <div className="relative group flex-shrink-0">
+                    <button
+                      onClick={handleWishlistToggle}
+                      className={`h-14 w-12 sm:w-14 border transition-colors flex items-center justify-center rounded ${isLiked
+                        ? 'border-royal-gold text-royal-gold bg-royal-gold/5'
+                        : 'border-black/10 text-black/40 hover:text-rich-black hover:border-rich-black bg-white'
+                        }`}
+                    >
+                      <HeartIcon isFilled={isLiked} className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </button>
+                    {/* Tooltip */}
+                    <div className="absolute right-0 bottom-full mb-2 px-3 py-1.5 bg-rich-black text-white text-xs font-medium rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 whitespace-nowrap z-10">
+                      {isLiked ? 'Saved' : 'Save'}
+                      <div className="absolute -bottom-1 right-4 w-2 h-2 bg-rich-black rotate-45"></div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Secondary Actions Row */}
-                <div className="grid grid-cols-2 gap-3">
+                {/* Secondary Action - Request Detail (Below) */}
+                <div className="mt-3">
                   <button
                     onClick={handleEnquire}
-                    className="h-12 border border-black/10 text-rich-black bg-transparent hover:bg-rich-black hover:text-white transition-all duration-300 flex items-center justify-center gap-2 font-bold tracking-widest uppercase text-[10px] sm:text-xs"
+                    className="w-full h-12 border border-black/80 text-rich-black bg-transparent hover:bg-rich-black hover:text-white transition-all duration-300 flex items-center justify-center gap-2 font-bold tracking-widest uppercase text-[10px] sm:text-xs rounded"
                   >
                     <WhatsAppIcon size={16} />
                     Request Detail
-                  </button>
-
-                  <button
-                    onClick={handleWishlistToggle}
-                    className={`h-12 border transition-colors flex items-center justify-center gap-2 font-bold tracking-widest uppercase text-[10px] sm:text-xs ${isLiked
-                      ? 'border-royal-gold text-royal-gold bg-royal-gold/5'
-                      : 'border-black/10 text-black/40 hover:text-rich-black hover:border-rich-black'
-                      }`}
-                  >
-                    <HeartIcon isFilled={isLiked} className="w-4 h-4" />
-                    {isLiked ? 'Saved' : 'Save'}
                   </button>
                 </div>
               </div>

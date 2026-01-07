@@ -26,10 +26,10 @@ const CART_KEY = 'regal_cart';
 const ADMIN_KEY = 'regal_admin_auth';
 const ADMIN_TOKEN_KEY = 'regal_admin_token';
 
-export function AppProvider({ children }) {
+export function AppProvider({ children, initialCategories = [] }) {
   // State for data
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState(initialCategories);
   const [brands, setBrands] = useState([]);
   const [businessTypes, setBusinessTypes] = useState([]);
   
@@ -64,8 +64,15 @@ export function AppProvider({ children }) {
         setLoading(false);
   }, []);
 
-  // Fetch categories from API
+  // Fetch categories from API (only if not provided server-side, or to refresh)
+  // This ensures categories are available immediately from server-side rendering
   useEffect(() => {
+    // If we already have categories from server-side, skip initial fetch
+    // Only fetch if categories array is empty (fallback for client-side navigation)
+    if (categories.length > 0) {
+      return;
+    }
+
     async function fetchCategories() {
       try {
         const response = await fetch('/api/categories?tree=true', {
@@ -92,7 +99,7 @@ export function AppProvider({ children }) {
     }
 
     fetchCategories();
-  }, []);
+  }, [categories.length]);
 
   // Fetch brands from API
   useEffect(() => {

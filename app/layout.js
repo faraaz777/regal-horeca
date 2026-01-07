@@ -7,17 +7,21 @@
 
 import './globals.css';
 import { AppProvider } from '@/context/AppContext';
+import { getCategories } from '@/lib/utils/getCategories';
 
 export const metadata = {
   title: 'Regal HoReCa - Premium Hospitality Supplies',
   description: 'Your one-stop solution for hotel, restaurant, and café equipment and supplies.',
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  // Fetch categories server-side for instant availability
+  const initialCategories = await getCategories();
+
   return (
     <html lang="en">
       <body>
-        <AppProvider>
+        <AppProvider initialCategories={initialCategories}>
           {children}
         </AppProvider>
       </body>

@@ -15,7 +15,10 @@ export const metadata = {
 };
 
 export default async function RootLayout({ children }) {
-  // Fetch categories server-side for instant availability
+  // Fetch categories server-side with caching
+  // Uses React cache() for deduplication and unstable_cache for cross-request caching
+  // This ensures categories are available instantly without blocking page loads
+  // Cache prevents database queries on every request
   const initialCategories = await getCategories();
 
   return (

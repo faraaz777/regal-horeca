@@ -36,9 +36,11 @@ export async function GET(request) {
     if (asTree) {
       // Return as tree structure (cached on client side via SWR)
       const tree = await Category.buildTree();
+      // Convert Mongoose documents to plain objects for Client Components
+      const plainTree = JSON.parse(JSON.stringify(tree));
       return NextResponse.json({
         success: true,
-        categories: tree,
+        categories: plainTree,
       }, {
         headers: {
           'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200',

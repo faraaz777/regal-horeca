@@ -14,22 +14,12 @@ export const metadata = {
   description: 'Your one-stop solution for hotel, restaurant, and café equipment and supplies.',
 };
 
-// Force dynamic rendering to prevent build-time database calls
-export const dynamic = 'force-dynamic';
-
 export default async function RootLayout({ children }) {
-  // Fetch categories server-side for instant availability
-  // Skip during build to prevent build slowdown (categories will load client-side)
-  let initialCategories = [];
-  try {
-    // Only fetch if not during build phase
-    if (process.env.NEXT_PHASE !== 'phase-production-build') {
-      initialCategories = await getCategories();
-    }
-  } catch (error) {
-    // Silently fail during build - categories will load client-side
-    console.warn('Categories not available during build, will load client-side');
-  }
+  // Fetch categories server-side with caching
+  // Uses React cache() for deduplication and unstable_cache for cross-request caching
+  // This ensures categories are available instantly without blocking page loads
+  // Cache prevents database queries on every request
+  const initialCategories = await getCategories();
 
   return (
     <html lang="en">

@@ -657,7 +657,7 @@ function DepartmentsBar({
                             <li key={sub._id || sub.id}>
                               <Link
                                 href={`/catalog?category=${sub.slug}`}
-                                className="text-xs text-gray-500 hover:text-accent transition-colors block leading-tight"
+                                className="text-sm text-gray-500 hover:text-accent transition-colors block leading-tight"
                               >
                                 {sub.name}
                               </Link>

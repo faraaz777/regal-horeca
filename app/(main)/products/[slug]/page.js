@@ -581,24 +581,24 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Content Container */}
-          <div className="bg-white rounded-2xl p-8 sm:p-16 shadow-[0_4px_30px_rgba(0,0,0,0.02)] border border-black/5 min-h-[300px]">
+          <div className="bg-white rounded-2xl p-6 sm:p-16 shadow-[0_4px_30px_rgba(0,0,0,0.02)] border border-black/5 min-h-[300px]">
 
             {/* Specs Content */}
             {activeTab === 'specs' && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="text-center mb-10">
-                  <h3 className="font-serif italic text-2xl text-royal-gold mb-2">Technical Details</h3>
-                  <p className="text-black/40 text-sm">Precise craftsmanship and dimensions</p>
+                <div className="text-center mb-6 sm:mb-10">
+                  <h3 className="font-serif italic text-xl sm:text-2xl text-royal-gold mb-1 sm:mb-2">Technical Details</h3>
+                  <p className="text-black/40 text-xs sm:text-sm">Precise craftsmanship and dimensions</p>
                 </div>
 
                 {Object.keys(specificationsObj).length > 0 ? (
-                  <div className="max-w-3xl mx-auto space-y-4">
+                  <div className="max-w-3xl mx-auto space-y-2 sm:space-y-4">
                     {Object.entries(specificationsObj).map(([key, value]) => (
-                      <div key={key} className="flex flex-col sm:flex-row sm:items-baseline justify-between py-4 border-b border-black/5 hover:bg-warm-white/50 transition-colors px-4 rounded-lg group">
-                        <span className="text-xs font-bold uppercase tracking-[0.2em] text-black/30 group-hover:text-royal-gold transition-colors mb-1 sm:mb-0">
+                      <div key={key} className="flex flex-row items-baseline justify-between py-2.5 sm:py-4 border-b border-black/5 hover:bg-warm-white/50 transition-colors px-3 sm:px-4 rounded-lg group">
+                        <span className="text-[10px] sm:text-xs font-bold uppercase text-black/50 group-hover:text-royal-gold transition-colors flex-shrink-0 mr-3 sm:mr-4">
                           {key}
                         </span>
-                        <span className="font-medium text-rich-black text-base text-left sm:text-right sm:max-w-[60%]">
+                        <span className="text-[10px] sm:text-xs font-bold uppercase text-black/70 text-right max-w-[60%] flex-shrink">
                           {value}
                         </span>
                       </div>

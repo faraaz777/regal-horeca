@@ -31,7 +31,7 @@ export default async function CatalogPage({ searchParams }) {
 
     // Build query params from searchParams
     const productsParams = new URLSearchParams();
-    const facetsParams = new URLSearchParams();
+  const facetsParams = new URLSearchParams();
     
     if (searchParams?.category) {
       productsParams.set('category', searchParams.category);

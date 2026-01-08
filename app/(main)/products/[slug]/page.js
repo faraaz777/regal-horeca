@@ -464,7 +464,7 @@ export default function ProductDetailPage() {
               <div className="mt-4 pt-6 border-t border-black/5">
                 <div className="flex items-center gap-2 sm:gap-3">
                   {/* Quantity - Left */}
-                  <div className="flex items-center bg-white border border-black/10 h-14 w-24 sm:w-28 rounded flex-shrink-0">
+                  <div className="flex items-center bg-white border border-black/10 h-14 w-20 sm:w-24 rounded flex-shrink-0">
                     <button
                       onClick={() => handleQuantityChange(-1)}
                       className="w-8 h-full flex items-center justify-center text-black/30 hover:text-black transition-colors"
@@ -555,9 +555,9 @@ export default function ProductDetailPage() {
         </div>
 
         {/* Centralized Tabs Section - Specs & Description */}
-        <div className="mt-20 sm:mt-24 max-w-4xl mx-auto">
+        <div className="mt-1 sm:mt-12 max-w-4xl mx-auto">
           {/* Tab Header */}
-          <div className="flex justify-center mb-12">
+          <div className="flex justify-center mb-6">
             <div className="inline-flex bg-white rounded-full p-1 border border-black/5 shadow-sm">
               <button
                 onClick={() => setActiveTab('specs')}
@@ -581,12 +581,12 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Content Container */}
-          <div className="bg-white rounded-2xl p-6 sm:p-16 shadow-[0_4px_30px_rgba(0,0,0,0.02)] border border-black/5 min-h-[300px]">
+          <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-[0_4px_30px_rgba(0,0,0,0.02)] border border-black/5">
 
             {/* Specs Content */}
             {activeTab === 'specs' && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="text-center mb-6 sm:mb-10">
+                <div className="text-center mb-4 sm:mb-6">
                   <h3 className="font-serif italic text-xl sm:text-2xl text-royal-gold mb-1 sm:mb-2">Technical Details</h3>
                   <p className="text-black/40 text-xs sm:text-sm">Precise craftsmanship and dimensions</p>
                 </div>
@@ -614,7 +614,7 @@ export default function ProductDetailPage() {
             {/* Description Content */}
             {activeTab === 'description' && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-2xl mx-auto">
-                <div className="text-center mb-10">
+                <div className="text-center mb-6">
                   <h3 className="font-serif italic text-2xl text-royal-gold mb-2">The Experience</h3>
                   <div className="w-12 h-0.5 bg-royal-gold/30 mx-auto mt-4"></div>
                 </div>
@@ -632,7 +632,7 @@ export default function ProductDetailPage() {
 
         {/* Related Section */}
         {relatedProducts.length > 0 && (
-          <div className="mt-32 pt-16 border-t border-black/5">
+          <div className="mt-10 pt-8 border-t border-black/5">
             <div className="flex items-center justify-between mb-12">
               <h2 className="text-xl sm:text-2xl font-light text-rich-black uppercase tracking-widest">You May Also Like</h2>
               <Link href="/catalog" className="hidden sm:block text-xs font-bold uppercase tracking-widest text-royal-gold hover:text-accent transition-colors">

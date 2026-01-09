@@ -93,13 +93,13 @@ export default async function HomePage() {
       <CircularCategories categories={categories} />
 
       {/* Featured Products Section */}
-      <section className="py-12 bg-white">
+      <section className="py-2 sm:py-6 md:py-10 bg-white">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-serif text-black mb-4">
+          <div className="text-center mb-8 sm:mb-10 md:mb-14">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif text-black mb-2 sm:mb-3 md:mb-4">
               Featured Products
             </h2>
-            <p className="text-black/60 max-w-2xl mx-auto font-light">
+            <p className="text-black/60 max-w-2xl mx-auto font-light text-sm sm:text-base">
               Handpicked items that define quality and elegance.
             </p>
           </div>

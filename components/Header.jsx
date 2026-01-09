@@ -10,7 +10,7 @@
  * - Visuals: Less rounded, cleaner borders, "Airy" feel
  */
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import useSWR from 'swr';
 import Logo from "./new/regalLogo.png";
 import Link from "next/link";
@@ -100,6 +100,26 @@ export default function Header() {
   const [departmentProducts, setDepartmentProducts] = useState({});
 
   const departmentMenuRefs = useRef({});
+  
+  // Debounced prefetch function to avoid too many requests
+  const prefetchTimeoutRef = useRef({});
+  const prefetchCatalog = useCallback((categorySlug) => {
+    // Clear existing timeout for this category
+    if (prefetchTimeoutRef.current[categorySlug]) {
+      clearTimeout(prefetchTimeoutRef.current[categorySlug]);
+    }
+    
+    // Set new timeout (debounce: 200ms)
+    prefetchTimeoutRef.current[categorySlug] = setTimeout(() => {
+      const url = `/catalog?category=${categorySlug}`;
+      router.prefetch(url);
+      // Prefetch API data in parallel
+      Promise.all([
+        fetch(`/api/products?category=${categorySlug}&page=1&limit=24`).catch(() => {}),
+        fetch(`/api/products/facets?category=${categorySlug}`).catch(() => {})
+      ]);
+    }, 200);
+  }, [router]);
 
   const navLinkClass =
     "text-xs md:text-xs font-semibold tracking-wide uppercase text-black hover:text-accent transition-colors relative py-2.5 group whitespace-nowrap flex-shrink-0";
@@ -267,13 +287,15 @@ export default function Header() {
   }, [activeDepartment, departments]);
 
   // Use SWR for fetching featured products with caching and deduplication
+  // OPTIMIZED: Increased deduping interval and added fallback data from cache
   const { data: productsData, error: productsError, isLoading: productsLoading } = useSWR(
     activeDept?.slug ? `/api/products?category=${activeDept.slug}&featured=true&limit=10` : null,
     fetcher,
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
-      dedupingInterval: 60000, // Cache for 1 minute
+      dedupingInterval: 300000, // Cache for 5 minutes (increased from 1 minute)
+      fallbackData: activeDept?.slug ? departmentProducts[activeDept.slug] ? { success: true, products: departmentProducts[activeDept.slug] } : null : null,
       onError: (error) => {
         console.error('Failed to fetch department products:', error);
       },
@@ -406,6 +428,7 @@ export default function Header() {
               topLevelCategories={topLevelCategories}
               productsLoading={productsLoading}
               productsError={productsError}
+              prefetchCatalog={prefetchCatalog}
             />
           </div>
 
@@ -478,6 +501,7 @@ function DepartmentsBar({
   setIsMoreDropdownOpen,
   productsLoading,
   productsError,
+  prefetchCatalog,
 }) {
   // Always show the department bar, even if empty (will show Home, About, More)
   // if (!departments.length) return null;
@@ -545,7 +569,11 @@ function DepartmentsBar({
                 className="relative flex items-center h-full"
                 onMouseEnter={() => setActiveDepartment(deptSlug)}
               >
-                <Link href={`/catalog?category=${dept.slug}`} className={navLinkClass}>
+                <Link 
+                  href={`/catalog?category=${dept.slug}`} 
+                  className={navLinkClass}
+                  onMouseEnter={() => prefetchCatalog(dept.slug)}
+                >
                   <span>{dept.name}</span>
                   {/* Active/Hover line */}
                   <span
@@ -648,6 +676,7 @@ function DepartmentsBar({
                         href={`/catalog?category=${childCat.slug}`}
                         className="block text-xs font-semibold uppercase tracking-wide text-black hover:text-accent pb-2 border-b border-black/5 min-h-[1.5rem] line-clamp-2"
                         title={childCat.name}
+                        onMouseEnter={() => prefetchCatalog(childCat.slug)}
                       >
                         {childCat.name}
                       </Link>
@@ -658,6 +687,7 @@ function DepartmentsBar({
                               <Link
                                 href={`/catalog?category=${sub.slug}`}
                                 className="text-sm text-gray-500 hover:text-accent transition-colors block leading-tight"
+                                onMouseEnter={() => prefetchCatalog(sub.slug)}
                               >
                                 {sub.name}
                               </Link>

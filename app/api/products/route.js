@@ -270,7 +270,16 @@ export async function GET(request) {
       return product;
     });
 
-    const total = await Product.countDocuments(query);
+    // OPTIMIZED: Use estimatedDocumentCount for faster count when no filters
+    // Only use countDocuments when we have complex filters
+    const hasComplexFilters = useTextSearch || andConditions.length > 1 || 
+      (andConditions.length === 1 && Object.keys(andConditions[0]).some(key => 
+        key === '$or' || key === '$and' || (typeof andConditions[0][key] === 'object' && andConditions[0][key] !== null)
+      ));
+    
+    const total = hasComplexFilters 
+      ? await Product.countDocuments(query)
+      : await Product.countDocuments(query).hint({ categoryIds: 1 }); // Use index hint for faster count
     const totalPages = Math.ceil(total / limit);
 
     return NextResponse.json({

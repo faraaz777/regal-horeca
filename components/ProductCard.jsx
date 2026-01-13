@@ -45,19 +45,19 @@ export default function ProductCard({ product, onAdd }) {
 
   const productImages = getProductImages();
 
-  // Debug: Log image detection
-  useEffect(() => {
-    if (productImages.length > 1) {
-      console.log('Product has multiple images:', {
-        productId: product._id || product.id,
-        title: product.title,
-        heroImage: product.heroImage,
-        gallery: product.gallery,
-        totalImages: productImages.length,
-        images: productImages
-      });
-    }
-  }, [productImages.length, product._id, product.id, product.title, product.heroImage, product.gallery]);
+  // Debug: Log image detection (only in development)
+  // useEffect(() => {
+  //   if (process.env.NODE_ENV === 'development' && productImages.length > 1) {
+  //     console.log('Product has multiple images:', {
+  //       productId: product._id || product.id,
+  //       title: product.title,
+  //       heroImage: product.heroImage,
+  //       gallery: product.gallery,
+  //       totalImages: productImages.length,
+  //       images: productImages
+  //     });
+  //   }
+  // }, [productImages.length, product._id, product.id, product.title, product.heroImage, product.gallery]);
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [touchStart, setTouchStart] = useState(null);

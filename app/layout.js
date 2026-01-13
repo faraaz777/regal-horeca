@@ -12,6 +12,9 @@ import { getCategories } from '@/lib/utils/getCategories';
 export const metadata = {
   title: 'Regal HoReCa - Premium Hospitality Supplies',
   description: 'Your one-stop solution for hotel, restaurant, and café equipment and supplies.',
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export default async function RootLayout({ children }) {
@@ -22,8 +25,8 @@ export default async function RootLayout({ children }) {
   const initialCategories = await getCategories();
 
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <AppProvider initialCategories={initialCategories}>
           {children}
         </AppProvider>

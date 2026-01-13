@@ -518,6 +518,86 @@ export default function AdminCategoriesPage() {
 }
 
 /**
+ * Uploads a file to Cloudflare R2 via the API
+ * Compresses images on frontend before upload to prevent HTTP 413 errors
+ */
+async function uploadToR2(file, folder = 'categories') {
+  // Dynamically import compression library to keep bundle size small
+  const imageCompression = (await import('browser-image-compression')).default;
+  
+  const MAX_INPUT_SIZE = 15 * 1024 * 1024; // 15MB - reject files larger than this
+  const MAX_OUTPUT_SIZE = 4 * 1024 * 1024; // 4MB - target compressed size
+  
+  try {
+    // Hard pre-check: Reject files larger than 15MB
+    if (file.size > MAX_INPUT_SIZE) {
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      throw new Error(`File size (${fileSizeMB}MB) exceeds the maximum allowed size of 15MB. Please choose a smaller image.`);
+    }
+    
+    // Validate file type
+    const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validImageTypes.includes(file.type)) {
+      throw new Error(`Invalid file type. Only images (JPEG, PNG, GIF, WebP) are allowed.`);
+    }
+    
+    let fileToUpload = file;
+    
+    // Compress image if it's larger than 4MB
+    if (file.size > MAX_OUTPUT_SIZE) {
+      try {
+        const compressionOptions = {
+          maxSizeMB: 4, // Target 4MB max
+          useWebWorker: true, // Use Web Worker for better performance
+          fileType: file.type, // Preserve original file type
+          preserveExif: false, // Remove EXIF data to reduce size
+        };
+        
+        fileToUpload = await imageCompression(file, compressionOptions);
+        
+        // Validate compressed file size before uploading
+        if (fileToUpload.size > MAX_OUTPUT_SIZE * 1.1) { // Allow 10% buffer
+          const compressedSizeMB = (fileToUpload.size / (1024 * 1024)).toFixed(2);
+          throw new Error(`Compression failed: Image is still ${compressedSizeMB}MB after compression. Please try a smaller image.`);
+        }
+      } catch (compressionError) {
+        // If compression fails, provide helpful error message
+        if (compressionError.message.includes('Compression failed')) {
+          throw compressionError;
+        }
+        throw new Error(`Image compression failed: ${compressionError.message}. Please try a different image.`);
+      }
+    }
+    
+    // Create FormData with compressed file (preserve original filename)
+    const formData = new FormData();
+    formData.append('file', fileToUpload, file.name);
+    
+    // Upload to server
+    const response = await fetch(`/api/upload?folder=${folder}`, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok || !data.success) {
+      const errorMessage = data.error || 'Upload failed';
+      const errorDetails = data.details ? `: ${data.details}` : '';
+      throw new Error(`${errorMessage}${errorDetails}`);
+    }
+    
+    return data.url;
+  } catch (error) {
+    // Re-throw with clear error message
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(`Upload failed: ${String(error)}`);
+  }
+}
+
+/**
  * Category Form Component
  * Modal form for creating/editing categories
  */
@@ -531,6 +611,7 @@ function CategoryForm({ category, allCategories, onSave, onClose, loading }) {
     image: '',
   });
   const [error, setError] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     if (category) {
@@ -560,6 +641,28 @@ function CategoryForm({ category, allCategories, onSave, onClose, loading }) {
       setFormData({ ...formData, [name]: value || null });
     } else {
       setFormData({ ...formData, [name]: value });
+    }
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setError('');
+
+    try {
+      const imageUrl = await uploadToR2(file, 'categories');
+      setFormData({ ...formData, image: imageUrl });
+      showToast.success('Image uploaded successfully');
+    } catch (error) {
+      console.error('Upload failed', error);
+      setError(`Image upload failed: ${error.message}`);
+      showToast.error(`Image upload failed: ${error.message}`);
+    } finally {
+      setIsUploading(false);
+      // Reset file input
+      e.target.value = '';
     }
   };
 
@@ -662,18 +765,99 @@ function CategoryForm({ category, allCategories, onSave, onClose, loading }) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Image URL</label>
-              <input 
-                name="image" 
-                type="url"
-                value={formData.image || ''} 
-                onChange={handleChange} 
-                placeholder="https://example.com/image.jpg"
-                className="w-full mt-1 p-2.5 sm:p-2 border border-gray-300 rounded-md shadow-sm text-base" 
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Enter the full URL of the category image (e.g., from Unsplash, your CDN, or uploaded images)
-              </p>
+              <label className="block text-sm font-medium mb-1">Category Image</label>
+              
+              {/* Image Upload Section */}
+              <div className="mb-3">
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Upload Image
+                </label>
+                <div className="flex items-center gap-2">
+                  <label className="flex-1 cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                      onChange={handleImageUpload}
+                      disabled={isUploading || loading}
+                      className="hidden"
+                    />
+                    <div className={`w-full px-4 py-2.5 border-2 border-dashed rounded-md text-center transition-colors ${
+                      isUploading 
+                        ? 'border-gray-300 bg-gray-50 cursor-not-allowed' 
+                        : 'border-gray-300 hover:border-primary hover:bg-primary/5 cursor-pointer'
+                    }`}>
+                      {isUploading ? (
+                        <span className="text-sm text-gray-500">Uploading...</span>
+                      ) : (
+                        <span className="text-sm text-gray-600">
+                          Click to upload or drag and drop
+                        </span>
+                      )}
+                    </div>
+                  </label>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Max file size: 15MB. Supported formats: JPEG, PNG, GIF, WebP
+                </p>
+              </div>
+
+              {/* Divider */}
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">OR</span>
+                </div>
+              </div>
+
+              {/* Image URL Input */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Image URL
+                </label>
+                <input 
+                  name="image" 
+                  type="url"
+                  value={formData.image || ''} 
+                  onChange={handleChange} 
+                  placeholder="https://example.com/image.jpg"
+                  className="w-full mt-1 p-2.5 sm:p-2 border border-gray-300 rounded-md shadow-sm text-base" 
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Enter the full URL of the category image (e.g., from Unsplash, your CDN, or uploaded images)
+                </p>
+              </div>
+
+              {/* Image Preview */}
+              {formData.image && (
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-2">
+                    Preview
+                  </label>
+                  <div className="relative w-full h-48 border border-gray-300 rounded-md overflow-hidden bg-gray-50">
+                    <img
+                      src={formData.image}
+                      alt="Category preview"
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
+                    />
+                    <div className="hidden w-full h-full items-center justify-center text-sm text-gray-400">
+                      Failed to load image
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, image: '' })}
+                    className="mt-2 text-xs text-red-600 hover:text-red-800"
+                  >
+                    Remove image
+                  </button>
+                </div>
+              )}
             </div>
           </div>
           <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 p-4 border-t bg-gray-50">

@@ -154,6 +154,7 @@ export default function CategoriesSection({ categories }) {
                           src={cat.image}
                           alt={cat.name}
                           fill
+                          unoptimized
                           sizes="280px"
                           className={`object-cover transition-transform duration-700 ${isActive ? "scale-110 md:scale-100" : "scale-100 group-hover:scale-110"
                             }`}

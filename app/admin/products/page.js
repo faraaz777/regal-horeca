@@ -67,8 +67,7 @@ export default function AdminProductsPage() {
 
   // Build URL with pagination and search
   const getProductsUrl = (page, search) => {
-    const skip = (page - 1) * ITEMS_PER_PAGE;
-    let url = `/api/products?limit=${ITEMS_PER_PAGE}&skip=${skip}`;
+    let url = `/api/products?limit=${ITEMS_PER_PAGE}&page=${page}`;
     if (search) {
       url += `&search=${encodeURIComponent(search)}`;
     }

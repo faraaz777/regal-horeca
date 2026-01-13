@@ -25,11 +25,11 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   SearchIcon,
-  ShoppingCartIcon,
   InfoIcon,
   UserIcon,
   PhoneIcon,
 } from "./Icons";
+import { ClipboardList as LuClipboardList } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import SearchBar from "./new/SearchBar";
 import CartDrawer from "./CartDrawer";
@@ -382,7 +382,7 @@ export default function Header() {
                 onClick={() => setIsCartOpen(true)}
                 className="relative p-1.5 text-black hover:text-accent transition-colors"
               >
-                <ShoppingCartIcon className="w-5 h-5 md:w-5 md:h-5" />
+                <LuClipboardList className="w-5 h-5 md:w-5 md:h-5" />
                 {getCartTotalItems() > 0 && (
                   <span className="absolute top-0 right-0 bg-accent text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold shadow-sm">
                     {getCartTotalItems()}
@@ -930,7 +930,7 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
               className="flex-1 flex items-center justify-center gap-2 py-4 px-4 text-sm font-medium text-black hover:bg-gray-50 transition-colors relative"
             >
               <div className="relative">
-                <ShoppingCartIcon className="w-5 h-5 text-gray-700" />
+                <LuClipboardList className="w-5 h-5 text-gray-700" />
                 {cartTotalItems > 0 && (
                   <span className="absolute -top-1 -right-1 bg-accent text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
                     {cartTotalItems}

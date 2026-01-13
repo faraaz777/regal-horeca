@@ -124,7 +124,7 @@ export default function CategoriesSection({ categories }) {
 
         <div
           ref={scrollContainerRef}
-          className={`flex w-full overflow-x-auto pb-8 md:pb-12 gap-4 md:gap-6 snap-x snap-mandatory pl-4 pr-8 md:px-12 hide-scrollbar ${mainCategories.length <= 5 ? "md:justify-center" : ""
+          className={`flex w-full overflow-x-auto pb-8 md:pb-12 gap-4 md:gap-6 snap-x py-2  snap-mandatory pl-4 pr-8 md:px-12 hide-scrollbar ${mainCategories.length <= 5 ? "md:justify-center" : ""
             }`}
           style={{ WebkitOverflowScrolling: 'touch' }}
         >

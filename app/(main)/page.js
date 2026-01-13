@@ -206,6 +206,7 @@ export default async function HomePage() {
               className="inline-flex items-center gap-2 border-b border-black pb-1 text-sm font-bold uppercase tracking-widest hover:text-accent hover:border-accent transition-colors"
             >
               See All New Items
+              <span>→</span>
             </Link>
           </div>
         </div>

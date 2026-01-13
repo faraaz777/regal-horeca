@@ -62,6 +62,7 @@ export default function CircularCategories({ categories }) {
                       src={cat.image}
                       alt={cat.name}
                       fill
+                      unoptimized
                       sizes="(max-width: 640px) 80px, (max-width: 768px) 80px, (max-width: 1024px) 96px, 112px"
                       className="object-cover group-hover:scale-110 transition-transform duration-300"
                     />

@@ -17,11 +17,11 @@ const getImageSrc = (img) => {
 // 2. Import it at the top: import newbrand from "../lib/newbrand.png"
 // 3. Add it to the BRANDS array below using getImageSrc(newbrand)
 const BRANDS = [
-  { src: getImageSrc(bybone), name: "By Bone" },
+  // { src: getImageSrc(bybone), name: "By Bone" },
   { src: getImageSrc(ocean), name: "Ocean" },
   { src: getImageSrc(ariane), name: "Ariane" },
   { src: "https://fns.co.in/cdn/shop/files/Frame_9309_110x.png?v=1721712046", name: "fns" },
-  // { src: "https://bybone.com/wp-content/uploads/2023/12/logow300_white.png", name: "By Bone" },
+  { src: "https://bybone.com/wp-content/uploads/2023/12/logow300_white.png", name: "By Bone" },
   { src:  "https://sujataappliances.com/wp-content/uploads/2021/08/SujataLogo-NEW-1024x345.png", name: "sujata" },
   { src: "https://www.milton.in/cdn/shop/files/1__1_-removebg-preview_1_a5b0b114-e4b3-4846-afe9-b88cac3a7abc.png?v=1752814136&width=200", name: "Milton" },
   { src: "https://file.hstatic.net/200000409027/file/logo_300_x_83_e722f9e57bbc489f85994c3fb893ccd5.png", name: "Superware" },
@@ -30,13 +30,13 @@ const BRANDS = [
 
 export default function Brands() {
   return (
-    <section className="relative bg-white border-t-4 border-b-4 border-black overflow-hidden">
+    <section className="relative bg-gray-900 overflow-hidden">
       {/* Full-bleed background */}
       <div className="w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] py-6 sm:py-7 md:py-8">
 
         {/* Heading */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 mb-6 sm:mb-7 md:mb-8 text-center">
-          <p className="text-sm sm:text-base md:text-lg uppercase font-semibold tracking-[0.25em] sm:tracking-[0.35em] text-black/60">
+          <p className="text-sm sm:text-base md:text-lg uppercase font-semibold tracking-[0.25em] sm:tracking-[0.35em] text-white/90">
             Trusted by the best in the world
           </p>
         </div>
@@ -44,8 +44,8 @@ export default function Brands() {
         {/* Marquee Container */}
         <div className="relative overflow-hidden">
           {/* Gradient overlays for smooth fade effect */}
-          <div className="absolute left-0 top-0 bottom-0 w-32 sm:w-48 md:w-64 bg-gradient-to-r from-white via-white/80 to-transparent z-10 pointer-events-none" />
-          <div className="absolute right-0 top-0 bottom-0 w-32 sm:w-48 md:w-64 bg-gradient-to-l from-white via-white/80 to-transparent z-10 pointer-events-none" />
+          <div className="absolute left-0 top-0 bottom-0 w-16 sm:w-20 md:w-24 bg-gradient-to-r from-gray-900 via-gray-900/80 to-transparent z-10 pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-16 sm:w-20 md:w-24 bg-gradient-to-l from-gray-900 via-gray-900/80 to-transparent z-10 pointer-events-none" />
 
           {/* Logo track */}
           <div className="flex gap-16 sm:gap-20 md:gap-24 lg:gap-32 animate-marquee items-center py-4">
@@ -54,7 +54,7 @@ export default function Brands() {
                 <img
                   src={brand.src}
                   alt={brand.name}
-                  className="h-8 sm:h-10 md:h-12 w-auto object-contain opacity-80"
+                  className="h-8 sm:h-10 md:h-12 w-auto object-contain opacity-70"
                 />
               </div>
             ))}

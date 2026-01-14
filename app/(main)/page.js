@@ -213,8 +213,8 @@ export default async function HomePage() {
       </section>
 
       {/* Brands Section */}
-      <section className="my-12 bg-white w-full flex justify-center items-center ">
-        <div className="container bg-white  ">
+      <section className="my-12 bg-gray-900 w-full flex justify-center items-center ">
+        <div className="container bg-gray-900  ">
           <Brands />
         </div>
       </section>

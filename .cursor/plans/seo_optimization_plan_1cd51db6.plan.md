@@ -48,6 +48,11 @@ todos:
     status: pending
     dependencies:
       - navbar-seo
+  - id: cache-revalidation-products
+    content: Add revalidatePath calls for product pages and sitemap in product API routes (POST, PUT, DELETE)
+    status: pending
+    dependencies:
+      - sitemap-generation
 ---
 
 # SEO Optimization Plan for Regal Horeca
@@ -301,7 +306,64 @@ Consider adding:
 - Use `generateMetadata` for dynamic SEO
 - Fetch product data server-side for initial HTML
 
-#### 8.2 Canonical URLs
+#### 8.2 Cache Revalidation for Product SEO (Critical)
+
+**Current Issue:**
+
+- Product API routes only revalidate homepage on create/update/delete
+- Product pages and sitemap are not revalidated
+- This means new products won't appear in sitemap immediately
+- Updated product metadata won't be reflected until cache expires
+
+**Required Changes:**
+
+1. **Product Creation (POST)** - File: `app/api/products/route.js`
+
+   - After line 453 (`revalidateHomepage()`), add:
+     ```javascript
+     // Revalidate product page for SEO
+     revalidatePath(`/products/${product.slug}`);
+     // Revalidate sitemap to include new product
+     revalidatePath('/sitemap.xml');
+     ```
+
+
+2. **Product Update (PUT)** - File: `app/api/products/[id]/route.js`
+
+   - After line 293 (`revalidateHomepage()`), add:
+     ```javascript
+     // Revalidate product page for SEO
+     revalidatePath(`/products/${product.slug}`);
+     // Revalidate sitemap
+     revalidatePath('/sitemap.xml');
+     ```
+
+
+3. **Product Deletion (DELETE)** - File: `app/api/products/[id]/route.js`
+
+   - After line 356 (`revalidateHomepage()`), add:
+     ```javascript
+     // Revalidate sitemap to remove deleted product
+     revalidatePath('/sitemap.xml');
+     ```
+
+
+4. **Import Statement**
+
+   - Ensure both files import `revalidatePath`:
+     ```javascript
+     import { revalidateHomepage, revalidatePath } from '@/lib/utils/revalidate';
+     ```
+
+
+**Why This Matters:**
+
+- Without revalidation: New products won't appear in sitemap, updated metadata may be stale
+- With revalidation: Instant sitemap updates, fresh product page metadata for search engines
+
+**Note:** No admin form changes needed - metadata is auto-generated from existing product fields (title, description, brand, price, slug, etc.)
+
+#### 8.3 Canonical URLs
 
 - Add canonical tags to prevent duplicate content
 - Handle URL parameters properly (catalog filters)
@@ -323,17 +385,20 @@ Consider adding:
 5. `app/(main)/products/[slug]/page.js` - Add generateMetadata, convert to SSR (if possible)
 6. `components/about/About.jsx` - Enhanced content with keywords
 7. `app/(main)/catalog/page.js` - Add dynamic metadata
+8. `app/api/products/route.js` - **CRITICAL**: Add cache revalidation for product pages and sitemap on create
+9. `app/api/products/[id]/route.js` - **CRITICAL**: Add cache revalidation for product pages and sitemap on update/delete
 
 ## Priority Ranking
 
 **Critical (Do First):**
 
 1. **Navbar dropdown SEO** - Make category links always accessible to crawlers
-2. robots.txt and sitemap.xml (include all category URLs)
-3. Enhanced root layout metadata with OG tags
-4. Product page metadata (generateMetadata)
-5. Organization and LocalBusiness schema
-6. SiteNavigationElement schema for navigation structure
+2. **Cache revalidation** - Add product page and sitemap revalidation to API routes (ensures SEO updates work)
+3. robots.txt and sitemap.xml (include all category URLs)
+4. Enhanced root layout metadata with OG tags
+5. Product page metadata (generateMetadata)
+6. Organization and LocalBusiness schema
+7. SiteNavigationElement schema for navigation structure
 
 **High Priority:**
 

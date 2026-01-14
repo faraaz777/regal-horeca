@@ -21,6 +21,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
   const router = useRouter();
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [openFilterSections, setOpenFilterSections] = useState({
     price: true,
@@ -660,9 +661,11 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
 
       <div className="flex flex-col lg:flex-row gap-12">
         {/* Filter Sidebar */}
-        <div className="hidden lg:block w-1/4 xl:w-1/5 border-r border-black/10">
-          <FilterSidebar />
-        </div>
+        {isDesktopSidebarOpen && (
+          <div className="hidden lg:block w-1/4 xl:w-1/5 border-r border-black/10 transition-all duration-300 ease-in-out">
+            <FilterSidebar />
+          </div>
+        )}
 
         {/* Mobile Filter Overlay */}
         {isFilterOpen && (
@@ -675,23 +678,40 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
         )}
 
         {/* Main Content */}
-        <main className="w-full lg:w-3/4 xl:w-4/5">
+        <main className={`w-full transition-all duration-300 ease-in-out ${isDesktopSidebarOpen ? 'lg:w-3/4 xl:w-4/5' : 'lg:w-full'}`}>
           {/* Toolbar */}
           <div className="flex justify-between items-center mb-6">
-            <button
-              onClick={() => setIsFilterOpen(true)}
-              className="flex items-center gap-2 font-semibold lg:hidden"
-            >
-              <FilterIcon /> Filter
-              {hasActiveFilters && (
-                <span className="ml-1 px-2 py-0.5 text-xs bg-accent text-white rounded-full">
-                  {Object.keys(selectedFilters).length +
-                    selectedColors.length +
-                    selectedBrands.length +
-                    (priceRange.minValue || priceRange.maxValue ? 1 : 0)}
-                </span>
-              )}
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setIsFilterOpen(true)}
+                className="flex items-center gap-2 font-semibold lg:hidden"
+              >
+                <FilterIcon /> Filter
+                {hasActiveFilters && (
+                  <span className="ml-1 px-2 py-0.5 text-xs bg-accent text-white rounded-full">
+                    {Object.keys(selectedFilters).length +
+                      selectedColors.length +
+                      selectedBrands.length +
+                      (priceRange.minValue || priceRange.maxValue ? 1 : 0)}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setIsDesktopSidebarOpen(!isDesktopSidebarOpen)}
+                className="hidden lg:flex items-center gap-2 font-semibold hover:text-accent transition-colors"
+              >
+                <FilterIcon className="w-5 h-5" />
+                <span>{isDesktopSidebarOpen ? 'Hide' : 'Show'} Filters</span>
+                {hasActiveFilters && (
+                  <span className="ml-1 px-2 py-0.5 text-xs bg-accent text-white rounded-full">
+                    {Object.keys(selectedFilters).length +
+                      selectedColors.length +
+                      selectedBrands.length +
+                      (priceRange.minValue || priceRange.maxValue ? 1 : 0)}
+                  </span>
+                )}
+              </button>
+            </div>
             <div className="hidden lg:block text-sm text-black/70">
               Showing {paginatedProducts.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0} - {Math.min(currentPage * ITEMS_PER_PAGE, totalProducts)} of {totalProducts}
             </div>

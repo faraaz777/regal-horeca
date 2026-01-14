@@ -7,7 +7,7 @@ import useSWR from 'swr';
 import ProductCard from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 import { useAppContext } from '@/context/AppContext';
-import { PlusIcon, MinusIcon, FilterIcon, XIcon, ChevronLeftIcon } from '@/components/Icons';
+import { PlusIcon, MinusIcon, FilterIcon, XIcon, ChevronLeftIcon, Grid2x2Icon, Grid3x3Icon, Grid4x4Icon, ListIcon } from '@/components/Icons';
 import '@/components/new/SidebarFilter.css';
 
 const ITEMS_PER_PAGE = 24;
@@ -27,6 +27,23 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
     price: true,
     color: true,
     brand: true,
+  });
+
+  // Grid view states - separate for mobile and desktop
+  const [mobileGridView, setMobileGridView] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('catalog-mobile-grid-view');
+      return saved || '2'; // Default: 2 columns for mobile
+    }
+    return '2';
+  });
+
+  const [desktopGridView, setDesktopGridView] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('catalog-desktop-grid-view');
+      return saved || '3'; // Default: 3 columns for desktop
+    }
+    return '3';
   });
 
   // Get all filters from URL (server-side filtering)
@@ -281,6 +298,19 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
   useEffect(() => {
     setIsFilterOpen(false);
   }, [selectedCategorySlug, selectedBusinessSlug, searchQuery]);
+
+  // Save grid view preferences to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('catalog-mobile-grid-view', mobileGridView);
+    }
+  }, [mobileGridView]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('catalog-desktop-grid-view', desktopGridView);
+    }
+  }, [desktopGridView]);
 
   // Initialize filter sections dynamically
   useEffect(() => {
@@ -641,6 +671,24 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
 
   const isLoading = contextLoading || facetsLoading;
 
+  // Get grid classes based on view preference
+  const getGridClasses = useCallback(() => {
+    // Mobile grid classes
+    const mobileClasses = {
+      '1': 'grid-cols-1',
+      '2': 'grid-cols-2',
+    };
+
+    // Desktop grid classes
+    const desktopClasses = {
+      '2': 'lg:grid-cols-2',
+      '3': 'lg:grid-cols-3',
+      '4': 'lg:grid-cols-4',
+    };
+
+    return `${mobileClasses[mobileGridView] || 'grid-cols-2'} ${desktopClasses[desktopGridView] || 'lg:grid-cols-3'}`;
+  }, [mobileGridView, desktopGridView]);
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="text-center mb-8">
@@ -716,18 +764,83 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
               Showing {paginatedProducts.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0} - {Math.min(currentPage * ITEMS_PER_PAGE, totalProducts)} of {totalProducts}
             </div>
 
-            <div className="flex items-center gap-2">
-              <label htmlFor="sort" className="text-sm text-black/70">Sort by:</label>
-              <select
-                id="sort"
-                value={sortBy}
-                onChange={e => handleSortChange(e.target.value)}
-                className="border border-black/20 rounded-sm p-2 text-sm text-black bg-white"
-              >
-                <option value="newest">Date, new to old</option>
-                <option value="price-asc">Price, low to high</option>
-                <option value="price-desc">Price, high to low</option>
-              </select>
+            <div className="flex items-center gap-4">
+              {/* Grid View Selector - Mobile */}
+              <div className="flex items-center gap-1 lg:hidden border border-black/20 rounded-sm p-1">
+                <button
+                  onClick={() => setMobileGridView('1')}
+                  className={`p-1.5 rounded transition-colors ${
+                    mobileGridView === '1'
+                      ? 'bg-accent text-white'
+                      : 'text-black/60 hover:text-black hover:bg-black/5'
+                  }`}
+                  title="1 Column"
+                >
+                  <ListIcon className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setMobileGridView('2')}
+                  className={`p-1.5 rounded transition-colors ${
+                    mobileGridView === '2'
+                      ? 'bg-accent text-white'
+                      : 'text-black/60 hover:text-black hover:bg-black/5'
+                  }`}
+                  title="2 Columns"
+                >
+                  <Grid2x2Icon className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Grid View Selector - Desktop */}
+              <div className="hidden lg:flex items-center gap-1 border border-black/20 rounded-sm p-1">
+                <button
+                  onClick={() => setDesktopGridView('2')}
+                  className={`p-1.5 rounded transition-colors ${
+                    desktopGridView === '2'
+                      ? 'bg-accent text-white'
+                      : 'text-black/60 hover:text-black hover:bg-black/5'
+                  }`}
+                  title="2 Columns"
+                >
+                  <Grid2x2Icon className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setDesktopGridView('3')}
+                  className={`p-1.5 rounded transition-colors ${
+                    desktopGridView === '3'
+                      ? 'bg-accent text-white'
+                      : 'text-black/60 hover:text-black hover:bg-black/5'
+                  }`}
+                  title="3 Columns"
+                >
+                  <Grid3x3Icon className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setDesktopGridView('4')}
+                  className={`p-1.5 rounded transition-colors ${
+                    desktopGridView === '4'
+                      ? 'bg-accent text-white'
+                      : 'text-black/60 hover:text-black hover:bg-black/5'
+                  }`}
+                  title="4 Columns"
+                >
+                  <Grid4x4Icon className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label htmlFor="sort" className="text-sm text-black/70">Sort by:</label>
+                <select
+                  id="sort"
+                  value={sortBy}
+                  onChange={e => handleSortChange(e.target.value)}
+                  className="border border-black/20 rounded-sm p-2 text-sm text-black bg-white"
+                >
+                  <option value="newest">Date, new to old</option>
+                  <option value="price-asc">Price, low to high</option>
+                  <option value="price-desc">Price, high to low</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -736,14 +849,14 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
 
           {/* Products Grid */}
           {isLoading ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+            <div className={`grid ${getGridClasses()} gap-4 md:gap-6`}>
               {Array.from({ length: 6 }).map((_, index) => (
                 <ProductCardSkeleton key={`skeleton-${index}`} />
               ))}
             </div>
           ) : paginatedProducts.length > 0 ? (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+              <div className={`grid ${getGridClasses()} gap-4 md:gap-6`}>
                 {paginatedProducts.map(product => (
                   <ProductCard key={product._id || product.id} product={product} />
                 ))}

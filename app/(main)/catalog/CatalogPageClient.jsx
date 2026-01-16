@@ -7,7 +7,7 @@ import useSWR from 'swr';
 import ProductCard from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 import { useAppContext } from '@/context/AppContext';
-import { PlusIcon, MinusIcon, FilterIcon, XIcon, ChevronLeftIcon, Grid2x2Icon, Grid3x3Icon, Grid4x4Icon, ListIcon } from '@/components/Icons';
+import { PlusIcon, MinusIcon, FilterIcon, XIcon, ChevronLeftIcon, Grid2x2Icon, Grid3x3Icon, Grid4x4Icon, Grid5x5Icon, ListIcon } from '@/components/Icons';
 import '@/components/new/SidebarFilter.css';
 
 const ITEMS_PER_PAGE = 24;
@@ -41,7 +41,10 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
   const [desktopGridView, setDesktopGridView] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('catalog-desktop-grid-view');
-      return saved || '3'; // Default: 3 columns for desktop
+      // Migrate old '2' preference to '3', or use saved value if valid (3, 4, or 5)
+      if (saved === '2') return '3';
+      if (saved === '3' || saved === '4' || saved === '5') return saved;
+      return '3'; // Default: 3 columns for desktop
     }
     return '3';
   });
@@ -681,9 +684,9 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
 
     // Desktop grid classes
     const desktopClasses = {
-      '2': 'lg:grid-cols-2',
       '3': 'lg:grid-cols-3',
       '4': 'lg:grid-cols-4',
+      '5': 'lg:grid-cols-5',
     };
 
     return `${mobileClasses[mobileGridView] || 'grid-cols-2'} ${desktopClasses[desktopGridView] || 'lg:grid-cols-3'}`;
@@ -701,11 +704,6 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm border-y border-black/10 my-8 py-4 text-center text-black/70">
-        <div>Express Delivery Dispatch within 24 Hours</div>
-        <div className="border-x-0 md:border-x border-black/10">Chat, Order & Confirm on WhatsApp</div>
-        <div>International shipping</div>
-      </div>
 
       <div className="flex flex-col lg:flex-row gap-12">
         {/* Filter Sidebar */}
@@ -745,7 +743,14 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
                 )}
               </button>
               <button
-                onClick={() => setIsDesktopSidebarOpen(!isDesktopSidebarOpen)}
+                onClick={() => {
+                  const willBeOpen = !isDesktopSidebarOpen;
+                  setIsDesktopSidebarOpen(willBeOpen);
+                  // When hiding filters, switch to 4 columns for better space utilization
+                  if (!willBeOpen) {
+                    setDesktopGridView('4');
+                  }
+                }}
                 className="hidden lg:flex items-center gap-2 font-semibold hover:text-accent transition-colors"
               >
                 <FilterIcon className="w-5 h-5" />
@@ -764,7 +769,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
               Showing {paginatedProducts.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0} - {Math.min(currentPage * ITEMS_PER_PAGE, totalProducts)} of {totalProducts}
             </div>
 
-            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4">
               {/* Grid View Selector - Mobile */}
               <div className="flex items-center gap-1 lg:hidden border border-black/20 rounded-sm p-1">
                 <button
@@ -794,17 +799,6 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
               {/* Grid View Selector - Desktop */}
               <div className="hidden lg:flex items-center gap-1 border border-black/20 rounded-sm p-1">
                 <button
-                  onClick={() => setDesktopGridView('2')}
-                  className={`p-1.5 rounded transition-colors ${
-                    desktopGridView === '2'
-                      ? 'bg-accent text-white'
-                      : 'text-black/60 hover:text-black hover:bg-black/5'
-                  }`}
-                  title="2 Columns"
-                >
-                  <Grid2x2Icon className="w-4 h-4" />
-                </button>
-                <button
                   onClick={() => setDesktopGridView('3')}
                   className={`p-1.5 rounded transition-colors ${
                     desktopGridView === '3'
@@ -826,20 +820,17 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
                 >
                   <Grid4x4Icon className="w-4 h-4" />
                 </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <label htmlFor="sort" className="text-sm text-black/70">Sort by:</label>
-                <select
-                  id="sort"
-                  value={sortBy}
-                  onChange={e => handleSortChange(e.target.value)}
-                  className="border border-black/20 rounded-sm p-2 text-sm text-black bg-white"
+                <button
+                  onClick={() => setDesktopGridView('5')}
+                  className={`p-1.5 rounded transition-colors ${
+                    desktopGridView === '5'
+                      ? 'bg-accent text-white'
+                      : 'text-black/60 hover:text-black hover:bg-black/5'
+                  }`}
+                  title="5 Columns"
                 >
-                  <option value="newest">Date, new to old</option>
-                  <option value="price-asc">Price, low to high</option>
-                  <option value="price-desc">Price, high to low</option>
-                </select>
+                  <Grid5x5Icon className="w-4 h-4" />
+                </button>
               </div>
             </div>
           </div>

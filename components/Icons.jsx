@@ -189,6 +189,12 @@ export const Grid4x4Icon = ({ className = 'w-5 h-5' }) => (
   </svg>
 );
 
+export const Grid5x5Icon = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h4v4H3V3zM10 3h4v4h-4V3zM17 3h4v4h-4V3zM3 10h4v4H3v-4zM10 10h4v4h-4v-4zM17 10h4v4h-4v-4zM3 17h4v4H3v-4zM10 17h4v4h-4v-4zM17 17h4v4h-4v-4z" />
+  </svg>
+);
+
 export const ListIcon = ({ className = 'w-5 h-5' }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />

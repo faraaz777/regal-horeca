@@ -708,7 +708,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
       <div className="flex flex-col lg:flex-row gap-12">
         {/* Filter Sidebar */}
         {isDesktopSidebarOpen && (
-          <div className="hidden lg:block w-1/4 xl:w-1/5 border-r border-black/10 transition-all duration-300 ease-in-out">
+          <div className="hidden lg:block w-1/4 xl:w-1/5 pr-6 transition-all duration-300 ease-in-out">
             <FilterSidebar />
           </div>
         )}

@@ -1,8 +1,11 @@
 /* Premium Sidebar Filter Styles */
 
 .sidebar-container {
-    padding-left: 0.5rem;
-    padding-right: 1.5rem;
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .filter-section-title {
@@ -14,8 +17,8 @@
 }
 
 .filter-section {
-    padding: 1.5rem 0;
-    border-bottom: 1.5px solid rgba(0, 0, 0, 0.08);
+    padding: 1.25rem 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .filter-section:last-child {
@@ -24,8 +27,8 @@
 
 /* Category Navigation */
 .category-section {
-    padding-bottom: 1.5rem;
-    border-bottom: 1.5px solid rgba(0, 0, 0, 0.08);
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .category-list {

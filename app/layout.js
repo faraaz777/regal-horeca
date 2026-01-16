@@ -9,6 +9,7 @@ import './globals.css';
 import { AppProvider } from '@/context/AppContext';
 import { getCategories } from '@/lib/utils/getCategories';
 
+
 export const metadata = {
   title: 'Regal HoReCa - Premium Hospitality Supplies',
   description: 'Your one-stop solution for hotel, restaurant, and café equipment and supplies.',

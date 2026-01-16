@@ -516,7 +516,7 @@ export default function CategoryPage() {
     };
   }, [isCategoryDropdownOpen]);
 
-  // Get departments (top-level categories) - limit to 4 for display
+  // Get departments (top-level categories) - show up to 5 for display
   const departments = useMemo(() => {
     if (!allCategories || allCategories.length === 0) return [];
     return allCategories
@@ -527,7 +527,7 @@ export default function CategoryPage() {
           (cat.level === "department" || cat.level === "category")
         );
       })
-      .slice(0, 4);
+      .slice(0, 5);
   }, [allCategories]);
 
   // Get cart items with product details
@@ -950,8 +950,8 @@ export default function CategoryPage() {
       {/* Product Collections Section */}
       {departments.length > 0 && (
         <section id="products" className="py-16 md:py-24 lg:py-12 bg-[#F5F5F5]">
-          <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-12">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12 md:mb-16">
+          <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-12 mb-12 md:mb-16">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
               <div>
                 <h2 className="text-3xl md:text-4xl lg:text-[2.5rem] font-bold text-black tracking-tight mb-4">
                   Dining Experience Collections
@@ -991,54 +991,40 @@ export default function CategoryPage() {
                 </button>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-              {departments.map((dept) => {
-                const deptSlug =
-                  dept.slug || dept.name?.toLowerCase().replace(/\s+/g, "-");
-                return (
-                  <Link
-                    key={dept._id || dept.id}
-                    href={`/catalog?department=${deptSlug}`}
-                    className="group relative aspect-[2/3] md:aspect-[4/3] rounded-md overflow-hidden"
-                  >
-                    {dept.image ? (
-                      <Image
-                        src={dept.image}
-                        alt={dept.name}
-                        fill
-                        className="object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-black/20 to-black/40" />
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                    <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
-                      <h4 className="text-xl md:text-2xl font-semibold text-white mb-3">
-                        {dept.name}
-                      </h4>
-                      <span className="inline-flex items-center gap-2 text-accent font-medium text-sm md:text-base group-hover:gap-3 transition-all duration-300">
-                        Learn More
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="24"
-                          height="24"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="w-4 h-4"
-                        >
-                          <path d="M5 12h14"></path>
-                          <path d="m12 5 7 7-7 7"></path>
-                        </svg>
-                      </span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
+          </div>
+          {/* Full-width grid with minimal gap */}
+          <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-px">
+            {departments.map((dept) => {
+              const deptSlug =
+                dept.slug || dept.name?.toLowerCase().replace(/\s+/g, "-");
+              return (
+                <Link
+                  key={dept._id || dept.id}
+                  href={`/catalog?department=${deptSlug}`}
+                  className="group relative h-[500px] sm:h-[550px] md:h-[600px] lg:h-[650px] overflow-hidden"
+                >
+                  {/* Full Height Image */}
+                  {dept.image ? (
+                    <Image
+                      src={dept.image}
+                      alt={dept.name}
+                      fill
+                      className="object-cover transition-transform duration-700 group-hover:scale-105"
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 25vw, 20vw"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300" />
+                  )}
+                  
+                  {/* Text Label at Bottom - White serif font matching image style */}
+                  <div className="absolute bottom-0 left-0 right-0 px-6 py-8 bg-gradient-to-t from-black/70 via-black/50 to-transparent">
+                    <h4 className="text-2xl md:text-3xl font-serif text-white font-normal tracking-normal">
+                      {dept.name}
+                    </h4>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </section>
       )}

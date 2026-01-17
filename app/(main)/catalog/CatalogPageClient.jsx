@@ -30,24 +30,31 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
   });
 
   // Grid view states - separate for mobile and desktop
-  const [mobileGridView, setMobileGridView] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('catalog-mobile-grid-view');
-      return saved || '2'; // Default: 2 columns for mobile
-    }
-    return '2';
-  });
+  // Initialize with default values to avoid hydration mismatch
+  const [mobileGridView, setMobileGridView] = useState('2');
+  const [desktopGridView, setDesktopGridView] = useState('3');
+  const [isClient, setIsClient] = useState(false);
 
-  const [desktopGridView, setDesktopGridView] = useState(() => {
+  // Load from localStorage after component mounts (client-side only)
+  useEffect(() => {
+    setIsClient(true);
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('catalog-desktop-grid-view');
-      // Migrate old '2' preference to '3', or use saved value if valid (3, 4, or 5)
-      if (saved === '2') return '3';
-      if (saved === '3' || saved === '4' || saved === '5') return saved;
-      return '3'; // Default: 3 columns for desktop
+      const savedMobile = localStorage.getItem('catalog-mobile-grid-view');
+      if (savedMobile) {
+        setMobileGridView(savedMobile);
+      }
+      
+      const savedDesktop = localStorage.getItem('catalog-desktop-grid-view');
+      if (savedDesktop) {
+        // Migrate old '2' preference to '3', or use saved value if valid (3, 4, or 5)
+        if (savedDesktop === '2') {
+          setDesktopGridView('3');
+        } else if (savedDesktop === '3' || savedDesktop === '4' || savedDesktop === '5') {
+          setDesktopGridView(savedDesktop);
+        }
+      }
     }
-    return '3';
-  });
+  }, []);
 
   // Get all filters from URL (server-side filtering)
   const selectedCategorySlug = searchParams.get('category') || '';
@@ -771,7 +778,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
 
               <div className="flex items-center gap-4">
               {/* Grid View Selector - Mobile */}
-              <div className="flex items-center gap-1 lg:hidden border border-black/20 rounded-sm p-1">
+              <div className="flex items-center gap-1 lg:hidden border border-black/20 rounded-sm p-1" suppressHydrationWarning>
                 <button
                   onClick={() => setMobileGridView('1')}
                   className={`p-1.5 rounded transition-colors ${
@@ -780,6 +787,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
                       : 'text-black/60 hover:text-black hover:bg-black/5'
                   }`}
                   title="1 Column"
+                  suppressHydrationWarning
                 >
                   <ListIcon className="w-4 h-4" />
                 </button>
@@ -791,13 +799,14 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
                       : 'text-black/60 hover:text-black hover:bg-black/5'
                   }`}
                   title="2 Columns"
+                  suppressHydrationWarning
                 >
                   <Grid2x2Icon className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Grid View Selector - Desktop */}
-              <div className="hidden lg:flex items-center gap-1 border border-black/20 rounded-sm p-1">
+              <div className="hidden lg:flex items-center gap-1 border border-black/20 rounded-sm p-1" suppressHydrationWarning>
                 <button
                   onClick={() => setDesktopGridView('3')}
                   className={`p-1.5 rounded transition-colors ${
@@ -806,6 +815,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
                       : 'text-black/60 hover:text-black hover:bg-black/5'
                   }`}
                   title="3 Columns"
+                  suppressHydrationWarning
                 >
                   <Grid3x3Icon className="w-4 h-4" />
                 </button>
@@ -817,6 +827,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
                       : 'text-black/60 hover:text-black hover:bg-black/5'
                   }`}
                   title="4 Columns"
+                  suppressHydrationWarning
                 >
                   <Grid4x4Icon className="w-4 h-4" />
                 </button>
@@ -828,6 +839,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
                       : 'text-black/60 hover:text-black hover:bg-black/5'
                   }`}
                   title="5 Columns"
+                  suppressHydrationWarning
                 >
                   <Grid5x5Icon className="w-4 h-4" />
                 </button>
@@ -849,7 +861,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
             <>
               <div className={`grid ${getGridClasses()} gap-4 md:gap-6`}>
                 {paginatedProducts.map(product => (
-                  <ProductCard key={product._id || product.id} product={product} />
+                  <ProductCard key={product._id || product.id} product={product} hidePrice={true} />
                 ))}
               </div>
 

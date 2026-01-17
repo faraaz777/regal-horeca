@@ -7,7 +7,7 @@ import { HeartIcon, ShoppingCartIcon } from './Icons';
 import { useAppContext } from '@/context/AppContext';
 import toast from 'react-hot-toast';
 
-export default function ProductCard({ product, onAdd }) {
+export default function ProductCard({ product, onAdd, hidePrice = false }) {
   const { addToWishlist, removeFromWishlist, isInWishlist, addToCart, removeFromCart, isInCart } = useAppContext();
 
   // Get product images - combine heroImage and gallery
@@ -202,7 +202,7 @@ export default function ProductCard({ product, onAdd }) {
       {/* Image Container - Separated with rounded corners */}
       <div
         ref={imageContainerRef}
-        className="group relative w-full aspect-square overflow-hidden bg-gray-50 rounded-none select-none"
+        className="group relative w-full aspect-square overflow-hidden  hover:scale-105 transition-all duration-700 rounded-none select-none"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -213,8 +213,8 @@ export default function ProductCard({ product, onAdd }) {
           src={productImage}
           alt={productName}
           fill
-          sizes="384px"
-          className="object-cover select-none pointer-events-none"
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw"
+          className="object-contain select-none pointer-events-none"
           draggable={false}
         />
         {/* Clickable overlay for navigation - only captures clicks, not touches */}
@@ -350,60 +350,49 @@ export default function ProductCard({ product, onAdd }) {
       {/* Content - Center Aligned, Separated from Image */}
       <div className="flex-1 flex flex-col px-4 py-3.5 text-center">
         {/* Brand/Category */}
-        {(brand || category) && (
-          <div className="inline-flex items-center gap-2 mb-2 justify-center">
-            <span className="h-px w-4 bg-accent/40"></span>
-            <span className="text-xs font-bold text-accent uppercase tracking-[0.2em]">
-              {brand && category ? `${brand} • ${category}` : brand || category}
-            </span>
-          </div>
-        )}
+     
 
         {/* Product Name - Larger and Bold */}
         <Link href={`/products/${productSlug}`}>
-          <h3 className="text-base font-bold text-black mb-2 line-clamp-2 hover:text-accent transition-colors leading-snug">
+          <h3 className="text-xs sm:text-sm md:text-base font-semibold text-black mb-2 hover:text-accent transition-colors leading-tight break-words">
             {productName}
           </h3>
         </Link>
 
         {/* Price Section - Compact and Clean */}
-        <div className="flex flex-col items-center gap-1 mt-auto">
-          <div className="flex items-center justify-center gap-2 flex-wrap">
-            {(() => {
-              const formattedPrice = formatPrice(product.price || 0);
-              const isPriceOnRequest = formattedPrice === 'Price on request';
-              return (
-                <span className={`text-sm ${isPriceOnRequest ? 'font-serif italic' : 'font-bold'} text-black`}>
-                  {formattedPrice}
-                </span>
-              );
-            })()}
-            {(() => {
-              // Calculate original price: use originalPrice if exists, otherwise calculate as price * 1.2
-              const originalPrice = product.originalPrice && product.originalPrice > product.price
-                ? product.originalPrice
-                : (product.price ? product.price * 1.2 : null);
+        {!hidePrice && (product.price && product.price > 0) && (
+          <div className="flex flex-col items-center gap-1 mt-auto">
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <span className="text-sm font-bold text-black">
+                {formatPrice(product.price)}
+              </span>
+              {(() => {
+                // Calculate original price: use originalPrice if exists, otherwise calculate as price * 1.2
+                const originalPrice = product.originalPrice && product.originalPrice > product.price
+                  ? product.originalPrice
+                  : (product.price ? product.price * 1.2 : null);
 
-              // Only show if we have a valid original price that's higher than current price
-              if (originalPrice && originalPrice > product.price) {
-                const discount = Math.round(((originalPrice - product.price) / originalPrice) * 100);
-                return (
-                  <>
-                    <span className="text-[11px] text-black/40 line-through font-normal">
-                      {formatPrice(originalPrice)}
-                    </span>
-                    {discount > 0 && (
-                      <span className="text-[11px] font-semibold text-accent">
-                        {discount}% off
+                // Only show if we have a valid original price that's higher than current price
+                if (originalPrice && originalPrice > product.price) {
+                  const discount = Math.round(((originalPrice - product.price) / originalPrice) * 100);
+                  return (
+                    <>
+                      <span className="text-[11px] text-black/40 line-through font-normal">
+                        {formatPrice(originalPrice)}
                       </span>
-                    )}
-                  </>
-                );
-              }
-              return null;
-            })()}
+                      {discount > 0 && (
+                        <span className="text-[11px] font-semibold text-accent">
+                          {discount}% off
+                        </span>
+                      )}
+                    </>
+                  );
+                }
+                return null;
+              })()}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

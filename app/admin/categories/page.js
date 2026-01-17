@@ -526,7 +526,7 @@ async function uploadToR2(file, folder = 'categories') {
   const imageCompression = (await import('browser-image-compression')).default;
   
   const MAX_INPUT_SIZE = 15 * 1024 * 1024; // 15MB - reject files larger than this
-  const MAX_OUTPUT_SIZE = 4 * 1024 * 1024; // 4MB - target compressed size
+  const MAX_OUTPUT_SIZE = 1.5 * 1024 * 1024; // 1.5MB - only compress if larger than this
   
   try {
     // Hard pre-check: Reject files larger than 15MB
@@ -543,11 +543,11 @@ async function uploadToR2(file, folder = 'categories') {
     
     let fileToUpload = file;
     
-    // Compress image if it's larger than 4MB
+    // Compress image if it's larger than 1.5MB (preserve original quality for smaller images)
     if (file.size > MAX_OUTPUT_SIZE) {
       try {
         const compressionOptions = {
-          maxSizeMB: 4, // Target 4MB max
+          maxSizeMB: 1.5, // Target 1.5MB max
           useWebWorker: true, // Use Web Worker for better performance
           fileType: file.type, // Preserve original file type
           preserveExif: false, // Remove EXIF data to reduce size

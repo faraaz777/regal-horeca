@@ -52,8 +52,14 @@ export async function POST(request) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Optimize image before upload (550KB limit)
-    const optimizedBuffer = await optimizeImage(buffer);
+    // Skip optimization if file is 1.5MB or less (preserve original quality)
+    const SKIP_OPTIMIZATION_SIZE = 1.5 * 1024 * 1024; // 1.5MB
+    let optimizedBuffer = buffer;
+    
+    if (file.size > SKIP_OPTIMIZATION_SIZE) {
+      // Optimize image before upload (550KB limit) only if larger than 1.5MB
+      optimizedBuffer = await optimizeImage(buffer);
+    }
 
     // Upload optimized image to R2
     const publicUrl = await uploadToR2(optimizedBuffer, file.name, folder);

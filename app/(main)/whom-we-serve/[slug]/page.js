@@ -811,25 +811,27 @@ export default function CategoryPage() {
       </section>
 
       {/* Partners Section - Celestial Pearl Gallery */}
-      <section className="py-8 sm:py-12 md:py-16 bg-gray-900 relative overflow-hidden">
-        {/* Background abstract accents */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full -z-0 pointer-events-none overflow-hidden">
-          <div className="absolute top-[10%] left-[5%] w-[45vw] h-[45vw] border border-white/5 rounded-full opacity-30 animate-pulse-slow"></div>
-          <div className="absolute bottom-[5%] right-[0%] w-[35vw] h-[35vw] border border-white/5 rounded-full opacity-30 animate-pulse-slow" style={{ animationDelay: '2s' }}></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[70vw] h-[70vw] border border-accent/5 rounded-full"></div>
-        </div>
+      <section className="pt-4 sm:pt-6 md:pt-8 pb-4 sm:pb-6 md:pb-8 relative">
+        <div className="max-w-[98%] md:max-w-[1800px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12">
+          <div className="bg-white rounded-t-3xl rounded-b-3xl shadow-[0_0_20px_rgba(0,0,0,0.08)] relative overflow-visible">
+            {/* Background abstract accents - subtle for white background */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full -z-0 pointer-events-none overflow-hidden">
+              <div className="absolute top-[10%] left-[5%] w-[45vw] h-[45vw] border border-gray-100 rounded-full opacity-50 animate-pulse-slow"></div>
+              <div className="absolute bottom-[5%] right-[0%] w-[35vw] h-[35vw] border border-gray-100 rounded-full opacity-50 animate-pulse-slow" style={{ animationDelay: '2s' }}></div>
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[70vw] h-[70vw] border border-gray-100 rounded-full opacity-30"></div>
+            </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12 mb-8 md:mb-10 relative z-20">
-          <div className="text-center">
-            <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.3em] text-white/60 mb-4">
-              Proud Partners in Hospitality
-            </p>
-          </div>
-        </div>
+            <div className="px-4 sm:px-6 md:px-8 lg:px-12 pt-8 sm:pt-10 md:pt-12 mb-8 md:mb-10 relative z-20">
+              <div className="text-center">
+                <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.3em] text-gray-600 mb-4">
+                  Proud Partners in Hospitality
+                </p>
+              </div>
+            </div>
 
-        {/* Full-width circular pearl gallery */}
-        <div className="w-full relative flex items-center justify-center pb-8 md:pb-12">
-          <div className="w-full max-w-[1600px] mx-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-y-6 md:gap-y-8 gap-x-6 md:gap-x-8 px-4 sm:px-6 md:px-8 relative z-10">
+            {/* Full-width circular pearl gallery */}
+            <div className="w-full relative flex items-center justify-center pb-8 sm:pb-10 md:pb-12 px-4 sm:px-6 md:px-8">
+              <div className="w-full max-w-[1600px] mx-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-y-6 md:gap-y-8 gap-x-6 md:gap-x-8 relative z-10">
             {partners.map((partner, idx) => {
               const driftDuration = 4 + (idx % 3);
               const entryDelay = idx * 0.05;
@@ -849,17 +851,14 @@ export default function CategoryPage() {
                   }}
                   className="flex items-center justify-center group"
                 >
-                  {/* Circular Pearl Tile */}
+                  {/* Circular Tile - Crisp and Clear */}
                   <div
                     className={`
                       relative w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 rounded-full
                       flex items-center justify-center overflow-hidden
-                      shadow-[0_15px_35px_rgba(0,0,0,0.3)]
-                      transition-all duration-700 ease-out cursor-pointer
-                      hover:scale-110 hover:-translate-y-3 hover:shadow-[0_40px_80px_rgba(238,64,35,0.25)]
-                      border-[4px] border-white/20
-                      bg-gradient-to-br from-white/5 via-white/10 to-white/5
-                      backdrop-blur-sm
+                      bg-white
+                      transition-all duration-300 ease-out cursor-pointer
+                      hover:scale-110 hover:-translate-y-2
                       animate-float-pearl
                     `}
                     style={{
@@ -867,68 +866,55 @@ export default function CategoryPage() {
                       animationDelay: `${idx * 0.1}s`,
                     }}
                   >
-                    {/* Pearl gradient overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-white/10 opacity-50"></div>
-                    <div className="absolute inset-0 bg-radial-gradient from-white/10 via-transparent to-transparent" style={{ background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15), transparent 70%)' }}></div>
-
                     {/* Logo - Always Colorful */}
                     <div className="relative z-10 p-4 sm:p-5 md:p-6 flex items-center justify-center w-full h-full">
                       <Image
                         src={partner.image}
                         alt={partner.name}
                         fill
-                        className="object-contain transition-all duration-700 opacity-90 group-hover:opacity-100 group-hover:scale-110"
+                        className="object-contain transition-all duration-300 group-hover:scale-105"
                         sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 14vw"
                       />
-                    </div>
-
-                    {/* Gold Bloom on Hover */}
-                    <div className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700">
-                      <div 
-                        className="absolute inset-0 rounded-full blur-xl"
-                        style={{ 
-                          background: 'radial-gradient(circle, rgba(238,64,35,0.2) 0%, rgba(238,64,35,0.1) 50%, transparent 100%)' 
-                        }}
-                      ></div>
-                      <div className="absolute inset-0 rounded-full border-2 border-accent/40 scale-100 group-hover:scale-95 transition-transform duration-700"></div>
                     </div>
                   </div>
                 </motion.div>
               );
             })}
+              </div>
+            </div>
+
+            {/* Custom CSS for animations */}
+            <style dangerouslySetInnerHTML={{ __html: `
+              @keyframes float-pearl {
+                0%, 100% {
+                  transform: translateY(0) rotate(0deg);
+                }
+                33% {
+                  transform: translateY(-8px) rotate(0.5deg);
+                }
+                66% {
+                  transform: translateY(-4px) rotate(-0.5deg);
+                }
+              }
+              @keyframes pulse-slow {
+                0%, 100% {
+                  transform: scale(1);
+                  opacity: 0.3;
+                }
+                50% {
+                  transform: scale(1.05);
+                  opacity: 0.1;
+                }
+              }
+              .animate-float-pearl {
+                animation: float-pearl ease-in-out infinite;
+              }
+              .animate-pulse-slow {
+                animation: pulse-slow 10s ease-in-out infinite;
+              }
+            `}} />
           </div>
         </div>
-
-        {/* Custom CSS for animations */}
-        <style dangerouslySetInnerHTML={{ __html: `
-          @keyframes float-pearl {
-            0%, 100% {
-              transform: translateY(0) rotate(0deg);
-            }
-            33% {
-              transform: translateY(-8px) rotate(0.5deg);
-            }
-            66% {
-              transform: translateY(-4px) rotate(-0.5deg);
-            }
-          }
-          @keyframes pulse-slow {
-            0%, 100% {
-              transform: scale(1);
-              opacity: 0.3;
-            }
-            50% {
-              transform: scale(1.05);
-              opacity: 0.1;
-            }
-          }
-          .animate-float-pearl {
-            animation: float-pearl ease-in-out infinite;
-          }
-          .animate-pulse-slow {
-            animation: pulse-slow 10s ease-in-out infinite;
-          }
-        `}} />
       </section>
 
       {/* Split Section: Elevating Experiences (Video Inspired) */}

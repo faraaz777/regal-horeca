@@ -1,11 +1,19 @@
 /* Premium Sidebar Filter Styles */
 
 .sidebar-container {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    border: 1px solid rgba(0, 0, 0, 0.06);
+    padding-left: 0.5rem;
+    padding-right: 1.5rem;
+}
+
+/* Desktop card styling */
+@media (min-width: 1024px) {
+    .sidebar-container {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+    }
 }
 
 .filter-section-title {

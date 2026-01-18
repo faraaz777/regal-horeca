@@ -727,14 +727,7 @@ function FeaturedProductsSection({ department, products, isLoading, error }) {
   // No products state
   if (!featuredProduct) return null;
 
-  const formatPrice = (price) => {
-    if (price == null) return 'Price on request';
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-    }).format(price).replace('₹', '₹ ');
-  };
+ 
 
   const productId = featuredProduct._id || featuredProduct.id;
   const productSlug = featuredProduct.slug || productId?.toString();
@@ -760,9 +753,7 @@ function FeaturedProductsSection({ department, products, isLoading, error }) {
         <h4 className="text-[10px] font-medium uppercase tracking-wide text-black group-hover:text-accent mb-0.5 transition-colors line-clamp-2 leading-tight">
           {featuredProduct.title}
         </h4>
-        <span className="text-[10px] font-bold text-accent">
-          {formatPrice(featuredProduct.price)}
-        </span>
+   
       </Link>
     </div>
   );

@@ -354,13 +354,13 @@ export default function ProductCard({ product, onAdd, hidePrice = false }) {
 
         {/* Product Name - Larger and Bold */}
         <Link href={`/products/${productSlug}`}>
-          <h3 className="text-xs sm:text-sm md:text-base font-semibold text-black mb-2 hover:text-accent transition-colors leading-tight break-words">
+          <h3 className="text-xs sm:text-sm md:text-base font-semibold text-black mt-2  hover:text-accent transition-colors leading-tight break-words">
             {productName}
           </h3>
         </Link>
 
         {/* Price Section - Compact and Clean */}
-        {!hidePrice && (product.price && product.price > 0) && (
+        {/* {!hidePrice && (product.price && product.price > 0) && (
           <div className="flex flex-col items-center gap-1 mt-auto">
             <div className="flex items-center justify-center gap-2 flex-wrap">
               <span className="text-sm font-bold text-black">
@@ -392,7 +392,7 @@ export default function ProductCard({ product, onAdd, hidePrice = false }) {
               })()}
             </div>
           </div>
-        )}
+        )} */}
       </div>
     </div>
   );

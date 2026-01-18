@@ -31,6 +31,29 @@ import partnersImage13 from "./images/Picture13.png";
 import partnersImage14 from "./images/Picture14.png";
 import partnersImage15 from "./images/Picture15.png";
 
+// Restaurant images
+import azeebo from "./restaurants/azeebo.png";
+import barkas from "./restaurants/barkas.jpg";
+import ismailbiryani from "./restaurants/ismailbiryani.jpg";
+import kirtunga from "./restaurants/kirtunga.jpg";
+import lucky from "./restaurants/lucky.png";
+import mandi36 from "./restaurants/mandi36.png";
+import mehfil from "./restaurants/Mehfil Logo.avif";
+import meridian from "./restaurants/meridian.png";
+import minerva from "./restaurants/minerva.jpg";
+import nawabs from "./restaurants/nawabs.png";
+import paradise from "./restaurants/paradise.png";
+import pistahouse from "./restaurants/pistahouse.png";
+import rumaan from "./restaurants/rumaan.png";
+import sarvi from "./restaurants/sarvi.jpg";
+import swagath from "./restaurants/swagath.png";
+import toshedaan from "./restaurants/toshedaan.jpg";
+import tulips from "./restaurants/tulips.png";
+import joharfa from "./restaurants/joharfa.jpg";
+import levant from "./restaurants/levant.png";
+import tansen from "./restaurants/tansen.jpg";
+import ironhill from "./restaurants/ironhill2.png";
+
 // Category-specific content data
 const categoryData = {
   hotels: {
@@ -340,6 +363,31 @@ const partners = [
   { name: "JUMBO", image: partnersImage11 },
   { name: "ANdAZ. HOTELS & RESORTS", image: partnersImage12 },
   { name: "TEDi", image: partnersImage14 },
+];
+
+// Restaurant partners images
+const restaurantPartners = [
+  { name: "Pista House", image: pistahouse },
+  { name: "Azeebo", image: azeebo },
+  { name: "Nawabs", image: nawabs },
+  { name: "Levant", image: levant },
+  { name: "Tansen", image: tansen },
+  { name: "Paradise", image: paradise },
+  { name: "Mandi 36", image: mandi36 },
+  { name: "Barkas", image: barkas },
+  { name: "Mehfil", image: mehfil },
+  { name: "Sarvi", image: sarvi },
+  { name: "Joharfa", image: joharfa },
+  { name: "Minerva", image: minerva },
+  { name: "Kirtunga", image: kirtunga },
+  { name: "Lucky", image: lucky },
+  { name: "Rumaan", image: rumaan },
+  { name: "Meridian", image: meridian },
+  { name: "Toshe Daan", image: toshedaan },
+  { name: "Ismail Biryani", image: ismailbiryani },
+  { name: "Swagath", image: swagath },
+  { name: "Tulips", image: tulips },
+  { name: "Iron Hill", image: ironhill },
 ];
 
 const features = [
@@ -824,7 +872,7 @@ export default function CategoryPage() {
             <div className="px-4 sm:px-6 md:px-8 lg:px-12 pt-8 sm:pt-10 md:pt-12 mb-8 md:mb-10 relative z-20">
               <div className="text-center">
                 <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.3em] text-gray-600 mb-4">
-                  Proud Partners in Hospitality
+                  {slug === 'restaurants' ? 'Our Restaurant Partners' : 'Proud Partners in Hospitality'}
                 </p>
               </div>
             </div>
@@ -832,7 +880,7 @@ export default function CategoryPage() {
             {/* Full-width circular pearl gallery */}
             <div className="w-full relative flex items-center justify-center pb-8 sm:pb-10 md:pb-12 px-4 sm:px-6 md:px-8">
               <div className="w-full max-w-[1600px] mx-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-y-6 md:gap-y-8 gap-x-6 md:gap-x-8 relative z-10">
-            {partners.map((partner, idx) => {
+            {(slug === 'restaurants' ? restaurantPartners : partners).map((partner, idx) => {
               const driftDuration = 4 + (idx % 3);
               const entryDelay = idx * 0.05;
               

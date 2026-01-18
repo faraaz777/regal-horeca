@@ -9,8 +9,8 @@ import Hero from '@/components/about/Hero';
 import Stats from '@/components/about/Stats';
 import About from '@/components/about/About';
 import Features from '@/components/about/Features';
-import Partners from '@/components/about/Partners';
 import Ventures from '@/components/about/Ventures';
+import ParticipatingBrands from './ParticipatingBrands';
 import WhyChooseUs from '@/components/WhyChooseUs';
 import Locations from '@/components/about/Locations';
 
@@ -21,8 +21,8 @@ export default function AboutPage() {
       <Stats />
       <About />
       <Features />
-      <Partners />
       <Ventures />
+      <ParticipatingBrands />
       <WhyChooseUs />
       <Locations />
     </div>

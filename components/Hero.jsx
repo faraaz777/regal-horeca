@@ -1,150 +1,80 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import Image from 'next/image';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import glassware from '@/components/images/glassware.png'
-import heroimg1 from "../components/images/hero.png"
-import heroimg2 from "../components/images/photo.png"
+import { useState } from 'react';
 
-const slides = [
-  {
-    id: 1,
-    image: heroimg1,
-    alt: 'Hero banner 1',
-  },
-  {
-    id: 2,
-    image: heroimg2,
-    alt: 'Hero banner 2',
-  },
-  {
-    id: 3,
-    image: glassware,
-    alt: 'Hero banner 3',
-  },
-];
+// YouTube video ID - Update this with your actual YouTube video ID
+// You can extract it from a YouTube URL: https://www.youtube.com/watch?v=VIDEO_ID
+// Or set it via environment variable: NEXT_PUBLIC_YOUTUBE_VIDEO_ID
+const YOUTUBE_VIDEO_ID =  'https://www.youtube.com/watch?v=UYmvFzDuO5k';
 
-export default function Hero() {
-  const [current, setCurrent] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [touchStartX, setTouchStartX] = useState(null);
-  const [touchEndX, setTouchEndX] = useState(null);
+export default function Hero({ videoId: propVideoId }) {
+  const [isLoaded, setIsLoaded] = useState(false);
 
-  const nextSlide = useCallback(() => {
-    if (isTransitioning) return;
-    setIsTransitioning(true);
-    setCurrent((prev) => (prev + 1) % slides.length);
-    setTimeout(() => setIsTransitioning(false), 600);
-  }, [isTransitioning]);
-
-  const prevSlide = useCallback(() => {
-    if (isTransitioning) return;
-    setIsTransitioning(true);
-    setCurrent((prev) => (prev - 1 + slides.length) % slides.length);
-    setTimeout(() => setIsTransitioning(false), 600);
-  }, [isTransitioning]);
-
-  const goToSlide = useCallback((index) => {
-    if (isTransitioning) return;
-    setIsTransitioning(true);
-    setCurrent(index);
-    setTimeout(() => setIsTransitioning(false), 600);
-  }, [isTransitioning]);
-
-  // Auto-play
-  useEffect(() => {
-    const timer = setInterval(nextSlide, 8000);
-    return () => clearInterval(timer);
-  }, [nextSlide]);
-
-  // Swipe handlers (mobile)
-  const onTouchStart = (e) => {
-    setTouchStartX(e.touches[0].clientX);
-    setTouchEndX(null);
-  };
-
-  const onTouchMove = (e) => {
-    setTouchEndX(e.touches[0].clientX);
-  };
-
-  const onTouchEnd = () => {
-    if (touchStartX === null || touchEndX === null) return;
-
-    const diff = touchStartX - touchEndX;
-
-    if (Math.abs(diff) > 50) {
-      if (diff > 0) {
-        // swipe left
-        nextSlide();
-      } else {
-        // swipe right
-        prevSlide();
-      }
+  // Extract video ID from URL if full URL is provided
+  const getVideoId = (videoIdOrUrl) => {
+    if (!videoIdOrUrl) return null;
+    
+    // If it's already just an ID, return it
+    if (!videoIdOrUrl.includes('youtube.com') && !videoIdOrUrl.includes('youtu.be')) {
+      return videoIdOrUrl;
     }
-
-    setTouchStartX(null);
-    setTouchEndX(null);
+    
+    // Extract from full URL
+    const urlPatterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
+      /youtube\.com\/embed\/([^&\n?#]+)/,
+    ];
+    
+    for (const pattern of urlPatterns) {
+      const match = videoIdOrUrl.match(pattern);
+      if (match) return match[1];
+    }
+    
+    return null;
   };
+
+  // Use prop video ID if provided, otherwise use constant/env variable
+  const videoId = getVideoId(propVideoId || YOUTUBE_VIDEO_ID);
+
+  if (!videoId) {
+    return (
+      <section className="relative w-full overflow-hidden">
+        <div className="relative w-full aspect-[21/9] sm:aspect-[21/8] md:aspect-[21/7] lg:aspect-[21/6] bg-gray-900 flex items-center justify-center">
+          <p className="text-white text-center px-4">
+            Please update YOUTUBE_VIDEO_ID in components/Hero.jsx with your YouTube video ID
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   return (
-    <section className="relative w-full overflow-hidden">
-      <div
-        className="relative w-full aspect-[21/9] sm:aspect-[21/8] md:aspect-[21/7] lg:aspect-[21/6] overflow-hidden group"
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-      >
-        {slides.map((slide, idx) => (
-          <div
-            key={slide.id}
-            className={`absolute inset-0 transition-opacity duration-1000 ease-out ${
-              idx === current ? 'opacity-100 z-10' : 'opacity-0 z-0'
-            }`}
-          >
-            <Image
-              src={slide.image}
-              alt={slide.alt}
-              fill
-              sizes="100vw"
-              priority={idx === 0}
-              className="object-cover"
-              style={{ objectPosition: 'center center' }}
-            />
-          </div>
-        ))}
-
-        {/* Navigation Arrows */}
-        <button
-          onClick={prevSlide}
-          className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-2 bg-white/80 hover:bg-white backdrop-blur-sm rounded-full shadow-lg transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95"
-          aria-label="Previous slide"
-        >
-          <ChevronLeft className="w-5 h-5 text-gray-900" />
-        </button>
-        <button
-          onClick={nextSlide}
-          className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-2 bg-white/80 hover:bg-white backdrop-blur-sm rounded-full shadow-lg transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95"
-          aria-label="Next slide"
-        >
-          <ChevronRight className="w-5 h-5 text-gray-900" />
-        </button>
-
-        {/* Dot Indicators */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
-          {slides.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={() => goToSlide(idx)}
-              className={`transition-all duration-300 rounded-full ${
-                idx === current
-                  ? 'w-8 h-2 bg-white'
-                  : 'w-2 h-2 bg-white/50 hover:bg-white/70'
-              }`}
-              aria-label={`Go to slide ${idx + 1}`}
-            />
-          ))}
+    <section className="relative w-full overflow-hidden bg-black">
+      <div className="relative w-full aspect-[21/9] sm:aspect-[21/8] md:aspect-[21/7] lg:aspect-[21/6] overflow-hidden">
+        {/* YouTube Video Embed - Zoomed to fill width */}
+        <div className="absolute inset-0 w-full h-full overflow-hidden">
+          <iframe
+            className="w-full h-full"
+            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&playsinline=1&enablejsapi=1`}
+            title="Hero Video"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            onLoad={() => setIsLoaded(true)}
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              width: '177.78%', // 16:9 aspect ratio scaled up (100% * 16/9)
+              height: '177.78%',
+              minWidth: '100%',
+              minHeight: '100%',
+              transform: 'translate(-50%, -50%) scale(1.5)', // Scale up to fill width
+            }}
+          />
         </div>
+
+        {/* Optional: Overlay for better text readability if needed */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none" />
       </div>
     </section>
   );

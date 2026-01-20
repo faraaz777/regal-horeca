@@ -124,7 +124,7 @@ A modern, production-ready Next.js application for managing and displaying a HoR
 1. Navigate to `/admin/login`
 2. Use the credentials from your `.env.local` file:
    - Email: `admin@regal.com` (or your configured email)
-   - Password: `Admin@123456` (or your configured password)
+   - Password:  (your configured password)
 
 ## Deployment
 

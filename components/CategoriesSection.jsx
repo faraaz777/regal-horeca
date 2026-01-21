@@ -9,6 +9,14 @@ export default function CategoriesSection({ categories }) {
   const scrollContainerRef = useRef(null);
   const categoryRefs = useRef([]);
 
+  // Set first card as active on desktop by default
+  useEffect(() => {
+    const isMobile = window.innerWidth < 1024;
+    if (!isMobile) {
+      setActiveCategoryIndex(0);
+    }
+  }, []);
+
   // Intersection Observer for mobile categories animation
   useEffect(() => {
     const isMobile = window.innerWidth < 1024;
@@ -124,7 +132,7 @@ export default function CategoriesSection({ categories }) {
 
         <div
           ref={scrollContainerRef}
-          className={`flex w-full overflow-x-auto pb-8 md:pb-12 gap-4 md:gap-6 snap-x py-2  snap-mandatory pl-4 pr-8 md:px-12 hide-scrollbar ${mainCategories.length <= 5 ? "md:justify-center" : ""
+          className={`flex w-full overflow-x-auto pb-8 md:pb-12 gap-4 md:gap-6 snap-x py-2 snap-mandatory pl-8 pr-8 md:pl-16 md:pr-16 hide-scrollbar ${mainCategories.length <= 5 ? "md:justify-center" : ""
             }`}
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
@@ -142,7 +150,7 @@ export default function CategoriesSection({ categories }) {
                   }`}
               >
                 {/* Hover Background Fill */}
-                <div className={`absolute inset-0 bg-accent origin-bottom transition-transform duration-500 ease-in-out z-0 ${isActive ? "scale-y-100 md:scale-y-0" : "scale-y-0 group-hover:scale-y-100"
+                <div className={`absolute inset-0 bg-accent origin-bottom transition-transform duration-500 ease-in-out z-0 ${isActive ? "scale-y-100 md:scale-y-0 md:group-hover:scale-y-100" : "scale-y-0 group-hover:scale-y-100"
                   }`} />
 
                 <div className="relative z-10 w-full h-full flex flex-col items-center">

@@ -5,7 +5,7 @@ import { useState } from 'react';
 // YouTube video ID - Update this with your actual YouTube video ID
 // You can extract it from a YouTube URL: https://www.youtube.com/watch?v=VIDEO_ID
 // Or set it via environment variable: NEXT_PUBLIC_YOUTUBE_VIDEO_ID
-const YOUTUBE_VIDEO_ID =  'https://www.youtube.com/watch?v=UYmvFzDuO5k';
+const YOUTUBE_VIDEO_ID =  'https://youtu.be/3vsamB_smgQ';
 
 export default function Hero({ videoId: propVideoId }) {
   const [isLoaded, setIsLoaded] = useState(false);

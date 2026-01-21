@@ -9,6 +9,7 @@ import { Suspense } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import LoadingPage from '@/components/LoadingPage';
+import { Analytics } from "@vercel/analytics/next"
 
 export default function MainLayout({ children }) {
   return (
@@ -19,6 +20,7 @@ export default function MainLayout({ children }) {
           <Header />
         </Suspense>
         <main className="flex-grow">{children}</main>
+        <Analytics />
         <Footer />
       </div>
     </>

@@ -87,22 +87,22 @@ export default function CircularCategories({ categories }) {
   return (
     <section className="py-3 md:py-4 bg-white border-b border-black/5 w-full">
       <div className="relative w-full">
-        {/* Left Arrow */}
+        {/* Left Arrow - Hidden on mobile */}
         {showLeftArrow && (
           <button
             onClick={scrollLeft}
-            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white border border-black/10 rounded-full p-2 shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center"
+            className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white border border-black/10 rounded-full p-2 shadow-md hover:shadow-lg transition-all duration-200 items-center justify-center"
             aria-label="Scroll left"
           >
             <ChevronLeft className="w-5 h-5 text-black" />
           </button>
         )}
 
-        {/* Right Arrow */}
+        {/* Right Arrow - Hidden on mobile */}
         {showRightArrow && (
           <button
             onClick={scrollRight}
-            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white border border-black/10 rounded-full p-2 shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center"
+            className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white border border-black/10 rounded-full p-2 shadow-md hover:shadow-lg transition-all duration-200 items-center justify-center"
             aria-label="Scroll right"
           >
             <ChevronRight className="w-5 h-5 text-black" />
@@ -112,7 +112,7 @@ export default function CircularCategories({ categories }) {
         {/* Scrollable Container - Full Width */}
         <div 
           ref={scrollContainerRef}
-          className="flex py-3 sm:py-4 overflow-x-auto hide-scrollbar gap-4 sm:gap-4 md:gap-5 lg:gap-6 pb-3 sm:pb-4 snap-x snap-mandatory px-12"
+          className="flex py-3 sm:py-4 overflow-x-auto hide-scrollbar gap-4 sm:gap-4 md:gap-5 lg:gap-6 pb-3 sm:pb-4 snap-x snap-mandatory px-4 md:px-12"
         >
           {displayCategories.map((cat, index) => {
             const categoryId = cat._id || cat.id || `category-${index}`;

@@ -57,6 +57,7 @@ export default async function HomePage() {
         next: { revalidate: 3600 } // Cache for 1 hour
       }).catch(() => null)
     ]);
+    console.log( categoriesResponse);
 
     // Parse responses - only if responses are valid
     const [featuredData, arrivalsData, categoriesData] = await Promise.all([

@@ -514,6 +514,7 @@ export default function CategoryPage() {
   const [isCartDropdownOpen, setIsCartDropdownOpen] = useState(false);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [includeCart, setIncludeCart] = useState(true);
+  const [hoveredCollectionIndex, setHoveredCollectionIndex] = useState(null);
   const categoryDropdownRef = useRef(null);
 
   // Update form data when businessTypes are loaded and we can find the matching businessType
@@ -1051,85 +1052,161 @@ export default function CategoryPage() {
         </div>
       </section>
 
-      {/* Product Collections Section */}
+      {/* Product Collections Section - Cinematic Expanding Panels Gallery */}
       {departments.length > 0 && (
-        <section id="products" className="py-16 md:py-24 lg:py-12 bg-[#F5F5F5]">
-          <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-12 mb-12 md:mb-16">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-              <div>
-                <h2 className="text-3xl md:text-4xl lg:text-[2.5rem] font-bold text-black tracking-tight mb-4">
-                  Dining Experience Collections
+        <section id="products" className="py-8 md:py-12 bg-white relative overflow-hidden">
+          {/* Redesigned Minimalist/Editorial Header */}
+          <div className="max-w-[1800px] mx-auto px-4 md:px-8 mb-8 md:mb-12">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center gap-8 md:gap-12">
+              {/* Monumental Text Block */}
+              <div className="flex-shrink-0">
+                <h2 className="text-3xl md:text-4xl lg:text-5xl font-serif leading-none tracking-tighter text-gray-900 select-none">
+                  The <br />
+                  <span className="italic text-[#D4AF37]">Archives.</span>
                 </h2>
-                <p className="text-base md:text-lg text-black/70 leading-relaxed max-w-xl">
-                  Crafted for elegance, durability, and effortless
-                  maintenance—designed to enhance every dining occasion.
-                </p>
               </div>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={scrollToForm}
-                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover-elevate active-elevate-2 bg-accent text-white border border-accent min-h-9 px-4 py-2"
-                >
-                  Enquire Now
-                </button>
-                <button
-                  onClick={() => router.push("/catalog")}
-                  className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover-elevate active-elevate-2 border border-black/20 shadow-xs active:shadow-none min-h-9 px-4 py-2 gap-2"
-                >
-                  View Catalog
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="w-4 h-4"
+
+              {/* Minimalist CTA & Context */}
+              <div className="flex-grow space-y-4">
+                <div className="max-w-xl">
+                  <div className="h-[1px] w-8 bg-gray-200 mb-3"></div>
+                  <p className="text-sm md:text-base font-light text-gray-400 italic leading-relaxed">
+                    "Curating the physical geometry of service excellence. Each collection is a testament to the weight of hospitality history."
+                  </p>
+                </div>
+                
+                <div className="flex items-center space-x-6">
+                  <button 
+                    onClick={scrollToForm}
+                    className="text-[8px] uppercase tracking-[0.4em] font-bold text-black border-b border-black pb-1 hover:text-[#D4AF37] hover:border-[#D4AF37] transition-all"
                   >
-                    <path d="M5 12h14"></path>
-                    <path d="m12 5 7 7-7 7"></path>
-                  </svg>
-                </button>
+                    Request Print Catalogue
+                  </button>
+                  <button 
+                    onClick={() => {
+                      const productsSection = document.getElementById('products');
+                      if (productsSection) {
+                        productsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    }}
+                    className="w-10 h-10 rounded-full border border-gray-100 flex items-center justify-center hover:bg-black hover:text-white transition-all"
+                  >
+                    <span className="text-sm">↓</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-          {/* Full-width grid with minimal gap */}
-          <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-px">
-            {departments.map((dept) => {
-              const deptSlug =
-                dept.slug || dept.name?.toLowerCase().replace(/\s+/g, "-");
+
+          {/* Cinematic Expanding Panels Gallery */}
+          <div className="w-full h-[700px] flex flex-col lg:flex-row gap-0 overflow-hidden px-4 md:px-8">
+            {departments.map((dept, idx) => {
+              const deptSlug = dept.slug || dept.name?.toLowerCase().replace(/\s+/g, "-");
+              
+              // Generate subtitle based on department name
+              const getSubtitle = (name) => {
+                const subtitleMap = {
+                  "Barware": "The Art of Mixology",
+                  "Catering": "Grand Scale Elegance",
+                  "Hotel & Hospitality": "Palatial Service Standards",
+                  "Kitchenware": "The Chef's Hardware",
+                  "Tableware": "The Final Narrative",
+                  "Dining": "The Final Narrative",
+                  "Service": "Grand Scale Elegance",
+                };
+                return subtitleMap[name] || "Crafted Excellence";
+              };
+
               return (
                 <Link
                   key={dept._id || dept.id}
                   href={`/catalog?department=${deptSlug}`}
-                  className="group relative h-[500px] sm:h-[550px] md:h-[600px] lg:h-[650px] overflow-hidden"
+                  onMouseEnter={() => setHoveredCollectionIndex(idx)}
+                  onMouseLeave={() => setHoveredCollectionIndex(null)}
+                  className={`
+                    relative h-full flex-grow transition-all duration-[1200ms] ease-[cubic-bezier(0.16,1,0.3,1)]
+                    overflow-hidden cursor-pointer group border-x border-white/5
+                    ${hoveredCollectionIndex === idx ? 'lg:flex-[3]' : 'lg:flex-[1]'}
+                  `}
                 >
-                  {/* Full Height Image */}
-                  {dept.image ? (
-                    <Image
-                      src={dept.image}
-                      alt={dept.name}
-                      fill
-                      className="object-cover transition-transform duration-700 group-hover:scale-105"
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 25vw, 20vw"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300" />
-                  )}
-                  
-                  {/* Text Label at Bottom - White serif font matching image style */}
-                  <div className="absolute bottom-0 left-0 right-0 px-6 py-8 bg-gradient-to-t from-black/70 via-black/50 to-transparent">
-                    <h4 className="text-2xl md:text-3xl font-serif text-white font-normal tracking-normal">
-                      {dept.name}
-                    </h4>
+                  {/* Background Image */}
+                  <div className="absolute inset-0 w-full h-full scale-110 group-hover:scale-100 transition-transform duration-[2000ms] ease-out">
+                    {dept.image ? (
+                      <Image
+                        src={dept.image}
+                        alt={dept.name}
+                        fill
+                        className={`w-full h-full object-cover transition-all duration-1000 ${
+                          hoveredCollectionIndex !== null && hoveredCollectionIndex !== idx 
+                            ? 'brightness-[0.4] grayscale' 
+                            : 'brightness-[0.85]'
+                        }`}
+                        sizes="(max-width: 1024px) 100vw, 20vw"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300" />
+                    )}
+                    {/* Gradient Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity"></div>
                   </div>
+
+                  {/* Content Layer */}
+                  <div className="absolute inset-0 flex flex-col justify-end p-8 md:p-12">
+                    <div className="space-y-4">
+                      <div className="overflow-hidden">
+                        <p className={`
+                          text-[9px] uppercase tracking-[0.5em] text-[#D4AF37] font-bold transition-all duration-700
+                          ${hoveredCollectionIndex === idx ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}
+                        `}>
+                          {getSubtitle(dept.name)}
+                        </p>
+                      </div>
+                      
+                      <h3 className={`
+                        text-2xl md:text-5xl font-serif text-white transition-all duration-700 leading-none
+                        ${hoveredCollectionIndex === idx ? 'scale-110 origin-left' : 'scale-100'}
+                      `}>
+                        {dept.name}
+                      </h3>
+                      
+                      <div className={`
+                        h-[1px] bg-white/30 transition-all duration-1000 ease-out
+                        ${hoveredCollectionIndex === idx ? 'w-full' : 'w-12'}
+                      `}></div>
+                    </div>
+
+                    {/* Vertical Title (Shown when not hovered) */}
+                    <div className={`
+                      absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
+                      transition-all duration-700 pointer-events-none
+                      ${hoveredCollectionIndex === idx ? 'opacity-0 scale-150' : 'opacity-100 scale-100'}
+                    `}>
+                      <span className="text-[12px] uppercase tracking-[0.8em] font-light text-white/40 vertical-text origin-center rotate-90 whitespace-nowrap">
+                        {dept.name}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Hover Accent Glow */}
+                  <div className="absolute bottom-0 left-0 w-full h-1 bg-[#D4AF37] scale-x-0 group-hover:scale-x-100 transition-transform duration-1000 origin-left"></div>
                 </Link>
               );
             })}
           </div>
+
+          <style dangerouslySetInnerHTML={{ __html: `
+            .vertical-text {
+              writing-mode: vertical-rl;
+              text-orientation: mixed;
+            }
+            @keyframes slideUp {
+              from { opacity: 0; transform: translateY(20px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            .animate-slide-up {
+              animation: slideUp 1s ease-out forwards;
+            }
+          `}} />
         </section>
       )}
 

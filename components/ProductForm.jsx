@@ -707,8 +707,10 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
   // Initialize form data when product is provided (edit mode) - only once per product
   useEffect(() => {
     const currentProductId = product?._id || product?.id;
+    // For duplicate products without ID, use a hash of the product data to track initialization
+    const productKey = currentProductId || (product ? JSON.stringify(product).substring(0, 100) : null);
     
-    if (product && initializedProductIdRef.current !== currentProductId) {
+    if (product && initializedProductIdRef.current !== productKey) {
       const categoryId = product.categoryId?._id || product.categoryId;
       const categoryIds = product.categoryIds || [];
       const brandCategoryId = product.brandCategoryId?._id || product.brandCategoryId;
@@ -745,6 +747,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         (rp?._id || rp)?.toString()
       ).filter(Boolean);
       
+      // Always set form data, even if categories/brands aren't loaded yet
       setFormData({
         ...product,
         categoryId: categoryId?.toString() || '',
@@ -763,6 +766,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         relatedProductIds: relatedProductIds,
       });
 
+      // Initialize category/brand selections only if categories/brands are loaded
       if (categoryId && categories.length > 0) {
         const ancestry = getCategoryAncestry(categoryId, categories);
         setCategorySelection(ancestry);
@@ -795,7 +799,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         setAdditionalBrandSelections([]);
       }
       
-      initializedProductIdRef.current = currentProductId;
+      initializedProductIdRef.current = productKey;
     } else if (!product) {
       // Reset when switching from edit to add mode
       initializedProductIdRef.current = null;
@@ -896,17 +900,33 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     
     setBrandSelection(newSelection);
 
-    // Set brandCategoryId to the most specific level selected
-    if (id) {
-      setFormData({ ...formData, brandCategoryId: id });
-    } else {
-      const mostSpecificLevel = ['subcategory', 'category', 'department'].find(l => newSelection[l]);
-      if (mostSpecificLevel) {
-        setFormData({ ...formData, brandCategoryId: newSelection[mostSpecificLevel] });
-      } else {
-        setFormData({ ...formData, brandCategoryId: '' });
+    // Determine the most specific level selected for brandCategoryId
+    const mostSpecificLevel = ['subcategory', 'category', 'department'].find(l => newSelection[l]);
+    let brandCategoryId = '';
+    let brandName = '';
+    
+    if (mostSpecificLevel && newSelection[mostSpecificLevel]) {
+      brandCategoryId = newSelection[mostSpecificLevel];
+    }
+    
+    // Always use department name for the top brand field
+    if (newSelection.department) {
+      const departmentBrand = brands.find(b => {
+        const bId = b._id || b.id;
+        return bId?.toString() === newSelection.department.toString();
+      });
+      
+      if (departmentBrand && departmentBrand.name) {
+        brandName = departmentBrand.name;
       }
     }
+    
+    // Update both brandCategoryId (most specific level) and brand (department name)
+    setFormData({ 
+      ...formData, 
+      brandCategoryId: brandCategoryId,
+      brand: brandName
+    });
   };
 
   const handleAdditionalBrandCategoryChange = (index, level, id) => {

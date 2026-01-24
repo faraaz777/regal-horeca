@@ -17,6 +17,7 @@ import Numbers from "@/components/Numbers";
 import Locations from "@/components/about/Locations";
 import CategoriesSection from "@/components/CategoriesSection";
 import CircularCategories from "@/components/CircularCategories";
+import FeaturedProductsShowcase from "@/components/FeaturedProductsShowcase";
 import { flattenCategories } from "@/lib/utils/categoryUtils";
 
 // Metadata for SEO
@@ -43,8 +44,8 @@ export default async function HomePage() {
     const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
 
-    const [featuredResponse, arrivalsResponse, categoriesResponse] = await Promise.all([
-      fetch(`${baseUrl}/api/products?featured=true&limit=4`, {
+      const [featuredResponse, arrivalsResponse, categoriesResponse] = await Promise.all([
+      fetch(`${baseUrl}/api/products?featured=true&limit=6`, {
         cache: 'force-cache',
         next: { revalidate: 300 } // Cache for 5 minutes
       }).catch(() => null),
@@ -92,46 +93,8 @@ export default async function HomePage() {
       {/* Circular Categories Section */}
       <CircularCategories categories={categories} />
 
-      {/* Featured Products Section */}
-      <section className="py-2 sm:py-6 md:py-10 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-8 sm:mb-10 md:mb-14">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif text-black mb-2 sm:mb-3 md:mb-4">
-              Featured Products
-            </h2>
-            <p className="text-black/60 max-w-2xl mx-auto font-light text-sm sm:text-base">
-              Handpicked items that define quality and elegance.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-12">
-            {featuredProducts.length > 0 ? (
-              featuredProducts.map((product, index) => (
-                <ProductCard
-                  key={product._id || product.id || `featured-${index}`}
-                  product={product}
-                />
-              ))
-            ) : (
-              <div className="col-span-full text-center py-8 text-black/60">
-                No featured products available
-              </div>
-            )}
-          </div>
-
-          <div className="flex justify-center mt-12">
-            <Link
-              href="/catalog"
-              className="group inline-flex items-center gap-2 border-b border-black pb-1 text-sm font-bold uppercase tracking-widest hover:text-accent hover:border-accent transition-colors"
-            >
-              View All Products
-              <span className="transform group-hover:translate-x-1 transition-transform">
-                →
-              </span>
-            </Link>
-          </div>
-        </div>
-      </section>
+      {/* Featured Products Showcase Section */}
+      <FeaturedProductsShowcase products={featuredProducts} categories={categories} />
 
       {/* Categories Section - Client Component */}
       <CategoriesSection categories={categories} />

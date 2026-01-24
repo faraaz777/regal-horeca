@@ -17,7 +17,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import useSWR from 'swr';
@@ -35,6 +35,8 @@ export default function AdminAddProductPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+  const [duplicateProduct, setDuplicateProduct] = useState(null);
+  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(true);
 
   // Fetch products based on selected category
   // If category is selected, fetch products in that category
@@ -62,6 +64,27 @@ export default function AdminAddProductPage() {
   });
 
   const products = productsData?.products || [];
+
+  // Check for duplicate product data in sessionStorage on mount
+  useEffect(() => {
+    try {
+      const duplicateData = sessionStorage.getItem('duplicateProductData');
+      if (duplicateData) {
+        const parsedData = JSON.parse(duplicateData);
+        console.log('Loaded duplicate product data:', parsedData);
+        setDuplicateProduct(parsedData);
+        // Clear sessionStorage after reading
+        sessionStorage.removeItem('duplicateProductData');
+      } else {
+        console.log('No duplicate product data found in sessionStorage');
+      }
+    } catch (error) {
+      console.error('Error parsing duplicate product data:', error);
+      showToast.error('Failed to load duplicate product data');
+    } finally {
+      setIsCheckingDuplicate(false);
+    }
+  }, []); // Run only once on mount
 
   const handleSave = async (productData) => {
     const toastId = showToast.loading('Creating product...');
@@ -103,6 +126,18 @@ export default function AdminAddProductPage() {
     router.push('/admin/products');
   };
 
+  // Don't render form until we've checked for duplicate data
+  if (isCheckingDuplicate) {
+    return (
+      <div className="max-w-4xl mx-auto w-full">
+        <div className="px-4 sm:px-6 py-8 text-center text-gray-500">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-2 text-sm">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto w-full">
       {error && (
@@ -111,9 +146,16 @@ export default function AdminAddProductPage() {
         </div>
       )}
       
-      <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">Add New Product</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">
+        {duplicateProduct ? 'Duplicate Product' : 'Add New Product'}
+      </h1>
+      {duplicateProduct && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mb-4 text-sm">
+          <p>This product is being duplicated. Please review and modify the fields as needed before saving.</p>
+        </div>
+      )}
       <ProductForm 
-        product={null}
+        product={duplicateProduct || null}
         allProducts={products}
         onSave={handleSave}
         onCancel={handleCancel}

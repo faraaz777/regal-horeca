@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
-import { PlusIcon, EditIcon, TrashIcon, SearchIcon, ChevronLeftIcon, ChevronRightIcon, StarIcon } from '@/components/Icons';
+import { PlusIcon, EditIcon, TrashIcon, SearchIcon, ChevronLeftIcon, ChevronRightIcon, StarIcon, DuplicateIcon } from '@/components/Icons';
 import ProductForm from '@/components/ProductForm';
 import { showToast } from '@/lib/utils/toast';
 import { apiClient, ApiError } from '@/lib/utils/apiClient';
@@ -155,6 +155,86 @@ export default function AdminProductsPage() {
       } else {
         showToast.error('Failed to delete product');
       }
+    } finally {
+      toast.dismiss(toastId);
+      setLoading(false);
+    }
+  };
+
+  const handleDuplicateProduct = async (product) => {
+    const productId = product._id || product.id;
+    if (!productId) {
+      showToast.error('Product ID not found');
+      return;
+    }
+
+    const toastId = showToast.loading('Preparing product for duplication...');
+    setLoading(true);
+
+    try {
+      // Fetch full product data with all fields
+      const response = await fetch(`/api/products/${productId}`);
+      const data = await response.json();
+
+      if (data.success && data.product) {
+        const productData = data.product;
+        
+        // Extract IDs from populated fields
+        const categoryId = productData.categoryId?._id || productData.categoryId;
+        const categoryIds = (productData.categoryIds || []).map(c => c?._id || c).filter(Boolean);
+        const brandCategoryId = productData.brandCategoryId?._id || productData.brandCategoryId;
+        const brandCategoryIds = (productData.brandCategoryIds || []).map(b => b?._id || b).filter(Boolean);
+        const relatedProductIds = (productData.relatedProductIds || []).map(rp => rp?._id || rp).filter(Boolean);
+        
+        // Clean the product data for duplication
+        const duplicatedProduct = {
+          ...productData,
+          // Remove MongoDB-specific fields
+          _id: undefined,
+          id: undefined,
+          createdAt: undefined,
+          updatedAt: undefined,
+          __v: undefined,
+          // Clear slug - will be auto-generated from title
+          slug: '',
+          // Append " (Copy)" to title
+          title: productData.title ? `${productData.title} (Copy)` : '',
+          // Convert populated objects to IDs
+          categoryId: categoryId ? String(categoryId) : '',
+          categoryIds: categoryIds.map(id => String(id)),
+          brandCategoryId: brandCategoryId ? String(brandCategoryId) : '',
+          brandCategoryIds: brandCategoryIds.map(id => String(id)),
+          relatedProductIds: relatedProductIds.map(id => String(id)),
+          // Keep all other fields (brand, images, specifications, etc.)
+        };
+
+        // Remove undefined fields and MongoDB populated objects
+        Object.keys(duplicatedProduct).forEach(key => {
+          if (duplicatedProduct[key] === undefined) {
+            delete duplicatedProduct[key];
+          }
+          // Remove any remaining MongoDB populated objects (they should be converted to IDs above)
+          if (duplicatedProduct[key] && typeof duplicatedProduct[key] === 'object' && duplicatedProduct[key]._id) {
+            // This shouldn't happen, but just in case
+            duplicatedProduct[key] = duplicatedProduct[key]._id;
+          }
+        });
+
+        // Store in sessionStorage to pass to add page
+        try {
+          sessionStorage.setItem('duplicateProductData', JSON.stringify(duplicatedProduct));
+          // Navigate to add page
+          router.push('/admin/products/add?duplicate=true');
+        } catch (storageError) {
+          console.error('Error storing duplicate data:', storageError);
+          showToast.error('Failed to store duplicate product data. The data might be too large.');
+        }
+      } else {
+        showToast.error(data.error || 'Failed to load product details');
+      }
+    } catch (error) {
+      console.error('Error duplicating product:', error);
+      showToast.error('Failed to duplicate product');
     } finally {
       toast.dismiss(toastId);
       setLoading(false);
@@ -477,6 +557,14 @@ export default function AdminProductsPage() {
                                   <EditIcon />
                                 </button>
                                 <button 
+                                  onClick={() => handleDuplicateProduct(product)} 
+                                  className="text-blue-600 hover:text-blue-900 mr-4"
+                                  disabled={loading}
+                                  title="Duplicate product"
+                                >
+                                  <DuplicateIcon />
+                                </button>
+                                <button 
                                   onClick={() => handleDeleteProduct(productId)} 
                                   className="text-red-600 hover:text-red-900"
                                   disabled={loading}
@@ -581,6 +669,14 @@ export default function AdminProductsPage() {
                               title="Edit product"
                             >
                               <EditIcon />
+                            </button>
+                            <button 
+                              onClick={() => handleDuplicateProduct(product)} 
+                              className="text-blue-600 hover:text-blue-900 p-2"
+                              disabled={loading}
+                              title="Duplicate product"
+                            >
+                              <DuplicateIcon />
                             </button>
                             <button 
                               onClick={() => handleDeleteProduct(productId)} 

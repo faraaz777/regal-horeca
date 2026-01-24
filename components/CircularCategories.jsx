@@ -125,15 +125,15 @@ export default function CircularCategories({ categories }) {
                 className="group flex flex-col items-center gap-1.5 sm:gap-2 transition-all duration-300 hover:-translate-y-1 flex-shrink-0 snap-center min-w-[70px] sm:min-w-[90px] md:min-w-[100px] lg:min-w-[110px]"
               >
                 {/* Circular Category Container - Larger on mobile */}
-                <div className="relative w-20 h-20 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 rounded-full border-2 border-black/10 group-hover:border-accent transition-all duration-300 overflow-hidden bg-white shadow-sm group-hover:shadow-md group-hover:border-[3px]">
+                <div className="relative w-[88px] h-[88px] sm:w-[88px] sm:h-[88px] md:w-[104px] md:h-[104px] lg:w-[120px] lg:h-[120px] rounded-none group-hover:rounded-full border-0 group-hover:border-[3px] group-hover:border-accent transition-all duration-300 overflow-hidden bg-white shadow-sm group-hover:shadow-md">
                   {cat.image ? (
                     <Image
                       src={cat.image}
                       alt={cat.name}
                       fill
                       unoptimized
-                      sizes="(max-width: 640px) 80px, (max-width: 768px) 80px, (max-width: 1024px) 96px, 112px"
-                      className="object-cover group-hover:scale-110 transition-transform duration-300"
+                      sizes="(max-width: 640px) 88px, (max-width: 768px) 88px, (max-width: 1024px) 104px, 120px"
+                      className="object-contain group-hover:object-cover group-hover:scale-110 transition-transform duration-300"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 text-gray-500 text-sm sm:text-base md:text-lg font-bold">

@@ -39,35 +39,37 @@ export default function CartDrawer({ isOpen, onClose }) {
     if (isOpen && cart.length > 0) {
       async function fetchCartProducts() {
         try {
-          setLoading(true);
-          // Fetch products by IDs
-          const productIds = cart.map(item => item.productId).filter(Boolean);
-          if (productIds.length === 0) {
-            setProducts([]);
-            return;
+          // Check if we already have the products loaded
+          const cartProductIds = [...new Set(cart.map(item => item.productId).filter(Boolean))];
+          const loadedProductIds = products.map(p => p._id || p.id);
+          const allLoaded = cartProductIds.every(id => loadedProductIds.includes(id));
+          
+          // Only show loading if we are missing products
+          if (!allLoaded) {
+            setLoading(true);
           }
 
-          // Fetch each product (could be optimized with a batch endpoint)
-          const productPromises = productIds.map(id => 
-            fetch(`/api/products/${id}`).then(res => res.json())
-          );
-          const productResults = await Promise.all(productPromises);
-          const fetchedProducts = productResults
-            .filter(result => result.success && result.product)
-            .map(result => result.product);
+          // If all loaded, we can still do a silent refresh, or skip if recently fetched
+          // For now, we'll fetch to ensure stock/price is up to date, but without loading spinner if already loaded
           
-          setProducts(fetchedProducts);
+          // Use bulk API to fetch all products in one request
+          const idsParam = cartProductIds.join(',');
+          const response = await fetch(`/api/products?ids=${idsParam}`);
+          const data = await response.json();
+          
+          if (data.success && data.products) {
+            setProducts(data.products);
+          }
         } catch (error) {
           console.error('Failed to fetch cart products:', error);
-          setProducts([]);
+          // Don't clear products on error to keep existing data visible
         } finally {
           setLoading(false);
         }
       }
       fetchCartProducts();
-    } else {
-      setProducts([]);
     }
+    // Note: We don't clear products when closed anymore, so they are cached for next open
   }, [isOpen, cart]);
 
   const cartItems = useMemo(() => {

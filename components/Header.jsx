@@ -653,7 +653,7 @@ function DepartmentsBar({
                       </Link>
                       {childCat.children && childCat.children.length > 0 && (
                         <ul className="space-y-1.5">
-                          {childCat.children.slice(0, 5).map((sub) => (
+                          {childCat.children.slice(0, 12).map((sub) => (
                             <li key={sub._id || sub.id}>
                               <Link
                                 href={`/catalog?category=${sub.slug}`}

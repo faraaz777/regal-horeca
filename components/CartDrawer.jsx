@@ -44,8 +44,9 @@ export default function CartDrawer({ isOpen, onClose }) {
           const loadedProductIds = products.map(p => p._id || p.id);
           const allLoaded = cartProductIds.every(id => loadedProductIds.includes(id));
           
-          // Only show loading if we are missing products
-          if (!allLoaded) {
+          // Only show loading if we are missing products AND we have no products at all
+          // If we have some products, we'll show them and let the new ones pop in
+          if (!allLoaded && products.length === 0) {
             setLoading(true);
           }
 
@@ -78,8 +79,9 @@ export default function CartDrawer({ isOpen, onClose }) {
         const pid = p._id || p.id;
         return pid?.toString() === cartItem.productId?.toString();
       });
-      return product ? { ...cartItem, product } : null;
-    }).filter(Boolean);
+      // Return item even if product is missing (will be handled in UI as loading state)
+      return { ...cartItem, product };
+    });
   }, [cart, products]);
 
   const formatPrice = (price) => {
@@ -177,6 +179,11 @@ export default function CartDrawer({ isOpen, onClose }) {
 
   const subtotal = useMemo(() => {
     return cartItems.reduce((sum, item) => {
+      // If product is not loaded yet, use 0 or item.price from cart
+      if (!item.product) {
+        return sum + ((item.price || 0) * item.quantity);
+      }
+      
       // Use stored price if available, otherwise fall back to product price
       const price = item.price || item.product.price || 0;
       return sum + (price * item.quantity);
@@ -233,7 +240,8 @@ export default function CartDrawer({ isOpen, onClose }) {
 
         {/* Cart Content */}
         <div className="flex-1 overflow-y-auto">
-          {loading ? (
+          {/* Show loading ONLY if we have items but NO products loaded yet */}
+          {loading && cartItems.length > 0 && products.length === 0 ? (
             <div className="flex items-center justify-center py-16">
               <div className="flex flex-col items-center gap-3">
                 <div className="w-8 h-8 border-3 border-accent border-t-transparent rounded-full animate-spin"></div>
@@ -244,6 +252,26 @@ export default function CartDrawer({ isOpen, onClose }) {
             <div className="px-3 sm:px-4 py-3 space-y-2.5">
               {cartItems.map((item) => {
                 const product = item.product;
+                
+                // Skeleton Loader for items being fetched
+                if (!product) {
+                  return (
+                    <div 
+                      key={`skeleton_${item.productId}`} 
+                      className="bg-white rounded-lg border border-black/5 p-3 animate-pulse"
+                    >
+                      <div className="flex gap-3">
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 bg-black/5 rounded-lg"></div>
+                        <div className="flex-1 space-y-2 py-1">
+                          <div className="h-4 bg-black/5 rounded w-3/4"></div>
+                          <div className="h-3 bg-black/5 rounded w-1/2"></div>
+                          <div className="h-8 bg-black/5 rounded w-24 mt-2"></div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
                 const productId = product._id || product.id;
                 const productImage = product.heroImage || product.image || (product.images && product.images[0]) || '/placeholder-product.jpg';
                 const productName = product.title || product.name || 'Product';

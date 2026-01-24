@@ -7,7 +7,7 @@ import { HeartIcon, ShoppingCartIcon } from './Icons';
 import { useAppContext } from '@/context/AppContext';
 import toast from 'react-hot-toast';
 
-export default function ProductCard({ product, onAdd, hidePrice = false }) {
+export default function ProductCard({ product, onAdd, hidePrice = false, transparent = false }) {
   const { addToWishlist, removeFromWishlist, isInWishlist, addToCart, removeFromCart, isInCart } = useAppContext();
 
   // Get product images - combine heroImage and gallery
@@ -198,11 +198,11 @@ export default function ProductCard({ product, onAdd, hidePrice = false }) {
   }, [isHovered, productImages.length]);
 
   return (
-    <div className="bg-white overflow-hidden flex flex-col h-full">
+    <div className={`overflow-hidden flex flex-col h-full ${transparent ? '' : 'bg-white'}`}>
       {/* Image Container - Separated with rounded corners */}
       <div
         ref={imageContainerRef}
-        className="group relative w-full aspect-square overflow-hidden  hover:scale-105 transition-all duration-700 rounded-none select-none"
+        className={`group relative w-full aspect-square overflow-hidden hover:scale-105 transition-all duration-700 rounded-none select-none ${transparent ? 'bg-white' : ''}`}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -354,7 +354,7 @@ export default function ProductCard({ product, onAdd, hidePrice = false }) {
 
         {/* Product Name - Larger and Bold */}
         <Link href={`/products/${productSlug}`}>
-          <h3 className="text-xs sm:text-sm md:text-base font-semibold text-black mt-2  hover:text-accent transition-colors leading-tight break-words">
+          <h3 className={`text-xs sm:text-sm md:text-base font-semibold mt-2 hover:text-accent transition-colors leading-tight break-words ${transparent ? 'text-white' : 'text-black'}`}>
             {productName}
           </h3>
         </Link>

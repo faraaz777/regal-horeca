@@ -160,6 +160,7 @@ export default function FeaturedProductsShowcase({ products = [], categories = [
                   key={productId}
                   product={piece}
                   hidePrice
+                  transparent
                 />
               );
             })}

@@ -15,51 +15,16 @@ import { WhatsAppIcon, ChevronDownIcon } from "@/components/Icons";
 import { useAppContext } from "@/context/AppContext";
 import { getWhatsAppBusinessLink, openWhatsAppLink } from "@/lib/utils/whatsapp";
 import toast from "react-hot-toast";
-import hotelImage from "./images/hotelH.png";
-import partnersImage from "./images/Picture1.png";
-import partnersImage2 from "./images/Picture2.png";
-import partnersImage4 from "./images/Picture4.png";
-import partnersImage5 from "./images/Picture5.png";
-import partnersImage6 from "./images/Picture6.png";
-import partnersImage7 from "./images/Picture7.png";
-import partnersImage8 from "./images/Picture8.png";
-import partnersImage9 from "./images/Picture9.png";
-import partnersImage10 from "./images/Picture10.png";
-import partnersImage11 from "./images/Picture11.png";
-import partnersImage12 from "./images/Picture12.png";
-import partnersImage13 from "./images/Picture13.png";
-import partnersImage14 from "./images/Picture14.png";
-import partnersImage15 from "./images/Picture15.png";
 
-// Restaurant images
-import azeebo from "./restaurants/azeebo.png";
-import barkas from "./restaurants/barkas.jpg";
-import ismailbiryani from "./restaurants/ismailbiryani.jpg";
-import kirtunga from "./restaurants/kirtunga.jpg";
-import lucky from "./restaurants/lucky.png";
-import mandi36 from "./restaurants/mandi36.png";
-import mehfil from "./restaurants/Mehfil Logo.avif";
-import meridian from "./restaurants/meridian.png";
-import minerva from "./restaurants/minerva.jpg";
-import nawabs from "./restaurants/nawabs.png";
-import paradise from "./restaurants/paradise.png";
-import pistahouse from "./restaurants/pistahouse.png";
-import rumaan from "./restaurants/rumaan.png";
-import sarvi from "./restaurants/sarvi.jpg";
-import swagath from "./restaurants/swagath.png";
-import toshedaan from "./restaurants/toshedaan.jpg";
-import tulips from "./restaurants/tulips.png";
-import joharfa from "./restaurants/joharfa.jpg";
-import levant from "./restaurants/levant.png";
-import tansen from "./restaurants/tansen.jpg";
-import ironhill from "./restaurants/ironhill2.png";
+// Cloudflare R2 Base URL
+const CF_BASE = "https://pub-f321790dd0774841a14d142aad52ade6.r2.dev";
 
 // Category-specific content data
 const categoryData = {
   hotels: {
     title: "Designed for Distinguished Hotels",
     subtitle: "Crafting Elevated Hospitality Experiences",
-    heroImage: hotelImage,
+    heroImage: `${CF_BASE}/images/hotelH.png`,
     introText:
       "From luxury hotels to boutique properties, Regal delivers refined hospitality solutions that balance timeless elegance, durability, and operational precision.",
     restaurantTypes: [
@@ -67,7 +32,7 @@ const categoryData = {
         title: "Luxury Hotels",
         description:
           "Sophisticated solutions designed to complement high-end hotel environments and premium guest experiences.",
-        image: hotelImage,
+        image: `${CF_BASE}/images/hotelH.png`,
       },
       {
         title: "Boutique Hotels",
@@ -333,7 +298,7 @@ const TOUCHPOINTS = [
     title: "Lounges & Bar Service",
     category: "Social",
     description:
-      'Upgrade cocktails and small bites with sleek service pieces that suit bar counters, lounges, and late-night service without looking "generic".',
+      "Upgrade cocktails and small bites with sleek service pieces that suit bar counters, lounges, and late-night service without looking \"generic\".",
     imageUrl:
       "https://images.unsplash.com/photo-1470337458703-46ad1756a187?auto=format&fit=crop&q=80&w=1200",
   },
@@ -349,45 +314,45 @@ const TOUCHPOINTS = [
 ];
 
 const partners = [
-  { name: "TAJ", image: partnersImage },
-  { name: "Clarks", image: partnersImage2 },
-  { name: "ROYAL ORCHID HOTELS", image: partnersImage9 },
-  { name: "Oberoi HOTELS & RESORTS", image: partnersImage4 },
-  { name: "THE LEELA PALACES HOTELS RESORTS", image: partnersImage5 },
-  { name: "ORIS HÖLSTEIN 1904", image: partnersImage6 },
-  { name: "Marriott HOTELS · RESORTS · SUITES", image: partnersImage7 },
-  { name: "Shera town", image: partnersImage8 },
-  { name: "Radisson BLU", image: partnersImage13 },
-  { name: "Le MERIDIEN", image: partnersImage15 },
-  { name: "American M2 Pets", image: partnersImage10 },
-  { name: "JUMBO", image: partnersImage11 },
-  { name: "ANdAZ. HOTELS & RESORTS", image: partnersImage12 },
-  { name: "TEDi", image: partnersImage14 },
+  { name: "TAJ", image: `${CF_BASE}/images/Picture1.png` },
+  { name: "Clarks", image: `${CF_BASE}/images/Picture2.png` },
+  { name: "ROYAL ORCHID HOTELS", image: `${CF_BASE}/images/Picture9.png` },
+  { name: "Oberoi HOTELS & RESORTS", image: `${CF_BASE}/images/Picture4.png` },
+  { name: "THE LEELA PALACES HOTELS RESORTS", image: `${CF_BASE}/images/Picture5.png` },
+  { name: "ORIS HÖLSTEIN 1904", image: `${CF_BASE}/images/Picture6.png` },
+  { name: "Marriott HOTELS · RESORTS · SUITES", image: `${CF_BASE}/images/Picture7.png` },
+  { name: "Shera town", image: `${CF_BASE}/images/Picture8.png` },
+  { name: "Radisson BLU", image: `${CF_BASE}/images/Picture13.png` },
+  { name: "Le MERIDIEN", image: `${CF_BASE}/images/Picture15.png` },
+  { name: "American M2 Pets", image: `${CF_BASE}/images/Picture10.png` },
+  { name: "JUMBO", image: `${CF_BASE}/images/Picture11.png` },
+  { name: "ANdAZ. HOTELS & RESORTS", image: `${CF_BASE}/images/Picture12.png` },
+  { name: "TEDi", image: `${CF_BASE}/images/Picture14.png` },
 ];
 
 // Restaurant partners images
 const restaurantPartners = [
-  { name: "Pista House", image: pistahouse },
-  { name: "Azeebo", image: azeebo },
-  { name: "Nawabs", image: nawabs },
-  { name: "Levant", image: levant },
-  { name: "Tansen", image: tansen },
-  { name: "Paradise", image: paradise },
-  { name: "Mandi 36", image: mandi36 },
-  { name: "Barkas", image: barkas },
-  { name: "Mehfil", image: mehfil },
-  { name: "Sarvi", image: sarvi },
-  { name: "Joharfa", image: joharfa },
-  { name: "Minerva", image: minerva },
-  { name: "Kirtunga", image: kirtunga },
-  { name: "Lucky", image: lucky },
-  { name: "Rumaan", image: rumaan },
-  { name: "Meridian", image: meridian },
-  { name: "Toshe Daan", image: toshedaan },
-  { name: "Ismail Biryani", image: ismailbiryani },
-  { name: "Swagath", image: swagath },
-  { name: "Tulips", image: tulips },
-  { name: "Iron Hill", image: ironhill },
+  { name: "Pista House", image: `${CF_BASE}/restaurants/pistahouse.png` },
+  { name: "Azeebo", image: `${CF_BASE}/restaurants/azeebo.png` },
+  { name: "Nawabs", image: `${CF_BASE}/restaurants/nawabs.png` },
+  { name: "Levant", image: `${CF_BASE}/restaurants/levant.png` },
+  { name: "Tansen", image: `${CF_BASE}/restaurants/tansen.jpg` },
+  { name: "Paradise", image: `${CF_BASE}/restaurants/paradise.png` },
+  { name: "Mandi 36", image: `${CF_BASE}/restaurants/mandi36.png` },
+  { name: "Barkas", image: `${CF_BASE}/restaurants/barkas.jpg` },
+  { name: "Mehfil", image: `${CF_BASE}/restaurants/Mehfil%20Logo.avif` },
+  { name: "Sarvi", image: `${CF_BASE}/restaurants/sarvi.jpg` },
+  { name: "Joharfa", image: `${CF_BASE}/restaurants/joharfa.jpg` },
+  { name: "Minerva", image: `${CF_BASE}/restaurants/minerva.jpg` },
+  { name: "Kirtunga", image: `${CF_BASE}/restaurants/kirtunga.jpg` },
+  { name: "Lucky", image: `${CF_BASE}/restaurants/lucky.png` },
+  { name: "Rumaan", image: `${CF_BASE}/restaurants/rumaan.png` },
+  { name: "Meridian", image: `${CF_BASE}/restaurants/meridian.png` },
+  { name: "Toshe Daan", image: `${CF_BASE}/restaurants/toshedaan.jpg` },
+  { name: "Ismail Biryani", image: `${CF_BASE}/restaurants/ismailbiryani.jpg` },
+  { name: "Swagath", image: `${CF_BASE}/restaurants/swagath.png` },
+  { name: "Tulips", image: `${CF_BASE}/restaurants/tulips.png` },
+  { name: "Iron Hill", image: `${CF_BASE}/restaurants/ironhill2.png` },
 ];
 
 const features = [

@@ -49,6 +49,7 @@ export async function GET(request) {
     const searchQuery = searchParams.get('search');
     const featured = searchParams.get('featured');
     const status = searchParams.get('status');
+    const idsParam = searchParams.get('ids');
     
     // User filters
     const priceMin = searchParams.get('priceMin');
@@ -103,6 +104,14 @@ export async function GET(request) {
     // Status filter
     if (status) {
       andConditions.push({ status: status });
+    }
+
+    // IDs filter
+    if (idsParam) {
+      const ids = idsParam.split(',').map(id => id.trim()).filter(Boolean);
+      if (ids.length > 0) {
+        andConditions.push({ _id: { $in: ids } });
+      }
     }
 
     // Price filter - combine min and max into single condition

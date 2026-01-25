@@ -355,6 +355,29 @@ const restaurantPartners = [
   { name: "Iron Hill", image: `${CF_BASE}/restaurants/ironhill2.png` },
 ];
 
+// Banquet partners images (Assumed to be in /restaurants/ or /banquets/ - using /restaurants/ based on user's cloudflare folders)
+// Naming convention: lowercase, no spaces to match existing style (e.g. pistahouse.png)
+// Note: Since images are not yet available, we will display initials as placeholders if image fails to load
+const banquetPartners = [
+  { name: "King Kohinoor", image: null },
+  { name: "Classic 3", image: null },
+  { name: "Red Rose", image: null },
+  { name: "OR Palace", image: null },
+  { name: "Regal Convention", image: null },
+  { name: "Metro Convention", image: null },
+  { name: "Vintage Palace", image: null },
+  { name: "Legacy Palace", image: null },
+  { name: "HF Convention", image: null },
+  { name: "Mehboob Pride", image: null },
+  { name: "Paigah Palace", image: null },
+  { name: "Shimla Garden", image: null },
+  { name: "MNR Garden", image: null },
+  { name: "Anmol Garden", image: null },
+  { name: "SR Classic", image: null },
+  { name: "TS Paradise", image: null },
+  { name: "IB Palace", image: null },
+];
+
 const features = [
   {
     title: "Engineered for Maximum Durability",
@@ -838,7 +861,7 @@ export default function CategoryPage() {
             <div className="px-4 sm:px-6 md:px-8 lg:px-12 pt-8 sm:pt-10 md:pt-12 mb-8 md:mb-10 relative z-20">
               <div className="text-center">
                 <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.3em] text-gray-600 mb-4">
-                  {slug === 'restaurants' ? 'Our Restaurant Partners' : 'Proud Partners in Hospitality'}
+                  {slug === 'restaurants' ? 'Our Restaurant Partners' : slug === 'banquets' ? 'Our Banquet Partners' : 'Proud Partners in Hospitality'}
                 </p>
               </div>
             </div>
@@ -846,7 +869,7 @@ export default function CategoryPage() {
             {/* Full-width circular pearl gallery */}
             <div className="w-full relative flex items-center justify-center pb-8 sm:pb-10 md:pb-12 px-4 sm:px-6 md:px-8">
               <div className="w-full max-w-[1600px] mx-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-y-6 md:gap-y-8 gap-x-6 md:gap-x-8 relative z-10">
-            {(slug === 'restaurants' ? restaurantPartners : partners).map((partner, idx) => {
+            {((slug === 'restaurants' ? restaurantPartners : slug === 'banquets' ? banquetPartners : partners)).map((partner, idx) => {
               const driftDuration = 4 + (idx % 3);
               const entryDelay = idx * 0.05;
               
@@ -870,7 +893,7 @@ export default function CategoryPage() {
                     className={`
                       relative w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 rounded-full
                       flex items-center justify-center overflow-hidden
-                      bg-white
+                      ${partner.image ? 'bg-white' : 'bg-gradient-to-br from-gray-900 via-gray-800 to-black shadow-lg border border-gray-700'}
                       transition-all duration-300 ease-out cursor-pointer
                       hover:scale-110 hover:-translate-y-2
                       animate-float-pearl
@@ -882,13 +905,23 @@ export default function CategoryPage() {
                   >
                     {/* Logo - Always Colorful */}
                     <div className="relative z-10 p-4 sm:p-5 md:p-6 flex items-center justify-center w-full h-full">
-                      <Image
-                        src={partner.image}
-                        alt={partner.name}
-                        fill
-                        className="object-contain transition-all duration-300 group-hover:scale-105"
-                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 14vw"
-                      />
+                      {partner.image ? (
+                        <Image
+                          src={partner.image}
+                          alt={partner.name}
+                          fill
+                          className="object-contain transition-all duration-300 group-hover:scale-105"
+                          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 14vw"
+                        />
+                      ) : (
+                        <div className="text-center w-full px-2 flex flex-col items-center gap-1">
+                          <div className="w-8 h-[1px] bg-accent/50 mb-1"></div>
+                          <span className="text-xs sm:text-sm md:text-[15px] font-bold text-white/90 uppercase tracking-[0.15em] leading-tight font-sans text-shadow-sm">
+                            {partner.name}
+                          </span>
+                          <div className="w-8 h-[1px] bg-accent/50 mt-1"></div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </motion.div>

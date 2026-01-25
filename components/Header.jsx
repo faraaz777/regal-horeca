@@ -617,7 +617,7 @@ function DepartmentsBar({
             transition-all duration-500 ease-out
             z-30 border-b border-black/10 shadow-xl
             ${hasActiveChildren
-              ? "opacity-100 translate-y-0 visible max-h-[500px]"
+              ? "opacity-100 translate-y-0 visible max-h-[85vh]"
               : "opacity-0 -translate-y-2 invisible max-h-0"
             }
           `}
@@ -653,7 +653,9 @@ function DepartmentsBar({
                       </Link>
                       {childCat.children && childCat.children.length > 0 && (
                         <ul className="space-y-1.5">
-                          {childCat.children.slice(0, 12).map((sub) => (
+                          {childCat.children
+                            .slice(0, (childCat.name?.toUpperCase() === 'STAINLESS STEEL FABRICATION' || childCat.slug === 'stainless-steel-fabrication') ? 30 : 12)
+                            .map((sub) => (
                             <li key={sub._id || sub.id}>
                               <Link
                                 href={`/catalog?category=${sub.slug}`}

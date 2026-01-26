@@ -9,6 +9,7 @@ import { Suspense } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import LoadingPage from '@/components/LoadingPage';
+import ClientOnly from '@/components/ClientOnly';
 import { Analytics } from "@vercel/analytics/next"
 
 export default function MainLayout({ children }) {
@@ -16,9 +17,11 @@ export default function MainLayout({ children }) {
     <>
       <LoadingPage />
       <div className="overflow-x-hidden">
-        <Suspense fallback={<div className="h-20 bg-white" />}>
-          <Header />
-        </Suspense>
+        <ClientOnly fallback={<div className="h-20 bg-white" />}>
+          <Suspense fallback={<div className="h-20 bg-white" />}>
+            <Header />
+          </Suspense>
+        </ClientOnly>
         <main className="flex-grow">{children}</main>
         <Analytics />
         <Footer />

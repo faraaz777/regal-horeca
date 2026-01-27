@@ -12,6 +12,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { WhatsAppIcon, ChevronDownIcon } from "@/components/Icons";
+import { MessageCircle } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { getWhatsAppBusinessLink, openWhatsAppLink } from "@/lib/utils/whatsapp";
 import toast from "react-hot-toast";
@@ -738,44 +739,45 @@ export default function CategoryPage() {
   return (
     <div className=" sm:pt-0 md:pt-0 lg:pt-0  ">
       {/* Hero Section */}
-      <section className="relative min-h-[250px] sm:min-h-[300px] md:min-h-[500px] lg:min-h-[700px] flex items-center justify-center overflow-hidden">
+      <section className="relative min-h-[280px] sm:min-h-[320px] md:min-h-[400px] lg:min-h-[500px] flex items-center justify-center overflow-hidden">
         <Image
           src={category.heroImage}
           alt={category.title}
           fill
           className="object-cover"
+          priority
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/40" />
-        <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12 text-center">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-[3.5rem] font-bold text-white tracking-tight leading-tight mb-4 sm:mb-6">
+        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/50 sm:bg-gradient-to-r sm:from-black/70 sm:via-black/50 sm:to-black/40" />
+        <div className="relative z-10 w-full max-w-4xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12 py-8 sm:py-12 text-center">
+          <h1 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-[3.5rem] font-bold text-white tracking-tight leading-[1.2] sm:leading-tight mb-3 sm:mb-4 md:mb-6 px-2">
             {category.title}
           </h1>
-          <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/90 leading-relaxed mb-6 sm:mb-8 md:mb-10 max-w-2xl mx-auto px-2">
+          <p className="text-xs sm:text-sm md:text-lg lg:text-xl text-white/90 leading-relaxed mb-5 sm:mb-6 md:mb-8 lg:mb-10 max-w-2xl mx-auto px-1 sm:px-2">
             {category.subtitle}
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+          <div className="flex flex-row items-center justify-center gap-2 sm:gap-3 md:gap-4">
             <button
               onClick={() => router.push("/catalog")}
-              className="inline-flex items-center justify-center whitespace-nowrap text-xs sm:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover-elevate active-elevate-2 border border-accent min-h-9 sm:min-h-10 rounded-md bg-accent text-white font-semibold px-6 sm:px-8 gap-2 w-full sm:w-auto"
+              className="inline-flex items-center justify-center whitespace-nowrap text-[10px] sm:text-xs md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent/90 active:bg-accent/80 transition-colors border border-accent min-h-[36px] sm:min-h-9 md:min-h-10 rounded-md bg-accent text-white font-semibold px-3 sm:px-4 md:px-6 lg:px-8 gap-1.5 sm:gap-2"
             >
               View Catalog
             </button>
             <button
               onClick={scrollToForm}
-              className="inline-flex items-center justify-center whitespace-nowrap text-xs sm:text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover-elevate active-elevate-2 border border-white/30 shadow-xs active:shadow-none min-h-9 sm:min-h-10 rounded-md bg-white/10 backdrop-blur-sm text-white font-semibold px-6 sm:px-8 gap-2 w-full sm:w-auto"
+              className="inline-flex items-center justify-center whitespace-nowrap text-[10px] sm:text-xs md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:pointer-events-none disabled:opacity-50 hover:bg-white/20 active:bg-white/15 transition-colors border border-white/40 shadow-sm active:shadow-none min-h-[36px] sm:min-h-9 md:min-h-10 rounded-md bg-white/10 backdrop-blur-sm text-white font-semibold px-3 sm:px-4 md:px-6 lg:px-8 gap-1.5 sm:gap-2"
             >
               Enquire Now
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
+                width="16"
+                height="16"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="w-5 h-5"
+                className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 flex-shrink-0"
               >
                 <path d="M5 12h14"></path>
                 <path d="m12 5 7 7-7 7"></path>
@@ -1053,48 +1055,6 @@ export default function CategoryPage() {
       {/* Product Collections Section - Cinematic Expanding Panels Gallery */}
       {departments.length > 0 && (
         <section id="products" className="py-8 md:py-12 bg-white relative overflow-hidden">
-          {/* Redesigned Minimalist/Editorial Header */}
-          <div className="max-w-[1800px] mx-auto px-4 md:px-8 mb-8 md:mb-12">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center gap-8 md:gap-12">
-              {/* Monumental Text Block */}
-              <div className="flex-shrink-0">
-                <h2 className="text-3xl md:text-4xl lg:text-5xl font-serif leading-none tracking-tighter text-gray-900 select-none">
-                  The <br />
-                  <span className="italic text-[#D4AF37]">Archives.</span>
-                </h2>
-              </div>
-
-              {/* Minimalist CTA & Context */}
-              <div className="flex-grow space-y-4">
-                <div className="max-w-xl">
-                  <div className="h-[1px] w-8 bg-gray-200 mb-3"></div>
-                  <p className="text-sm md:text-base font-light text-gray-400 italic leading-relaxed">
-                    "Curating the physical geometry of service excellence. Each collection is a testament to the weight of hospitality history."
-                  </p>
-                </div>
-                
-                <div className="flex items-center space-x-6">
-                  <button 
-                    onClick={scrollToForm}
-                    className="text-[8px] uppercase tracking-[0.4em] font-bold text-black border-b border-black pb-1 hover:text-[#D4AF37] hover:border-[#D4AF37] transition-all"
-                  >
-                    Request Print Catalogue
-                  </button>
-                  <button 
-                    onClick={() => {
-                      const productsSection = document.getElementById('products');
-                      if (productsSection) {
-                        productsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }
-                    }}
-                    className="w-10 h-10 rounded-full border border-gray-100 flex items-center justify-center hover:bg-black hover:text-white transition-all"
-                  >
-                    <span className="text-sm">↓</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* Cinematic Expanding Panels Gallery */}
           <div className="w-full h-[700px] flex flex-col lg:flex-row gap-0 overflow-hidden px-4 md:px-8">
@@ -1297,6 +1257,54 @@ export default function CategoryPage() {
           </div>
         </div>
       </section>
+
+      {/* Floating WhatsApp Button */}
+      <motion.button
+        onClick={() => {
+          const whatsappUrl = getWhatsAppBusinessLink("Hello! I would like to make an enquiry.");
+          openWhatsAppLink(whatsappUrl);
+        }}
+        className="fixed bottom-[4.5rem] right-4 sm:bottom-[4.5rem] sm:right-6 md:bottom-24 md:right-8 z-50 bg-[#25D366] hover:bg-[#20BA5A] active:bg-[#1DA851] text-white rounded-full shadow-2xl hover:shadow-[#25D366]/50 flex items-center justify-center overflow-hidden group transition-all duration-300 ease-in-out touch-manipulation"
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.1 }}
+        whileTap={{ scale: 0.95 }}
+        aria-label="Contact on WhatsApp"
+        style={{
+          padding: "0.75rem",
+          minWidth: "48px",
+          minHeight: "48px",
+        }}
+      >
+        <div className="flex items-center">
+          <WhatsAppIcon className="w-5 h-5 sm:w-5 sm:h-5 md:w-6 md:h-6 flex-shrink-0 transition-transform duration-300 group-hover:scale-110" />
+          <span className="hidden md:block text-xs md:text-sm font-bold uppercase tracking-wider whitespace-nowrap overflow-hidden max-w-0 group-hover:max-w-[150px] transition-all duration-300 ease-in-out opacity-0 group-hover:opacity-100 group-hover:ml-3">
+            WhatsApp
+          </span>
+        </div>
+      </motion.button>
+
+      {/* Floating Enquire Now Button */}
+      <motion.button
+        onClick={scrollToForm}
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 md:bottom-8 md:right-8 z-50 bg-accent hover:bg-accent/90 active:bg-accent/80 text-white rounded-full shadow-2xl hover:shadow-accent/50 flex items-center justify-center overflow-hidden group transition-all duration-300 ease-in-out touch-manipulation"
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        whileTap={{ scale: 0.95 }}
+        aria-label="Enquire Now"
+        style={{
+          padding: "0.75rem",
+          minWidth: "48px",
+          minHeight: "48px",
+        }}
+      >
+        <div className="flex items-center">
+          <MessageCircle className="w-5 h-5 sm:w-5 sm:h-5 md:w-6 md:h-6 flex-shrink-0 transition-transform duration-300 group-hover:scale-110" />
+          <span className="hidden md:block text-xs md:text-sm font-bold uppercase tracking-wider whitespace-nowrap overflow-hidden max-w-0 group-hover:max-w-[150px] transition-all duration-300 ease-in-out opacity-0 group-hover:opacity-100 group-hover:ml-3">
+            Enquire Now
+          </span>
+        </div>
+      </motion.button>
     </div>
   );
 }

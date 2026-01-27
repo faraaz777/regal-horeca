@@ -3,7 +3,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { HeartIcon, ShoppingCartIcon } from './Icons';
+import { HeartIcon } from './Icons';
+import { ClipboardList as LuClipboardList } from "lucide-react";
 import { useAppContext } from '@/context/AppContext';
 import toast from 'react-hot-toast';
 
@@ -343,7 +344,7 @@ export default function ProductCard({ product, onAdd, hidePrice = false, transpa
             }`}
           aria-label={inCart ? 'Remove from cart' : 'Add to cart'}
         >
-          <ShoppingCartIcon />
+          <LuClipboardList className="w-5 h-5" />
         </button>
       </div>
 

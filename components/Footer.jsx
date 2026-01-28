@@ -5,6 +5,7 @@
  */
 
 import Link from 'next/link';
+import { Instagram } from 'lucide-react';
 
 export default function Footer() {
   return (
@@ -39,7 +40,11 @@ export default function Footer() {
 
           <div>
             <h4 className="font-semibold text-lg mb-4 text-accent">Follow Us</h4>
-            <div className="flex space-x-4">{/* Social icons */}</div>
+            <div className="flex space-x-4">
+              <a href="https://www.instagram.com/regalhoreca" target="_blank" rel="noopener noreferrer" className="text-white/70 hover:text-white transition-colors" aria-label="Follow us on Instagram">
+                <Instagram className="w-6 h-6" />
+              </a>
+            </div>
           </div>
         </div>
 

@@ -12,7 +12,7 @@ export default function FeaturedProductsShowcase({ products = [], categories = [
     { id: 'all', label: 'All', icon: '✨', slug: 'all' },
     { id: 'barware', label: 'Barware', icon: '🍷', slug: 'barware' },
     { id: 'catering', label: 'Catering', icon: '🍽️', slug: 'catering' },
-    { id: 'hotel-hospitality', label: 'Hotel & Resort', icon: '🏨', slug: 'hotel-hospitality' },
+    { id: 'hotel-hospitality', label: 'Hotel & Resort', icon: '🏨', slug: 'hospitality' },
     { id: 'kitchenware', label: 'Kitchenware', icon: '👨‍🍳', slug: 'kitchenware' },
     { id: 'tableware', label: 'Tableware', icon: '🍴', slug: 'tableware' },
   ];

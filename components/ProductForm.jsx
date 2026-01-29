@@ -14,7 +14,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '@/context/AppContext';
-import { PlusIcon, TrashIcon, MagicIcon, StarIcon } from './Icons';
+import { PlusIcon, TrashIcon, MagicIcon, StarIcon, DragHandleIcon } from './Icons';
 import Image from 'next/image';
 import ColorPicker from './ColorPicker';
 
@@ -478,6 +478,10 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
   // AI generation state
   const [aiLoading, setAiLoading] = useState({ summary: false, description: false });
   const [aiCooldown, setAiCooldown] = useState({ summary: false, description: false });
+  
+  // Drag and drop state for specifications
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
   const lastAiCallRef = useRef({ summary: 0, description: 0 });
   
   // Specifications JSON mode state

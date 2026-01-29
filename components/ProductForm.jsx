@@ -480,6 +480,11 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
   const [aiCooldown, setAiCooldown] = useState({ summary: false, description: false });
   const lastAiCallRef = useRef({ summary: 0, description: 0 });
   
+  // Specifications JSON mode state
+  const [specJsonMode, setSpecJsonMode] = useState(false);
+  const [specJsonInput, setSpecJsonInput] = useState('');
+  const [specJsonError, setSpecJsonError] = useState('');
+  
   // Reset color picker state when opening
   const handleOpenColorPicker = () => {
     setCustomColorHex('#000000');
@@ -1379,6 +1384,191 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       ...formData, 
       specifications: (formData.specifications || []).filter((_, i) => i !== index) 
     });
+  };
+
+  /**
+   * Convert specifications array and available sizes to JSON string
+   */
+  const convertSpecsToJson = () => {
+    try {
+      const specs = formData.specifications || [];
+      const availableSizes = formData.availableSizes || '';
+      
+      // Build the JSON object
+      const jsonObject = {
+        specifications: [],
+        availableSizes: availableSizes.trim()
+      };
+      
+      // Handle empty array
+      if (Array.isArray(specs) && specs.length > 0) {
+        // Filter out null/undefined and ensure proper structure
+        const validSpecs = specs
+          .filter(spec => spec !== null && spec !== undefined)
+          .map(spec => ({
+            label: spec.label || '',
+            value: spec.value || '',
+            unit: spec.unit || ''
+          }))
+          .filter(spec => spec.label || spec.value || spec.unit); // Keep non-empty specs
+        
+        jsonObject.specifications = validSpecs;
+      }
+      
+      return JSON.stringify(jsonObject, null, 2);
+    } catch (error) {
+      console.error('Error converting specs to JSON:', error);
+      return JSON.stringify({ specifications: [], availableSizes: '' }, null, 2);
+    }
+  };
+
+  /**
+   * Validate and parse JSON specifications (including available sizes)
+   */
+  const validateAndParseSpecJson = (jsonString) => {
+    // Reset error
+    setSpecJsonError('');
+    
+    // Handle empty/whitespace-only input
+    if (!jsonString || !jsonString.trim()) {
+      return { specifications: [], availableSizes: '' };
+    }
+
+    try {
+      // Parse JSON
+      const parsed = JSON.parse(jsonString.trim());
+      
+      // Handle both formats: object with specifications/availableSizes OR array (legacy)
+      let specifications = [];
+      let availableSizes = '';
+      
+      if (Array.isArray(parsed)) {
+        // Legacy format: just an array of specifications
+        specifications = parsed;
+      } else if (typeof parsed === 'object' && parsed !== null) {
+        // New format: object with specifications and availableSizes
+        specifications = parsed.specifications || [];
+        availableSizes = parsed.availableSizes || '';
+        
+        // Validate availableSizes is a string
+        if (availableSizes !== null && availableSizes !== undefined && typeof availableSizes !== 'string') {
+          availableSizes = String(availableSizes);
+        }
+      } else {
+        setSpecJsonError('JSON must be an object with "specifications" array and optional "availableSizes" string, or an array of specification objects');
+        return null;
+      }
+
+      // Validate specifications is an array
+      if (!Array.isArray(specifications)) {
+        setSpecJsonError('"specifications" must be an array of objects');
+        return null;
+      }
+
+      // Validate each item in array
+      const validatedSpecs = specifications.map((item, index) => {
+        // Handle null/undefined items
+        if (item === null || item === undefined) {
+          return { label: '', value: '', unit: '' };
+        }
+
+        // Handle non-object items
+        if (typeof item !== 'object') {
+          setSpecJsonError(`Specification at index ${index} must be an object`);
+          return null;
+        }
+
+        // Ensure required structure with defaults
+        return {
+          label: item.label || '',
+          value: item.value || '',
+          unit: item.unit || ''
+        };
+      }).filter(item => item !== null);
+
+      // Check if any items were invalid
+      if (validatedSpecs.length !== specifications.length) {
+        setSpecJsonError('Some specifications were invalid and have been filtered out');
+      }
+
+      return { specifications: validatedSpecs, availableSizes: availableSizes.trim() };
+    } catch (error) {
+      // Handle various JSON parsing errors
+      if (error instanceof SyntaxError) {
+        setSpecJsonError(`Invalid JSON: ${error.message}`);
+      } else {
+        setSpecJsonError(`Error parsing JSON: ${error.message}`);
+      }
+      return null;
+    }
+  };
+
+  /**
+   * Handle switching to JSON mode
+   */
+  const handleSwitchToJsonMode = () => {
+    // Clear any pending debounce
+    if (specJsonDebounceRef.current) {
+      clearTimeout(specJsonDebounceRef.current);
+    }
+    
+    const jsonString = convertSpecsToJson();
+    setSpecJsonInput(jsonString);
+    setSpecJsonMode(true);
+    setSpecJsonError('');
+  };
+
+  /**
+   * Handle switching to form mode
+   */
+  const handleSwitchToFormMode = () => {
+    // Clear any pending debounce
+    if (specJsonDebounceRef.current) {
+      clearTimeout(specJsonDebounceRef.current);
+    }
+    
+    const parsed = validateAndParseSpecJson(specJsonInput);
+    
+    if (parsed !== null) {
+      setFormData({ 
+        ...formData, 
+        specifications: parsed.specifications,
+        availableSizes: parsed.availableSizes
+      });
+      setSpecJsonMode(false);
+      setSpecJsonError('');
+    }
+    // If validation fails, stay in JSON mode and show error
+  };
+
+  /**
+   * Handle JSON input change with real-time validation
+   */
+  const specJsonDebounceRef = useRef(null);
+  const handleSpecJsonChange = (value) => {
+    setSpecJsonInput(value);
+    
+    // Clear previous timeout
+    if (specJsonDebounceRef.current) {
+      clearTimeout(specJsonDebounceRef.current);
+    }
+    
+    // Only validate if JSON mode is active
+    if (specJsonMode) {
+      if (!value.trim()) {
+        setSpecJsonError('');
+        return;
+      }
+      
+      // Debounce validation for better UX
+      specJsonDebounceRef.current = setTimeout(() => {
+        const result = validateAndParseSpecJson(value);
+        // Result is now an object with {specifications, availableSizes} or null
+        // Error is set inside validateAndParseSpecJson
+      }, 500);
+    } else {
+      setSpecJsonError('');
+    }
   };
 
   const handleFilterChange = (index, e) => {
@@ -2705,6 +2895,47 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
           <p className="text-xs text-gray-600 mb-4">
             <strong className="text-gray-700">Available sizes</strong> is a default optional field. If provided, it will appear as a dropdown on the product detail page. It will not be shown in the specifications table.
           </p>
+          
+          {/* Mode Toggle */}
+          <div className="mb-4 flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Input Mode</label>
+              <p className="text-xs text-gray-500 mt-1">Switch between form and JSON input</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (specJsonMode) {
+                    handleSwitchToFormMode();
+                  }
+                }}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  !specJsonMode
+                    ? 'bg-primary text-white'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                Form Mode
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!specJsonMode) {
+                    handleSwitchToJsonMode();
+                  }
+                }}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  specJsonMode
+                    ? 'bg-primary text-white'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                JSON Mode
+              </button>
+            </div>
+          </div>
+
           <div className="space-y-3">
             {/* Available Sizes - Default Optional Field */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -2719,46 +2950,102 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                 className="md:col-span-9 p-2.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary focus:border-primary" 
               />
             </div>
-            {formData.specifications?.map((spec, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-8 gap-2 items-center">
-                <input 
-                  name="label" 
-                  placeholder="Label (e.g., Diameter)" 
-                  value={spec.label} 
-                  onChange={e => handleSpecChange(index, e)} 
-                  className="md:col-span-3 p-2 border rounded-md" 
+
+            {specJsonMode ? (
+              /* JSON Mode */
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-700">
+                    JSON Format Specifications
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleSwitchToFormMode}
+                    className="text-xs text-primary hover:underline font-medium"
+                  >
+                    Apply JSON
+                  </button>
+                </div>
+                <textarea
+                  value={specJsonInput}
+                  onChange={(e) => handleSpecJsonChange(e.target.value)}
+                  placeholder={`{\n  "specifications": [\n    {\n      "label": "Diameter",\n      "value": "24",\n      "unit": "cm"\n    },\n    {\n      "label": "Height",\n      "value": "12",\n      "unit": "cm"\n    }\n  ],\n  "availableSizes": "22,24,26,28,30"\n}`}
+                  className={`w-full p-3 border rounded-md font-mono text-sm min-h-[250px] focus:ring-2 focus:ring-primary focus:border-primary ${
+                    specJsonError ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                  }`}
+                  spellCheck={false}
                 />
-                <input 
-                  name="value" 
-                  placeholder="Value" 
-                  value={spec.value} 
-                  onChange={e => handleSpecChange(index, e)} 
-                  className="md:col-span-2 p-2 border rounded-md" 
-                />
-                <input 
-                  name="unit" 
-                  placeholder="Unit (e.g., cm)" 
-                  value={spec.unit || ''} 
-                  onChange={e => handleSpecChange(index, e)} 
-                  className="md:col-span-2 p-2 border rounded-md" 
-                />
+                {specJsonError && (
+                  <div className="p-2 bg-red-50 border border-red-200 rounded-md">
+                    <p className="text-xs text-red-700 font-medium">Error: {specJsonError}</p>
+                    <p className="text-xs text-red-600 mt-1">
+                      Expected format: Object with "specifications" array and optional "availableSizes" string
+                    </p>
+                  </div>
+                )}
+                {!specJsonError && specJsonInput.trim() && (
+                  <div className="p-2 bg-green-50 border border-green-200 rounded-md">
+                    <p className="text-xs text-green-700 font-medium">✓ Valid JSON</p>
+                  </div>
+                )}
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <p className="text-xs text-blue-700 font-medium mb-1">JSON Format Guide:</p>
+                  <ul className="text-xs text-blue-600 space-y-1 list-disc list-inside">
+                    <li>Must be a valid JSON object with "specifications" and optional "availableSizes"</li>
+                    <li>"specifications" must be an array of objects</li>
+                    <li>Each specification object should have "label", "value", and optional "unit" fields</li>
+                    <li>"availableSizes" should be a comma-separated string (e.g., "22,24,26,28,30")</li>
+                    <li>Empty strings are allowed for any field</li>
+                    <li>Null/undefined items will be converted to empty objects</li>
+                    <li>Legacy format: Array of specification objects is also supported</li>
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              /* Form Mode */
+              <>
+                {formData.specifications?.map((spec, index) => (
+                  <div key={index} className="grid grid-cols-1 md:grid-cols-8 gap-2 items-center">
+                    <input 
+                      name="label" 
+                      placeholder="Label (e.g., Diameter)" 
+                      value={spec.label || ''} 
+                      onChange={e => handleSpecChange(index, e)} 
+                      className="md:col-span-3 p-2 border rounded-md" 
+                    />
+                    <input 
+                      name="value" 
+                      placeholder="Value" 
+                      value={spec.value || ''} 
+                      onChange={e => handleSpecChange(index, e)} 
+                      className="md:col-span-2 p-2 border rounded-md" 
+                    />
+                    <input 
+                      name="unit" 
+                      placeholder="Unit (e.g., cm)" 
+                      value={spec.unit || ''} 
+                      onChange={e => handleSpecChange(index, e)} 
+                      className="md:col-span-2 p-2 border rounded-md" 
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => removeSpec(index)} 
+                      className="text-red-500 hover:text-red-700 justify-self-center"
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
+                ))}
                 <button 
                   type="button" 
-                  onClick={() => removeSpec(index)} 
-                  className="text-red-500 hover:text-red-700 justify-self-center"
+                  onClick={addSpec} 
+                  className="mt-2 text-sm text-primary hover:underline font-semibold flex items-center gap-1"
                 >
-                  <TrashIcon />
+                  <PlusIcon className="w-4 h-4" /> Add Specification
                 </button>
-              </div>
-            ))}
+              </>
+            )}
           </div>
-          <button 
-            type="button" 
-            onClick={addSpec} 
-            className="mt-2 text-sm text-primary hover:underline font-semibold flex items-center gap-1"
-          >
-            <PlusIcon className="w-4 h-4" /> Add Specification
-          </button>
         </FormSection>
 
             <FormSection title="Related Products">

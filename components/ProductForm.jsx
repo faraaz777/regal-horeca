@@ -1390,6 +1390,42 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     });
   };
 
+  const reorderSpecs = (fromIndex, toIndex) => {
+    const newSpecs = [...(formData.specifications || [])];
+    const [movedSpec] = newSpecs.splice(fromIndex, 1);
+    newSpecs.splice(toIndex, 0, movedSpec);
+    setFormData({ ...formData, specifications: newSpecs });
+  };
+
+  const handleSpecDragStart = (index) => {
+    setDraggedIndex(index);
+  };
+
+  const handleSpecDragOver = (e, index) => {
+    e.preventDefault();
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleSpecDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleSpecDrop = (e, index) => {
+    e.preventDefault();
+    if (draggedIndex !== null && draggedIndex !== index) {
+      reorderSpecs(draggedIndex, index);
+    }
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleSpecDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
   /**
    * Convert specifications array and available sizes to JSON string
    */
@@ -3006,35 +3042,51 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                 </div>
               </div>
             ) : (
-              /* Form Mode */
+              /* Form Mode - draggable specification tiles */
               <>
                 {formData.specifications?.map((spec, index) => (
-                  <div key={index} className="grid grid-cols-1 md:grid-cols-8 gap-2 items-center">
+                  <div
+                    key={index}
+                    draggable
+                    onDragStart={() => handleSpecDragStart(index)}
+                    onDragOver={(e) => handleSpecDragOver(e, index)}
+                    onDragLeave={handleSpecDragLeave}
+                    onDrop={(e) => handleSpecDrop(e, index)}
+                    onDragEnd={handleSpecDragEnd}
+                    className={`grid grid-cols-1 md:grid-cols-12 gap-2 items-center p-3 rounded-lg border transition-all cursor-move ${
+                      draggedIndex === index ? 'opacity-50 bg-gray-100' : 'bg-white hover:bg-gray-50'
+                    } ${
+                      dragOverIndex === index ? 'border-primary border-2 shadow-md' : 'border-gray-200'
+                    }`}
+                  >
+                    <div className="md:col-span-1 flex items-center justify-center text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
+                      <DragHandleIcon className="w-5 h-5" />
+                    </div>
                     <input 
                       name="label" 
                       placeholder="Label (e.g., Diameter)" 
                       value={spec.label || ''} 
                       onChange={e => handleSpecChange(index, e)} 
-                      className="md:col-span-3 p-2 border rounded-md" 
+                      className="md:col-span-3 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary" 
                     />
                     <input 
                       name="value" 
                       placeholder="Value" 
                       value={spec.value || ''} 
                       onChange={e => handleSpecChange(index, e)} 
-                      className="md:col-span-2 p-2 border rounded-md" 
+                      className="md:col-span-3 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary" 
                     />
                     <input 
                       name="unit" 
                       placeholder="Unit (e.g., cm)" 
                       value={spec.unit || ''} 
                       onChange={e => handleSpecChange(index, e)} 
-                      className="md:col-span-2 p-2 border rounded-md" 
+                      className="md:col-span-3 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary" 
                     />
                     <button 
                       type="button" 
                       onClick={() => removeSpec(index)} 
-                      className="text-red-500 hover:text-red-700 justify-self-center"
+                      className="md:col-span-2 text-red-500 hover:text-red-700 justify-self-center"
                     >
                       <TrashIcon />
                     </button>

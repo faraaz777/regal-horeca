@@ -15,6 +15,7 @@ import Brand from '@/lib/models/Brand';
 import { generateUniqueSlug } from '@/lib/utils/slug';
 import { getCategoryIdsWithChildren } from '@/lib/utils/categoryCache';
 import { revalidateHomepage } from '@/lib/utils/revalidate';
+import { normalizeFilterValues } from '@/lib/utils/normalizeFilterValue';
 
 // Allow caching with revalidation for better performance
 // Revalidate every 5 minutes (300 seconds)
@@ -399,16 +400,16 @@ export async function POST(request) {
       const oldFilters = productData.filters;
       productData.filters = [];
       if (oldFilters.material && Array.isArray(oldFilters.material) && oldFilters.material.length > 0) {
-        productData.filters.push({ key: 'Material', values: oldFilters.material });
+        productData.filters.push({ key: 'Material', values: normalizeFilterValues(oldFilters.material) });
       }
       if (oldFilters.size && Array.isArray(oldFilters.size) && oldFilters.size.length > 0) {
-        productData.filters.push({ key: 'Size', values: oldFilters.size });
+        productData.filters.push({ key: 'Size', values: normalizeFilterValues(oldFilters.size) });
       }
       if (oldFilters.color && Array.isArray(oldFilters.color) && oldFilters.color.length > 0) {
-        productData.filters.push({ key: 'Color', values: oldFilters.color });
+        productData.filters.push({ key: 'Color', values: normalizeFilterValues(oldFilters.color) });
       }
       if (oldFilters.usage && Array.isArray(oldFilters.usage) && oldFilters.usage.length > 0) {
-        productData.filters.push({ key: 'Usage', values: oldFilters.usage });
+        productData.filters.push({ key: 'Usage', values: normalizeFilterValues(oldFilters.usage) });
       }
       // Handle any other keys
       Object.keys(oldFilters).forEach(key => {
@@ -416,17 +417,17 @@ export async function POST(request) {
             Array.isArray(oldFilters[key]) && oldFilters[key].length > 0) {
           productData.filters.push({ 
             key: key.charAt(0).toUpperCase() + key.slice(1), 
-            values: oldFilters[key] 
+            values: normalizeFilterValues(oldFilters[key])
           });
         }
       });
     } else {
-      // Ensure it's a valid array with proper structure
+      // Ensure it's a valid array with proper structure; normalize values for consistent sidebar filtering
       productData.filters = productData.filters
         .filter(f => f && f.key && Array.isArray(f.values))
         .map(f => ({
           key: f.key.trim(),
-          values: f.values.filter(v => v && v.trim())
+          values: normalizeFilterValues(f.values.filter(v => v && v.trim()))
         }));
     }
     if (!productData.tags) {

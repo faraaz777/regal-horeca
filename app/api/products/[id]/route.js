@@ -14,6 +14,7 @@ import Product from '@/lib/models/Product';
 import { deleteFromR2 } from '@/lib/utils/r2Upload';
 import { generateUniqueSlug } from '@/lib/utils/slug';
 import { revalidateHomepage } from '@/lib/utils/revalidate';
+import { normalizeFilterValues } from '@/lib/utils/normalizeFilterValue';
 import mongoose from 'mongoose';
 
 /**
@@ -253,16 +254,16 @@ export async function PUT(request, { params }) {
         const oldFilters = updateData.filters;
         updateData.filters = [];
         if (oldFilters.material && Array.isArray(oldFilters.material) && oldFilters.material.length > 0) {
-          updateData.filters.push({ key: 'Material', values: oldFilters.material });
+          updateData.filters.push({ key: 'Material', values: normalizeFilterValues(oldFilters.material) });
         }
         if (oldFilters.size && Array.isArray(oldFilters.size) && oldFilters.size.length > 0) {
-          updateData.filters.push({ key: 'Size', values: oldFilters.size });
+          updateData.filters.push({ key: 'Size', values: normalizeFilterValues(oldFilters.size) });
         }
         if (oldFilters.color && Array.isArray(oldFilters.color) && oldFilters.color.length > 0) {
-          updateData.filters.push({ key: 'Color', values: oldFilters.color });
+          updateData.filters.push({ key: 'Color', values: normalizeFilterValues(oldFilters.color) });
         }
         if (oldFilters.usage && Array.isArray(oldFilters.usage) && oldFilters.usage.length > 0) {
-          updateData.filters.push({ key: 'Usage', values: oldFilters.usage });
+          updateData.filters.push({ key: 'Usage', values: normalizeFilterValues(oldFilters.usage) });
         }
         // Handle any other keys
         Object.keys(oldFilters).forEach(key => {
@@ -270,17 +271,17 @@ export async function PUT(request, { params }) {
               Array.isArray(oldFilters[key]) && oldFilters[key].length > 0) {
             updateData.filters.push({ 
               key: key.charAt(0).toUpperCase() + key.slice(1), 
-              values: oldFilters[key] 
+              values: normalizeFilterValues(oldFilters[key])
             });
           }
         });
       } else {
-        // Ensure it's a valid array with proper structure
+        // Ensure it's a valid array with proper structure; normalize values for consistent sidebar filtering
         updateData.filters = updateData.filters
           .filter(f => f && f.key && Array.isArray(f.values))
           .map(f => ({
             key: f.key.trim(),
-            values: f.values.filter(v => v && v.trim())
+            values: normalizeFilterValues(f.values.filter(v => v && v.trim()))
           }));
       }
     }

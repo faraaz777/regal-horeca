@@ -184,7 +184,6 @@ export default function AdminProductsPage() {
         const categoryIds = (productData.categoryIds || []).map(c => c?._id || c).filter(Boolean);
         const brandCategoryId = productData.brandCategoryId?._id || productData.brandCategoryId;
         const brandCategoryIds = (productData.brandCategoryIds || []).map(b => b?._id || b).filter(Boolean);
-        const relatedProductIds = (productData.relatedProductIds || []).map(rp => rp?._id || rp).filter(Boolean);
         
         // Clean the product data for duplication
         const duplicatedProduct = {
@@ -204,7 +203,10 @@ export default function AdminProductsPage() {
           categoryIds: categoryIds.map(id => String(id)),
           brandCategoryId: brandCategoryId ? String(brandCategoryId) : '',
           brandCategoryIds: brandCategoryIds.map(id => String(id)),
-          relatedProductIds: relatedProductIds.map(id => String(id)),
+          // Clear related products and tags - do not duplicate them
+          relatedProductIds: [],
+          tags: [],
+          tagsInput: '',
           // Keep all other fields (brand, images, specifications, etc.)
         };
 

@@ -14,9 +14,10 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '@/context/AppContext';
-import { PlusIcon, TrashIcon, MagicIcon, StarIcon, DragHandleIcon } from './Icons';
+import { PlusIcon, TrashIcon, MagicIcon, StarIcon, DragHandleIcon, SearchIcon } from './Icons';
 import Image from 'next/image';
 import ColorPicker from './ColorPicker';
+import useSWR from 'swr';
 
 const AVAILABLE_COLORS = [
   { name: 'Blue', hex: '#0000FF' }, 
@@ -474,6 +475,33 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
   const [generatedTagsPreview, setGeneratedTagsPreview] = useState([]);
   const [showTagsPreview, setShowTagsPreview] = useState(false);
   const autoTagDebounceRef = useRef(null);
+  const [relatedProductsSearchQuery, setRelatedProductsSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  
+  // Debounce search query to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(relatedProductsSearchQuery);
+    }, 300); // 300ms debounce
+    
+    return () => clearTimeout(timer);
+  }, [relatedProductsSearchQuery]);
+  
+  // Fetch products from API when searching (searches ALL products, not just 200)
+  const searchProductsUrl = debouncedSearchQuery.trim() 
+    ? `/api/products?search=${encodeURIComponent(debouncedSearchQuery.trim())}&limit=500`
+    : null;
+  
+  const { data: searchProductsData } = useSWR(
+    searchProductsUrl,
+    (url) => fetch(url).then(res => res.json()),
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 5000, // Cache for 5 seconds
+    }
+  );
+  
+  const searchedProducts = searchProductsData?.products || [];
   
   // AI generation state
   const [aiLoading, setAiLoading] = useState({ summary: false, description: false });
@@ -631,6 +659,10 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       clearTimeout(autoTagDebounceRef.current);
     }
     
+    // Don't auto-generate tags for duplicate products - user must click "Auto-Generate Tags" button
+    const isDuplicateProduct = product && !product._id && !product.id;
+    if (isDuplicateProduct) return;
+    
     // Don't auto-generate if user is manually editing tags or preview is shown
     if (showTagsPreview) return;
     
@@ -687,7 +719,8 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     categories,
     brands,
     businessTypes,
-    showTagsPreview
+    showTagsPreview,
+    product // Include to check if product is a duplicate
   ]);
 
   // Helper function to get brand ancestry (similar to category ancestry)
@@ -1306,10 +1339,224 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     formData.relatedProductIds
   ]);
 
+  // Get products to use for related products selection
+  // When searching, use server-side search results (searches ALL products)
+  // When not searching, use allProducts passed as prop
+  const availableProductsForSelection = useMemo(() => {
+    if (debouncedSearchQuery.trim() && searchedProducts.length > 0) {
+      // When searching, use server-side search results
+      // Merge with allProducts to ensure we have all products for relevance scoring
+      const allProductIds = new Set(allProducts.map(p => (p._id || p.id)?.toString()));
+      const searchedProductIds = new Set(searchedProducts.map(p => (p._id || p.id)?.toString()));
+      
+      // Combine: searched products + any products from allProducts not in search results
+      const combined = [...searchedProducts];
+      allProducts.forEach(p => {
+        const pid = (p._id || p.id)?.toString();
+        if (pid && !searchedProductIds.has(pid)) {
+          combined.push(p);
+        }
+      });
+      
+      return combined;
+    }
+    // When not searching, use allProducts
+    return allProducts;
+  }, [debouncedSearchQuery, searchedProducts, allProducts]);
+
+  // Recalculate sorted candidates with updated product list when searching
+  const getSortedRelatedCandidatesWithSearch = useMemo(() => {
+    const currentProductId = product?._id || product?.id;
+    
+    // Use availableProductsForSelection instead of allProducts
+    const productsToUse = availableProductsForSelection;
+    
+    // LAYER 1: Category = Candidate Pool (Filter, not score)
+    const formCategoryId = formData.categoryId;
+    const formCategory = categories.find(c => {
+      const cId = c._id || c.id;
+      return cId?.toString() === formCategoryId?.toString();
+    });
+    
+    const formCategoryAncestry = formCategoryId ? getCategoryAncestry(formCategoryId, categories) : {};
+    const formSubcategoryId = formCategoryAncestry.subcategory;
+    const formTypeId = formCategoryAncestry.type;
+    
+    // Filter candidates by same subcategory OR same type
+    let candidatePool = productsToUse.filter(p => {
+      const pid = p._id || p.id;
+      if (pid?.toString() === currentProductId?.toString()) {
+        return false;
+      }
+      
+      if (!formCategoryId) {
+        return true;
+      }
+      
+      const candidateCategoryId = p.categoryId?._id || p.categoryId;
+      if (!candidateCategoryId) return false;
+      
+      const candidateCategory = categories.find(c => {
+        const cId = c._id || c.id;
+        return cId?.toString() === candidateCategoryId?.toString();
+      });
+      
+      if (!candidateCategory) return false;
+      
+      const candidateAncestry = getCategoryAncestry(candidateCategoryId, categories);
+      const candidateSubcategoryId = candidateAncestry.subcategory;
+      const candidateTypeId = candidateAncestry.type;
+      
+      if (formTypeId && candidateTypeId) {
+        return formTypeId.toString() === candidateTypeId.toString();
+      }
+      if (formSubcategoryId && candidateSubcategoryId) {
+        return formSubcategoryId.toString() === candidateSubcategoryId.toString();
+      }
+      
+      if (formCategory && candidateCategory) {
+        return formCategory.level === candidateCategory.level && 
+               formCategoryId.toString() === candidateCategoryId.toString();
+      }
+      
+      return false;
+    });
+    
+    // Fallback: If filtered pool is empty, show all products (except current)
+    if (candidatePool.length === 0 && productsToUse.length > 0) {
+      candidatePool = productsToUse.filter(p => {
+        const pid = p._id || p.id;
+        return pid?.toString() !== currentProductId?.toString();
+      });
+    }
+    
+    // Get current tags (normalized)
+    const currentTags = formData.tagsInput 
+      ? formData.tagsInput.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
+      : (formData.tags || []).map(t => t.toLowerCase()).filter(Boolean);
+
+    // LAYER 2: Shared Signals = Relevance (Scoring)
+    return candidatePool.map(candidate => {
+      let score = 0;
+      let reasons = [];
+
+      // Tags = PRIMARY SIGNAL
+      const sharedTags = (candidate.tags || []).filter(t => 
+        currentTags.includes(t.toLowerCase())
+      );
+      if (sharedTags.length > 0) {
+        score += sharedTags.length * 5;
+        reasons.push(`${sharedTags.length} Shared Tag${sharedTags.length > 1 ? 's' : ''}`);
+      }
+
+      // Business Type = Secondary Signal
+      const sharedBusiness = (candidate.businessTypeSlugs || []).filter(s => 
+        formData.businessTypeSlugs?.includes(s)
+      );
+      if (sharedBusiness.length > 0) {
+        score += sharedBusiness.length * 2;
+        if (!reasons.some(r => r.includes('Business'))) {
+          reasons.push(`${sharedBusiness.length} Shared Business Type${sharedBusiness.length > 1 ? 's' : ''}`);
+        }
+      }
+
+      // Category = Small Influence
+      const candidateCategoryId = candidate.categoryId?._id || candidate.categoryId;
+      const formCategoryIdForScore = formData.categoryId;
+      if (candidateCategoryId?.toString() === formCategoryIdForScore?.toString()) {
+        score += 3;
+        if (!reasons.some(r => r.includes('Category'))) {
+          reasons.push('Same Category');
+        }
+      }
+
+      // Price Proximity
+      const currentPrice = Number(formData.price) || 0;
+      if (currentPrice > 0 && candidate.price >= currentPrice * 0.7 && candidate.price <= currentPrice * 1.3) {
+        score += 2;
+        if (!reasons.some(r => r.includes('Price'))) {
+          reasons.push('Similar Price');
+        }
+      }
+
+      return {
+        ...candidate,
+        relevanceScore: score,
+        relevanceReasons: reasons
+      };
+    }).sort((a, b) => {
+      // LAYER 3: Manual Override = Always Wins
+      const aId = a._id || a.id;
+      const bId = b._id || b.id;
+      const aSelected = formData.relatedProductIds?.some(id => id?.toString() === aId?.toString());
+      const bSelected = formData.relatedProductIds?.some(id => id?.toString() === bId?.toString());
+      
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+      
+      // Then sort by relevance score
+      return b.relevanceScore - a.relevanceScore;
+    });
+  }, [
+    availableProductsForSelection,
+    product,
+    categories,
+    formData.categoryId,
+    formData.tagsInput,
+    formData.businessTypeSlugs,
+    formData.price,
+    formData.relatedProductIds
+  ]);
+
+  // Filter related products candidates by search query
+  // When searching: Simple direct search results (no category filtering, no relevance scoring)
+  // When not searching: Use getSortedRelatedCandidates with relevance logic
+  const filteredRelatedCandidates = useMemo(() => {
+    if (!debouncedSearchQuery.trim()) {
+      // Not searching - use original sorted candidates with relevance scoring
+      return getSortedRelatedCandidates;
+    }
+    
+    // When searching: Return simple search results without category/relevance logic
+    // Just exclude the current product and sort selected products first
+    const currentProductId = product?._id || product?.id;
+    
+    const simpleSearchResults = searchedProducts
+      .filter(p => {
+        const pid = p._id || p.id;
+        return pid?.toString() !== currentProductId?.toString();
+      })
+      .map(p => ({
+        ...p,
+        relevanceScore: 0, // No relevance scoring for search
+        relevanceReasons: [] // No match reasons for search
+      }))
+      .sort((a, b) => {
+        // Only sort: selected products first, then alphabetical by title
+        const aId = a._id || a.id;
+        const bId = b._id || b.id;
+        const aSelected = formData.relatedProductIds?.some(id => id?.toString() === aId?.toString());
+        const bSelected = formData.relatedProductIds?.some(id => id?.toString() === bId?.toString());
+        
+        if (aSelected && !bSelected) return -1;
+        if (!aSelected && bSelected) return 1;
+        
+        // Alphabetical by title
+        return (a.title || '').localeCompare(b.title || '');
+      });
+    
+    return simpleSearchResults;
+  }, [debouncedSearchQuery, searchedProducts, getSortedRelatedCandidates, product, formData.relatedProductIds]);
+
   const handleAutoSuggestRelated = () => {
+    // Use filtered candidates (respects search if active)
+    const candidatesToUse = filteredRelatedCandidates.length > 0 
+      ? filteredRelatedCandidates 
+      : getSortedRelatedCandidates;
+    
     // Filter candidates that have meaningful relationships (score > 0)
     // Prioritize tag-based matches (score >= 5 means at least 1 shared tag)
-    const tagBasedMatches = getSortedRelatedCandidates
+    const tagBasedMatches = candidatesToUse
       .filter(c => c.relevanceScore >= 5) // At least 1 shared tag
       .slice(0, 3); // Top 3 tag-based matches
     
@@ -1317,7 +1564,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     // Otherwise, fall back to any matches with score > 0
     const topMatches = tagBasedMatches.length > 0
       ? tagBasedMatches
-      : getSortedRelatedCandidates
+      : candidatesToUse
           .filter(c => c.relevanceScore > 0)
           .slice(0, 4);
     
@@ -3105,24 +3352,57 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         </FormSection>
 
             <FormSection title="Related Products">
-          <div className="flex justify-between items-end mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-800">Manual Override</label>
-              <p className="text-xs text-gray-500">Select related products manually. Top recommendations are sorted first.</p>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-800 mb-2">Manual Override</label>
+              <p className="text-xs text-gray-500 mb-3">Select related products manually. Top recommendations are sorted first.</p>
+              
+              {/* Search Input */}
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <SearchIcon className="h-4 w-4 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  value={relatedProductsSearchQuery}
+                  onChange={(e) => setRelatedProductsSearchQuery(e.target.value)}
+                  placeholder="Search products by name, SKU, tags, or brand..."
+                  className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+                />
+                {relatedProductsSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setRelatedProductsSearchQuery('')}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                    title="Clear search"
+                  >
+                    <span className="text-lg leading-none">×</span>
+                  </button>
+                )}
+              </div>
             </div>
             <button 
               type="button" 
               onClick={handleAutoSuggestRelated} 
-              className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-semibold py-1.5 px-3 rounded-md flex items-center gap-1 transition-colors"
+              className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-semibold py-1.5 px-3 rounded-md flex items-center gap-1 transition-colors whitespace-nowrap"
             >
               <MagicIcon className="w-4 h-4" /> Auto-Generate Suggestions
             </button>
           </div>
           
           <div className="max-h-60 overflow-y-auto border border-gray-300 rounded-md space-y-0 divide-y divide-gray-100 bg-gray-50">
-            {getSortedRelatedCandidates.map(otherProduct => {
+            {debouncedSearchQuery.trim() && relatedProductsSearchQuery !== debouncedSearchQuery && (
+              <div className="p-4 text-center text-sm text-gray-500">
+                <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                Searching products...
+              </div>
+            )}
+            {filteredRelatedCandidates.length > 0 ? (
+              filteredRelatedCandidates.map(otherProduct => {
               // High match = has shared tags (score >= 5) OR very high overall score
-              const isHighMatch = otherProduct.relevanceScore >= 5;
+              // Only show for non-search results (when not searching)
+              const isSearching = debouncedSearchQuery.trim().length > 0;
+              const isHighMatch = !isSearching && otherProduct.relevanceScore >= 5;
               const productId = otherProduct._id || otherProduct.id;
               const isSelected = formData.relatedProductIds?.some(id => id?.toString() === productId?.toString());
               
@@ -3149,7 +3429,8 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                       <span className={`text-sm ${isSelected ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
                         {otherProduct.title}
                       </span>
-                      {otherProduct.relevanceReasons.length > 0 && (
+                      {/* Only show relevance reasons when NOT searching */}
+                      {!isSearching && otherProduct.relevanceReasons.length > 0 && (
                         <span className="text-[10px] text-gray-500 flex gap-1">
                           Match: {otherProduct.relevanceReasons.slice(0, 2).join(', ')}
                         </span>
@@ -3163,9 +3444,28 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   )}
                 </label>
               );
-            })}
-            {allProducts.length <= 1 && (
-              <p className="text-sm text-gray-500 italic p-4 text-center">No other products available to link.</p>
+              })
+            ) : (
+              <div className="p-4 text-center">
+                {relatedProductsSearchQuery ? (
+                  <p className="text-sm text-gray-500 italic">
+                    No products found matching "{relatedProductsSearchQuery}". Try a different search term.
+                  </p>
+                ) : allProducts.length <= 1 ? (
+                  <p className="text-sm text-gray-500 italic">No other products available to link.</p>
+                ) : (
+                  <p className="text-sm text-gray-500 italic">No products match the current filters.</p>
+                )}
+              </div>
+            )}
+            {filteredRelatedCandidates.length > 0 && debouncedSearchQuery.trim() && (
+              <div className="px-4 py-2 bg-blue-50 border-t border-blue-200 text-xs text-blue-700">
+                {searchedProducts.length > 0 ? (
+                  <>Found {filteredRelatedCandidates.length} product{filteredRelatedCandidates.length !== 1 ? 's' : ''} matching "{debouncedSearchQuery}"</>
+                ) : (
+                  <>Showing {filteredRelatedCandidates.length} product{filteredRelatedCandidates.length !== 1 ? 's' : ''}</>
+                )}
+              </div>
             )}
           </div>
         </FormSection>

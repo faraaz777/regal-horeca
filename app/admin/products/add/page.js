@@ -40,7 +40,7 @@ export default function AdminAddProductPage() {
 
   // Fetch products based on selected category
   // If category is selected, fetch products in that category
-  // Otherwise, fetch latest 200 products
+  // Otherwise, fetch latest products (increased limit for better related products selection)
   const productsUrl = useMemo(() => {
     if (selectedCategoryId && categories.length > 0) {
       // Find category slug from ID
@@ -50,12 +50,12 @@ export default function AdminAddProductPage() {
       });
       
       if (category?.slug) {
-        // Fetch products filtered by category slug
-        return `/api/products?limit=200&category=${category.slug}`;
+        // Fetch products filtered by category slug (increased limit)
+        return `/api/products?limit=1000&category=${category.slug}`;
       }
     }
-    // Fetch latest 200 products when no category selected
-    return '/api/products?limit=200&sortBy=newest';
+    // Fetch latest products when no category selected (increased limit)
+    return '/api/products?limit=1000&sortBy=newest';
   }, [selectedCategoryId, categories]);
 
   const { data: productsData } = useSWR(productsUrl, fetcher, {

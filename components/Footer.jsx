@@ -5,7 +5,8 @@
  */
 
 import Link from 'next/link';
-import { Instagram } from 'lucide-react';
+import { Instagram, Facebook, Twitter, Linkedin, Youtube } from 'lucide-react';
+import { WhatsAppIcon } from './Icons';
 
 export default function Footer() {
   return (
@@ -41,8 +42,59 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold text-lg mb-4 text-accent">Follow Us</h4>
             <div className="flex space-x-4">
-              <a href="https://www.instagram.com/regalhoreca" target="_blank" rel="noopener noreferrer" className="text-white/70 hover:text-white transition-colors" aria-label="Follow us on Instagram">
+              <a 
+                href="https://www.instagram.com/regalhoreca" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-white/70 hover:text-white transition-colors" 
+                aria-label="Follow us on Instagram"
+              >
                 <Instagram className="w-6 h-6" />
+              </a>
+              <a 
+                href="https://www.facebook.com/regalhoreca" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-white/70 hover:text-white transition-colors" 
+                aria-label="Follow us on Facebook"
+              >
+                <Facebook className="w-6 h-6" />
+              </a>
+              <a 
+                href="https://twitter.com/regalhoreca" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-white/70 hover:text-white transition-colors" 
+                aria-label="Follow us on Twitter"
+              >
+                <Twitter className="w-6 h-6" />
+              </a>
+              <a 
+                href="https://www.linkedin.com/company/regalhoreca" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-white/70 hover:text-white transition-colors" 
+                aria-label="Follow us on LinkedIn"
+              >
+                <Linkedin className="w-6 h-6" />
+              </a>
+              <a 
+                href="https://www.youtube.com/@regalhoreca" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-white/70 hover:text-white transition-colors" 
+                aria-label="Follow us on YouTube"
+              >
+                <Youtube className="w-6 h-6" />
+              </a>
+              <a 
+                href="https://wa.me/917093913311" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-white/70 hover:text-white transition-colors" 
+                aria-label="Contact us on WhatsApp"
+              >
+                <WhatsAppIcon className="w-6 h-6" />
               </a>
             </div>
           </div>

@@ -1,11 +1,3 @@
-
-
-
-
-
-
-
-
 /**
  * Admin Layout
  * 
@@ -21,6 +13,7 @@ import { usePathname } from 'next/navigation';
 import useSWR from 'swr';
 import { Menu, X } from 'lucide-react';
 import PasswordModal from '@/components/admin/PasswordModal';
+
 
 // SWR fetcher for enquiry counts
 const fetcher = async (url) => {

@@ -702,13 +702,26 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="text-center mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight">{currentCategoryName}</h1>
-        <p className="text-black/60 mt-2">
-          {searchQuery
-            ? `Found ${totalProducts} result${totalProducts !== 1 ? 's' : ''}`
-            : `${totalProducts} product${totalProducts !== 1 ? 's' : ''}`
-          }
-        </p>
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+          {currentCategory ? currentCategory.name : 'All Products'}
+        </h1>
+        {displayCategories && displayCategories.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-3 mt-4">
+            {displayCategories.map(cat => (
+              <Link
+                key={cat._id || cat.id}
+                href={`/catalog?category=${cat.slug}`}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  selectedCategorySlug === cat.slug
+                    ? 'bg-accent text-white'
+                    : 'bg-gray-100 text-black hover:bg-gray-200'
+                }`}
+              >
+                {cat.name}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
 

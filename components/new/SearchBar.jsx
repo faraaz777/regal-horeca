@@ -235,9 +235,10 @@ export default function SearchBar({ className = "", placeholder = "What are you 
     if (!trimmed) return;
 
     setShowResults(false);
-    const newParams = new URLSearchParams(searchParams.toString());
+    // When performing explicit search, start fresh with only search term so results match
+    // what live search suggested (live search does not apply filters)
+    const newParams = new URLSearchParams();
     newParams.set("search", trimmed);
-    newParams.delete("category");
 
     router.push(`/catalog?${newParams.toString()}`);
   };

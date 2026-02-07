@@ -112,7 +112,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https:",
-              "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com",
+              "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://www.google.com",
               "connect-src 'self' https://va.vercel-insights.com https://vitals.vercel-insights.com",
               "media-src 'self'",
               "object-src 'none'",

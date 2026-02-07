@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import useSWR from 'swr';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ProductCard from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 import { useAppContext } from '@/context/AppContext';
@@ -34,6 +36,11 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
   const [mobileGridView, setMobileGridView] = useState('2');
   const [desktopGridView, setDesktopGridView] = useState('3');
   const [isClient, setIsClient] = useState(false);
+
+  // Subcategories scroll (CircularCategories-style)
+  const subcategoriesScrollRef = useRef(null);
+  const [showSubcatLeftArrow, setShowSubcatLeftArrow] = useState(false);
+  const [showSubcatRightArrow, setShowSubcatRightArrow] = useState(true);
 
   // Load from localStorage after component mounts (client-side only)
   useEffect(() => {
@@ -321,6 +328,40 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
       localStorage.setItem('catalog-desktop-grid-view', desktopGridView);
     }
   }, [desktopGridView]);
+
+  // Subcategories with images only (for CircularCategories-style display)
+  const subcategoriesWithImages = useMemo(() => 
+    (displayCategories || []).filter(cat => cat.image && cat.image.trim()),
+    [displayCategories]
+  );
+
+  const truncateCategoryName = (name) => {
+    if (!name) return '';
+    const words = name.trim().split(/\s+/);
+    if (words.length >= 3) return words.slice(0, 2).join(' ') + '...';
+    return name;
+  };
+
+  const checkSubcategoriesScrollPosition = useCallback(() => {
+    const container = subcategoriesScrollRef.current;
+    if (!container) return;
+    const { scrollLeft, scrollWidth, clientWidth } = container;
+    setShowSubcatLeftArrow(scrollLeft > 0);
+    setShowSubcatRightArrow(scrollLeft < scrollWidth - clientWidth - 10);
+  }, []);
+
+  useEffect(() => {
+    checkSubcategoriesScrollPosition();
+    const container = subcategoriesScrollRef.current;
+    if (container) {
+      container.addEventListener('scroll', checkSubcategoriesScrollPosition);
+      window.addEventListener('resize', checkSubcategoriesScrollPosition);
+      return () => {
+        container.removeEventListener('scroll', checkSubcategoriesScrollPosition);
+        window.removeEventListener('resize', checkSubcategoriesScrollPosition);
+      };
+    }
+  }, [subcategoriesWithImages.length, checkSubcategoriesScrollPosition]);
 
   // Initialize filter sections dynamically
   useEffect(() => {
@@ -700,26 +741,59 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
   }, [mobileGridView, desktopGridView]);
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-          {currentCategory ? currentCategory.name : 'All Products'}
-        </h1>
-        {displayCategories && displayCategories.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-3 mt-4">
-            {displayCategories.map(cat => (
-              <Link
-                key={cat._id || cat.id}
-                href={`/catalog?category=${cat.slug}`}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  selectedCategorySlug === cat.slug
-                    ? 'bg-accent text-white'
-                    : 'bg-gray-100 text-black hover:bg-gray-200'
-                }`}
+    <div className="container mx-auto px-4 py-6 md:py-8">
+      <div className="text-center">
+        {subcategoriesWithImages.length > 0 && (
+          <div className="relative w-full ">
+            {showSubcatLeftArrow && (
+              <button
+                onClick={() => subcategoriesScrollRef.current?.scrollBy({ left: -300, behavior: 'smooth' })}
+                className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white border border-black/10 rounded-full p-2 shadow-md hover:shadow-lg transition-all duration-200 items-center justify-center"
+                aria-label="Scroll left"
               >
-                {cat.name}
-              </Link>
-            ))}
+                <ChevronLeft className="w-5 h-5 text-black" />
+              </button>
+            )}
+            {showSubcatRightArrow && (
+              <button
+                onClick={() => subcategoriesScrollRef.current?.scrollBy({ left: 300, behavior: 'smooth' })}
+                className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white border border-black/10 rounded-full p-2 shadow-md hover:shadow-lg transition-all duration-200 items-center justify-center"
+                aria-label="Scroll right"
+              >
+                <ChevronRight className="w-5 h-5 text-black" />
+              </button>
+            )}
+            <div
+              ref={subcategoriesScrollRef}
+              className="flex py-3 sm:py-4 overflow-x-auto hide-scrollbar gap-4 sm:gap-4 md:gap-5 lg:gap-6 pb-3 sm:pb-4 snap-x snap-mandatory justify-center px-4"
+            >
+              {subcategoriesWithImages.map((cat, index) => (
+                <Link
+                  key={cat._id || cat.id || `subcat-${index}`}
+                  href={`/catalog?category=${cat.slug}`}
+                  className={`group flex flex-col items-center gap-1.5 sm:gap-2 transition-all duration-300 hover:-translate-y-1 flex-shrink-0 snap-center min-w-[70px] sm:min-w-[90px] md:min-w-[100px] lg:min-w-[110px] ${
+                    selectedCategorySlug === cat.slug ? 'ring-2 ring-accent ring-offset-2 rounded-full' : ''
+                  }`}
+                >
+                  <div className={`relative w-[88px] h-[88px] sm:w-[88px] sm:h-[88px] md:w-[104px] md:h-[104px] lg:w-[120px] lg:h-[120px] rounded-none group-hover:rounded-full border-0 group-hover:border-[3px] group-hover:border-accent transition-all duration-300 overflow-hidden bg-white shadow-sm group-hover:shadow-md ${
+                    selectedCategorySlug === cat.slug ? 'rounded-full border-[3px] border-accent' : ''
+                  }`}>
+                    <Image
+                      src={cat.image}
+                      alt={cat.name}
+                      fill
+                      unoptimized
+                      sizes="(max-width: 640px) 88px, (max-width: 768px) 88px, (max-width: 1024px) 104px, 120px"
+                      className="object-contain group-hover:object-cover group-hover:scale-110 transition-transform duration-300"
+                    />
+                  </div>
+                  <span className="text-[9px] sm:text-xs font-semibold uppercase tracking-wide text-black group-hover:text-accent transition-colors duration-300 text-center whitespace-nowrap px-1">
+                    {truncateCategoryName(cat.name)}
+                  </span>
+                </Link>
+              ))}
+            </div>
+      
           </div>
         )}
       </div>
@@ -746,8 +820,19 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
         {/* Main Content */}
         <main className={`w-full transition-all duration-300 ease-in-out ${isDesktopSidebarOpen ? 'lg:w-3/4 xl:w-4/5' : 'lg:w-full'}`}>
           {/* Toolbar */}
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] sm:items-center gap-4 py-4 mb-6 border-b border-gray-100">
+            {/* Left: Showing count */}
+            <div className="text-sm text-black/60 order-2 sm:order-1">
+              Showing {paginatedProducts.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0} - {Math.min(currentPage * ITEMS_PER_PAGE, totalProducts)} of {totalProducts}
+            </div>
+
+            {/* Center: currentCategory */}
+            <div className="text-xl md:text-2xl font-display font-medium tracking-wide text-gray-600 order-1 sm:order-2 text-center">
+              {currentCategory ? currentCategory.name : 'All Products'}
+            </div>
+
+            {/* Right: Filter + Grid layout */}
+            <div className="flex items-center justify-center sm:justify-end gap-4 order-3">
               <button
                 onClick={() => setIsFilterOpen(true)}
                 className="flex items-center gap-2 font-semibold lg:hidden"
@@ -766,7 +851,6 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
                 onClick={() => {
                   const willBeOpen = !isDesktopSidebarOpen;
                   setIsDesktopSidebarOpen(willBeOpen);
-                  // When hiding filters, switch to 4 columns for better space utilization
                   if (!willBeOpen) {
                     setDesktopGridView('4');
                   }
@@ -784,12 +868,6 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
                   </span>
                 )}
               </button>
-            </div>
-            <div className="hidden lg:block text-sm text-black/70">
-              Showing {paginatedProducts.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0} - {Math.min(currentPage * ITEMS_PER_PAGE, totalProducts)} of {totalProducts}
-            </div>
-
-              <div className="flex items-center gap-4">
               {/* Grid View Selector - Mobile */}
               <div className="flex items-center gap-1 lg:hidden border border-black/20 rounded-sm p-1" suppressHydrationWarning>
                 <button

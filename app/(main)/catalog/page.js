@@ -12,6 +12,9 @@
  */
 
 import { Suspense } from 'react';
+
+// Uses searchParams - must be dynamic (cannot be statically generated)
+export const dynamic = 'force-dynamic';
 import CatalogPageClient from './CatalogPageClient';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 
@@ -54,11 +57,9 @@ export default async function CatalogPage({ searchParams }) {
     // Fetch products and facets in parallel (server-side)
     const [productsResponse, facetsResponse] = await Promise.all([
       fetch(`${baseUrl}/api/products?${productsParams.toString()}`, {
-        cache: 'force-cache',
         next: { revalidate: 60 }, // Cache for 1 minute
       }).catch(() => null),
       fetch(`${baseUrl}/api/products/facets?${facetsParams.toString()}`, {
-        cache: 'force-cache',
         next: { revalidate: 60 }, // Cache for 1 minute
       }).catch(() => null),
     ]);

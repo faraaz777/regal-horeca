@@ -743,7 +743,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
   return (
     <div className="container mx-auto px-4 py-6 md:py-8">
       <div className="text-center">
-        {subcategoriesWithImages.length > 0 && (
+        {currentCategory && subcategoriesWithImages.length > 0 && (
           <div className="relative w-full ">
             {showSubcatLeftArrow && (
               <button

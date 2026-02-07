@@ -43,16 +43,13 @@ export default async function HomePage() {
 
       const [featuredResponse, arrivalsResponse, categoriesResponse] = await Promise.all([
       fetch(`${baseUrl}/api/products?featured=true&limit=6`, {
-        cache: 'force-cache',
-        next: { revalidate: 300 } // Cache for 5 minutes
+        next: { revalidate: 300 }, // Cache for 5 minutes
       }).catch(() => null),
       fetch(`${baseUrl}/api/products?limit=4`, {
-        cache: 'force-cache',
-        next: { revalidate: 300 } // Cache for 5 minutes
+        next: { revalidate: 300 }, // Cache for 5 minutes
       }).catch(() => null),
       fetch(`${baseUrl}/api/categories?tree=true`, {
-        cache: 'force-cache',
-        next: { revalidate: 3600 } // Cache for 1 hour
+        next: { revalidate: 3600 }, // Cache for 1 hour
       }).catch(() => null)
     ]);
 

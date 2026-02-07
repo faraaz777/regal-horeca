@@ -6,7 +6,6 @@
  */
 
 import Link from "next/link";
-import { headers } from "next/headers";
 import ProductCard from "@/components/ProductCard";
 import WhomWeServe from "@/components/new/WhomWeServe";
 import Brands from "@/components/Brands";
@@ -38,11 +37,9 @@ export default async function HomePage() {
   let categories = [];
 
   try {
-    // Get base URL from headers or environment variable
-    const headersList = headers();
-    const host = headersList.get('host') || 'localhost:3000';
-    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
+    // Get base URL from environment variable (required for static/ISR build)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL 
+      || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
       const [featuredResponse, arrivalsResponse, categoriesResponse] = await Promise.all([
       fetch(`${baseUrl}/api/products?featured=true&limit=6`, {
@@ -58,7 +55,6 @@ export default async function HomePage() {
         next: { revalidate: 3600 } // Cache for 1 hour
       }).catch(() => null)
     ]);
-    console.log( categoriesResponse);
 
     // Parse responses - only if responses are valid
     const [featuredData, arrivalsData, categoriesData] = await Promise.all([

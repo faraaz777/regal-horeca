@@ -100,6 +100,26 @@ const nextConfig = {
             key: 'Referrer-Policy',
             value: 'origin-when-cross-origin'
           },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()'
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-insights.com",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "font-src 'self' https://fonts.gstatic.com",
+              "img-src 'self' data: blob: https:",
+              "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com",
+              "connect-src 'self' https://va.vercel-insights.com https://vitals.vercel-insights.com",
+              "media-src 'self'",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "form-action 'self'"
+            ].join('; ')
+          },
         ],
       },
     ];

@@ -12,7 +12,6 @@
  */
 
 import { Suspense } from 'react';
-import { headers } from 'next/headers';
 import CatalogPageClient from './CatalogPageClient';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 
@@ -23,11 +22,9 @@ export default async function CatalogPage({ searchParams }) {
   let initialFacetsData = null;
 
   try {
-    // Get base URL for server-side fetch
-    const headersList = headers();
-    const host = headersList.get('host') || 'localhost:3000';
-    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
+    // Get base URL from environment variable (required for static/ISR build)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL 
+      || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
     // Build query params from searchParams
     const productsParams = new URLSearchParams();

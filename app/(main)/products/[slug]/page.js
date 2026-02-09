@@ -302,9 +302,9 @@ export default function ProductDetailPage() {
 
   return (
     <div className="min-h-screen bg-warm-white animate-in font-sans selection:bg-royal-gold selection:text-white">
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 sm:py-12">
         {/* Breadcrumbs - Compact & Styled */}
-        <nav className="flex text-xs uppercase tracking-widest text-black/40 mb-6" aria-label="Breadcrumb">
+        <nav className="hidden md:flex text-xs uppercase tracking-widest text-black/40 mb-6" aria-label="Breadcrumb">
           <ol className="flex items-center flex-wrap gap-2">
             <li><Link href="/" className="hover:text-royal-gold transition-colors">Home</Link></li>
             <li><span className="text-black/10">/</span></li>
@@ -332,7 +332,7 @@ export default function ProductDetailPage() {
 
         <div className="lg:grid lg:grid-cols-12 lg:gap-x-12 xl:gap-x-16">
           {/* Left Column: Gallery (7 Cols) */}
-          <div className="lg:col-span-7 mb-10 lg:mb-0">
+          <div className="lg:col-span-7 mb-4 lg:mb-0">
             <div className="sticky top-24">
               <ProductGallery
                 images={allImages}
@@ -398,7 +398,7 @@ export default function ProductDetailPage() {
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-xs font-bold text-rich-black uppercase tracking-widest">
-                        Finish
+                        Color
                       </span>
                       {selectedColor && (
                         <span className="text-xs font-serif italic text-black/60">

@@ -742,21 +742,6 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
 
   return (
     <div className="container mx-auto px-4 py-4 sm:py-6 md:py-8">
-      {/* Breadcrumbs for SEO & UX */}
-      <nav className="mb-4 text-xs uppercase tracking-wider text-black/50" aria-label="Breadcrumb">
-        <ol className="flex items-center gap-2 flex-wrap">
-          <li><Link href="/" className="hover:text-accent transition-colors">Home</Link></li>
-          <li><span>/</span></li>
-          <li><Link href="/catalog" className="hover:text-accent transition-colors">Catalog</Link></li>
-          {currentCategory && (
-            <>
-              <li><span>/</span></li>
-              <li className="text-black font-medium" aria-current="page">{currentCategory.name}</li>
-            </>
-          )}
-        </ol>
-      </nav>
-
       <div className="text-center">
         {currentCategory && subcategoriesWithImages.length > 0 && (
           <div className="relative w-full ">

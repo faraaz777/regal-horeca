@@ -344,7 +344,7 @@ export default function Header() {
               <Link href="/" className="block">
                 <Image
                   src={Logo}
-                  alt="Regal HoReCa"
+                  alt="REGAL® HoReCa - Commercial kitchen equipment Hyderabad"
                   priority
                   className="h-10 md:h-12  w-auto object-contain"
                 />
@@ -868,7 +868,7 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
         {/* Mobile Menu Header */}
         <div className="flex items-center justify-between px-4 h-16 border-b border-gray-100 flex-shrink-0">
           <Link href="/" onClick={() => setIsMenuOpen(false)}>
-            <Image src={Logo} alt="Regal" width={100} height={40} className="h-8 w-auto object-contain" />
+            <Image src={Logo} alt="REGAL® HoReCa" width={100} height={40} className="h-8 w-auto object-contain" />
           </Link>
           <button onClick={() => setIsMenuOpen(false)} className="p-2 text-black/60 hover:text-black">
             <XIcon className="w-6 h-6" />

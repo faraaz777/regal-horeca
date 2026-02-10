@@ -2,11 +2,13 @@
  * Footer Component
  * 
  * Site footer with links, contact information, and copyright.
+ * Uses consistent NAP (Name, Address, Phone) for SEO.
  */
 
 import Link from 'next/link';
 import { Instagram, Facebook, Twitter, Linkedin, Youtube } from 'lucide-react';
 import { WhatsAppIcon } from './Icons';
+import { REGAL_NAP } from '@/lib/constants/seo';
 
 export default function Footer() {
   return (
@@ -14,7 +16,7 @@ export default function Footer() {
       <div className="max-w-screen-xl mx-auto px-4 py-12 overflow-x-hidden">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           <div>
-            <h3 className="text-xl font-bold mb-4 text-accent ">REGAL</h3>
+            <h3 className="text-xl font-bold mb-4 text-accent">REGAL® HoReCa</h3>
             <p className="text-white/70">
               Your trusted partner in the HoReCa industry for over 45 years. Providing quality and excellence.
             </p>
@@ -24,6 +26,7 @@ export default function Footer() {
             <h4 className="font-semibold text-lg mb-4 text-accent">Quick Links</h4>
             <ul className="space-y-2">
               <li><Link href="/about" className="text-white/70 hover:text-white transition-colors">About Us</Link></li>
+              <li><Link href="/regal" className="text-white/70 hover:text-white transition-colors">REGAL® Brand</Link></li>
               <li><Link href="/catalog" className="text-white/70 hover:text-white transition-colors">Products</Link></li>
               <li><Link href="/enquiry" className="text-white/70 hover:text-white transition-colors">Contact</Link></li>
               <li><Link href="#faqs" className="text-white/70 hover:text-white transition-colors">FAQ</Link></li>
@@ -33,9 +36,9 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold text-lg mb-4 text-accent">Contact Us</h4>
             <address className="not-italic text-white/70 space-y-2">
-              <p>15-5, Afzal Gunj, Mahaboob Gunj, 696ASHOKBAZARAFZALGUNJ, Hyderabad, Telangana 500012</p>
-              <p>Phone: +91 70939 13311</p>
-              <p>Email: regalmetals@rediffmail.com</p>
+              <p>{REGAL_NAP.address.full}</p>
+              <p>Phone: {REGAL_NAP.phones.join(', ')}</p>
+              <p>Email: {REGAL_NAP.email}</p>
             </address>
           </div>
 
@@ -101,7 +104,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-8 border-t border-white/20 pt-6 text-center text-white/70">
-          <p>&copy; {new Date().getFullYear()} Regal Brass & Steelware. All Rights Reserved.</p>
+          <p>&copy; {new Date().getFullYear()} {REGAL_NAP.legalName}. All Rights Reserved.</p>
         </div>
       </div>
     </footer>

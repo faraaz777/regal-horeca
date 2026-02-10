@@ -123,7 +123,7 @@ export default function WhyChooseUs() {
               >
                 <Image 
                   src={DEFAULT_IMAGE} 
-                  alt="Regal Hospitality Default"
+                  alt="REGAL® HoReCa Hospitality"
                   fill
                   className="object-cover"
                   sizes="(max-width: 768px) 100vw, 50vw"

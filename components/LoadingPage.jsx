@@ -38,7 +38,7 @@ export default function LoadingPage() {
         <div className="transform transition-all duration-1000 animate-pulse">
           <Image
             src={Logo}
-            alt="Regal HoReCa"
+            alt="REGAL® HoReCa"
             width={200}
             height={100}
             priority

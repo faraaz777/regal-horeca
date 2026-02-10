@@ -2,19 +2,23 @@
  * Catalog Page
  * 
  * Product catalog with advanced filtering, search, and category navigation.
- * Features:
- * - Context-aware faceted navigation
- * - URL state management for all filters
- * - Backend facets API integration
- * - Filter counts and disabled states
- * - Active filter chips
- * - Pagination support
  */
 
 import { Suspense } from 'react';
+import { SITE_CONFIG } from '@/lib/constants/seo';
 
 // Uses searchParams - must be dynamic (cannot be statically generated)
 export const dynamic = 'force-dynamic';
+
+export const metadata = {
+  title: 'Product Catalog - Commercial Kitchen Equipment',
+  description: 'Browse REGAL® HoReCa product catalog. Tableware, kitchenware, barware, hotel & restaurant supplies. Hyderabad.',
+  openGraph: {
+    title: 'Product Catalog | REGAL® HoReCa Hyderabad',
+    url: `${SITE_CONFIG.baseUrl}/catalog`,
+  },
+  alternates: { canonical: '/catalog' },
+};
 import CatalogPageClient from './CatalogPageClient';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 

@@ -18,12 +18,19 @@ import CategoriesSection from "@/components/CategoriesSection";
 import CircularCategories from "@/components/CircularCategories";
 import FeaturedProductsShowcase from "@/components/FeaturedProductsShowcase";
 import { flattenCategories } from "@/lib/utils/categoryUtils";
+import { generateFAQSchema } from "@/lib/utils/structuredData";
+import { FAQ_ITEMS } from "@/lib/constants/faqs";
+import { REGAL_NAP } from "@/lib/constants/seo";
 
 // Metadata for SEO
 export const metadata = {
-  title: 'Regal HoReCa - Premium Hospitality Supplies | Hotel, Restaurant & Café Equipment',
-  description: 'Discover premium hospitality supplies from Regal HoReCa. Quality tableware, kitchenware, and equipment for hotels, restaurants, and cafés. Over 45 years of excellence.',
-  keywords: 'hospitality supplies, hotel equipment, restaurant supplies, HoReCa, commercial kitchen equipment, tableware, kitchenware',
+  title: 'Commercial Kitchen Equipment Hyderabad',
+  description: 'REGAL® HoReCa - Premium hospitality supplies in Hyderabad. Quality tableware, kitchenware, barware for hotels, restaurants, cafés. Over 45 years. Visit our showroom.',
+  openGraph: {
+    title: 'Commercial Kitchen Equipment Hyderabad | REGAL® HoReCa',
+    description: 'Premium hospitality supplies. Tableware, kitchen equipment & hotel supplies. Hyderabad showroom.',
+  },
+  alternates: { canonical: '/' },
 };
 
 // Enable ISR (Incremental Static Regeneration) - revalidate every 5 minutes
@@ -79,8 +86,16 @@ export default async function HomePage() {
     // Continue with empty arrays - page will still render
   }
 
+  const faqSchema = generateFAQSchema(FAQ_ITEMS);
+
   return (
     <div>
+      {faqSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+        />
+      )}
       {/* Hero Slider Section */}
       <Hero />
 
@@ -180,6 +195,23 @@ export default async function HomePage() {
       <section className="bg-white">
         <div className="container mx-auto px-4">
           <WhomWeServe />
+        </div>
+      </section>
+
+      {/* REGAL® Brand/Entity Section - SEO: associate REGAL with this business */}
+      <section className="py-12 md:py-16 bg-gray-50 border-y border-black/5">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-2xl md:text-3xl font-bold mb-3">REGAL® HoReCa – Hyderabad</h2>
+          <p className="text-black/70 max-w-2xl mx-auto mb-6">
+            Commercial kitchen equipment & hotel supplies. Physical showroom, {REGAL_NAP.yearsInBusiness}+ years in business. 
+            Serving hotels, restaurants, cafés, bakeries, catering & banquets.
+          </p>
+          <Link
+            href="/regal"
+            className="inline-block text-accent font-bold uppercase tracking-widest hover:underline"
+          >
+            Learn about the REGAL® brand →
+          </Link>
         </div>
       </section>
 

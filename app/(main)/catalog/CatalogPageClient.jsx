@@ -742,6 +742,21 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
 
   return (
     <div className="container mx-auto px-4 py-4 sm:py-6 md:py-8">
+      {/* Breadcrumbs for SEO & UX */}
+      <nav className="mb-4 text-xs uppercase tracking-wider text-black/50" aria-label="Breadcrumb">
+        <ol className="flex items-center gap-2 flex-wrap">
+          <li><Link href="/" className="hover:text-accent transition-colors">Home</Link></li>
+          <li><span>/</span></li>
+          <li><Link href="/catalog" className="hover:text-accent transition-colors">Catalog</Link></li>
+          {currentCategory && (
+            <>
+              <li><span>/</span></li>
+              <li className="text-black font-medium" aria-current="page">{currentCategory.name}</li>
+            </>
+          )}
+        </ol>
+      </nav>
+
       <div className="text-center">
         {currentCategory && subcategoriesWithImages.length > 0 && (
           <div className="relative w-full ">
@@ -821,10 +836,10 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
         <main className={`w-full transition-all duration-300 ease-in-out ${isDesktopSidebarOpen ? 'lg:w-3/4 xl:w-4/5' : 'lg:w-full'}`}>
           {/* Toolbar */}
           <div className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center gap-2 sm:gap-4 py-3 sm:py-4 mb-4 sm:mb-6 border-b border-gray-100">
-            {/* Row 1 (mobile) / Col 1 (desktop): Category */}
-            <div className="text-lg sm:text-xl md:text-2xl font-display font-medium tracking-wide text-gray-600 text-center sm:order-2 sm:col-span-1 sm:text-center">
+            {/* Row 1 (mobile) / Col 1 (desktop): Category - H1 for SEO */}
+            <h1 className="text-lg sm:text-xl md:text-2xl font-display font-medium tracking-wide text-gray-600 text-center sm:order-2 sm:col-span-1 sm:text-center">
               {currentCategory ? currentCategory.name : 'All Products'}
-            </div>
+            </h1>
 
             {/* Row 2 (mobile): Showing + Filter + Grid in one row */}
             <div className="flex items-center justify-between gap-3 sm:contents">

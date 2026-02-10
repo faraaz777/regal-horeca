@@ -13,7 +13,7 @@ import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
 import { deleteFromR2 } from '@/lib/utils/r2Upload';
 import { generateUniqueSlug } from '@/lib/utils/slug';
-import { revalidateHomepage } from '@/lib/utils/revalidate';
+import { revalidateHomepage, revalidatePath } from '@/lib/utils/revalidate';
 import { normalizeFilterValues } from '@/lib/utils/normalizeFilterValue';
 import mongoose from 'mongoose';
 
@@ -211,6 +211,9 @@ export async function PUT(request, { params }) {
       );
     }
 
+    // Store original slug before update (for revalidation)
+    const oldSlug = product.slug;
+
     // Store original title for comparison
     const originalTitle = product.title;
     const newTitle = updateData.title;
@@ -290,8 +293,23 @@ export async function PUT(request, { params }) {
     Object.assign(product, updateData);
     await product.save();
 
+    // Get the new slug (either from updateData if changed, or old slug)
+    const newSlug = product.slug || oldSlug;
+
     // Revalidate homepage to update cached products
     revalidateHomepage();
+    
+    // Revalidate product pages for SEO
+    if (oldSlug && oldSlug !== newSlug) {
+      // If slug changed, revalidate old page (for redirect handling)
+      revalidatePath(`/products/${oldSlug}`);
+    }
+    // Always revalidate new/current product page
+    if (newSlug) {
+      revalidatePath(`/products/${newSlug}`);
+    }
+    // Revalidate sitemap to include updated product
+    revalidatePath('/sitemap.xml');
 
     return NextResponse.json({
       success: true,
@@ -339,6 +357,9 @@ export async function DELETE(request, { params }) {
       );
     }
 
+    // Store slug before deletion for revalidation
+    const productSlug = product.slug;
+
     // Delete images from R2
     const imagesToDelete = [
       product.heroImage,
@@ -355,6 +376,12 @@ export async function DELETE(request, { params }) {
 
     // Revalidate homepage to update cached products
     revalidateHomepage();
+    
+    // Revalidate product page (if slug exists) and sitemap for SEO
+    if (productSlug) {
+      revalidatePath(`/products/${productSlug}`);
+    }
+    revalidatePath('/sitemap.xml');
 
     return NextResponse.json({
       success: true,

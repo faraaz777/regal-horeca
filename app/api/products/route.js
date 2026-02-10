@@ -14,7 +14,7 @@ import Category from '@/lib/models/Category';
 import Brand from '@/lib/models/Brand';
 import { generateUniqueSlug } from '@/lib/utils/slug';
 import { getCategoryIdsWithChildren } from '@/lib/utils/categoryCache';
-import { revalidateHomepage } from '@/lib/utils/revalidate';
+import { revalidateHomepage, revalidatePath } from '@/lib/utils/revalidate';
 import { normalizeFilterValues } from '@/lib/utils/normalizeFilterValue';
 
 // Allow caching with revalidation for better performance
@@ -461,6 +461,12 @@ export async function POST(request) {
 
     // Revalidate homepage to update cached products
     revalidateHomepage();
+    
+    // Revalidate product page and sitemap for SEO
+    if (product.slug) {
+      revalidatePath(`/products/${product.slug}`);
+    }
+    revalidatePath('/sitemap.xml');
 
     return NextResponse.json({
       success: true,

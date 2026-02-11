@@ -4,7 +4,7 @@
  */
 
 import { getProductBySlug } from '@/lib/utils/getProductBySlug';
-import { generateProductSchema, generateBreadcrumbSchema } from '@/lib/utils/structuredData';
+import { generateProductSchema } from '@/lib/utils/structuredData';
 import { SITE_CONFIG } from '@/lib/constants/seo';
 
 export async function generateMetadata({ params }) {
@@ -59,26 +59,6 @@ export default async function ProductLayout({ params, children }) {
   const slug = params?.slug;
   const product = await getProductBySlug(slug);
   const productSchema = product ? generateProductSchema(product) : null;
-  
-  // Build breadcrumb items with actual category hierarchy
-  const breadcrumbItems = [{ name: 'Home', url: '/' }];
-  
-  if (product?.categoryPath && product.categoryPath.length > 0) {
-    // Add category hierarchy to breadcrumbs
-    product.categoryPath.forEach((cat) => {
-      breadcrumbItems.push({ name: cat.name, url: `/catalog?category=${cat.slug}` });
-    });
-  } else {
-    // Fallback to Catalog if no category path
-    breadcrumbItems.push({ name: 'Catalog', url: '/catalog' });
-  }
-  
-  // Add product as last item
-  if (product) {
-    breadcrumbItems.push({ name: product.title, url: `/products/${slug}` });
-  }
-  
-  const breadcrumbSchema = product ? generateBreadcrumbSchema(breadcrumbItems) : null;
 
   return (
     <>
@@ -86,12 +66,6 @@ export default async function ProductLayout({ params, children }) {
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
-        />
-      )}
-      {breadcrumbSchema && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
         />
       )}
       {children}

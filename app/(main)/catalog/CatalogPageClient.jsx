@@ -820,21 +820,11 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
         {/* Main Content */}
         <main className={`w-full transition-all duration-300 ease-in-out ${isDesktopSidebarOpen ? 'lg:w-3/4 xl:w-4/5' : 'lg:w-full'}`}>
           {/* Toolbar */}
-          <div className="flex flex-col sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center gap-2 sm:gap-4 py-3 sm:py-4 mb-4 sm:mb-6 border-b border-gray-100">
-            {/* Row 1 (mobile) / Col 1 (desktop): Category - H1 for SEO */}
-            <h1 className="text-lg sm:text-xl md:text-2xl font-display font-medium tracking-wide text-gray-600 text-center sm:order-2 sm:col-span-1 sm:text-center">
-              {currentCategory ? currentCategory.name : 'All Products'}
-            </h1>
-
-            {/* Row 2 (mobile): Showing + Filter + Grid in one row */}
+          <div className="flex flex-col sm:grid sm:grid-cols-[auto_1fr_auto] sm:items-center gap-2 sm:gap-4 py-3 sm:py-4 mb-4 sm:mb-6 border-b border-gray-100">
+            {/* Filter (left) | Category + Showing (center) | Grid (right) */}
             <div className="flex items-center justify-between gap-3 sm:contents">
-              {/* Left: Showing count */}
-              <div className="text-xs sm:text-sm text-black/60 sm:order-1 truncate min-w-0">
-                Showing {paginatedProducts.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0} - {Math.min(currentPage * ITEMS_PER_PAGE, totalProducts)} of {totalProducts}
-              </div>
-
-              {/* Right: Filter + Grid layout */}
-              <div className="flex items-center gap-2 sm:justify-end sm:order-3 shrink-0">
+              {/* Left: Filter */}
+              <div className="flex items-center gap-2 shrink-0 sm:order-1">
               <button
                 onClick={() => setIsFilterOpen(true)}
                 className="flex items-center gap-2 font-semibold lg:hidden min-h-[44px] px-3 py-2.5 -ml-2 rounded-lg active:bg-black/5"
@@ -870,8 +860,23 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
                   </span>
                 )}
               </button>
+              </div>
+
+              {/* Center: Category + Showing count */}
+              <div className="flex items-center justify-center gap-2 sm:gap-3 text-center sm:order-2 truncate min-w-0">
+                <h1 className="text-lg sm:text-xl md:text-2xl font-display font-medium tracking-wide text-gray-600 shrink-0">
+                  {currentCategory ? currentCategory.name : 'All Products'}
+                </h1>
+                <span className="hidden sm:inline text-black/30">·</span>
+                <span className="text-xs sm:text-sm text-black/60">
+                  Showing {paginatedProducts.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0} - {Math.min(currentPage * ITEMS_PER_PAGE, totalProducts)} of {totalProducts}
+                </span>
+              </div>
+
+              {/* Right: Grid layout */}
+              <div className="flex items-center gap-2 sm:justify-end sm:order-3 shrink-0">
               {/* Grid View Selector - Mobile */}
-              <div className="flex items-center gap-1 lg:hidden border border-black/20 rounded-lg p-1 ml-auto" suppressHydrationWarning>
+              <div className="flex items-center gap-1 lg:hidden border border-black/20 rounded-lg p-1" suppressHydrationWarning>
                 <button
                   onClick={() => setMobileGridView('1')}
                   className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md transition-colors ${

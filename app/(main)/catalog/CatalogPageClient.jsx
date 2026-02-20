@@ -742,10 +742,17 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
   }, [mobileGridView, desktopGridView]);
 
   return (
-    <div className="container mx-auto px-4 py-4 sm:py-6 md:py-8">
-      <div className="text-center">
+    <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 md:py-5">
+      {/* Category title - left on mobile, centered on md+ */}
+      <div className={`mb-2 sm:mb-3 ${currentCategory && subcategoriesWithImages.length > 0 ? 'text-left md:text-center' : 'text-center'}`}>
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-medium tracking-tight text-gray-900">
+          {currentCategory ? currentCategory.name : 'All Products'}
+        </h1>
+      </div>
+
+      <div className="text-left md:text-center">
         {currentCategory && subcategoriesWithImages.length > 0 && (
-          <div className="relative w-full ">
+          <div className="relative w-full">
             {showSubcatLeftArrow && (
               <button
                 onClick={() => subcategoriesScrollRef.current?.scrollBy({ left: -300, behavior: 'smooth' })}
@@ -766,7 +773,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
             )}
             <div
               ref={subcategoriesScrollRef}
-              className="flex py-2 sm:py-4 overflow-x-auto hide-scrollbar gap-3 sm:gap-4 md:gap-5 lg:gap-6 pb-2 sm:pb-4 snap-x snap-mandatory justify-center px-2 sm:px-4"
+              className="flex py-1.5 sm:py-2 overflow-x-auto hide-scrollbar gap-3 sm:gap-4 md:gap-5 lg:gap-6 pb-1.5 sm:pb-2 snap-x snap-mandatory justify-start md:justify-center px-0 sm:px-4"
             >
               {subcategoriesWithImages.map((cat, index) => (
                 <Link
@@ -800,7 +807,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
       </div>
 
 
-      <div className="flex flex-col lg:flex-row gap-12">
+      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 mt-2 sm:mt-4">
         {/* Filter Sidebar */}
         {isDesktopSidebarOpen && (
           <div className="hidden lg:block w-1/4 xl:w-1/5 pr-6 transition-all duration-300 ease-in-out">
@@ -821,16 +828,16 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
         {/* Main Content */}
         <main className={`w-full transition-all duration-300 ease-in-out ${isDesktopSidebarOpen ? 'lg:w-3/4 xl:w-4/5' : 'lg:w-full'}`}>
           {/* Toolbar */}
-          <div className="flex flex-col sm:grid sm:grid-cols-[auto_1fr_auto] sm:items-center gap-2 sm:gap-4 py-3 sm:py-4 mb-4 sm:mb-6 border-b border-gray-100">
-            {/* Filter (left) | Category + Showing (center) | Grid (right) */}
+          <div className="flex flex-col sm:grid sm:grid-cols-[auto_1fr_auto] sm:items-center gap-2 sm:gap-3 py-2 sm:py-3 mb-3 sm:mb-4 border-b border-gray-100">
+            {/* Filter (left) | Showing (center) | Grid (right) */}
             <div className="flex items-center justify-between gap-3 sm:contents">
               {/* Left: Filter */}
               <div className="flex items-center gap-2 shrink-0 sm:order-1">
               <button
                 onClick={() => setIsFilterOpen(true)}
-                className="flex items-center gap-2 font-semibold lg:hidden min-h-[44px] px-3 py-2.5 -ml-2 rounded-lg active:bg-black/5"
+                className="flex items-center gap-2  lg:hidden min-h-[44px] px-3 py-2 -ml-2 rounded-lg active:bg-black/5"
               >
-                <FiSliders className="w-4 h-4" /> Filter
+                <FiSliders className="w-5 h-5" /> Filter
                 {hasActiveFilters && (
                   <span className="ml-1 px-2 py-0.5 text-xs bg-accent text-white rounded-full">
                     {Object.keys(selectedFilters).length +
@@ -863,24 +870,19 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
               </button>
               </div>
 
-              {/* Center: Category + Showing count */}
-              <div className="flex items-center justify-center gap-2 sm:gap-3 text-center sm:order-2 truncate min-w-0">
-                <h1 className="text-lg sm:text-xl md:text-2xl font-display font-medium tracking-wide text-gray-600 shrink-0">
-                  {currentCategory ? currentCategory.name : 'All Products'}
-                </h1>
-                <span className="hidden sm:inline text-black/30">·</span>
-                <span className="text-xs sm:text-sm text-black/60">
-                  Showing {paginatedProducts.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0} - {Math.min(currentPage * ITEMS_PER_PAGE, totalProducts)} of {totalProducts}
-                </span>
+              {/* Center: Showing count */}
+              <div className="text-xs sm:text-sm text-black/60 text-center sm:order-2 min-w-0">
+                Showing {paginatedProducts.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0} - {Math.min(currentPage * ITEMS_PER_PAGE, totalProducts)}
+               {" "} of {totalProducts}
               </div>
 
               {/* Right: Grid layout */}
               <div className="flex items-center gap-2 sm:justify-end sm:order-3 shrink-0">
               {/* Grid View Selector - Mobile */}
-              <div className="flex items-center gap-1 lg:hidden border border-black/20 rounded-lg p-1" suppressHydrationWarning>
+              <div className="flex items-center gap-0.5 lg:hidden border border-black/20 rounded-md p-0.5" suppressHydrationWarning>
                 <button
                   onClick={() => setMobileGridView('1')}
-                  className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md transition-colors ${
+                  className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded transition-colors ${
                     mobileGridView === '1'
                       ? 'bg-accent text-white'
                       : 'text-black/60 hover:text-black active:bg-black/5'
@@ -888,11 +890,11 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
                   title="1 Column"
                   suppressHydrationWarning
                 >
-                  <ListIcon className="w-5 h-5" />
+                  <ListIcon className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setMobileGridView('2')}
-                  className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md transition-colors ${
+                  className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded transition-colors ${
                     mobileGridView === '2'
                       ? 'bg-accent text-white'
                       : 'text-black/60 hover:text-black active:bg-black/5'
@@ -900,7 +902,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
                   title="2 Columns"
                   suppressHydrationWarning
                 >
-                  <Grid2x2Icon className="w-5 h-5" />
+                  <Grid2x2Icon className="w-4 h-4" />
                 </button>
               </div>
 

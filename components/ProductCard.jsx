@@ -360,6 +360,14 @@ export default function ProductCard({ product, onAdd, hidePrice = false, transpa
           </h3>
         </Link>
 
+        {/* Summary for SEO (crawlable keyword-rich content) */}
+        {(product.summary || product.description) && (
+          <p className="text-[11px] sm:text-xs mt-1.5 line-clamp-2 text-black/60 leading-snug">
+            {(product.summary || product.description || '').replace(/\s+/g, ' ').trim().slice(0, 120)}
+            {(product.summary || product.description || '').length > 120 ? '…' : ''}
+          </p>
+        )}
+
         {/* Price Section - Compact and Clean */}
         {/* {!hidePrice && (product.price && product.price > 0) && (
           <div className="flex flex-col items-center gap-1 mt-auto">

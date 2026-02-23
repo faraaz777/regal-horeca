@@ -33,6 +33,7 @@ export async function generateMetadata({ params }) {
   return {
     title: `${title} | REGAL® HoReCa Hyderabad`,
     description,
+    robots: { index: true, follow: true },
     openGraph: {
       title: `${title} | REGAL® HoReCa`,
       description,

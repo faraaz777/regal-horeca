@@ -1258,32 +1258,6 @@ export default function CategoryPage() {
         </div>
       </section>
 
-      {/* Floating WhatsApp Button */}
-      <motion.button
-        onClick={() => {
-          const whatsappUrl = getWhatsAppBusinessLink("Hello! I would like to make an enquiry.");
-          openWhatsAppLink(whatsappUrl);
-        }}
-        className="fixed bottom-[4.5rem] right-4 sm:bottom-[4.5rem] sm:right-6 md:bottom-24 md:right-8 z-50 bg-[#25D366] hover:bg-[#20BA5A] active:bg-[#1DA851] text-white rounded-full shadow-2xl hover:shadow-[#25D366]/50 flex items-center justify-center overflow-hidden group transition-all duration-300 ease-in-out touch-manipulation"
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.1 }}
-        whileTap={{ scale: 0.95 }}
-        aria-label="Contact on WhatsApp"
-        style={{
-          padding: "0.75rem",
-          minWidth: "48px",
-          minHeight: "48px",
-        }}
-      >
-        <div className="flex items-center">
-          <WhatsAppIcon className="w-5 h-5 sm:w-5 sm:h-5 md:w-6 md:h-6 flex-shrink-0 transition-transform duration-300 group-hover:scale-110" />
-          <span className="hidden md:block text-xs md:text-sm font-bold uppercase tracking-wider whitespace-nowrap overflow-hidden max-w-0 group-hover:max-w-[150px] transition-all duration-300 ease-in-out opacity-0 group-hover:opacity-100 group-hover:ml-3">
-            WhatsApp
-          </span>
-        </div>
-      </motion.button>
-
       {/* Floating Enquire Now Button */}
       <motion.button
         onClick={scrollToForm}

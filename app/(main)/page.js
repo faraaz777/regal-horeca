@@ -20,7 +20,6 @@ import FeaturedProductsShowcase from "@/components/FeaturedProductsShowcase";
 import { flattenCategories } from "@/lib/utils/categoryUtils";
 import { generateFAQSchema } from "@/lib/utils/structuredData";
 import { FAQ_ITEMS } from "@/lib/constants/faqs";
-import { REGAL_NAP } from "@/lib/constants/seo";
 
 // Metadata for SEO
 export const metadata = {
@@ -195,23 +194,6 @@ export default async function HomePage() {
       <section className="bg-white">
         <div className="container mx-auto px-4">
           <WhomWeServe />
-        </div>
-      </section>
-
-      {/* REGAL® Brand/Entity Section - SEO: associate REGAL with this business */}
-      <section className="py-12 md:py-16 bg-gray-50 border-y border-black/5">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-2xl md:text-3xl font-bold mb-3">REGAL® HoReCa – Hyderabad</h2>
-          <p className="text-black/70 max-w-2xl mx-auto mb-6">
-            Commercial kitchen equipment & hotel supplies. Physical showroom, {REGAL_NAP.yearsInBusiness}+ years in business. 
-            Serving hotels, restaurants, cafés, bakeries, catering & banquets.
-          </p>
-          <Link
-            href="/regal"
-            className="inline-block text-accent font-bold uppercase tracking-widest hover:underline"
-          >
-            Learn about the REGAL® brand →
-          </Link>
         </div>
       </section>
 

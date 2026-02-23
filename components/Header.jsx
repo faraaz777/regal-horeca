@@ -325,7 +325,7 @@ export default function Header() {
         className={`bg-white fixed top-0 left-0 right-0 z-40  border-b  border-black/5 transition-transform duration-300 ease-out ${isHeaderVisible ? "translate-y-0" : "-translate-y-full"
           }`}
       >
-        <div className="container mx-auto px-4 lg:px-8">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
 
           {/* DESKTOP + MOBILE TOP ROW */}
           <div className="flex items-center justify-between py-1.5 lg:py-1.5 gap-4">
@@ -624,7 +624,7 @@ function DepartmentsBar({
         >
           {/* Mega Menu Content */}
           {activeDept && hasActiveChildren && (
-            <div className="container mx-auto px-8 py-8">
+            <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
               <div className="flex gap-8">
                 {/* Categories Grid */}
                 {/* Categories Grid - Adjusted per user request for consistent alignment */}
@@ -861,12 +861,12 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
       }}
     >
       <div
-        className={`fixed inset-y-0 left-0 w-[85%] max-w-[320px] bg-white shadow-2xl transform transition-transform duration-300 ease-out flex flex-col ${isMenuOpen ? "translate-x-0" : "-translate-x-full"
+        className={`fixed inset-y-0 left-0 w-[85%] max-w-[320px] sm:max-w-[380px] md:max-w-[420px] bg-white shadow-2xl transform transition-transform duration-300 ease-out flex flex-col ${isMenuOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Mobile Menu Header */}
-        <div className="flex items-center justify-between px-4 h-16 border-b border-gray-100 flex-shrink-0">
+        <div className="flex items-center justify-between px-4 sm:px-6 md:px-8 h-16 sm:h-[72px] border-b border-gray-100 flex-shrink-0">
           <Link href="/" onClick={() => setIsMenuOpen(false)}>
             <Image src={Logo} alt="REGAL® HoReCa" width={100} height={40} className="h-8 w-auto object-contain" />
           </Link>
@@ -876,16 +876,16 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
         </div>
 
         {/* Search Bar */}
-        <div className="px-4 py-4 border-b border-gray-300">
+        <div className="px-4 sm:px-6 md:px-8 py-4 sm:py-5 border-b border-gray-300">
           <form onSubmit={handleSearchSubmit} className="relative">
             <div className="relative">
-              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none z-10" />
+              <SearchIcon className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none z-10" />
               <input
                 type="text"
                 placeholder="What are you looking for?"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-11 pr-24 py-3 border-2 border-orange-200 rounded-lg text-xs text-black placeholder:text-gray-400 placeholder:text-xs bg-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all shadow-sm"
+                className="w-full pl-11 sm:pl-12 pr-24 py-3 sm:py-3.5 border-2 border-orange-200 rounded-lg text-xs sm:text-sm text-black placeholder:text-gray-400 bg-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all shadow-sm"
               />
               <button
                 type="submit"
@@ -903,7 +903,7 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
             <Link
               href="/wishlist"
               onClick={() => setIsMenuOpen(false)}
-              className="flex-1 flex items-center justify-center gap-2 py-4 px-4 text-sm font-medium text-black hover:bg-gray-50 transition-colors border-r border-gray-300 relative"
+              className="flex-1 flex items-center justify-center gap-2 py-4 sm:py-5 px-4 sm:px-6 text-sm sm:text-base font-medium text-black hover:bg-gray-50 transition-colors border-r border-gray-300 relative"
             >
               <div className="relative">
                 <HeartIcon className="w-5 h-5 text-gray-700" />
@@ -920,7 +920,7 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
                 setIsMenuOpen(false);
                 onCartClick();
               }}
-              className="flex-1 flex items-center justify-center gap-2 py-4 px-4 text-sm font-medium text-black hover:bg-gray-50 transition-colors relative"
+              className="flex-1 flex items-center justify-center gap-2 py-4 sm:py-5 px-4 sm:px-6 text-sm sm:text-base font-medium text-black hover:bg-gray-50 transition-colors relative"
             >
               <div className="relative">
                 <LuClipboardList className="w-5 h-5 text-gray-700" />
@@ -936,17 +936,17 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
         </div>
 
         {/* Menu Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-8">
           {navStack.length > 1 ? (
             <>
               <button
                 onClick={handleNavBack}
-                className="flex items-center gap-2 px-4 py-3 w-full text-left text-sm font-semibold text-black/60 hover:bg-gray-50 border-b border-gray-50"
+                className="flex items-center gap-2 w-full text-left text-sm sm:text-base font-semibold text-black/60 hover:bg-gray-50 border-b border-gray-50 py-3.5 sm:py-4 -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8"
               >
-                <ChevronLeftIcon className="w-4 h-4" />
+                <ChevronLeftIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                 Back to {navStack[navStack.length - 2]?.name || "Menu"}
               </button>
-              <div className="py-2">
+              <div className="py-2 sm:py-3">
                 {currentMenu.children && currentMenu.children.map((item) => {
                   const hasChildren = item.children && item.children.length > 0;
                   const isServe = item.slug === "serve";
@@ -956,21 +956,21 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
                       <div key={item.id} className="border-b border-gray-50/50">
                         <button
                           onClick={() => toggleAccordion(item.id)}
-                          className="flex items-center justify-between w-full px-5 py-3 text-left"
+                          className="flex items-center justify-between w-full py-3.5 sm:py-4 text-left -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8 hover:bg-gray-50/50"
                         >
-                          <span className="text-[15px] font-medium text-black uppercase tracking-wide">{item.name}</span>
+                          <span className="text-sm sm:text-base font-medium text-black uppercase tracking-wide">{item.name}</span>
                           <ChevronDownIcon
-                            className={`w-4 h-4 text-black/40 transition-transform ${openAccordions[item.id] ? 'rotate-180' : ''}`}
+                            className={`w-4 h-4 sm:w-5 sm:h-5 text-black/40 transition-transform flex-shrink-0 ${openAccordions[item.id] ? 'rotate-180' : ''}`}
                           />
                         </button>
                         {openAccordions[item.id] && (
-                          <div className="bg-gray-50 px-5 py-2 space-y-2">
+                          <div className="bg-gray-50 -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8 py-2.5 sm:py-3 space-y-1.5 sm:space-y-2">
                             {item.children.map(sub => (
                               <Link
                                 key={sub.id}
                                 href={`/catalog?category=${sub.slug}`}
                                 onClick={() => setIsMenuOpen(false)}
-                                className="block py-2 text-sm text-gray-600 hover:text-accent pl-2 border-l-2 border-transparent hover:border-accent"
+                                className="block py-2 sm:py-2.5 text-sm sm:text-base text-gray-600 hover:text-accent pl-3 sm:pl-4 border-l-2 border-transparent hover:border-accent"
                               >
                                 {sub.name}
                               </Link>
@@ -986,7 +986,7 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
                       key={item.id}
                       href={item.slug}
                       onClick={() => setIsMenuOpen(false)}
-                      className="flex items-center justify-between px-5 py-3 text-[15px] font-medium text-black hover:bg-gray-50 border-b border-gray-50/50 uppercase tracking-wide"
+                      className="flex items-center justify-between py-3.5 sm:py-4 text-sm sm:text-base font-medium text-black hover:bg-gray-50/50 border-b border-gray-50/50 uppercase tracking-wide -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8"
                     >
                       {item.name}
                     </Link>
@@ -995,14 +995,14 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
               </div>
             </>
           ) : (
-            <div className="py-2">
+            <div className="py-2 sm:py-3">
               {/* Home Link */}
               <Link
                 href="/"
                 onClick={() => setIsMenuOpen(false)}
-                className="flex items-center gap-3 px-5 py-3 text-[15px] font-medium text-black hover:bg-gray-50 border-b border-gray-50/50"
+                className="flex items-center gap-3 py-3.5 sm:py-4 text-sm sm:text-base font-medium text-black hover:bg-gray-50/50 border-b border-gray-50/50 -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                 </svg>
                 <span>Home</span>
@@ -1011,8 +1011,8 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
               {/* Shop by Category Section */}
               {departments && departments.length > 0 && (
                 <>
-                  <div className="px-5 py-3 border-b border-gray-50/50">
-                    <h3 className="text-xs font-bold text-black uppercase tracking-widest">SHOP BY CATEGORY</h3>
+                  <div className="py-3.5 sm:py-4 border-b border-gray-50/50 -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8">
+                    <h3 className="text-xs sm:text-sm font-bold text-black uppercase tracking-widest">SHOP BY CATEGORY</h3>
                   </div>
                   {departments.map((dept) => {
                     const deptSlug = dept.slug;
@@ -1029,13 +1029,13 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
                               children: dept.children,
                             });
                           }}
-                          className="flex items-center justify-between w-full px-5 py-3 text-left hover:bg-gray-50 border-b border-gray-50/50"
+                          className="flex items-center justify-between w-full py-3.5 sm:py-4 text-left hover:bg-gray-50/50 border-b border-gray-50/50 -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8"
                         >
-                          <div className="flex items-center gap-3">
-                            <CategoryIcon categorySlug={deptSlug} className="w-5 h-5 text-black/60" />
-                            <span className="text-[15px] font-medium text-black uppercase">{dept.name}</span>
+                          <div className="flex items-center gap-3 sm:gap-4">
+                            <CategoryIcon categorySlug={deptSlug} className="w-5 h-5 sm:w-6 sm:h-6 text-black/60 flex-shrink-0" />
+                            <span className="text-sm sm:text-base font-medium text-black uppercase">{dept.name}</span>
                           </div>
-                          <ChevronRightIcon className="w-4 h-4 text-black/40" />
+                          <ChevronRightIcon className="w-4 h-4 sm:w-5 sm:h-5 text-black/40 flex-shrink-0" />
                         </button>
                       );
                     }
@@ -1045,11 +1045,11 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
                         key={dept._id || dept.id || deptSlug}
                         href={`/catalog?category=${deptSlug}`}
                         onClick={() => setIsMenuOpen(false)}
-                        className="flex items-center justify-between w-full px-5 py-3 text-left hover:bg-gray-50 border-b border-gray-50/50"
+                        className="flex items-center justify-between w-full py-3.5 sm:py-4 text-left hover:bg-gray-50/50 border-b border-gray-50/50 -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8"
                       >
-                        <div className="flex items-center gap-3">
-                          <CategoryIcon categorySlug={deptSlug} className="w-5 h-5 text-black/60" />
-                          <span className="text-[15px] font-medium text-black">{dept.name}</span>
+                        <div className="flex items-center gap-3 sm:gap-4">
+                          <CategoryIcon categorySlug={deptSlug} className="w-5 h-5 sm:w-6 sm:h-6 text-black/60 flex-shrink-0" />
+                          <span className="text-sm sm:text-base font-medium text-black">{dept.name}</span>
                         </div>
                       </Link>
                     );
@@ -1061,9 +1061,9 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
               <Link
                 href="/about"
                 onClick={() => setIsMenuOpen(false)}
-                className="flex items-center gap-3 px-5 py-3 text-[15px] font-medium text-black hover:bg-gray-50 border-b border-gray-50/50"
+                className="flex items-center gap-3 py-3.5 sm:py-4 text-sm sm:text-base font-medium text-black hover:bg-gray-50/50 border-b border-gray-50/50 -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8"
               >
-                <InfoIcon className="w-5 h-5 text-black/60" />
+                <InfoIcon className="w-5 h-5 sm:w-6 sm:h-6 text-black/60 flex-shrink-0" />
                 <span>About Us</span>
               </Link>
             </div>
@@ -1072,7 +1072,7 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
 
         {/* Bottom Action Buttons */}
         {navStack.length === 1 && (
-          <div className="border-t border-gray-100 p-4 flex gap-2">
+          <div className="border-t border-gray-100 p-4 sm:p-5 md:p-6 flex gap-2 sm:gap-3 flex-shrink-0">
             <button
               onClick={onProfileClick}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 text-black text-sm font-medium rounded-md hover:bg-gray-100 transition-colors"

@@ -31,29 +31,25 @@ export default function AdminCategoriesPage() {
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState(new Set());
 
-  // Fetch categories directly from API (not flattened)
+  // Fetch categories from admin endpoint (uncached, instant list updates)
   const fetchCategoriesList = async () => {
     try {
       setIsLoadingCategories(true);
       setError('');
-      const response = await fetch('/api/categories');
-      const data = await response.json();
-        if (data.success) {
-          const cats = data.categories || [];
-          // Only log in development
-          if (process.env.NODE_ENV === 'development') {
-            console.log('Fetched categories:', cats.length);
-          }
-          setCategoriesList(cats);
-          return cats;
+      const data = await apiClient.request('/api/admin/categories');
+      if (data.success) {
+        const cats = data.categories || [];
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Fetched categories:', cats.length);
+        }
+        setCategoriesList(cats);
+        return cats;
       } else {
-        console.error('Failed to fetch categories:', data.error);
         setError(data.error || 'Failed to load categories');
         return [];
       }
     } catch (error) {
-      console.error('Error fetching categories:', error);
-      setError('Failed to load categories: ' + error.message);
+      setError(error?.message || 'Failed to load categories');
       return [];
     } finally {
       setIsLoadingCategories(false);

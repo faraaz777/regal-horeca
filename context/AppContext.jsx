@@ -337,13 +337,12 @@ export function AppProvider({ children, initialCategories = [] }) {
     console.log('refreshProducts called - products are now fetched per-page');
   }, []);
 
-  // Refresh categories from API
+  // Refresh categories from API (admin endpoint = uncached, instant updates in Add Product)
   const refreshCategories = useCallback(async () => {
     try {
-      const response = await fetch('/api/categories?tree=true');
+      const response = await fetch('/api/admin/categories?tree=true');
       const data = await response.json();
-      if (data.success) {
-        // Flatten tree structure for easier access
+      if (response.ok && data.success) {
         const flattenCategories = (cats) => {
           let result = [];
           cats.forEach(cat => {

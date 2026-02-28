@@ -116,8 +116,11 @@ export default function ProductCard({ product, onAdd, hidePrice = false, transpa
     setTouchEnd(null);
   };
 
-  // Get product name/title
-  const productName = product.title || product.name || 'Product';
+  // Get product name/title and optional specs (when title uses " | " separator)
+  const rawTitle = product.title || product.name || 'Product';
+  const pipeParts = rawTitle.split(/\s*\|\s*/).map((s) => s.trim()).filter(Boolean);
+  const productName = pipeParts[0] || rawTitle;
+  const productSpecs = pipeParts.length > 1 ? pipeParts.slice(1).join(' · ') : null;
 
   // Get product ID
   const productId = product._id || product.id;
@@ -353,15 +356,20 @@ export default function ProductCard({ product, onAdd, hidePrice = false, transpa
         {/* Brand/Category */}
      
 
-        {/* Product Name - Larger and Bold */}
-        <Link href={`/products/${productSlug}`}>
-          <h3 className={`text-xs sm:text-sm md:text-base font-semibold mt-2 hover:text-accent transition-colors leading-tight break-words ${transparent ? 'text-white' : 'text-black'}`}>
+        {/* Product Name - Large, Bold + Specs line (smaller, grey) */}
+        <Link href={`/products/${productSlug}`} className="block">
+          <h3 className={`text-sm sm:text-base md:text-lg font-bold mt-2 hover:text-accent transition-colors leading-tight break-words ${transparent ? 'text-white' : 'text-black'}`}>
             {productName}
           </h3>
+          {productSpecs && (
+            <p className={`text-[11px] sm:text-xs font-medium mt-0.5 tracking-wide leading-snug ${transparent ? 'text-white/80' : 'text-black/60'}`}>
+              {productSpecs}
+            </p>
+          )}
         </Link>
 
         {/* Summary for SEO (crawlable keyword-rich content) */}
-        {(product.summary || product.description) && (
+        {(product.summary || product.description) && !productSpecs && (
           <p className="text-[11px] sm:text-xs mt-1.5 line-clamp-2 text-black/60 leading-snug">
             {(product.summary || product.description || '').replace(/\s+/g, ' ').trim().slice(0, 120)}
             {(product.summary || product.description || '').length > 120 ? '…' : ''}

@@ -9,8 +9,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ProductCard from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 import { useAppContext } from '@/context/AppContext';
-import { FiSliders } from 'react-icons/fi';
-import { PlusIcon, MinusIcon, XIcon, ChevronLeftIcon, Grid2x2Icon, Grid3x3Icon, Grid4x4Icon, Grid5x5Icon, ListIcon } from '@/components/Icons';
+import { PlusIcon, MinusIcon, XIcon, ChevronLeftIcon, Grid2x2Icon, Grid3x3Icon, Grid4x4Icon, Grid5x5Icon, ListIcon, FilterIcon } from '@/components/Icons';
 import '@/components/new/SidebarFilter.css';
 
 const ITEMS_PER_PAGE = 24;
@@ -837,7 +836,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
                 onClick={() => setIsFilterOpen(true)}
                 className="flex items-center gap-2  lg:hidden min-h-[44px] px-3 py-2 -ml-2 rounded-lg active:bg-black/5"
               >
-                <FiSliders className="w-5 h-5" /> Filter
+                <FilterIcon className="w-5 h-5" /> Filter
                 {hasActiveFilters && (
                   <span className="ml-1 px-2 py-0.5 text-xs bg-accent text-white rounded-full">
                     {Object.keys(selectedFilters).length +
@@ -857,7 +856,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
                 }}
                 className="hidden lg:flex items-center gap-2 font-semibold hover:text-accent transition-colors"
               >
-                <FiSliders className="w-5 h-5" />
+                <FilterIcon className="w-5 h-5" />
                 <span>{isDesktopSidebarOpen ? 'Hide' : 'Show'} Filters</span>
                 {hasActiveFilters && (
                   <span className="ml-1 px-2 py-0.5 text-xs bg-accent text-white rounded-full">

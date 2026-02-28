@@ -16,7 +16,6 @@ export default function robots() {
           '/api/',
           '/admin/',
           '/admin',
-          '/_next/',
           '/wishlist',
         ],
       },

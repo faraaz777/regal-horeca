@@ -1,10 +1,12 @@
 /**
  * Next.js Sitemap
  * Dynamically generates sitemap for all indexable pages.
+ * Product image URLs use direct R2 URLs for SEO (no /_next/image).
  */
 
 import { SITE_CONFIG } from '@/lib/constants/seo';
 import { getProductSlugs } from '@/lib/utils/getProductSlugs';
+import { toDirectSeoImageUrl } from '@/lib/utils/ogImage';
 import { WHOM_WE_SERVE_SLUGS } from '@/lib/constants/whomWeServe';
 
 export default async function sitemap() {
@@ -18,16 +20,21 @@ export default async function sitemap() {
     { url: `${baseUrl}/enquiry`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
   ];
 
-  // Product pages
+  // Product pages (with direct R2 image URLs for image sitemap / SEO)
   let productPages = [];
   try {
     const slugs = await getProductSlugs();
-    productPages = slugs.map(({ slug, lastModified }) => ({
-      url: `${baseUrl}/products/${slug}`,
-      lastModified: lastModified ? new Date(lastModified) : new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.7,
-    }));
+    productPages = slugs.map(({ slug, lastModified, heroImage }) => {
+      const directImageUrl = heroImage ? toDirectSeoImageUrl(heroImage, baseUrl) : null;
+      const entry = {
+        url: `${baseUrl}/products/${slug}`,
+        lastModified: lastModified ? new Date(lastModified) : new Date(),
+        changeFrequency: 'weekly',
+        priority: 0.7,
+      };
+      if (directImageUrl) entry.images = [directImageUrl];
+      return entry;
+    });
   } catch (e) {
     console.error('Sitemap: failed to fetch product slugs', e);
   }

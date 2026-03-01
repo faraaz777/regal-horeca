@@ -31,6 +31,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'pub-83aac0f4bf7f4e08825bbcd70a863973.r2.dev',
       },
+      {
+        protocol: 'https',
+        hostname: 'pub-f321790dd0774841a14d142aad52ade6.r2.dev',
+      },
     ],
     // Optimize images in production
     // Reduced sizes/formats to minimize Vercel image optimization usage

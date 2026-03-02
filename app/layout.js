@@ -47,6 +47,12 @@ export default async function RootLayout({ children }) {
 
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta
+          name="google-site-verification"
+          content="RXUWFb3zOQhYOdYjfvs6PjNXe1LjmRZeV72wtbusTcI"
+        />
+      </head>
       <body suppressHydrationWarning>
         <script
           type="application/ld+json"

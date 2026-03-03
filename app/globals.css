@@ -194,3 +194,63 @@ body {
   scrollbar-width: none;
   /* Firefox */
 }
+
+/* TipTap editor base styles */
+.ProseMirror {
+  outline: none;
+}
+
+.ProseMirror p {
+  margin: 0.3rem 0;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 1.25rem;
+  margin: 0.3rem 0;
+}
+
+.ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+}
+
+.ProseMirror th,
+.ProseMirror td {
+  border: 1px solid #d1d5db;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.875rem;
+}
+
+.ProseMirror th {
+  background-color: #f3f4f6;
+  font-weight: 600;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: #9ca3af;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Product description HTML styles (frontend) */
+.product-description-html table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem auto;
+}
+
+.product-description-html th,
+.product-description-html td {
+  border: 1px solid #d1d5db;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+.product-description-html th {
+  background-color: #f3f4f6;
+  font-weight: 600;
+}

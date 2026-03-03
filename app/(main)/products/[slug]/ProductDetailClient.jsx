@@ -18,6 +18,8 @@ import LightCaptureModal from '@/components/LightCaptureModal';
 import ProductCard from '@/components/ProductCard';
 import ProductGallery from '@/components/ProductGallery';
 import ReactMarkdown from 'react-markdown';
+import DOMPurify from 'dompurify';
+import { isHtml, stripHtml } from '@/lib/utils/html';
 import toast from 'react-hot-toast';
 
 export default function ProductDetailClient({ initialProduct = null }) {
@@ -35,6 +37,11 @@ export default function ProductDetailClient({ initialProduct = null }) {
   const [showCaptureModal, setShowCaptureModal] = useState(false);
   const [pendingEnquiry, setPendingEnquiry] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const isBusinessContext = searchParams?.get('business') ||
     (product?.businessTypeSlugs && product.businessTypeSlugs.length > 0);
@@ -451,7 +458,8 @@ export default function ProductDetailClient({ initialProduct = null }) {
                   <button
                     onClick={() => {
                       if (navigator.share) {
-                        navigator.share({ title: product.title, text: product.summary, url: window.location.href });
+                        const text = stripHtml(product.summary || '') || product.title;
+                        navigator.share({ title: product.title, text, url: window.location.href });
                       }
                     }}
                     className="flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-black/5 shadow-[0_2px_10px_rgba(0,0,0,0.06)] hover:shadow-[0_4px_15px_rgba(0,0,0,0.1)] transition-all duration-300 active:scale-95 group"
@@ -517,7 +525,39 @@ export default function ProductDetailClient({ initialProduct = null }) {
                 </div>
                 <div className="prose prose-lg prose-p:text-black/60 prose-p:leading-loose prose-headings:text-black prose-strong:text-black prose-ul:text-black prose-li:text-black/60 text-center max-w-none">
                   {product.description ? (
-                    <ReactMarkdown>{product.description}</ReactMarkdown>
+                    isHtml(product.description) ? (
+                      <div
+                        className="product-description-html"
+                        dangerouslySetInnerHTML={{
+                          __html: mounted
+                            ? DOMPurify.sanitize(product.description, {
+                                ALLOWED_TAGS: [
+                                  'p',
+                                  'br',
+                                  'strong',
+                                  'em',
+                                  'u',
+                                  's',
+                                  'ul',
+                                  'ol',
+                                  'li',
+                                  'table',
+                                  'thead',
+                                  'tbody',
+                                  'tr',
+                                  'th',
+                                  'td',
+                                  'h1',
+                                  'h2',
+                                  'h3',
+                                ],
+                              })
+                            : product.description,
+                        }}
+                      />
+                    ) : (
+                      <ReactMarkdown>{product.description}</ReactMarkdown>
+                    )
                   ) : (
                     <p>No description available for this product.</p>
                   )}

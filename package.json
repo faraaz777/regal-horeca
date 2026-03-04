@@ -22,11 +22,9 @@
     "@vercel/analytics": "^1.6.1",
     "bcryptjs": "^2.4.3",
     "browser-image-compression": "^2.0.2",
-<<<<<<< HEAD
+
     "exceljs": "^4.4.0",
-=======
     "dompurify": "^3.3.1",
->>>>>>> 086da3a8e2a661ffcaa963f9279f722cc72a3198
     "framer-motion": "^12.23.26",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.556.0",

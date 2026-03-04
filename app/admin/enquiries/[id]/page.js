@@ -68,6 +68,8 @@ export default function EnquiryDetailPage() {
   const [isEditingUserType, setIsEditingUserType] = useState(false);
   const [messageText, setMessageText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [gstPercent, setGstPercent] = useState(0);
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [isRelatedEnquiriesOpen, setIsRelatedEnquiriesOpen] = useState(true); // Default open
@@ -187,6 +189,48 @@ export default function EnquiryDetailPage() {
     });
   };
 
+  const downloadBlob = (blob, filename) => {
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(blobUrl);
+  };
+
+  const getFilenameFromContentDisposition = (contentDisposition) => {
+    if (!contentDisposition) return null;
+    const match = /filename="([^"]+)"/i.exec(contentDisposition);
+    return match?.[1] || null;
+  };
+
+  const handleExportExcel = async () => {
+    if (!enquiryId) return;
+    setIsExporting(true);
+    try {
+      const response = await fetch(
+        `/api/admin/enquiries/${enquiryId}/export?gst=${encodeURIComponent(gstPercent || 0)}`,
+        { method: 'GET' }
+      );
+      if (!response.ok) {
+        throw new Error('Failed to export');
+      }
+      const blob = await response.blob();
+      const filename =
+        getFilenameFromContentDisposition(response.headers.get('content-disposition')) ||
+        `order-${enquiryId}.xlsx`;
+      downloadBlob(blob, filename);
+      toast.success('Excel downloaded');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to export Excel');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const customerName = customer.name || enquiry?.name || 'N/A';
   const customerEmail = customer.email || enquiry?.email || '';
   const customerPhone = customer.phone || enquiry?.phone || '';
@@ -230,6 +274,37 @@ export default function EnquiryDetailPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Enquiry Details</h1>
             <p className="text-gray-600 mt-1 text-sm sm:text-base">ID: {enquiryId}</p>
           </div>
+        </div>
+
+        {/* Export to Excel */}
+        <div className="flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-2">
+            <label className="text-sm text-gray-600" htmlFor="gstPercent">
+              GST%
+            </label>
+            <input
+              id="gstPercent"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={100}
+              value={gstPercent}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                if (!Number.isFinite(val)) return;
+                setGstPercent(Math.max(0, Math.min(100, val)));
+              }}
+              className="w-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm"
+            />
+          </div>
+          <button
+            onClick={handleExportExcel}
+            disabled={isExporting}
+            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+            title="Download Excel with product images"
+          >
+            {isExporting ? 'Exporting...' : 'Export Excel'}
+          </button>
         </div>
       </div>
 

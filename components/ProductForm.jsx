@@ -18,6 +18,22 @@ import { PlusIcon, TrashIcon, MagicIcon, StarIcon, DragHandleIcon, SearchIcon } 
 import Image from 'next/image';
 import ColorPicker from './ColorPicker';
 import useSWR from 'swr';
+import RichTextEditor from './RichTextEditor';
+
+function getTextLength(str) {
+  if (!str || typeof str !== 'string') return 0;
+  return str.replace(/<[^>]*>/g, '').trim().length;
+}
+
+function plainTextToHtml(text) {
+  if (!text || typeof text !== 'string') return '';
+  const trimmed = text.trim();
+  if (!trimmed) return '';
+  return trimmed
+    .split(/\n\n+/)
+    .map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+    .join('');
+}
 
 const AVAILABLE_COLORS = [
   { name: 'Blue', hex: '#0000FF' }, 
@@ -580,7 +596,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
 
     // Determine mode: generate if empty/minimal, enhance if substantial text exists
     const currentText = field === 'summary' ? formData.summary : formData.description;
-    const hasSubstantialText = currentText && currentText.trim().length > 20;
+    const hasSubstantialText = getTextLength(currentText) > 20;
     const mode = hasSubstantialText ? 'enhance' : 'generate';
 
     // Set loading state
@@ -628,10 +644,11 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         throw new Error('AI returned empty response');
       }
 
-      // Update form data with generated text
+      // Update form data with generated text (convert plain text to simple HTML)
+      const html = plainTextToHtml(data.text);
       setFormData(prev => ({
         ...prev,
-        [field]: data.text,
+        [field]: html,
       }));
 
       // Set cooldown state
@@ -2172,11 +2189,11 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                       className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
                         aiLoading.summary || aiCooldown.summary || !formData.title || formData.title.trim().length < 3
                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : formData.summary && formData.summary.trim().length > 20
+                          : getTextLength(formData.summary) > 20
                           ? 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200'
                           : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
                       }`}
-                      title={!formData.title || formData.title.trim().length < 3 ? 'Enter product title first' : formData.summary && formData.summary.trim().length > 20 ? 'Improve existing description' : 'Generate new description'}
+                      title={!formData.title || formData.title.trim().length < 3 ? 'Enter product title first' : getTextLength(formData.summary) > 20 ? 'Improve existing description' : 'Generate new description'}
                     >
                       {aiLoading.summary ? (
                         <>
@@ -2191,19 +2208,22 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                           </svg>
-                          <span>{formData.summary && formData.summary.trim().length > 20 ? 'Improve' : 'Generate'}</span>
+                          <span>{getTextLength(formData.summary) > 20 ? 'Improve' : 'Generate'}</span>
                         </>
                       )}
                     </button>
                   </div>
                 </div>
-                <textarea 
-                  name="summary" 
-                  value={formData.summary} 
-                  onChange={handleChange} 
-                  className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base resize-y focus:ring-2 focus:ring-primary focus:border-primary transition-colors" 
-                  rows={3}
+                <RichTextEditor
+                  value={formData.summary}
+                  onChange={(html) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      summary: html,
+                    }))
+                  }
                   placeholder="Enter short description"
+                  minHeight="120px"
                 />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2356,17 +2376,17 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                       className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
                         aiLoading.description || aiCooldown.description || !formData.title || formData.title.trim().length < 3
                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : formData.description && formData.description.trim().length > 20
+                          : getTextLength(formData.description) > 20
                           ? 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200'
                           : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
                       }`}
-                      title={!formData.title || formData.title.trim().length < 3 ? 'Enter product title first' : formData.description && formData.description.trim().length > 20 ? 'Improve existing description' : 'Generate new description'}
+                      title={!formData.title || formData.title.trim().length < 3 ? 'Enter product title first' : getTextLength(formData.description) > 20 ? 'Improve existing description' : 'Generate new description'}
                     >
                       {aiLoading.description ? (
                         <>
                           <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a 8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 0 1 4 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
                           <span>Generating...</span>
                         </>
@@ -2375,19 +2395,22 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                           </svg>
-                          <span>{formData.description && formData.description.trim().length > 20 ? 'Improve' : 'Generate'}</span>
+                          <span>{getTextLength(formData.description) > 20 ? 'Improve' : 'Generate'}</span>
                         </>
                       )}
                     </button>
                   </div>
                 </div>
-                <textarea 
-                  name="description" 
-                  value={formData.description} 
-                  onChange={handleChange} 
-                  className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base resize-y focus:ring-2 focus:ring-primary focus:border-primary transition-colors" 
-                  rows={6}
+                <RichTextEditor
+                  value={formData.description}
+                  onChange={(html) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      description: html,
+                    }))
+                  }
                   placeholder="Enter long description"
+                  minHeight="200px"
                 />
               </div>
             </FormSection>

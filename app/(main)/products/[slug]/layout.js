@@ -5,15 +5,16 @@
  */
 
 import { getProductBySlug } from '@/lib/utils/getProductBySlug';
-import { generateProductSchema, stripMarkdownForMeta } from '@/lib/utils/structuredData';
+import { generateProductSchema } from '@/lib/utils/structuredData';
 import { getProductOgImageUrl } from '@/lib/utils/ogImage';
 import { SITE_CONFIG } from '@/lib/constants/seo';
+import { stripHtml } from '@/lib/utils/html';
 
 /** Shared title/description for product cards (consistent across OG and Twitter). */
 function productCardMeta(product) {
   const title = product.title || 'Product';
   const raw = product.summary || product.description || '';
-  const plain = stripMarkdownForMeta(raw).slice(0, 160);
+  const plain = stripHtml(raw).slice(0, 160);
   const description =
     plain ||
     `${title} - Commercial kitchen equipment. REGAL® HoReCa Hyderabad.`;

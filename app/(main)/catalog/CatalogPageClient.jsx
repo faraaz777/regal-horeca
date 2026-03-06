@@ -119,6 +119,8 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
     fetcher,
     {
       revalidateOnFocus: false,
+      revalidateOnMount: false,
+      revalidateIfStale: false,
       dedupingInterval: 60000, // Cache for 1 minute
       fallbackData: initialProductsData, // Use server-side data immediately
     }
@@ -228,6 +230,8 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
     fetcher,
     {
       revalidateOnFocus: false,
+      revalidateOnMount: false,
+      revalidateIfStale: false,
       dedupingInterval: 60000, // Cache for 1 minute
       fallbackData: initialFacetsData, // Use server-side data immediately
     }

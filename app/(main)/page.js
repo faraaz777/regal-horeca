@@ -17,9 +17,10 @@ import Locations from "@/components/about/Locations";
 import CategoriesSection from "@/components/CategoriesSection";
 import CircularCategories from "@/components/CircularCategories";
 import FeaturedProductsShowcase from "@/components/FeaturedProductsShowcase";
-import { flattenCategories } from "@/lib/utils/categoryUtils";
 import { generateFAQSchema } from "@/lib/utils/structuredData";
 import { FAQ_ITEMS } from "@/lib/constants/faqs";
+import { getCategories } from "@/lib/utils/getCategories";
+import { queryProducts } from "@/lib/server/products/queryProducts";
 
 // Metadata for SEO
 export const metadata = {
@@ -43,43 +44,16 @@ export default async function HomePage() {
   let categories = [];
 
   try {
-    // Get base URL from environment variable (required for static/ISR build)
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL 
-      || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
-
-      const [featuredResponse, arrivalsResponse, categoriesResponse] = await Promise.all([
-      fetch(`${baseUrl}/api/products?featured=true&limit=6`, {
-        next: { revalidate: 300 }, // Cache for 5 minutes
-      }).catch(() => null),
-      fetch(`${baseUrl}/api/products?limit=4`, {
-        next: { revalidate: 300 }, // Cache for 5 minutes
-      }).catch(() => null),
-      fetch(`${baseUrl}/api/categories?tree=true`, {
-        next: { revalidate: 3600 }, // Cache for 1 hour
-      }).catch(() => null)
+    const [featuredRes, arrivalsRes, categoriesRes] = await Promise.all([
+      queryProducts({ featured: 'true', limit: 6, page: 1, includePopulates: true }),
+      queryProducts({ limit: 4, page: 1, includePopulates: true }),
+      getCategories(),
     ]);
 
-    // Parse responses - only if responses are valid
-    const [featuredData, arrivalsData, categoriesData] = await Promise.all([
-      featuredResponse ? featuredResponse.json().catch(() => ({ success: false })) : Promise.resolve({ success: false }),
-      arrivalsResponse ? arrivalsResponse.json().catch(() => ({ success: false })) : Promise.resolve({ success: false }),
-      categoriesResponse ? categoriesResponse.json().catch(() => ({ success: false })) : Promise.resolve({ success: false })
-    ]);
-
-    // Extract data with error handling
-    if (featuredData?.success) {
-      featuredProducts = featuredData.products || [];
-    }
-
-    if (arrivalsData?.success) {
-      newArrivals = arrivalsData.products || [];
-    }
-
-    if (categoriesData?.success) {
-      // Flatten the category tree structure
-      const flattenedCategories = flattenCategories(categoriesData.categories || []);
-      categories = flattenedCategories;
-    }
+    // Serialize for Client Components (strip ObjectId prototypes, Dates, etc.)
+    featuredProducts = JSON.parse(JSON.stringify(featuredRes.products || []));
+    newArrivals = JSON.parse(JSON.stringify(arrivalsRes.products || []));
+    categories = JSON.parse(JSON.stringify(categoriesRes || []));
   } catch (error) {
     console.error('Error fetching homepage data:', error);
     // Continue with empty arrays - page will still render

@@ -12,7 +12,7 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Category from '@/lib/models/Category';
 import { clearCategoryCache } from '@/lib/utils/categoryCache';
-import { revalidateHomepage } from '@/lib/utils/revalidate';
+import { revalidateHomepage, revalidateCategories } from '@/lib/utils/revalidate';
 
 /**
  * GET /api/categories/[id]
@@ -95,6 +95,7 @@ export async function PUT(request, { params }) {
 
     // Revalidate homepage to update cached categories
     revalidateHomepage();
+    revalidateCategories();
 
     return NextResponse.json({
       success: true,
@@ -146,6 +147,7 @@ export async function DELETE(request, { params }) {
 
     // Revalidate homepage to update cached categories
     revalidateHomepage();
+    revalidateCategories();
 
     return NextResponse.json({
       success: true,

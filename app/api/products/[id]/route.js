@@ -13,7 +13,7 @@ import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
 import { deleteFromR2 } from '@/lib/utils/r2Upload';
 import { generateUniqueSlug } from '@/lib/utils/slug';
-import { revalidateHomepage, revalidatePath } from '@/lib/utils/revalidate';
+import { revalidateHomepage, revalidatePath, revalidateProducts } from '@/lib/utils/revalidate';
 import { normalizeFilterValues } from '@/lib/utils/normalizeFilterValue';
 import mongoose from 'mongoose';
 
@@ -298,6 +298,7 @@ export async function PUT(request, { params }) {
 
     // Revalidate homepage to update cached products
     revalidateHomepage();
+    revalidateProducts();
     
     // Revalidate product pages for SEO
     if (oldSlug && oldSlug !== newSlug) {
@@ -376,6 +377,7 @@ export async function DELETE(request, { params }) {
 
     // Revalidate homepage to update cached products
     revalidateHomepage();
+    revalidateProducts();
     
     // Revalidate product page (if slug exists) and sitemap for SEO
     if (productSlug) {

@@ -10,12 +10,10 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
-import Category from '@/lib/models/Category';
-import Brand from '@/lib/models/Brand';
 import { generateUniqueSlug } from '@/lib/utils/slug';
-import { getCategoryIdsWithChildren } from '@/lib/utils/categoryCache';
-import { revalidateHomepage, revalidatePath } from '@/lib/utils/revalidate';
+import { revalidateHomepage, revalidatePath, revalidateProducts } from '@/lib/utils/revalidate';
 import { normalizeFilterValues } from '@/lib/utils/normalizeFilterValue';
+import { queryProducts } from '@/lib/server/products/queryProducts';
 
 // Allow caching with revalidation for better performance
 // Revalidate every 5 minutes (300 seconds)
@@ -40,8 +38,6 @@ export const revalidate = 300;
  */
 export async function GET(request) {
   try {
-    await connectToDatabase();
-
     const { searchParams } = new URL(request.url);
     
     // Context filters
@@ -63,240 +59,31 @@ export async function GET(request) {
     // Pagination
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '24');
-    const skip = (page - 1) * limit;
-
-    // Build query - MongoDB $text must be at root level, so we handle it separately
-    const query = {};
-    const andConditions = [];
-    let useTextSearch = false;
-    let textSearchQuery = null;
-
-    // Text search - must be at root level, cannot be in $and
-    if (searchQuery && searchQuery.trim()) {
-      useTextSearch = true;
-      textSearchQuery = { $text: { $search: searchQuery.trim() } };
-    }
-
-    // Category filter - use cached category tree
-    if (categorySlug) {
-      const categoryIds = await getCategoryIdsWithChildren(categorySlug);
-      if (categoryIds.length > 0) {
-        andConditions.push({
-          $or: [
-            { categoryId: { $in: categoryIds } },
-            { categoryIds: { $in: categoryIds } }
-          ]
-        });
-      }
-    }
-
-    // Business type filter
-    if (businessSlug) {
-      andConditions.push({
-        businessTypeSlugs: businessSlug
-      });
-    }
-
-    // Featured filter
-    if (featured === 'true') {
-      andConditions.push({ featured: true });
-    }
-
-    // Status filter
-    if (status) {
-      andConditions.push({ status: status });
-    }
-
-    // IDs filter
-    if (idsParam) {
-      const ids = idsParam.split(',').map(id => id.trim()).filter(Boolean);
-      if (ids.length > 0) {
-        andConditions.push({ _id: { $in: ids } });
-      }
-    }
-
-    // Price filter - combine min and max into single condition
-    const priceConditions = {};
-    if (priceMin) {
-      const min = parseFloat(priceMin);
-      if (!isNaN(min)) {
-        priceConditions.$gte = min;
-      }
-    }
-    if (priceMax) {
-      const max = parseFloat(priceMax);
-      if (!isNaN(max)) {
-        priceConditions.$lte = max;
-      }
-    }
-    if (Object.keys(priceConditions).length > 0) {
-      andConditions.push({ price: priceConditions });
-    }
-
-    // Brand filter
-    if (brandsParam) {
-      const brands = brandsParam.split(',').map(b => b.trim()).filter(Boolean);
-      if (brands.length > 0) {
-        andConditions.push({ brand: { $in: brands } });
-      }
-    }
-
-    // Color filter
-    if (colorsParam) {
-      const colors = colorsParam.split(',').map(c => c.trim()).filter(Boolean);
-      if (colors.length > 0) {
-        andConditions.push({
-          'colorVariants.colorName': { $in: colors }
-        });
-      }
-    }
-
-    // Dynamic filters (from admin form)
-    if (filtersParam) {
-      try {
-        const filters = JSON.parse(decodeURIComponent(filtersParam));
-        if (typeof filters === 'object' && filters !== null) {
-          Object.entries(filters).forEach(([filterKey, filterValues]) => {
-            if (Array.isArray(filterValues) && filterValues.length > 0) {
-              // Normalize filter key (capitalize first letter)
-              const normalizedKey = filterKey.trim().charAt(0).toUpperCase() + filterKey.trim().slice(1).toLowerCase();
-              // Normalize values
-              const normalizedValues = filterValues.map(v => 
-                v.trim().charAt(0).toUpperCase() + v.trim().slice(1).toLowerCase()
-              );
-              
-      andConditions.push({
-                filters: {
-                  $elemMatch: {
-                    key: normalizedKey,
-                    values: { $in: normalizedValues }
-                  }
-                }
-              });
-            }
-          });
-        }
-      } catch (error) {
-        console.warn('Failed to parse filters param:', error);
-      }
-    }
-
-    // Combine conditions
-    // If using text search, combine with $and
-    if (useTextSearch) {
-    if (andConditions.length > 0) {
-        query.$and = [textSearchQuery, ...andConditions];
-      } else {
-        Object.assign(query, textSearchQuery);
-      }
-    } else if (andConditions.length > 0) {
-      query.$and = andConditions;
-    }
-
-    // Build sort object
-    let sortObject = {};
-    switch (sortBy) {
-      case 'price-asc':
-        sortObject = { price: 1 };
-        break;
-      case 'price-desc':
-        sortObject = { price: -1 };
-        break;
-      case 'newest':
-      default:
-        // If using text search, sort by text score first, then by date
-        if (useTextSearch) {
-          sortObject = { score: { $meta: 'textScore' }, createdAt: -1 };
-        } else {
-          sortObject = { createdAt: -1 };
-        }
-        break;
-    }
-
-    // Execute query
-    // For list views, select only needed fields to reduce payload size
-    // For detail views (limit=1 or specific ID), fetch full document
-    const isListQuery = limit > 1 && !searchParams.get('id');
-    const selectFields = isListQuery 
-      ? 'title slug heroImage gallery price brand categoryId featured status createdAt sku tags colorVariants filters'
-      : undefined; // undefined = fetch all fields
-    
-    let queryBuilder = Product.find(query);
-    
-    // Add text score projection if using text search
-    if (useTextSearch) {
-      // For text search, we need to add score projection
-      // select() can be called multiple times - fields are additive
-      if (selectFields) {
-        queryBuilder = queryBuilder.select(selectFields);
-      }
-      // Add text score (must be added separately)
-      queryBuilder = queryBuilder.select({ score: { $meta: 'textScore' } });
-    } else if (selectFields) {
-      queryBuilder = queryBuilder.select(selectFields);
-    }
-    
-    let products = await queryBuilder
-      .populate('categoryId', 'name slug level')
-      .populate('categoryIds', 'name slug level')
-      .populate('brandCategoryId', 'name slug level')
-      .populate('brandCategoryIds', 'name slug level')
-      .sort(sortObject)
-      .limit(limit)
-      .skip(skip)
-      .lean();
-
-    // Normalize filters for all products (convert old object format to array format)
-    products = products.map(product => {
-      if (product.filters && !Array.isArray(product.filters)) {
-        // Convert old object format {material: [], color: [], usage: []} to new array format
-        const oldFilters = product.filters;
-        product.filters = [];
-        if (oldFilters.material && Array.isArray(oldFilters.material) && oldFilters.material.length > 0) {
-          product.filters.push({ key: 'Material', values: oldFilters.material });
-        }
-        if (oldFilters.size && Array.isArray(oldFilters.size) && oldFilters.size.length > 0) {
-          product.filters.push({ key: 'Size', values: oldFilters.size });
-        }
-        if (oldFilters.color && Array.isArray(oldFilters.color) && oldFilters.color.length > 0) {
-          product.filters.push({ key: 'Color', values: oldFilters.color });
-        }
-        if (oldFilters.usage && Array.isArray(oldFilters.usage) && oldFilters.usage.length > 0) {
-          product.filters.push({ key: 'Usage', values: oldFilters.usage });
-        }
-        // Handle any other keys
-        Object.keys(oldFilters).forEach(key => {
-          if (!['material', 'size', 'color', 'usage'].includes(key.toLowerCase()) && 
-              Array.isArray(oldFilters[key]) && oldFilters[key].length > 0) {
-            product.filters.push({ 
-              key: key.charAt(0).toUpperCase() + key.slice(1), 
-              values: oldFilters[key] 
-            });
-          }
-        });
-      } else if (!product.filters) {
-        product.filters = [];
-      }
-      return product;
+    const { products, pagination } = await queryProducts({
+      categorySlug,
+      businessSlug,
+      searchQuery,
+      featured,
+      status,
+      idsParam,
+      priceMin,
+      priceMax,
+      colorsParam,
+      brandsParam,
+      filtersParam,
+      sortBy,
+      page,
+      limit,
+      includePopulates: true,
     });
-
-    const total = await Product.countDocuments(query);
-    const totalPages = Math.ceil(total / limit);
 
     return NextResponse.json({
       success: true,
       products,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1,
-      },
+      pagination,
       // Keep backward compatibility
-      total,
-      skip,
+      total: pagination.total,
+      skip: (pagination.page - 1) * pagination.limit,
     }, {
       headers: {
         'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
@@ -461,6 +248,7 @@ export async function POST(request) {
 
     // Revalidate homepage to update cached products
     revalidateHomepage();
+    revalidateProducts();
     
     // Revalidate product page and sitemap for SEO
     if (product.slug) {

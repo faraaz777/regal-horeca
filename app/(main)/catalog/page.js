@@ -6,6 +6,8 @@
 
 import { Suspense } from 'react';
 import { SITE_CONFIG } from '@/lib/constants/seo';
+import { queryProducts } from '@/lib/server/products/queryProducts';
+import { queryProductFacets } from '@/lib/server/products/queryFacets';
 
 // Uses searchParams - must be dynamic (cannot be statically generated)
 export const dynamic = 'force-dynamic';
@@ -29,59 +31,52 @@ export default async function CatalogPage({ searchParams }) {
   let initialFacetsData = null;
 
   try {
-    // Get base URL from environment variable (required for static/ISR build)
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL 
-      || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+    // Compute products + facets directly (no self-HTTP).
+    const category = searchParams?.category;
+    const business = searchParams?.business;
+    const search = searchParams?.search;
 
-    // Build query params from searchParams
-    const productsParams = new URLSearchParams();
-  const facetsParams = new URLSearchParams();
-    
-    if (searchParams?.category) {
-      productsParams.set('category', searchParams.category);
-      facetsParams.set('category', searchParams.category);
-    }
-    if (searchParams?.business) {
-      productsParams.set('business', searchParams.business);
-      facetsParams.set('business', searchParams.business);
-    }
-    if (searchParams?.search) {
-      productsParams.set('search', searchParams.search);
-      facetsParams.set('search', searchParams.search);
-    }
-    if (searchParams?.priceMin) productsParams.set('priceMin', searchParams.priceMin);
-    if (searchParams?.priceMax) productsParams.set('priceMax', searchParams.priceMax);
-    if (searchParams?.colors) productsParams.set('colors', searchParams.colors);
-    if (searchParams?.brands) productsParams.set('brands', searchParams.brands);
-    if (searchParams?.filters) productsParams.set('filters', searchParams.filters);
-    if (searchParams?.sortBy) productsParams.set('sortBy', searchParams.sortBy);
-    productsParams.set('page', searchParams?.page || '1');
-    productsParams.set('limit', '24');
+    const page = searchParams?.page || '1';
+    const limit = 24;
 
-    // Fetch products and facets in parallel (server-side)
-    const [productsResponse, facetsResponse] = await Promise.all([
-      fetch(`${baseUrl}/api/products?${productsParams.toString()}`, {
-        next: { revalidate: 60 }, // Cache for 1 minute
-      }).catch(() => null),
-      fetch(`${baseUrl}/api/products/facets?${facetsParams.toString()}`, {
-        next: { revalidate: 60 }, // Cache for 1 minute
-      }).catch(() => null),
+    const [productsResult, facetsResult] = await Promise.all([
+      queryProducts({
+        categorySlug: category,
+        businessSlug: business,
+        searchQuery: search,
+        priceMin: searchParams?.priceMin,
+        priceMax: searchParams?.priceMax,
+        colorsParam: searchParams?.colors,
+        brandsParam: searchParams?.brands,
+        filtersParam: searchParams?.filters,
+        sortBy: searchParams?.sortBy || 'newest',
+        page,
+        limit,
+        includePopulates: true,
+      }),
+      queryProductFacets({
+        categorySlug: category,
+        businessSlug: business,
+        searchQuery: search,
+      }),
     ]);
 
-    // Parse responses
-    if (productsResponse) {
-      const productsData = await productsResponse.json().catch(() => null);
-      if (productsData?.success) {
-        initialProductsData = productsData;
-      }
-    }
+    // Serialize for Client Components boundary (convert ObjectIds, Dates, etc. to plain JSON)
+    const safeProductsResult = JSON.parse(JSON.stringify(productsResult));
+    const safeFacetsResult = JSON.parse(JSON.stringify(facetsResult));
 
-    if (facetsResponse) {
-      const facetsData = await facetsResponse.json().catch(() => null);
-      if (facetsData?.success) {
-        initialFacetsData = facetsData;
-      }
-    }
+    initialProductsData = {
+      success: true,
+      products: safeProductsResult.products,
+      pagination: safeProductsResult.pagination,
+      total: safeProductsResult.pagination.total,
+      skip: (safeProductsResult.pagination.page - 1) * safeProductsResult.pagination.limit,
+    };
+
+    initialFacetsData = {
+      success: true,
+      facets: safeFacetsResult,
+    };
   } catch (error) {
     console.error('Error fetching initial catalog data:', error);
     // Continue with null - client-side will fetch

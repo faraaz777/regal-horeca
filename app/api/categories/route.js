@@ -11,7 +11,7 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Category from '@/lib/models/Category';
 import { clearCategoryCache } from '@/lib/utils/categoryCache';
-import { revalidateHomepage } from '@/lib/utils/revalidate';
+import { revalidateHomepage, revalidateCategories } from '@/lib/utils/revalidate';
 
 // Allow caching with revalidation - categories change less frequently
 // Revalidate every hour (3600 seconds)
@@ -36,11 +36,9 @@ export async function GET(request) {
     if (asTree) {
       // Return as tree structure (cached on client side via SWR)
       const tree = await Category.buildTree();
-      // Convert Mongoose documents to plain objects for Client Components
-      const plainTree = JSON.parse(JSON.stringify(tree));
       return NextResponse.json({
         success: true,
-        categories: plainTree,
+        categories: tree,
       }, {
         headers: {
           'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200',
@@ -126,6 +124,7 @@ export async function POST(request) {
 
     // Revalidate homepage to update cached categories
     revalidateHomepage();
+    revalidateCategories();
 
     return NextResponse.json({
       success: true,

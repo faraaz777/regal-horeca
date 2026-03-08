@@ -26,7 +26,7 @@ const features = [
   },
   { 
     title: "Retail Presence", 
-    desc: "Accessible stores in Begum Bazar and Afzalgunj.",
+    desc: "Visit our showroom at Ashok Bazar, Afzal Gunj, Hyderabad.",
     image: Logo,
   },
   { 

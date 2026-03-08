@@ -111,7 +111,7 @@ Help Google associate "REGAL" with REGAL® HoReCa (hospitality supplies), not ci
 
 #### 1. Google Business Profile
 - [ ] Create/claim profile as "REGAL HoReCa" or "Regal Brass & Steelware"
-- [ ] Add address: Tolichowki / Hakeempet X Road, Hyderabad
+- [ ] Add address: REGAL HORECA, Ashok Bazar, Afzal Gunj, Hyderabad, Telangana 500012
 - [ ] Add phone, website URL
 - [ ] Add categories: Kitchen Equipment Supplier, Restaurant Supply Store
 - [ ] Add photos: showroom, products

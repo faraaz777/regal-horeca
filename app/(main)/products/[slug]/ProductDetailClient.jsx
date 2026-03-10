@@ -22,6 +22,66 @@ import DOMPurify from 'dompurify';
 import { isHtml, stripHtml } from '@/lib/utils/html';
 import toast from 'react-hot-toast';
 
+function normalizeTitlePart(value) {
+  return String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*·\s*/g, ' · ')
+    .trim();
+}
+
+function isLikelyLabel(value) {
+  const v = normalizeTitlePart(value);
+  if (!v) return false;
+
+  const words = v.split(/\s+/).filter(Boolean);
+  if (words.length > 4) return false;
+  if (v.length > 28) return false;
+
+  // Consider it a "label" if it has no lowercase letters (common for collections like "OCEAN")
+  // or if it's very short and looks like an acronym-ish tag.
+  const hasLower = /[a-z]/.test(v);
+  if (!hasLower) return true;
+
+  const alpha = v.replace(/[^A-Za-z]/g, '');
+  if (alpha.length >= 2) {
+    const upperCount = (alpha.match(/[A-Z]/g) || []).length;
+    if (upperCount / alpha.length >= 0.85 && words.length <= 3) return true;
+  }
+  return false;
+}
+
+function splitProductTitle(rawTitle) {
+  const title = normalizeTitlePart(rawTitle);
+  if (!title) return { primary: '', secondary: '' };
+
+  // Primary strategy: pipe-delimited titles (your catalog convention)
+  if (title.includes('|')) {
+    const parts = title
+      .split(/\s*\|\s*/g)
+      .map(normalizeTitlePart)
+      .filter(Boolean);
+
+    const primary = parts[0] || title;
+    // Keep secondary succinct: prefer "everything after first pipe" but cap to last 2 parts if too long.
+    const rest = parts.slice(1);
+    const secondary = rest.length <= 2 ? rest.join(' · ') : rest.slice(-2).join(' · ');
+    return { primary, secondary };
+  }
+
+  // Fallback: handle "Name - Label" / "Name: Label" patterns (only when the tail looks label-like)
+  const fallbackSeparators = [' - ', ' – ', ' — ', ': '];
+  for (const sep of fallbackSeparators) {
+    if (!title.includes(sep)) continue;
+    const [left, ...rightParts] = title.split(sep).map(normalizeTitlePart).filter(Boolean);
+    const right = rightParts.join(sep).trim();
+    if (left && right && isLikelyLabel(right)) {
+      return { primary: left, secondary: right };
+    }
+  }
+
+  return { primary: title, secondary: '' };
+}
+
 export default function ProductDetailClient({ initialProduct = null }) {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -153,6 +213,9 @@ export default function ProductDetailClient({ initialProduct = null }) {
   const productId = product._id || product.id;
   const isLiked = isInWishlist(productId);
   const inCart = isInCart(productId, selectedColor);
+  const { primary: primaryTitle, secondary: secondaryTitle } = splitProductTitle(product.title);
+  const secondaryIsLabel = isLikelyLabel(secondaryTitle);
+  const isPriceOnRequest = product.price == null || product.price === 0;
 
   const getDisplayImages = () => {
     if (selectedColor && selectedColor.images && selectedColor.images.length > 0) {
@@ -303,12 +366,30 @@ export default function ProductDetailClient({ initialProduct = null }) {
                 </div>
               )}
 
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-light text-rich-black mb-4 leading-[1.1] tracking-tight">
-                {product.title}
+              <h1 className="mb-4">
+                <span className="block text-2xl sm:text-3xl lg:text-4xl font-light text-rich-black leading-[1.1] tracking-tight">
+                  {primaryTitle || product.title}
+                </span>
+                {secondaryTitle && (
+                  <span
+                    className={[
+                      'block mt-2 text-sm sm:text-base',
+                      secondaryIsLabel ? 'uppercase tracking-[0.22em]' : 'tracking-wide',
+                      'text-black/55',
+                    ].join(' ')}
+                  >
+                    {secondaryTitle}
+                  </span>
+                )}
               </h1>
 
               <div className="flex flex-wrap items-baseline gap-3 mb-8 pb-6 border-b border-black/5">
-                <span className="font-serif italic text-4xl text-rich-black">
+                <span
+                  className={[
+                    'font-serif italic text-rich-black',
+                    isPriceOnRequest ? 'text-2xl sm:text-3xl' : 'text-4xl',
+                  ].join(' ')}
+                >
                   {formatPrice(product.price)}
                 </span>
                 {(() => {

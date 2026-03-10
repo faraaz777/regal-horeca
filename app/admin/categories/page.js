@@ -22,7 +22,7 @@ import { showToast } from '@/lib/utils/toast';
 import { apiClient, ApiError } from '@/lib/utils/apiClient';
 
 export default function AdminCategoriesPage() {
-  const { refreshCategories } = useAppContext();
+  const { upsertCategory, removeCategory } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -96,8 +96,8 @@ export default function AdminCategoriesPage() {
       });
 
       showToast.success('Category deleted successfully');
-      await fetchCategoriesList();
-      await refreshCategories();
+      setCategoriesList((prev) => prev.filter((c) => (c._id || c.id)?.toString() !== categoryId?.toString()));
+      removeCategory(categoryId);
     } catch (error) {
       if (error instanceof ApiError) {
         showToast.error(error.message);
@@ -132,20 +132,40 @@ export default function AdminCategoriesPage() {
       
       const method = editingCategory ? 'PUT' : 'POST';
 
-      await apiClient.requestWithRetry(url, {
+      const res = await apiClient.requestWithRetry(url, {
         method,
         body: categoryData,
       });
+
+      const savedCategory = res?.category;
+      if (savedCategory) {
+        // Update admin list immediately (no refetch)
+        setCategoriesList((prev) => {
+          const next = Array.isArray(prev) ? [...prev] : [];
+          const savedId = (savedCategory._id || savedCategory.id)?.toString?.() ?? (savedCategory._id || savedCategory.id);
+          const idx = next.findIndex((c) => (c._id || c.id)?.toString?.() === savedId);
+          if (idx >= 0) {
+            next[idx] = { ...next[idx], ...savedCategory };
+          } else {
+            next.push(savedCategory);
+          }
+          // keep stable alphabetical order like API
+          next.sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')));
+          return next;
+        });
+
+        // Update global categories context for Add Product, etc.
+        upsertCategory(savedCategory);
+      }
 
       showToast.success(editingCategory ? 'Category updated successfully' : 'Category created successfully');
       setIsModalOpen(false);
       setEditingCategory(null);
       
-      // Refresh categories list immediately
-      const refreshedCats = await fetchCategoriesList();
       // If this is a child category, expand its parent
-      if (categoryData.parent && refreshedCats.length > 0) {
-        const parentIdStr = (categoryData.parent?._id || categoryData.parent)?.toString();
+      if (categoryData.parent) {
+        const parentIdStr = (savedCategory?.parent?._id || savedCategory?.parent || categoryData.parent?._id || categoryData.parent)?.toString?.() 
+          ?? (savedCategory?.parent?._id || savedCategory?.parent || categoryData.parent?._id || categoryData.parent);
         if (parentIdStr) {
           setExpandedCategories(prev => {
             const newSet = new Set(prev);
@@ -154,8 +174,6 @@ export default function AdminCategoriesPage() {
           });
         }
       }
-      // Also refresh context
-      await refreshCategories();
     } catch (error) {
       if (error instanceof ApiError) {
         showToast.error(error.message);

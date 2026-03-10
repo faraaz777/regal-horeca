@@ -8,7 +8,7 @@
  * DELETE /api/categories/[id] - Delete category (admin only)
  */
 
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Category from '@/lib/models/Category';
 import { clearCategoryCache } from '@/lib/utils/categoryCache';
@@ -93,13 +93,30 @@ export async function PUT(request, { params }) {
     // Clear category cache since structure changed
     clearCategoryCache();
 
-    // Revalidate homepage to update cached categories
-    revalidateHomepage();
-    revalidateCategories();
+    // Revalidate after response so admin UI isn't blocked
+    try {
+      after(() => {
+        try {
+          revalidateHomepage();
+          revalidateCategories();
+        } catch (e) {
+          console.error('Error during category revalidation:', e);
+        }
+      });
+    } catch (e) {
+      // Fallback for runtimes where `after()` isn't available
+      try {
+        revalidateHomepage();
+        revalidateCategories();
+      } catch (err) {
+        console.error('Error during category revalidation fallback:', err);
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      category: await Category.findById(id).populate('parent').lean(),
+      // Return saved doc directly (avoid extra DB round-trip)
+      category: category.toObject({ virtuals: true }),
     });
   } catch (error) {
     console.error('Error updating category:', error);

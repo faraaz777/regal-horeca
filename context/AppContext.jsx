@@ -360,6 +360,29 @@ export function AppProvider({ children, initialCategories = [] }) {
     }
   }, []);
 
+  // Fast path for admin: update categories locally from API response (no refetch)
+  const upsertCategory = useCallback((category) => {
+    if (!category) return;
+    const id = (category._id || category.id)?.toString?.() ?? (category._id || category.id);
+    if (!id) return;
+
+    setCategories((prev) => {
+      const next = Array.isArray(prev) ? [...prev] : [];
+      const idx = next.findIndex((c) => (c._id || c.id)?.toString?.() === id);
+      if (idx >= 0) {
+        next[idx] = { ...next[idx], ...category };
+        return next;
+      }
+      return [...next, category];
+    });
+  }, []);
+
+  const removeCategory = useCallback((categoryId) => {
+    const id = categoryId?.toString?.() ?? categoryId;
+    if (!id) return;
+    setCategories((prev) => (Array.isArray(prev) ? prev.filter((c) => (c._id || c.id)?.toString?.() !== id) : []));
+  }, []);
+
   // Refresh brands from API
   const refreshBrands = useCallback(async () => {
     try {
@@ -417,6 +440,8 @@ export function AppProvider({ children, initialCategories = [] }) {
     deleteProduct,
     refreshProducts,
     refreshCategories,
+    upsertCategory,
+    removeCategory,
     refreshBrands,
   };
 

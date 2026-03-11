@@ -9,8 +9,8 @@ import { SITE_CONFIG } from '@/lib/constants/seo';
 import { queryProducts } from '@/lib/server/products/queryProducts';
 import { queryProductFacets } from '@/lib/server/products/queryFacets';
 
-// Uses searchParams - must be dynamic (cannot be statically generated)
-export const dynamic = 'force-dynamic';
+// ISR: revalidate every 60s so catalog can be cached at edge between requests
+export const revalidate = 60;
 
 export const metadata = {
   title: 'Product Catalog - Commercial Kitchen Equipment',

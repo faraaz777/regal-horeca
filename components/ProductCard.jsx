@@ -3,12 +3,14 @@
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { HeartIcon } from './Icons';
 import { ClipboardList as LuClipboardList } from "lucide-react";
 import { useAppContext } from '@/context/AppContext';
 import toast from 'react-hot-toast';
 
 export default function ProductCard({ product, onAdd, hidePrice = false, transparent = false }) {
+  const router = useRouter();
   const { addToWishlist, removeFromWishlist, isInWishlist, addToCart, removeFromCart, isInCart } = useAppContext();
 
   // Get product images - combine heroImage and gallery
@@ -251,8 +253,8 @@ export default function ProductCard({ product, onAdd, hidePrice = false, transpa
                   return; // It was a swipe, don't navigate
                 }
               }
-              // It was a click, navigate to product page
-              window.location.href = `/products/${productSlug}`;
+              // It was a click, use client-side navigation (no full page reload)
+              router.push(`/products/${productSlug}`);
             }}
           />
         )}

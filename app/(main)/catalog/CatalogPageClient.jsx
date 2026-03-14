@@ -10,6 +10,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ProductCard from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 import { useAppContext } from '@/context/AppContext';
+import { buildCategoryMaps, getChildrenByParentMap } from '@/lib/utils/categoryUtils';
 import { XIcon, ChevronLeftIcon, Grid2x2Icon, Grid3x3Icon, Grid4x4Icon, Grid5x5Icon, ListIcon, FilterIcon } from '@/components/Icons';
 import '@/components/new/SidebarFilter.css';
 
@@ -254,32 +255,20 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
     totalProducts: 0,
   };
 
-  // Category navigation
+  // Category navigation (O(1) lookups via maps instead of repeated .filter())
   const { currentCategory, parentCategory, displayCategories } = useMemo(() => {
-    const findCategoryBySlug = (slug) => slug ? categories.find(c => c.slug === slug) : undefined;
-
-    const current = findCategoryBySlug(selectedCategorySlug);
-    const parent = current?.parent ? categories.find(p => {
-      const pId = p._id || p.id;
-      const currentParent = current.parent?._id || current.parent;
-      return pId === currentParent;
-    }) : null;
-
-    const children = current
-      ? categories.filter(c => {
-        const cParent = c.parent?._id || c.parent;
-        const currentId = current._id || current.id;
-        return cParent === currentId;
-      })
-      : categories.filter(c => {
-        const cParent = c.parent?._id || c.parent;
-        return cParent === null;
-      });
+    const { parentMap, idMap, slugMap } = buildCategoryMaps(categories);
+    const current = selectedCategorySlug ? slugMap.get(selectedCategorySlug) : undefined;
+    const parentId = current?.parent?._id ?? current?.parent ?? null;
+    const parent = parentId != null ? idMap.get(parentId?.toString?.() ?? String(parentId)) : null;
+    const displayCategoriesList = current
+      ? getChildrenByParentMap(parentMap, current._id ?? current.id)
+      : getChildrenByParentMap(parentMap, null);
 
     return {
       currentCategory: current,
-      parentCategory: parent,
-      displayCategories: children,
+      parentCategory: parent ?? null,
+      displayCategories: displayCategoriesList,
     };
   }, [selectedCategorySlug, categories]);
 

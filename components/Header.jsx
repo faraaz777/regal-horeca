@@ -31,6 +31,7 @@ import {
 } from "./Icons";
 import { ClipboardList as LuClipboardList } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
+import { buildCategoryTree } from "@/lib/utils/categoryUtils";
 import SearchBar from "./new/SearchBar";
 import CartDrawer from "./CartDrawer";
 import LightCaptureModal, { updateSavedLeadProfile } from "./LightCaptureModal";
@@ -105,30 +106,11 @@ export default function Header() {
     "text-xs md:text-xs font-semibold tracking-wide uppercase text-black hover:text-accent transition-colors relative py-2.5 group whitespace-nowrap flex-shrink-0";
 
   // ---------- Category tree building ----------
-  // Memoize category tree building to prevent unnecessary recalculations
-  const categoryTree = useMemo(() => {
-    const buildCategoryTree = (parentId = null) => {
-      return categories
-        .filter((cat) => {
-          const catParent = cat.parent?._id || cat.parent || null;
-          return catParent === parentId;
-        })  
-        .map((cat) => ({
-          ...cat,
-          id: cat._id || cat.id,
-          children: buildCategoryTree(cat._id || cat.id),
-        }));
-    };
-    return buildCategoryTree();
-  }, [categories]);
+  // Use optimized utility (single-pass parent map, no repeated .filter())
+  const categoryTree = useMemo(() => buildCategoryTree(categories), [categories]);
 
-  // Memoize top level categories
-  const topLevelCategories = useMemo(() => {
-    return categoryTree.filter((cat) => {
-      const catParent = cat.parent?._id || cat.parent || null;
-      return catParent === null;
-    });
-  }, [categoryTree]);
+  // Root-level categories (same as categoryTree from utility)
+  const topLevelCategories = categoryTree;
 
   // Use actual departments from database (top-level categories)
   // Filter by level === "department" if level field exists, otherwise use all top-level categories

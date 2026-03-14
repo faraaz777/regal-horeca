@@ -20,6 +20,7 @@ import { useAppContext } from '@/context/AppContext';
 import { PlusIcon, EditIcon, TrashIcon, ChevronRightIcon, ChevronDownIcon } from '@/components/Icons';
 import { showToast } from '@/lib/utils/toast';
 import { apiClient, ApiError } from '@/lib/utils/apiClient';
+import { buildCategoryTree } from '@/lib/utils/categoryUtils';
 
 export default function AdminCategoriesPage() {
   const { upsertCategory, removeCategory } = useAppContext();
@@ -222,42 +223,6 @@ export default function AdminCategoriesPage() {
     setExpandedCategories(new Set());
   };
 
-  // Helper function to extract parent ID from category
-  const getParentId = (category) => {
-    const cParent = category.parent;
-    if (cParent === null || cParent === undefined) {
-      return null;
-    }
-    if (typeof cParent === 'object') {
-      // Parent is populated object or ObjectId object
-      if (cParent._id) {
-        return cParent._id.toString();
-      }
-      // If it's an ObjectId-like object, try to get the string value
-      if (cParent.toString) {
-        const idStr = cParent.toString();
-        // Skip if parent points to itself (invalid data)
-        const catId = (category._id || category.id)?.toString();
-        if (catId === idStr) {
-          console.warn('Category has parent pointing to itself:', category.name, category._id);
-          return null; // Treat as top-level if parent is self
-        }
-        return idStr;
-      }
-    }
-    // Parent is direct ID (string or ObjectId)
-    const parentStr = cParent ? cParent.toString() : null;
-    // Skip if parent points to itself
-    if (parentStr) {
-      const catId = (category._id || category.id)?.toString();
-      if (catId === parentStr) {
-        console.warn('Category has parent pointing to itself:', category.name, category._id);
-        return null; // Treat as top-level if parent is self
-      }
-    }
-    return parentStr;
-  };
-
   // Helper function to get category ID (normalized to string)
   const getCategoryId = (category) => {
     const id = category._id || category.id;
@@ -269,36 +234,12 @@ export default function AdminCategoriesPage() {
     return String(id);
   };
 
-  const buildCategoryTree = (parentId = null) => {
-    if (!categoriesList || categoriesList.length === 0) {
-      return [];
-    }
-
-    const parentIdStr = parentId ? parentId.toString() : null;
-
-    const filtered = categoriesList.filter(category => {
-      const cParentIdStr = getParentId(category);
-      // Compare: both null (top-level) or both equal strings
-      const matches = parentIdStr === cParentIdStr;
-      return matches;
-    });
-
-    return filtered.map(category => {
-      const cId = getCategoryId(category);
-      const children = cId ? buildCategoryTree(cId) : [];
-      return {
-        ...category,
-        children: children.length > 0 ? children : undefined,
-      };
-    });
-  };
-
-  // Rebuild tree whenever categoriesList changes
+  // Rebuild tree whenever categoriesList changes (optimized utility, no repeated .filter())
   const categoryTree = useMemo(() => {
     if (process.env.NODE_ENV === 'development') {
       console.log('Rebuilding category tree with', categoriesList.length, 'categories');
     }
-    const tree = buildCategoryTree();
+    const tree = buildCategoryTree(categoriesList || []);
     if (process.env.NODE_ENV === 'development') {
       console.log('Built tree with', tree.length, 'root categories');
     }

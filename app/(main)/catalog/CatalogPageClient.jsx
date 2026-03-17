@@ -122,7 +122,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
 
   // Fetch products from API with server-side filtering and pagination
   // Use initial data from server-side fetch for instant display
-  const { data: productsData, isLoading: productsLoading } = useSWR(
+  const { data: productsData, isLoading: productsLoading, isValidating: productsValidating } = useSWR(
     `/api/products?${productsParams.toString()}`,
     fetcher,
     {
@@ -137,6 +137,19 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
   const products = productsData?.products || [];
   const pagination = productsData?.pagination || { total: 0, page: 1, totalPages: 1 };
   const contextLoading = productsLoading;
+
+  // Instant UI feedback: show skeleton immediately when the query changes,
+  // even before the next SWR response is applied.
+  const productsQueryKey = useMemo(() => productsParams.toString(), [productsParams]);
+  const [isRoutePending, setIsRoutePending] = useState(false);
+  const lastProductsQueryKeyRef = useRef(productsQueryKey);
+
+  useEffect(() => {
+    if (lastProductsQueryKeyRef.current !== productsQueryKey) {
+      setIsRoutePending(true);
+      lastProductsQueryKeyRef.current = productsQueryKey;
+    }
+  }, [productsQueryKey]);
 
   // Filter handlers - only update URL, no client-side filtering
   const handlePriceMinChange = useCallback((value) => {
@@ -233,7 +246,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
   if (selectedBusinessSlug) facetsParams.set('business', selectedBusinessSlug);
   if (searchQuery) facetsParams.set('search', searchQuery);
 
-  const { data: facetsData, isLoading: facetsLoading } = useSWR(
+  const { data: facetsData, isLoading: facetsLoading, isValidating: facetsValidating } = useSWR(
     `/api/products/facets?${facetsParams.toString()}`,
     fetcher,
     {
@@ -254,6 +267,14 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
     priceRange: { min: 0, max: 0 },
     totalProducts: 0,
   };
+
+  // Clear "pending" as soon as the new requests finish.
+  useEffect(() => {
+    if (!isRoutePending) return;
+    if (!productsValidating && !facetsValidating) {
+      setIsRoutePending(false);
+    }
+  }, [isRoutePending, productsValidating, facetsValidating]);
 
   // Category navigation (O(1) lookups via maps instead of repeated .filter())
   const { currentCategory, parentCategory, displayCategories } = useMemo(() => {
@@ -489,6 +510,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
   };
 
   const isLoading = contextLoading || facetsLoading;
+  const showInstantGridSkeleton = isRoutePending && !isLoading;
 
   // Get grid classes based on view preference
   const getGridClasses = useCallback(() => {
@@ -728,10 +750,24 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
             </div>
           ) : paginatedProducts.length > 0 ? (
             <>
-              <div className={`grid ${getGridClasses()} gap-4 md:gap-6`}>
-                {paginatedProducts.map(product => (
-                  <ProductCard key={product._id || product.id} product={product} hidePrice={true} />
-                ))}
+              <div className="relative">
+                <div className={`${showInstantGridSkeleton ? 'opacity-50 pointer-events-none select-none' : ''}`}>
+                  <div className={`grid ${getGridClasses()} gap-4 md:gap-6`}>
+                    {paginatedProducts.map(product => (
+                      <ProductCard key={product._id || product.id} product={product} hidePrice={true} />
+                    ))}
+                  </div>
+                </div>
+
+                {showInstantGridSkeleton && (
+                  <div className="absolute inset-0">
+                    <div className={`grid ${getGridClasses()} gap-4 md:gap-6`}>
+                      {Array.from({ length: 6 }).map((_, index) => (
+                        <ProductCardSkeleton key={`instant-skeleton-${index}`} />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Pagination */}

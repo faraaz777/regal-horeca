@@ -1,7 +1,7 @@
 /**
- * Image Upload API Route
+ * File Upload API Route
  * 
- * Handles file uploads to Cloudflare R2.
+ * Handles image and PDF uploads to Cloudflare R2.
  * Only authenticated admins can upload files.
  * 
  * POST /api/upload
@@ -26,11 +26,13 @@ export async function POST(request) {
       );
     }
 
-    // Validate file type (only images)
+    // Validate file type (images + PDF)
     const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-    if (!validImageTypes.includes(file.type)) {
+    const validDocumentTypes = ['application/pdf'];
+    const validTypes = [...validImageTypes, ...validDocumentTypes];
+    if (!validTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: 'Invalid file type. Only images are allowed.' },
+        { error: 'Invalid file type. Only images and PDF files are allowed.' },
         { status: 400 }
       );
     }
@@ -56,12 +58,13 @@ export async function POST(request) {
     const SKIP_OPTIMIZATION_SIZE = 1.5 * 1024 * 1024; // 1.5MB
     let optimizedBuffer = buffer;
     
-    if (file.size > SKIP_OPTIMIZATION_SIZE) {
+    const isImage = validImageTypes.includes(file.type);
+    if (isImage && file.size > SKIP_OPTIMIZATION_SIZE) {
       // Optimize image before upload (550KB limit) only if larger than 1.5MB
       optimizedBuffer = await optimizeImage(buffer);
     }
 
-    // Upload optimized image to R2
+    // Upload file to R2
     const publicUrl = await uploadToR2(optimizedBuffer, file.name, folder);
 
     return NextResponse.json({
@@ -71,7 +74,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Upload error:', error);
     // Return the actual error message so the client can display it
-    const errorMessage = error.message || 'Failed to upload image';
+    const errorMessage = error.message || 'Failed to upload file';
     return NextResponse.json(
       { 
         success: false,

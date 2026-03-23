@@ -229,8 +229,44 @@ export async function POST(request) {
     if (!productData.gallery) {
       productData.gallery = [];
     }
+    if (!productData.detailPhotos) {
+      productData.detailPhotos = [];
+    } else if (!Array.isArray(productData.detailPhotos)) {
+      productData.detailPhotos = [];
+    } else {
+      productData.detailPhotos = productData.detailPhotos.map(String).filter(Boolean).slice(0, 3);
+    }
     if (!productData.specifications) {
       productData.specifications = [];
+    }
+    if (!productData.testimonials) {
+      productData.testimonials = [];
+    } else if (!Array.isArray(productData.testimonials)) {
+      productData.testimonials = [];
+    } else {
+      productData.testimonials = productData.testimonials
+        .filter(t => t && typeof t === 'object')
+        .map(t => ({
+          quote: String(t.quote || '').trim(),
+          authorName: String(t.authorName || '').trim(),
+          authorRole: String(t.authorRole || '').trim(),
+          companyName: String(t.companyName || '').trim(),
+          companyLogo: String(t.companyLogo || '').trim(),
+        }))
+        .filter(t => t.quote);
+    }
+    if (!productData.faqs) {
+      productData.faqs = [];
+    } else if (!Array.isArray(productData.faqs)) {
+      productData.faqs = [];
+    } else {
+      productData.faqs = productData.faqs
+        .filter(f => f && typeof f === 'object')
+        .map(f => ({
+          question: String(f.question || '').trim(),
+          answer: String(f.answer || '').trim(),
+        }))
+        .filter(f => f.question && f.answer);
     }
     if (!productData.colorVariants) {
       productData.colorVariants = [];
@@ -240,6 +276,12 @@ export async function POST(request) {
     }
     if (!productData.relatedProductIds) {
       productData.relatedProductIds = [];
+    }
+    if (!productData.frequentlyOrderedTogetherProductIds) {
+      productData.frequentlyOrderedTogetherProductIds = [];
+    }
+    if (productData.frequentlyOrderedTogetherProductIds && !Array.isArray(productData.frequentlyOrderedTogetherProductIds)) {
+      productData.frequentlyOrderedTogetherProductIds = [];
     }
 
     // Create product

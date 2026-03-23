@@ -34,6 +34,7 @@ import { useAppContext } from "@/context/AppContext";
 import SearchBar from "./new/SearchBar";
 import CartDrawer from "./CartDrawer";
 import LightCaptureModal, { updateSavedLeadProfile } from "./LightCaptureModal";
+import { LoadingLink } from "@/components/ui/LoadingCTA";
 import toast from 'react-hot-toast';
 
 // SWR fetcher function
@@ -594,13 +595,13 @@ function DepartmentsBar({
               }}
             >
               {moreLinks.map((link) => (
-                <Link
+                <LoadingLink
                   key={link.href}
                   href={link.href}
                   className="block px-6 py-3 text-xs font-bold uppercase tracking-widest text-black/70 hover:bg-gray-50 hover:text-accent transition-colors"
                 >
                   {link.name}
-                </Link>
+                </LoadingLink>
               ))}
             </motion.div>
           )}
@@ -1080,14 +1081,14 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
               <UserIcon className="w-5 h-5" />
               <span>Profile</span>
             </button>
-            <Link
+            <LoadingLink
               href="/#contact"
               onClick={() => setIsMenuOpen(false)}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 text-black text-sm font-medium rounded-md hover:bg-gray-100 transition-colors"
             >
               <PhoneIcon className="w-5 h-5" />
               <span>Contact</span>
-            </Link>
+            </LoadingLink>
           </div>
         )}
       </div>

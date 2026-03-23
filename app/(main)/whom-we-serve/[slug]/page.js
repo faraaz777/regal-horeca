@@ -12,6 +12,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { WhatsAppIcon, ChevronDownIcon } from "@/components/Icons";
+import { LoadingButton } from "@/components/ui/LoadingCTA";
 import { MessageCircle } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { getWhatsAppBusinessLink, openWhatsAppLink } from "@/lib/utils/whatsapp";
@@ -762,8 +763,8 @@ export default function CategoryPage() {
             >
               View Catalog
             </button>
-            <button
-              onClick={scrollToForm}
+            <LoadingButton
+              onClick={async () => { scrollToForm(); await new Promise(r => setTimeout(r, 400)); }}
               className="inline-flex items-center justify-center whitespace-nowrap text-[10px] sm:text-xs md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:pointer-events-none disabled:opacity-50 hover:bg-white/20 active:bg-white/15 transition-colors border border-white/40 shadow-sm active:shadow-none min-h-[36px] sm:min-h-9 md:min-h-10 rounded-md bg-white/10 backdrop-blur-sm text-white font-semibold px-3 sm:px-4 md:px-6 lg:px-8 gap-1.5 sm:gap-2"
             >
               Enquire Now
@@ -782,7 +783,7 @@ export default function CategoryPage() {
                 <path d="M5 12h14"></path>
                 <path d="m12 5 7 7-7 7"></path>
               </svg>
-            </button>
+            </LoadingButton>
           </div>
         </div>
       </section>
@@ -1035,12 +1036,12 @@ export default function CategoryPage() {
               experience across every dining touchpoint.
             </p>
             <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
-              <button
-                onClick={scrollToForm}
+              <LoadingButton
+                onClick={async () => { scrollToForm(); await new Promise(r => setTimeout(r, 400)); }}
                 className="bg-black text-white px-6 sm:px-8 md:px-10 py-3 sm:py-4 text-xs sm:text-sm font-bold uppercase tracking-widest hover:bg-accent transition-all duration-300"
               >
                 Enquire Now
-              </button>
+              </LoadingButton>
               <button
                 onClick={() => router.push("/catalog?category=tableware")}
                 className="border border-black px-6 sm:px-8 md:px-10 py-3 sm:py-4 text-xs sm:text-sm font-bold uppercase tracking-widest hover:bg-black hover:text-white transition-all duration-300"
@@ -1247,10 +1248,15 @@ export default function CategoryPage() {
                 )}
 
                 <div className="flex justify-center pt-2">
-                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} disabled={isSubmitting} type="submit" className="w-full px-10 py-4 bg-gray-900 text-white text-xs font-black tracking-[0.2em] rounded-xl shadow-xl flex items-center justify-center gap-3 transition-colors hover:bg-black uppercase">
+                  <LoadingButton
+                    loading={isSubmitting}
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full px-10 py-4 bg-gray-900 text-white text-xs font-black tracking-[0.2em] rounded-xl shadow-xl flex items-center justify-center gap-3 transition-colors hover:bg-black uppercase relative overflow-hidden"
+                  >
                     <WhatsAppIcon className="w-5 h-5" />
                     <span>{isSubmitting ? "Submitting..." : "START CONVERSATION"}</span>
-                  </motion.button>
+                  </LoadingButton>
                 </div>
               </form>
             </motion.div>
@@ -1259,26 +1265,29 @@ export default function CategoryPage() {
       </section>
 
       {/* Floating Enquire Now Button */}
-      <motion.button
-        onClick={scrollToForm}
-        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 md:bottom-8 md:right-8 z-50 bg-accent hover:bg-accent/90 active:bg-accent/80 text-white rounded-full shadow-2xl hover:shadow-accent/50 flex items-center justify-center overflow-hidden group transition-all duration-300 ease-in-out touch-manipulation"
+      <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
-        whileTap={{ scale: 0.95 }}
-        aria-label="Enquire Now"
-        style={{
-          padding: "0.75rem",
-          minWidth: "48px",
-          minHeight: "48px",
-        }}
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 md:bottom-8 md:right-8 z-50"
       >
-        <div className="flex items-center">
-          <MessageCircle className="w-5 h-5 sm:w-5 sm:h-5 md:w-6 md:h-6 flex-shrink-0 transition-transform duration-300 group-hover:scale-110" />
-          <span className="hidden md:block text-xs md:text-sm font-bold uppercase tracking-wider whitespace-nowrap overflow-hidden max-w-0 group-hover:max-w-[150px] transition-all duration-300 ease-in-out opacity-0 group-hover:opacity-100 group-hover:ml-3">
-            Enquire Now
-          </span>
-        </div>
-      </motion.button>
+        <LoadingButton
+          onClick={async () => { scrollToForm(); await new Promise(r => setTimeout(r, 400)); }}
+          className="bg-accent hover:bg-accent/90 active:bg-accent/80 text-white rounded-full shadow-2xl hover:shadow-accent/50 flex items-center justify-center overflow-hidden group transition-all duration-300 ease-in-out touch-manipulation"
+          aria-label="Enquire Now"
+          style={{
+            padding: "0.75rem",
+            minWidth: "48px",
+            minHeight: "48px",
+          }}
+        >
+          <div className="flex items-center">
+            <MessageCircle className="w-5 h-5 sm:w-5 sm:h-5 md:w-6 md:h-6 flex-shrink-0 transition-transform duration-300 group-hover:scale-110" />
+            <span className="hidden md:block text-xs md:text-sm font-bold uppercase tracking-wider whitespace-nowrap overflow-hidden max-w-0 group-hover:max-w-[150px] transition-all duration-300 ease-in-out opacity-0 group-hover:opacity-100 group-hover:ml-3">
+              Enquire Now
+            </span>
+          </div>
+        </LoadingButton>
+      </motion.div>
     </div>
   );
 }

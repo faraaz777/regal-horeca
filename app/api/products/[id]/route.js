@@ -250,6 +250,58 @@ export async function PUT(request, { params }) {
       }
     }
 
+    // Normalize detailPhotos if provided (max 3)
+    if (updateData.detailPhotos !== undefined) {
+      if (!Array.isArray(updateData.detailPhotos)) {
+        updateData.detailPhotos = [];
+      } else {
+        updateData.detailPhotos = updateData.detailPhotos.map(String).filter(Boolean).slice(0, 3);
+      }
+    }
+
+    // Normalize FAQs if provided
+    if (updateData.faqs !== undefined) {
+      if (!Array.isArray(updateData.faqs)) {
+        updateData.faqs = [];
+      } else {
+        updateData.faqs = updateData.faqs
+          .filter(f => f && typeof f === 'object')
+          .map(f => ({
+            question: String(f.question || '').trim(),
+            answer: String(f.answer || '').trim(),
+          }))
+          .filter(f => f.question && f.answer);
+      }
+    }
+
+    // Normalize frequently ordered together ids if provided
+    if (updateData.frequentlyOrderedTogetherProductIds !== undefined) {
+      if (!Array.isArray(updateData.frequentlyOrderedTogetherProductIds)) {
+        updateData.frequentlyOrderedTogetherProductIds = [];
+      } else {
+        updateData.frequentlyOrderedTogetherProductIds = updateData.frequentlyOrderedTogetherProductIds
+          .filter(id => id && String(id).trim() !== '');
+      }
+    }
+
+    // Normalize testimonials if provided
+    if (updateData.testimonials !== undefined) {
+      if (!Array.isArray(updateData.testimonials)) {
+        updateData.testimonials = [];
+      } else {
+        updateData.testimonials = updateData.testimonials
+          .filter(t => t && typeof t === 'object')
+          .map(t => ({
+            quote: String(t.quote || '').trim(),
+            authorName: String(t.authorName || '').trim(),
+            authorRole: String(t.authorRole || '').trim(),
+            companyName: String(t.companyName || '').trim(),
+            companyLogo: String(t.companyLogo || '').trim(),
+          }))
+          .filter(t => t.quote);
+      }
+    }
+
     // Normalize filters to array format if filters are being updated
     if (updateData.filters !== undefined) {
       if (!Array.isArray(updateData.filters)) {

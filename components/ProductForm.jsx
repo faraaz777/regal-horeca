@@ -51,10 +51,12 @@ const AVAILABLE_COLORS = [
 ];
 
 /**
- * Uploads a file to Cloudflare R2 via the API
- * Compresses images on frontend before upload to prevent HTTP 413 errors
+ * Uploads a file to Cloudflare R2 via the API.
+ * - Images are compressed on frontend before upload.
+ * - Documents are uploaded as-is.
  */
-async function uploadToR2(file) {
+async function uploadToR2(file, options = {}) {
+  const { allowedTypes = 'image', folder = 'products' } = options;
   // Dynamically import compression library to keep bundle size small
   const imageCompression = (await import('browser-image-compression')).default;
   
@@ -70,14 +72,20 @@ async function uploadToR2(file) {
     
     // Validate file type
     const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-    if (!validImageTypes.includes(file.type)) {
-      throw new Error(`Invalid file type. Only images (JPEG, PNG, GIF, WebP) are allowed.`);
+    const validDocumentTypes = ['application/pdf'];
+    const allowedMimeTypes = allowedTypes === 'document' ? validDocumentTypes : validImageTypes;
+    if (!allowedMimeTypes.includes(file.type)) {
+      throw new Error(
+        allowedTypes === 'document'
+          ? 'Invalid file type. Only PDF files are allowed.'
+          : 'Invalid file type. Only images (JPEG, PNG, GIF, WebP) are allowed.'
+      );
     }
     
     let fileToUpload = file;
     
     // Compress image if it's larger than 1.5MB (preserve original quality for smaller images)
-    if (file.size > MAX_OUTPUT_SIZE) {
+    if (allowedTypes !== 'document' && file.size > MAX_OUTPUT_SIZE) {
       try {
         const compressionOptions = {
           maxSizeMB: 1.5, // Target 1.5MB max
@@ -108,7 +116,7 @@ async function uploadToR2(file) {
     formData.append('file', fileToUpload, file.name);
     
     // Upload to server
-    const response = await fetch('/api/upload?folder=products', {
+    const response = await fetch(`/api/upload?folder=${encodeURIComponent(folder)}`, {
       method: 'POST',
       body: formData,
     });
@@ -449,25 +457,34 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
   const [formData, setFormData] = useState({
     title: '',
     brand: '',
+    manufacturer: '',
     sku: '',
+    barcode: '',
     brandCategoryId: '',
     brandCategoryIds: [],
     categoryId: '',
     categoryIds: [],
     summary: '',
     description: '',
+    usageAndCare: '',
     price: 0,
     originalPrice: null,
     businessTypeSlugs: [],
     heroImage: '',
     gallery: [],
     specifications: [],
+    faqs: [],
+    testimonials: [],
+    detailPhotos: [],
     relatedProductIds: [],
+    frequentlyOrderedTogetherProductIds: [],
     featured: false,
     isPremium: false,
     tags: [],
     tagsInput: '',
     status: 'In Stock',
+    sizeChartUrl: '',
+    brochureUrl: '',
     colorVariants: [],
     filters: [{ key: 'Material', values: [] }, { key: 'Size', values: [] }],
     availableSizes: '', // Optional field for comma-separated sizes
@@ -805,6 +822,10 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       const relatedProductIds = (product.relatedProductIds || []).map(rp => 
         (rp?._id || rp)?.toString()
       ).filter(Boolean);
+
+      const frequentlyOrderedTogetherProductIds = (product.frequentlyOrderedTogetherProductIds || [])
+        .map(rp => (rp?._id || rp)?.toString())
+        .filter(Boolean);
       
       // Always set form data, even if categories/brands aren't loaded yet
       setFormData({
@@ -819,10 +840,19 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         // Ensure these fields are properly initialized
         gallery: product.gallery || [],
         specifications: product.specifications || [],
+        faqs: product.faqs || [],
+        testimonials: product.testimonials || [],
+        detailPhotos: product.detailPhotos || [],
         summary: product.summary || '',
         description: product.description || '',
+        manufacturer: product.manufacturer || '',
+        barcode: product.barcode || '',
+        usageAndCare: product.usageAndCare || '',
+        sizeChartUrl: product.sizeChartUrl || '',
+        brochureUrl: product.brochureUrl || '',
         businessTypeSlugs: product.businessTypeSlugs || [],
         relatedProductIds: relatedProductIds,
+        frequentlyOrderedTogetherProductIds: frequentlyOrderedTogetherProductIds,
       });
 
       // Initialize category/brand selections only if categories/brands are loaded
@@ -1197,6 +1227,19 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       });
     } else {
       setFormData({ ...formData, relatedProductIds: [...currentRelated, productId] });
+    }
+  };
+
+  const handleFrequentlyOrderedProductChange = (productId) => {
+    const current = formData.frequentlyOrderedTogetherProductIds || [];
+    const productIdStr = productId?.toString();
+    if (current.some(id => id?.toString() === productIdStr)) {
+      setFormData({
+        ...formData,
+        frequentlyOrderedTogetherProductIds: current.filter(id => id?.toString() !== productIdStr),
+      });
+    } else {
+      setFormData({ ...formData, frequentlyOrderedTogetherProductIds: [...current, productId] });
     }
   };
   
@@ -1615,6 +1658,14 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       if (field === 'heroImage') {
         const imageUrl = await uploadToR2(files[0]);
         setFormData({ ...formData, heroImage: imageUrl });
+      } else if (field === 'detailPhotos') {
+        const existing = formData.detailPhotos || [];
+        const remaining = Math.max(0, 3 - existing.length);
+        const picked = Array.from(files).slice(0, remaining);
+        if (picked.length === 0) return;
+        const uploadPromises = picked.map(file => uploadToR2(file));
+        const newImageUrls = await Promise.all(uploadPromises);
+        setFormData({ ...formData, detailPhotos: [...existing, ...newImageUrls].slice(0, 3) });
       } else {
         const uploadPromises = Array.from(files).map(file => uploadToR2(file));
         const newImageUrls = await Promise.all(uploadPromises);
@@ -1631,6 +1682,63 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
   const handleRemoveGalleryImage = (index) => {
     const newGallery = formData.gallery.filter((_, i) => i !== index);
     setFormData({ ...formData, gallery: newGallery });
+  };
+
+  const handleRemoveDetailPhoto = (index) => {
+    const next = (formData.detailPhotos || []).filter((_, i) => i !== index);
+    setFormData({ ...formData, detailPhotos: next });
+  };
+
+  const handleAttachmentUpload = async (field, file) => {
+    if (!file) return;
+    setIsUploading(true);
+    setError('');
+    try {
+      const fileUrl = await uploadToR2(file, { allowedTypes: 'document', folder: 'products/attachments' });
+      setFormData((prev) => ({ ...prev, [field]: fileUrl }));
+    } catch (error) {
+      console.error('Attachment upload failed', error);
+      setError(`Attachment upload failed: ${error.message}`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Testimonials helpers
+  const addTestimonial = () => {
+    const next = [
+      ...(formData.testimonials || []),
+      { quote: '', authorName: '', authorRole: '', companyName: '', companyLogo: '' },
+    ];
+    setFormData({ ...formData, testimonials: next });
+  };
+
+  const removeTestimonial = (index) => {
+    const next = (formData.testimonials || []).filter((_, i) => i !== index);
+    setFormData({ ...formData, testimonials: next });
+  };
+
+  const handleTestimonialChange = (index, field, value) => {
+    const next = (formData.testimonials || []).map((t, i) => (i === index ? { ...t, [field]: value } : t));
+    setFormData({ ...formData, testimonials: next });
+  };
+
+  const handleTestimonialLogoUpload = async (index, file) => {
+    if (!file) return;
+    setIsUploading(true);
+    setError('');
+    try {
+      const imageUrl = await uploadToR2(file);
+      const next = (formData.testimonials || []).map((t, i) =>
+        i === index ? { ...t, companyLogo: imageUrl } : t
+      );
+      setFormData({ ...formData, testimonials: next });
+    } catch (error) {
+      console.error('Upload failed', error);
+      setError(`Image upload failed: ${error.message}`);
+    } finally {
+      setIsUploading(false);
+    }
   };
   
   const handleSpecChange = (index, e) => {
@@ -2077,6 +2185,22 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     setFormData({ ...formData, colorVariants: updatedVariants });
   };
 
+  // FAQs helpers
+  const addFaq = () => {
+    const next = [...(formData.faqs || []), { question: '', answer: '' }];
+    setFormData({ ...formData, faqs: next });
+  };
+
+  const removeFaq = (index) => {
+    const next = (formData.faqs || []).filter((_, i) => i !== index);
+    setFormData({ ...formData, faqs: next });
+  };
+
+  const handleFaqChange = (index, field, value) => {
+    const next = (formData.faqs || []).map((f, i) => (i === index ? { ...f, [field]: value } : f));
+    setFormData({ ...formData, faqs: next });
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
@@ -2084,6 +2208,16 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     // Only title and hero image are required - everything else can be added later
     if (!formData.title || !formData.heroImage) {
       setError("Please provide a Title and a Hero Image.");
+      return;
+    }
+
+    // Detail photos are optional:
+    // - allow 0 photos
+    // - allow exactly 3 photos
+    // - disallow 1–2 photos (incomplete set for the UI)
+    const detailPhotosCount = (formData.detailPhotos || []).filter(Boolean).length;
+    if (detailPhotosCount !== 0 && detailPhotosCount !== 3) {
+      setError("Detail Page Photos must be either 0 or exactly 3 images.");
       return;
     }
     
@@ -2281,6 +2415,18 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   )}
                 </div>
                 <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-700">Manufacturer</label>
+                  <input
+                    name="manufacturer"
+                    value={formData.manufacturer || ''}
+                    onChange={handleChange}
+                    className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+                    placeholder="Enter manufacturer name"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
                   <label className="block text-sm font-medium mb-2 text-gray-700">SKU *</label>
                   <input 
                     name="sku" 
@@ -2288,6 +2434,16 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     onChange={handleChange} 
                     className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors" 
                     placeholder="Enter SKU"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-700">Barcode</label>
+                  <input
+                    name="barcode"
+                    value={formData.barcode || ''}
+                    onChange={handleChange}
+                    className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+                    placeholder="Enter Barcode"
                   />
                 </div>
               </div>
@@ -2412,6 +2568,20 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   placeholder="Enter long description"
                   minHeight="200px"
                 />
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">Usage &amp; Care</label>
+                <RichTextEditor
+                  value={formData.usageAndCare}
+                  onChange={(html) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      usageAndCare: html,
+                    }))
+                  }
+                  placeholder="Enter usage and care instructions"
+                  minHeight="160px"
+                />
+              </div>
               </div>
             </FormSection>
 
@@ -2906,6 +3076,114 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     </div>
                   )}
                 </div>
+
+                <div>
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="block text-sm font-medium mb-2 text-gray-700">
+                      Detail Page Photos (3) *
+                    </label>
+                    <span className="text-xs text-gray-500">
+                      {((formData.detailPhotos || []).length)}/3
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-2">
+                    These appear below FAQs on the product detail page (mobile phone ratio).
+                  </p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={e => handleImageUpload(e, 'detailPhotos')}
+                    className="w-full mt-1 text-sm file:mr-4 file:py-2.5 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary-700 transition-colors"
+                    disabled={isUploading || (formData.detailPhotos || []).length >= 3}
+                  />
+                  {formData.detailPhotos && formData.detailPhotos.length > 0 && (
+                    <div className="mt-3 grid grid-cols-3 gap-3">
+                      {formData.detailPhotos.map((url, index) => (
+                        <div key={index} className="relative">
+                          <div className="relative w-full aspect-[9/16] rounded-lg overflow-hidden border-2 border-gray-200 shadow-sm bg-white">
+                            <Image
+                              src={url}
+                              alt="Detail photo preview"
+                              fill
+                              unoptimized
+                              className="object-cover"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveDetailPhoto(index)}
+                            className="absolute -top-2 -right-2 z-10 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-md hover:bg-red-600 transition-colors"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                    <label className="block text-sm font-medium mb-2 text-gray-700">Size Chart (PDF)</label>
+                    <input
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      onChange={(e) => handleAttachmentUpload('sizeChartUrl', e.target.files?.[0])}
+                      className="w-full text-sm file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary-700 transition-colors"
+                      disabled={isUploading}
+                    />
+                    {formData.sizeChartUrl ? (
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <a
+                          href={formData.sizeChartUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-blue-600 hover:underline truncate"
+                        >
+                          View uploaded size chart
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => setFormData((prev) => ({ ...prev, sizeChartUrl: '' }))}
+                          className="text-xs text-red-600 hover:text-red-700 font-medium"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                    <label className="block text-sm font-medium mb-2 text-gray-700">Brochure (PDF)</label>
+                    <input
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      onChange={(e) => handleAttachmentUpload('brochureUrl', e.target.files?.[0])}
+                      className="w-full text-sm file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary-700 transition-colors"
+                      disabled={isUploading}
+                    />
+                    {formData.brochureUrl ? (
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <a
+                          href={formData.brochureUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-blue-600 hover:underline truncate"
+                        >
+                          View uploaded brochure
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => setFormData((prev) => ({ ...prev, brochureUrl: '' }))}
+                          className="text-xs text-red-600 hover:text-red-700 font-medium"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
               </div>
             </FormSection>
 
@@ -3374,6 +3652,164 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
           </div>
         </FormSection>
 
+            <FormSection title="FAQs">
+          <p className="text-xs text-gray-600 mb-4">
+            Add product-specific FAQs. These will appear on the product detail page.
+          </p>
+
+          <div className="space-y-3">
+            {(formData.faqs || []).map((faq, index) => (
+              <div key={index} className="p-3 border border-gray-200 rounded-lg bg-white">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 space-y-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Question</label>
+                      <input
+                        value={faq.question || ''}
+                        onChange={(e) => handleFaqChange(index, 'question', e.target.value)}
+                        placeholder="Enter question"
+                        className="w-full p-2.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Answer</label>
+                      <textarea
+                        value={faq.answer || ''}
+                        onChange={(e) => handleFaqChange(index, 'answer', e.target.value)}
+                        placeholder="Enter answer"
+                        rows={3}
+                        className="w-full p-2.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeFaq(index)}
+                    className="text-red-500 hover:text-red-700 mt-7"
+                    title="Remove FAQ"
+                  >
+                    <TrashIcon />
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={addFaq}
+              className="mt-2 text-sm text-primary hover:underline font-semibold flex items-center gap-1"
+            >
+              <PlusIcon className="w-4 h-4" /> Add FAQ
+            </button>
+          </div>
+        </FormSection>
+
+        <FormSection title="Testimonials">
+          <p className="text-xs text-gray-600 mb-4">
+            Add product testimonials (quote, author info, and optional company logo). These can be reused per product.
+          </p>
+
+          <div className="space-y-3">
+            {(formData.testimonials || []).map((t, index) => (
+              <div key={index} className="p-3 border border-gray-200 rounded-lg bg-white">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
+                  <div className="md:col-span-10 space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Quote *</label>
+                      <textarea
+                        value={t.quote || ''}
+                        onChange={(e) => handleTestimonialChange(index, 'quote', e.target.value)}
+                        placeholder="Outstanding performance with ... growth in repeat business orders."
+                        rows={3}
+                        className="w-full p-2.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Author Name</label>
+                        <input
+                          value={t.authorName || ''}
+                          onChange={(e) => handleTestimonialChange(index, 'authorName', e.target.value)}
+                          placeholder="ITC Kohinoor"
+                          className="w-full p-2.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Author Role</label>
+                        <input
+                          value={t.authorRole || ''}
+                          onChange={(e) => handleTestimonialChange(index, 'authorRole', e.target.value)}
+                          placeholder="Head Chef"
+                          className="w-full p-2.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                        <input
+                          value={t.companyName || ''}
+                          onChange={(e) => handleTestimonialChange(index, 'companyName', e.target.value)}
+                          placeholder="C Hotel"
+                          className="w-full p-2.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Company Logo (optional)</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleTestimonialLogoUpload(index, e.target.files?.[0])}
+                        className="w-full text-sm file:mr-4 file:py-2 file:px-3 file:rounded-md file:border-0 file:font-semibold file:bg-primary file:text-white"
+                        disabled={isUploading}
+                      />
+                      {t.companyLogo ? (
+                        <div className="mt-2 flex items-center gap-3">
+                          <Image
+                            src={t.companyLogo}
+                            alt="Company logo"
+                            width={56}
+                            height={56}
+                            unoptimized
+                            className="w-14 h-14 rounded-full object-cover border border-gray-300 bg-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleTestimonialChange(index, 'companyLogo', '')}
+                            className="text-xs text-red-600 hover:text-red-700 font-medium"
+                          >
+                            Remove Logo
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-2 flex md:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => removeTestimonial(index)}
+                      className="text-red-500 hover:text-red-700 md:mt-7"
+                      title="Remove testimonial"
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={addTestimonial}
+              className="mt-2 text-sm text-primary hover:underline font-semibold flex items-center gap-1"
+            >
+              <PlusIcon className="w-4 h-4" /> Add Testimonial
+            </button>
+          </div>
+        </FormSection>
+
             <FormSection title="Related Products">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-4">
             <div className="flex-1">
@@ -3538,11 +3974,69 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
           </div>
         </FormSection>
 
+        <FormSection title="Frequently Ordered Together">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-800 mb-2">
+                Select together products manually
+              </label>
+              <p className="text-xs text-gray-500 mb-3">
+                Uses the same product search list as “Related Products”.
+              </p>
+            </div>
+          </div>
+
+          <div className="max-h-60 overflow-y-auto border border-gray-300 rounded-md space-y-0 divide-y divide-gray-100 bg-gray-50">
+            {filteredRelatedCandidates.length > 0 ? (
+              filteredRelatedCandidates.map(otherProduct => {
+                const productId = otherProduct._id || otherProduct.id;
+                const isSelected = formData.frequentlyOrderedTogetherProductIds?.some(
+                  id => id?.toString() === productId?.toString()
+                );
+
+                return (
+                  <label
+                    key={productId}
+                    className={`flex items-center justify-between p-2 hover:bg-white transition-colors cursor-pointer group ${isSelected ? 'bg-blue-50' : ''}`}
+                  >
+                    <div className="flex items-center space-x-3 overflow-hidden">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleFrequentlyOrderedProductChange(productId)}
+                        className="h-4 w-4 rounded text-primary focus:ring-primary border-gray-300"
+                      />
+                      <Image
+                        src={otherProduct.heroImage}
+                        alt=""
+                        width={32}
+                        height={32}
+                        className="w-8 h-8 rounded object-cover border border-gray-200"
+                      />
+                      <div className="flex flex-col truncate">
+                        <span className={`text-sm ${isSelected ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
+                          {otherProduct.title}
+                        </span>
+                      </div>
+                    </div>
+                  </label>
+                );
+              })
+            ) : (
+              <div className="p-4 text-center">
+                <p className="text-sm text-gray-500 italic">
+                  No products found for the current search.
+                </p>
+              </div>
+            )}
+          </div>
+        </FormSection>
+
           </div>
         </div>
 
         {isUploading && (
-          <div className="text-blue-600 font-medium text-center mt-6">Uploading images, please wait...</div>
+          <div className="text-blue-600 font-medium text-center mt-6">Uploading files, please wait...</div>
         )}
         
         <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 pt-4 sm:pt-6 border-t mt-6">

@@ -12,6 +12,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useAppContext } from '@/context/AppContext';
 import { PlusIcon, MinusIcon, XIcon, WhatsAppIcon } from '@/components/Icons';
+import { LoadingButton } from '@/components/ui/LoadingCTA';
 import { getWhatsAppBusinessLink } from '@/lib/utils/whatsapp';
 import { useEnquiry, createEnquiryAndRedirect } from '@/lib/hooks/useEnquiry';
 import LightCaptureModal, { getSavedLeadProfile } from './LightCaptureModal';
@@ -475,7 +476,7 @@ export default function CartDrawer({ isOpen, onClose }) {
               </div>
 
               {/* Checkout Button */}
-              <button
+              <LoadingButton
                 className="w-full bg-gradient-to-r from-accent to-accent/90 hover:from-accent/90 hover:to-accent text-white font-bold py-3 px-5 rounded-lg transition-all duration-200 touch-manipulation flex items-center justify-center gap-2.5 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-sm sm:text-base group"
                 onClick={handleWhatsAppCheckout}
               >
@@ -484,7 +485,7 @@ export default function CartDrawer({ isOpen, onClose }) {
                 <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
-              </button>
+              </LoadingButton>
             </div>
           </div>
         )}

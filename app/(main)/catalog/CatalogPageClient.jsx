@@ -10,6 +10,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ProductCard from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 import { useAppContext } from '@/context/AppContext';
+import { buildCategoryMaps, getChildrenByParentMap } from '@/lib/utils/categoryUtils';
 import { XIcon, ChevronLeftIcon, Grid2x2Icon, Grid3x3Icon, Grid4x4Icon, Grid5x5Icon, ListIcon, FilterIcon } from '@/components/Icons';
 import '@/components/new/SidebarFilter.css';
 
@@ -121,7 +122,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
 
   // Fetch products from API with server-side filtering and pagination
   // Use initial data from server-side fetch for instant display
-  const { data: productsData, isLoading: productsLoading } = useSWR(
+  const { data: productsData, isLoading: productsLoading, isValidating: productsValidating } = useSWR(
     `/api/products?${productsParams.toString()}`,
     fetcher,
     {
@@ -136,6 +137,19 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
   const products = productsData?.products || [];
   const pagination = productsData?.pagination || { total: 0, page: 1, totalPages: 1 };
   const contextLoading = productsLoading;
+
+  // Instant UI feedback: show skeleton immediately when the query changes,
+  // even before the next SWR response is applied.
+  const productsQueryKey = useMemo(() => productsParams.toString(), [productsParams]);
+  const [isRoutePending, setIsRoutePending] = useState(false);
+  const lastProductsQueryKeyRef = useRef(productsQueryKey);
+
+  useEffect(() => {
+    if (lastProductsQueryKeyRef.current !== productsQueryKey) {
+      setIsRoutePending(true);
+      lastProductsQueryKeyRef.current = productsQueryKey;
+    }
+  }, [productsQueryKey]);
 
   // Filter handlers - only update URL, no client-side filtering
   const handlePriceMinChange = useCallback((value) => {
@@ -232,7 +246,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
   if (selectedBusinessSlug) facetsParams.set('business', selectedBusinessSlug);
   if (searchQuery) facetsParams.set('search', searchQuery);
 
-  const { data: facetsData, isLoading: facetsLoading } = useSWR(
+  const { data: facetsData, isLoading: facetsLoading, isValidating: facetsValidating } = useSWR(
     `/api/products/facets?${facetsParams.toString()}`,
     fetcher,
     {
@@ -254,32 +268,28 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
     totalProducts: 0,
   };
 
-  // Category navigation
+  // Clear "pending" as soon as the new requests finish.
+  useEffect(() => {
+    if (!isRoutePending) return;
+    if (!productsValidating && !facetsValidating) {
+      setIsRoutePending(false);
+    }
+  }, [isRoutePending, productsValidating, facetsValidating]);
+
+  // Category navigation (O(1) lookups via maps instead of repeated .filter())
   const { currentCategory, parentCategory, displayCategories } = useMemo(() => {
-    const findCategoryBySlug = (slug) => slug ? categories.find(c => c.slug === slug) : undefined;
-
-    const current = findCategoryBySlug(selectedCategorySlug);
-    const parent = current?.parent ? categories.find(p => {
-      const pId = p._id || p.id;
-      const currentParent = current.parent?._id || current.parent;
-      return pId === currentParent;
-    }) : null;
-
-    const children = current
-      ? categories.filter(c => {
-        const cParent = c.parent?._id || c.parent;
-        const currentId = current._id || current.id;
-        return cParent === currentId;
-      })
-      : categories.filter(c => {
-        const cParent = c.parent?._id || c.parent;
-        return cParent === null;
-      });
+    const { parentMap, idMap, slugMap } = buildCategoryMaps(categories);
+    const current = selectedCategorySlug ? slugMap.get(selectedCategorySlug) : undefined;
+    const parentId = current?.parent?._id ?? current?.parent ?? null;
+    const parent = parentId != null ? idMap.get(parentId?.toString?.() ?? String(parentId)) : null;
+    const displayCategoriesList = current
+      ? getChildrenByParentMap(parentMap, current._id ?? current.id)
+      : getChildrenByParentMap(parentMap, null);
 
     return {
       currentCategory: current,
-      parentCategory: parent,
-      displayCategories: children,
+      parentCategory: parent ?? null,
+      displayCategories: displayCategoriesList,
     };
   }, [selectedCategorySlug, categories]);
 
@@ -500,6 +510,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
   };
 
   const isLoading = contextLoading || facetsLoading;
+  const showInstantGridSkeleton = isRoutePending && !isLoading;
 
   // Get grid classes based on view preference
   const getGridClasses = useCallback(() => {
@@ -739,10 +750,24 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
             </div>
           ) : paginatedProducts.length > 0 ? (
             <>
-              <div className={`grid ${getGridClasses()} gap-4 md:gap-6`}>
-                {paginatedProducts.map(product => (
-                  <ProductCard key={product._id || product.id} product={product} hidePrice={true} />
-                ))}
+              <div className="relative">
+                <div className={`${showInstantGridSkeleton ? 'opacity-50 pointer-events-none select-none' : ''}`}>
+                  <div className={`grid ${getGridClasses()} gap-4 md:gap-6`}>
+                    {paginatedProducts.map(product => (
+                      <ProductCard key={product._id || product.id} product={product} hidePrice={true} />
+                    ))}
+                  </div>
+                </div>
+
+                {showInstantGridSkeleton && (
+                  <div className="absolute inset-0">
+                    <div className={`grid ${getGridClasses()} gap-4 md:gap-6`}>
+                      {Array.from({ length: 6 }).map((_, index) => (
+                        <ProductCardSkeleton key={`instant-skeleton-${index}`} />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Pagination */}

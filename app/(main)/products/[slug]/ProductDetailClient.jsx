@@ -213,6 +213,18 @@ export default function ProductDetailClient({ initialProduct = null }) {
     [product?.testimonials]
   );
 
+  const tabs = useMemo(
+    () => [
+      { id: 'specs', label: 'Specifications', Icon: Settings },
+      { id: 'description', label: 'Description', Icon: AlignLeft },
+      { id: 'usage', label: 'Usage & Care', Icon: Package },
+      { id: 'delivery', label: 'Delivery & Returns', Icon: Truck },
+      { id: 'manufacturer', label: 'Manufacturer', Icon: Factory },
+      { id: 'why', label: 'Why Buy From Us', Icon: BadgeCheck },
+    ],
+    []
+  );
+
   useEffect(() => {
     if (testimonials.length <= 1) return;
     const id = window.setInterval(() => {
@@ -521,15 +533,6 @@ export default function ProductDetailClient({ initialProduct = null }) {
       return true;
     });
   })();
-
-  const tabs = useMemo(() => ([
-    { id: 'specs', label: 'Specifications', Icon: Settings },
-    { id: 'description', label: 'Description', Icon: AlignLeft },
-    { id: 'usage', label: 'Usage & Care', Icon: Package },
-    { id: 'delivery', label: 'Delivery & Returns', Icon: Truck },
-    { id: 'manufacturer', label: 'Manufacturer', Icon: Factory },
-    { id: 'why', label: 'Why Buy From Us', Icon: BadgeCheck },
-  ]), []);
 
   // (Location suggestions removed; plain inputs only)
 

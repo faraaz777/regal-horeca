@@ -9,7 +9,7 @@ import { ClipboardList as LuClipboardList } from "lucide-react";
 import { useAppContext } from '@/context/AppContext';
 import toast from 'react-hot-toast';
 
-export default function ProductCard({ product, onAdd, hidePrice = false, transparent = false }) {
+export default function ProductCard({ product, onAdd, hidePrice = false, transparent = false, compact = false }) {
   const router = useRouter();
   const { addToWishlist, removeFromWishlist, isInWishlist, addToCart, removeFromCart, isInCart } = useAppContext();
 
@@ -208,7 +208,7 @@ export default function ProductCard({ product, onAdd, hidePrice = false, transpa
       {/* Image Container - Separated with rounded corners */}
       <div
         ref={imageContainerRef}
-        className={`group relative w-full aspect-square overflow-hidden hover:scale-105 transition-all duration-700 rounded-none select-none ${transparent ? 'bg-white' : ''}`}
+        className={`group relative w-full ${compact ? 'aspect-[3/2] sm:aspect-[4/3] md:aspect-square' : 'aspect-square'} overflow-hidden hover:scale-105 transition-all duration-700 rounded-none select-none ${transparent ? 'bg-white' : ''}`}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -345,26 +345,35 @@ export default function ProductCard({ product, onAdd, hidePrice = false, transpa
         {/* Shopping Cart Button - Bottom Right */}
         <button
           onClick={handleAddToCart}
-          className={`absolute bottom-3 right-3 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-all duration-200 z-30 pointer-events-auto ${inCart ? 'ring-2 ring-accent' : ''
-            }`}
+          className={`absolute bottom-3 right-3 bg-white rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-all duration-200 z-30 pointer-events-auto ${
+            compact ? 'w-8 h-8' : 'w-10 h-10'
+          } ${inCart ? 'ring-2 ring-accent' : ''}`}
           aria-label={inCart ? 'Remove from cart' : 'Add to cart'}
         >
-          <LuClipboardList className="w-5 h-5" />
+          <LuClipboardList className={compact ? 'w-[15px] h-[15px]' : 'w-5 h-5'} />
         </button>
       </div>
 
       {/* Content - Center Aligned, Separated from Image */}
-      <div className="flex-1 flex flex-col px-4 py-3.5 text-center">
+      <div className={`flex-1 flex flex-col text-center ${compact ? 'px-2.5 py-1.5' : 'px-4 py-3.5'}`}>
         {/* Brand/Category */}
      
 
         {/* Product Name - Large, Bold + Specs line (smaller, grey) */}
         <Link href={`/products/${productSlug}`} className="block">
-          <h3 className={`text-sm sm:text-base md:text-lg font-bold mt-2 hover:text-accent transition-colors leading-tight break-words ${transparent ? 'text-white' : 'text-black'}`}>
+          <h3
+            className={`font-bold hover:text-accent transition-colors leading-tight break-words ${
+              compact ? 'text-[11px] sm:text-[13px] md:text-sm mt-1' : 'text-sm sm:text-base md:text-lg mt-2'
+            } ${transparent ? 'text-white' : 'text-black'}`}
+          >
             {productName}
           </h3>
           {productSpecs && (
-            <p className={`text-[11px] sm:text-xs font-medium mt-0.5 tracking-wide leading-snug ${transparent ? 'text-white/80' : 'text-black/60'}`}>
+            <p
+              className={`font-medium mt-0.5 tracking-wide leading-snug ${
+                compact ? 'text-[9px] sm:text-[10px]' : 'text-[11px] sm:text-xs'
+              } ${transparent ? 'text-white/80' : 'text-black/60'}`}
+            >
               {productSpecs}
             </p>
           )}

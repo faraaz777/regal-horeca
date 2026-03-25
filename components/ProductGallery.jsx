@@ -166,12 +166,12 @@ export default function ProductGallery({
 
       {/* Thumbnails - horizontal row (scrollable) with hidden scrollbar */}
       {images.length > 1 && (
-        <div className="mt-2 flex justify-start gap-2 sm:gap-3 overflow-x-auto no-scrollbar scroll-smooth">
+        <div className="mt-0 flex justify-start gap-0 overflow-x-auto no-scrollbar scroll-smooth">
           {images.map((img, idx) => (
             <button
               key={idx}
               onClick={() => setSelectedIndex(idx)}
-              className={`relative flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 border rounded-xl overflow-hidden transition-all duration-300 ${selectedIndex === idx
+              className={`relative flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 border overflow-hidden transition-all duration-300 ${selectedIndex === idx
                 ? 'border-accent shadow-md ring-1 ring-accent/20 scale-[0.98]'
                 : 'border-black/5 hover:border-black/20 bg-white opacity-80 hover:opacity-100'
                 }`}
@@ -187,7 +187,7 @@ export default function ProductGallery({
               {selectedIndex === idx && (
                 <motion.div
                   layoutId="active-thumb"
-                  className="absolute inset-0 border-2 border-accent rounded-xl pointer-events-none"
+                  className="absolute inset-0 border-2 border-accent pointer-events-none"
                 />
               )}
             </button>

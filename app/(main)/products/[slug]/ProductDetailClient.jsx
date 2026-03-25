@@ -1195,46 +1195,46 @@ export default function ProductDetailClient({ initialProduct = null }) {
               {/* Moving delivery banner directly below Sizes */}
               <div className="mb-8 -mx-4 sm:mx-0">
                 <div className="relative overflow-hidden rounded-lg bg-[#F6F7F9] shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
-                  <div className="py-2 sm:py-2.5 px-3 sm:px-4">
+                  <div className="py-3 sm:py-2.5 px-4 sm:px-4">
                     <div className="flex items-center gap-10 whitespace-nowrap banner-track">
-                      <div className="inline-flex items-center gap-2 text-xs sm:text-sm font-medium text-black/70">
-                        <Truck size={16} className="text-accent flex-shrink-0" />
+                      <div className="inline-flex items-center gap-2.5 text-sm sm:text-sm font-medium text-black/70">
+                        <Truck size={18} className="text-accent flex-shrink-0" />
                         <span>
                           <span className="font-semibold">Telangana:</span> Same-day delivery
                         </span>
                       </div>
                       <span className="mx-1 text-black/20" aria-hidden>|</span>
-                      <div className="inline-flex items-center gap-2 text-xs sm:text-sm font-medium text-black/70">
-                        <Truck size={16} className="text-accent flex-shrink-0" />
+                      <div className="inline-flex items-center gap-2.5 text-sm sm:text-sm font-medium text-black/70">
+                        <Truck size={18} className="text-accent flex-shrink-0" />
                         <span>
                           <span className="font-semibold">Other states:</span> 3–4 days
                         </span>
                       </div>
                       <span className="mx-1 text-black/20" aria-hidden>|</span>
-                      <div className="inline-flex items-center gap-2 text-xs sm:text-sm font-medium text-black/70">
-                        <Globe2 size={16} className="text-accent flex-shrink-0" />
+                      <div className="inline-flex items-center gap-2.5 text-sm sm:text-sm font-medium text-black/70">
+                        <Globe2 size={18} className="text-accent flex-shrink-0" />
                         <span>
                           <span className="font-semibold">International:</span> 10–15 days
                         </span>
                       </div>
                       {/* Duplicate set for seamless loop */}
                       <span className="mx-1 text-black/20" aria-hidden>|</span>
-                      <div className="inline-flex items-center gap-2 text-xs sm:text-sm font-medium text-black/70">
-                        <Truck size={16} className="text-accent flex-shrink-0" />
+                      <div className="inline-flex items-center gap-2.5 text-sm sm:text-sm font-medium text-black/70">
+                        <Truck size={18} className="text-accent flex-shrink-0" />
                         <span>
                           <span className="font-semibold">Telangana:</span> Same-day delivery
                         </span>
                       </div>
                       <span className="mx-1 text-black/20" aria-hidden>|</span>
-                      <div className="inline-flex items-center gap-2 text-xs sm:text-sm font-medium text-black/70">
-                        <Truck size={16} className="text-accent flex-shrink-0" />
+                      <div className="inline-flex items-center gap-2.5 text-sm sm:text-sm font-medium text-black/70">
+                        <Truck size={18} className="text-accent flex-shrink-0" />
                         <span>
                           <span className="font-semibold">Other states:</span> 3–4 days
                         </span>
                       </div>
                       <span className="mx-1 text-black/20" aria-hidden>|</span>
-                      <div className="inline-flex items-center gap-2 text-xs sm:text-sm font-medium text-black/70">
-                        <Globe2 size={16} className="text-accent flex-shrink-0" />
+                      <div className="inline-flex items-center gap-2.5 text-sm sm:text-sm font-medium text-black/70">
+                        <Globe2 size={18} className="text-accent flex-shrink-0" />
                         <span>
                           <span className="font-semibold">International:</span> 10–15 days
                         </span>
@@ -1290,7 +1290,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
 
         <div className="mt-4   sm:mt-6 w-full">
           {/* Tabs bar (like reference image) */}
-          <div className="bg-white border-y border-black/10 rounded-none overflow-hidden">
+          <div className="bg-white border-y border-black/20 sm:border-black/10 rounded-none overflow-hidden">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 w-full">
               {tabs.map(({ id, label, Icon }) => {
                 const isActive = activeTab === id;
@@ -1411,6 +1411,50 @@ export default function ProductDetailClient({ initialProduct = null }) {
             </div>
           </div>
         </div>
+
+        {frequentlyOrderedProducts.length > 0 && (
+          <div className="mt-5 pt-4 border-b border-black/10 pb-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base sm:text-lg font-semibold text-rich-black uppercase tracking-widest">
+                Frequently Ordered Together
+              </h2>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
+              {frequentlyOrderedProducts.map((p) => (
+                <ProductCard key={p._id || p.id} product={p} compact />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {relatedProducts.length > 0 && (
+          <div className="mt-5 pt-4 border-b border-black/10 pb-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base sm:text-lg font-semibold text-rich-black uppercase tracking-widest">
+                Related Products
+              </h2>
+              <Link
+                href="/catalog"
+                className="hidden sm:block text-xs font-bold uppercase tracking-widest text-royal-gold hover:text-accent transition-colors"
+              >
+                View Full Collection
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
+              {relatedProducts.map((relatedProduct) => (
+                <ProductCard key={relatedProduct._id || relatedProduct.id} product={relatedProduct} compact />
+              ))}
+            </div>
+            <div className="mt-8 text-center sm:hidden">
+              <Link
+                href="/catalog"
+                className="text-xs font-bold uppercase tracking-widest text-royal-gold hover:text-accent transition-colors border-b border-royal-gold/20 pb-1"
+              >
+                View Full Collection
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* Desktop quote modal */}
         <div className={`hidden sm:block fixed inset-0 z-50 ${isQuoteModalOpen ? '' : 'pointer-events-none'}`}>
@@ -2109,44 +2153,6 @@ export default function ProductDetailClient({ initialProduct = null }) {
                 ))}
               </div>
             )}
-          </div>
-        )}
-
-        {frequentlyOrderedProducts.length > 0 && (
-          <div className="mt-10 pt-8 border-t border-black/5">
-            <div className="flex items-center justify-between mb-12">
-              <h2 className="text-xl sm:text-2xl font-light text-rich-black uppercase tracking-widest">
-                Frequently Ordered Together
-              </h2>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-10">
-              {frequentlyOrderedProducts.map((p) => (
-                <ProductCard key={p._id || p.id} product={p} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {relatedProducts.length > 0 && (
-          <div className="mt-10 pt-8 border-t border-black/5">
-            <div className="flex items-center justify-between mb-12">
-              <h2 className="text-xl sm:text-2xl font-light text-rich-black uppercase tracking-widest">
-                Related Products
-              </h2>
-              <Link href="/catalog" className="hidden sm:block text-xs font-bold uppercase tracking-widest text-royal-gold hover:text-accent transition-colors">
-                View Full Collection
-              </Link>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-10">
-              {relatedProducts.map((relatedProduct) => (
-                <ProductCard key={relatedProduct._id || relatedProduct.id} product={relatedProduct} />
-              ))}
-            </div>
-            <div className="mt-8 text-center sm:hidden">
-              <Link href="/catalog" className="text-xs font-bold uppercase tracking-widest text-royal-gold hover:text-accent transition-colors border-b border-royal-gold/20 pb-1">
-                View Full Collection
-              </Link>
-            </div>
           </div>
         )}
 

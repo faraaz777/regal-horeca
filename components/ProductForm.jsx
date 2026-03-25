@@ -467,6 +467,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     summary: '',
     description: '',
     usageAndCare: '',
+    whyBuyFrom: '',
     price: 0,
     originalPrice: null,
     businessTypeSlugs: [],
@@ -849,6 +850,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         manufacturer: product.manufacturer || '',
         barcode: product.barcode || '',
         usageAndCare: product.usageAndCare || '',
+        whyBuyFrom: product.whyBuyFrom || '',
         sizeChartUrl: product.sizeChartUrl || '',
         brochureUrl: product.brochureUrl || '',
         blogUrl: product.blogUrl || '',
@@ -2418,12 +2420,16 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-700">Manufacturer</label>
-                  <input
-                    name="manufacturer"
+                  <RichTextEditor
                     value={formData.manufacturer || ''}
-                    onChange={handleChange}
-                    className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
-                    placeholder="Enter manufacturer name"
+                    onChange={(html) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        manufacturer: html,
+                      }))
+                    }
+                    placeholder="Enter manufacturer details"
+                    minHeight="120px"
                   />
                 </div>
               </div>
@@ -2581,6 +2587,20 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     }))
                   }
                   placeholder="Enter usage and care instructions"
+                  minHeight="160px"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">Why Buy From</label>
+                <RichTextEditor
+                  value={formData.whyBuyFrom}
+                  onChange={(html) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      whyBuyFrom: html,
+                    }))
+                  }
+                  placeholder="Enter why buy from content"
                   minHeight="160px"
                 />
               </div>

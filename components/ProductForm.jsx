@@ -485,6 +485,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     status: 'In Stock',
     sizeChartUrl: '',
     brochureUrl: '',
+    blogUrl: '',
     colorVariants: [],
     filters: [{ key: 'Material', values: [] }, { key: 'Size', values: [] }],
     availableSizes: '', // Optional field for comma-separated sizes
@@ -850,6 +851,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         usageAndCare: product.usageAndCare || '',
         sizeChartUrl: product.sizeChartUrl || '',
         brochureUrl: product.brochureUrl || '',
+        blogUrl: product.blogUrl || '',
         businessTypeSlugs: product.businessTypeSlugs || [],
         relatedProductIds: relatedProductIds,
         frequentlyOrderedTogetherProductIds: frequentlyOrderedTogetherProductIds,
@@ -3183,6 +3185,20 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                       </div>
                     ) : null}
                   </div>
+                </div>
+
+                <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                  <label className="block text-sm font-medium mb-2 text-gray-700">Blog URL (optional)</label>
+                  <input
+                    name="blogUrl"
+                    value={formData.blogUrl || ''}
+                    onChange={handleChange}
+                    className="w-full p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors bg-white"
+                    placeholder="https://…"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    If provided, a “Blog” link will appear on the product detail page.
+                  </p>
                 </div>
               </div>
             </FormSection>

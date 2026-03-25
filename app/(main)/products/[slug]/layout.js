@@ -5,7 +5,7 @@
  */
 
 import { getProductBySlug } from '@/lib/utils/getProductBySlug';
-import { generateProductSchema } from '@/lib/utils/structuredData';
+import { generateBreadcrumbSchema, generateProductSchema } from '@/lib/utils/structuredData';
 import { getProductOgImageUrl } from '@/lib/utils/ogImage';
 import { SITE_CONFIG } from '@/lib/constants/seo';
 import { stripHtml } from '@/lib/utils/html';
@@ -76,6 +76,23 @@ export default async function ProductLayout({ params, children }) {
   const slug = params?.slug;
   const product = await getProductBySlug(slug);
   const productSchema = product ? generateProductSchema(product) : null;
+  const breadcrumbSchema = (() => {
+    if (!product) return null;
+    const items = [
+      { name: 'Home', url: '/' },
+      { name: 'Products', url: '/catalog' },
+      ...(Array.isArray(product.categoryPath)
+        ? product.categoryPath
+            .filter(Boolean)
+            .map((c) => ({
+              name: c.name,
+              url: c.slug ? `/catalog?category=${c.slug}` : '/catalog',
+            }))
+        : []),
+      { name: product.title, url: product.slug ? `/products/${product.slug}` : undefined },
+    ];
+    return generateBreadcrumbSchema(items);
+  })();
 
   return (
     <>
@@ -83,6 +100,12 @@ export default async function ProductLayout({ params, children }) {
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
+        />
+      )}
+      {breadcrumbSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
         />
       )}
       {children}

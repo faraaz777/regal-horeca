@@ -51,6 +51,8 @@ import FaqAccordion from '@/components/FaqAccordion';
 import ReactMarkdown from 'react-markdown';
 import DOMPurify from 'dompurify';
 import { isHtml, stripHtml } from '@/lib/utils/html';
+import { getWhatsAppBusinessLink, openWhatsAppLink } from '@/lib/utils/whatsapp';
+import toast from 'react-hot-toast';
 
 function normalizeTitlePart(value) {
   return String(value ?? '')
@@ -116,7 +118,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
   const params = useParams();
   const searchParams = useSearchParams();
   const { slug } = params;
-  const { isInWishlist, addToWishlist, removeFromWishlist, categories } = useAppContext();
+  const { isInWishlist, addToWishlist, removeFromWishlist, categories, addToCart, removeFromCart, isInCart } = useAppContext();
   const [product, setProduct] = useState(initialProduct);
   const [loading, setLoading] = useState(!initialProduct);
   const [activeTab, setActiveTab] = useState('specs');
@@ -485,6 +487,32 @@ export default function ProductDetailClient({ initialProduct = null }) {
     else addToWishlist(productId);
   };
 
+  const handleContactNow = () => {
+    if (typeof window === 'undefined') return;
+    const url = window.location.href;
+    const msg = `Hi, I'm interested in this product:\n\n${product?.title || 'Product'}\nSKU: ${product?.sku || '—'}\n\n${url}\n\nPlease share pricing and availability.`;
+    openWhatsAppLink(getWhatsAppBusinessLink(msg));
+  };
+
+  const openCartDrawer = () => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new Event('openCartDrawer'));
+  };
+
+  const handleAddToQuote = () => {
+    const id = product?._id || product?.id;
+    if (!id) return;
+    const alreadyInCart = isInCart(id, selectedColor || null);
+    if (alreadyInCart) {
+      removeFromCart(id, selectedColor || null);
+      toast.success('Removed from quote');
+      return;
+    }
+    addToCart(id, 1, { selectedColor: selectedColor || null, price: product?.price || null });
+    toast.success('Added to quote');
+    openCartDrawer();
+  };
+
   const handleColorSelect = (variant) => {
     if (selectedColor?.colorName === variant.colorName) setSelectedColor(null);
     else setSelectedColor(variant);
@@ -743,11 +771,11 @@ export default function ProductDetailClient({ initialProduct = null }) {
       return (
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
           {specGridEntries.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-10 gap-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-3">
               {specGridEntries.map(([key, value]) => (
-                <div key={key} className="space-y-1">
-                  <div className="text-xs text-black/40">{key}</div>
-                  <div className="text-sm text-rich-black font-medium">{value}</div>
+                <div key={key} className="space-y-0.5">
+                  <div className="text-[12px] text-black/80 leading-snug">{key}</div>
+                  <div className="text-[13px] text-rich-black font-semibold ">{value}</div>
                 </div>
               ))}
             </div>
@@ -876,7 +904,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
   };
 
   return (
-    <div className="min-h-screen bg-white animate-in font-sans selection:bg-royal-gold selection:text-white">
+    <div className="min-h-screen bg-white animate-in font-montserrat selection:bg-royal-gold selection:text-white">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 pb-20 sm:pb-12">
         <nav className="flex text-xs uppercase tracking-widest text-black/40 mb-3 sm:mb-4" aria-label="Breadcrumb">
           <ol className="flex items-center flex-wrap gap-2">
@@ -884,23 +912,39 @@ export default function ProductDetailClient({ initialProduct = null }) {
             <li><span className="text-black/10">/</span></li>
             {categoryPath.length > 0 ? (
               <>
-                {categoryPath.map((cat, index) => (
+                {categoryPath.map((cat, index) => {
+                  const isLastCategory = index === categoryPath.length - 1;
+                  return (
                   <li key={cat._id || cat.id || cat.slug || index} className="flex items-center gap-2">
                     {index > 0 && <span className="text-black/10">/</span>}
-                    <Link href={`/catalog?category=${cat.slug}`} className="hover:text-royal-gold transition-colors">
+                    <Link
+                      href={`/catalog?category=${cat.slug}`}
+                      className={`transition-colors ${
+                        isLastCategory
+                          ? 'text-rich-black font-semibold'
+                          : 'hover:text-royal-gold text-black/40'
+                      }`}
+                      aria-current={isLastCategory ? 'page' : undefined}
+                    >
                       {cat.name}
                     </Link>
                   </li>
-                ))}
-                <li><span className="text-black/10">/</span></li>
+                  );
+                })}
               </>
             ) : (
               <>
-                <li><Link href="/catalog" className="hover:text-royal-gold transition-colors">Products</Link></li>
-                <li><span className="text-black/10">/</span></li>
+                <li>
+                  <Link
+                    href="/catalog"
+                    className="text-rich-black font-semibold"
+                    aria-current="page"
+                  >
+                    Products
+                  </Link>
+                </li>
               </>
             )}
-            <li className="text-rich-black font-semibold truncate" aria-current="page">{product.title}</li>
           </ol>
         </nav>
 
@@ -921,7 +965,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
           </div>
 
           {/* Right column scrolls normally while left image stays sticky */}
-          <div className="lg:col-span-6 flex flex-col h-full lg:-mt-2">
+          <div className="lg:col-span-6 flex flex-col h-full lg:-mt-14">
             <div className="animate-in slide-in-from-right-8 duration-700 delay-100">
               {product.brand && (
                 <div className="mb-4">
@@ -997,12 +1041,19 @@ export default function ProductDetailClient({ initialProduct = null }) {
                   )} */}
                 </div>
                 <div className="flex items-center gap-x-2 text-xs sm:text-sm text-accent flex-shrink-0 flex-wrap">
-                  <Link href="#" className="hover:underline">
-                    Blog
-                  </Link>
+                  {product?.blogUrl ? (
+                    <a
+                      href={product.blogUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="hover:underline"
+                    >
+                      Blog
+                    </a>
+                  ) : null}
                   {testimonials.length > 0 && (
                     <>
-                      <span className="text-[#D7DCE1]">|</span>
+                      {product?.blogUrl ? <span className="text-[#D7DCE1]">|</span> : null}
                       <a href="#product-testimonials" className="hover:underline">
                         Testimonials
                       </a>
@@ -1010,7 +1061,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
                   )}
                   {product?.faqs?.length > 0 && (
                     <>
-                      <span className="text-[#D7DCE1]">|</span>
+                      {(product?.blogUrl || testimonials.length > 0) ? <span className="text-[#D7DCE1]">|</span> : null}
                       <a href="#product-faq" className="hover:underline">
                         FAQ
                       </a>
@@ -1078,51 +1129,38 @@ export default function ProductDetailClient({ initialProduct = null }) {
                     </div>
                   )}
                 </div>
-                <div className="flex flex-col">
-                  <p className="text-md font-bold text-rich-black   mb-2 min-h-[1.25rem] flex items-center">
-                    Attachments
-                  </p>
-                  <div className="flex flex-wrap gap-3 items-center min-h-[2.5rem]">
-                    {product.sizeChartUrl ? (
-                      <button
-                        type="button"
-                        onClick={() => handleAttachmentAccess({ url: product.sizeChartUrl, label: 'Size Chart' })}
-                        className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold border border-black/10 rounded-md bg-white hover:border-accent hover:text-accent transition-colors"
-                      >
-                        <FileText size={16} className="flex-shrink-0" />
-                        Size Chart
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled
-                        className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold border border-black/10 rounded-md bg-gray-50 text-black/40 cursor-not-allowed"
-                      >
-                        <FileText size={16} className="flex-shrink-0" />
-                        Size Chart
-                      </button>
-                    )}
-                    {product.brochureUrl ? (
-                      <button
-                        type="button"
-                        onClick={() => handleAttachmentAccess({ url: product.brochureUrl, label: 'Brochure' })}
-                        className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold border border-black/10 rounded-md bg-white hover:border-accent hover:text-accent transition-colors"
-                      >
-                        <Download size={16} className="flex-shrink-0" />
-                        Brochure
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled
-                        className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold border border-black/10 rounded-md bg-gray-50 text-black/40 cursor-not-allowed"
-                      >
-                        <Download size={16} className="flex-shrink-0" />
-                        Brochure
-                      </button>
-                    )}
+                {(product.sizeChartUrl || product.brochureUrl) ? (
+                  <div className="flex flex-col">
+                    <p className="text-md font-bold text-rich-black   mb-2 min-h-[1.25rem] flex items-center">
+                      Attachments
+                    </p>
+                    <div className="flex flex-wrap gap-3 items-center min-h-[2.5rem]">
+                      {product.sizeChartUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => handleAttachmentAccess({ url: product.sizeChartUrl, label: 'Size Chart' })}
+                          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold border border-black/10 rounded-md bg-white hover:border-accent hover:text-accent transition-colors"
+                        >
+                          <FileText size={16} className="flex-shrink-0" />
+                          Size Chart
+                        </button>
+                      ) : null}
+                      {product.brochureUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => handleAttachmentAccess({ url: product.brochureUrl, label: 'Brochure' })}
+                          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold border border-black/10 rounded-md bg-white hover:border-accent hover:text-accent transition-colors"
+                        >
+                          <Download size={16} className="flex-shrink-0" />
+                          Brochure
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  // keep 2-column grid aligned when attachments missing (desktop/tablet)
+                  <div className="hidden sm:block" />
+                )}
               </div>
 
               {/* Sizes - full width right below Colour + Attachments */}
@@ -1211,6 +1249,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
                 <div className="flex flex-row w-full gap-3">
                   <button
                     type="button"
+                    onClick={handleContactNow}
                     className="inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold bg-accent text-white shadow-sm hover:bg-[#d5153d] transition-colors rounded-lg flex-1"
                   >
                     <MessageCircle size={18} className="text-white" />
@@ -1218,10 +1257,13 @@ export default function ProductDetailClient({ initialProduct = null }) {
                   </button>
                   <button
                     type="button"
+                    onClick={handleAddToQuote}
                     className="inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold border border-black/10 bg-white text-rich-black hover:border-accent hover:text-accent transition-colors rounded-lg flex-1"
                   >
                     <FileText size={18} className="text-black" />
-                    <span>Add to Quote</span>
+                    <span>
+                      {isInCart(productId, selectedColor || null) ? 'Remove from Quote' : 'Add to Quote'}
+                    </span>
                   </button>
                 </div>
               </div>
@@ -1246,9 +1288,9 @@ export default function ProductDetailClient({ initialProduct = null }) {
           </div>
         </div>
 
-        <div className="mt-4 sm:mt-6 w-full">
+        <div className="mt-4   sm:mt-6 w-full">
           {/* Tabs bar (like reference image) */}
-          <div className="bg-white border border-black/10 rounded-none overflow-hidden">
+          <div className="bg-white border-y border-black/10 rounded-none overflow-hidden">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 w-full">
               {tabs.map(({ id, label, Icon }) => {
                 const isActive = activeTab === id;
@@ -1257,8 +1299,8 @@ export default function ProductDetailClient({ initialProduct = null }) {
                     key={id}
                     type="button"
                     onClick={() => handleTabClick(id)}
-                    className={`flex flex-col items-center justify-center gap-3 px-3 py-6 sm:py-4 text-sm sm:text-xs font-semibold text-center leading-tight min-h-[104px] sm:min-h-[64px] transition-colors border-r border-black/10 last:border-r-0 w-full ${
-                      isActive ? 'bg-accent text-white' : 'bg-white text-black/50 hover:text-black hover:bg-black/[0.02]'
+                    className={`flex flex-col items-center justify-center m-1 border-r-2 border-black/10 gap-2   px-3 py-6 sm:py-4 text-sm sm:text-xs font-bold text-center leading-tight min-h-[104px] sm:min-h-[64px] transition-colors last:border-r-0 w-full ${
+                      isActive ? 'bg-accent/90 text-white' : 'bg-white text-black/80 hover:text-black hover:bg-black/[0.02]'
                     }`}
                   >
                     <Icon size={24} className={isActive ? 'text-white' : 'text-accent'} />
@@ -1270,7 +1312,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
           </div>
 
           {/* Content */}
-          <div className="bg-white mt-0 border-x border-b border-black/10 rounded-none p-4 sm:p-6 hidden sm:block">
+          <div className="bg-white mt-0  border-b border-black/10 rounded-none p-4 sm:p-6 hidden sm:block">
             {renderTabContent()}
           </div>
 
@@ -2114,6 +2156,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
             <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
               <button
                 type="button"
+                onClick={handleContactNow}
                 className="inline-flex items-center justify-center gap-2 h-10 rounded-lg bg-accent text-white text-xs font-semibold shadow-sm"
               >
                 <MessageCircle size={16} className="text-white" />
@@ -2121,11 +2164,11 @@ export default function ProductDetailClient({ initialProduct = null }) {
               </button>
               <button
                 type="button"
-                onClick={openQuoteModal}
+                onClick={handleAddToQuote}
                 className="inline-flex items-center justify-center gap-2 h-10 rounded-lg border border-black/10 bg-white text-rich-black text-xs font-semibold"
               >
                 <FileText size={16} className="text-black/70" />
-                Quote
+                {isInCart(productId, selectedColor || null) ? 'Remove from Quote' : 'Add to Quote'}
               </button>
               <button
                 type="button"

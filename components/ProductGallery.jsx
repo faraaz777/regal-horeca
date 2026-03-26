@@ -32,9 +32,9 @@ export default function ProductGallery({
   const badgeText = isPremium ? 'Premium' : (featured ? 'Exclusive' : null);
 
   return (
-     <div className="flex flex-col lg:items-end md:items-start  ">
+     <div className="flex flex-col items-start w-full">
       {/* Main Image Container - square so product images fit and center properly */}
-      <div className="relative w-full lg:min-w-[90%] aspect-square bg-white border border-black/5 rounded-2xl overflow-hidden group shadow-sm  ">
+      <div className="relative w-full aspect-square bg-white border border-black/5 rounded-2xl overflow-hidden group shadow-sm">
         <AnimatePresence mode="wait">
           <motion.div
             key={images[selectedIndex]}
@@ -50,7 +50,7 @@ export default function ProductGallery({
               fill
               priority
               sizes="(max-width: 768px) 100vw, 50vw"
-              className="object-contain object-left p-6 sm:p-8 md:p-10 transition-transform duration-700 group-hover:scale-105"
+              className="object-contain object-center p-6 sm:p-8 md:p-10 transition-transform duration-700 group-hover:scale-105"
             />
           </motion.div>
         </AnimatePresence>
@@ -164,16 +164,16 @@ export default function ProductGallery({
         <div className="absolute inset-x-0 bottom-0 py-4 bg-gradient-to-t from-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
       </div>
 
-      {/* Thumbnails - horizontal row (scrollable) with hidden scrollbar */}
+      {/* Thumbnails - horizontal row (scrollable) with consistent spacing */}
       {images.length > 1 && (
-        <div className="mt-0 flex justify-start gap-0 overflow-x-auto no-scrollbar scroll-smooth">
+        <div className="mt-2   w-full flex items-center justify-start gap-2 sm:gap-3 overflow-x-auto no-scrollbar scroll-smooth pb-1">
           {images.map((img, idx) => (
             <button
               key={idx}
               onClick={() => setSelectedIndex(idx)}
-              className={`relative flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 border overflow-hidden transition-all duration-300 ${selectedIndex === idx
-                ? 'border-accent shadow-md ring-1 ring-accent/20 scale-[0.98]'
-                : 'border-black/5 hover:border-black/20 bg-white opacity-80 hover:opacity-100'
+              className={`relative flex-shrink-0 rounded-lg w-20 h-20 sm:w-24 sm:h-24 border overflow-hidden transition-all duration-300 ${selectedIndex === idx
+                ? ''
+                : 'border-black/5 rounded-lg hover:border-black/20 bg-white opacity-80 hover:opacity-100'
                 }`}
             >
               <Image
@@ -187,7 +187,7 @@ export default function ProductGallery({
               {selectedIndex === idx && (
                 <motion.div
                   layoutId="active-thumb"
-                  className="absolute inset-0 border-2 border-accent pointer-events-none"
+                  className="absolute inset-0 border-2 border-accent rounded-lg pointer-events-none"
                 />
               )}
             </button>

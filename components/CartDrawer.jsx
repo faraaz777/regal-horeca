@@ -61,6 +61,26 @@ export default function CartDrawer({ isOpen, onClose }) {
           
           if (data.success && data.products) {
             setProducts(data.products);
+
+            // If some cart items were deleted in admin, remove them from cart
+            const returnedIds = new Set(
+              (data.products || [])
+                .map(p => (p._id || p.id)?.toString())
+                .filter(Boolean)
+            );
+            const missingIds = cartProductIds
+              .map(id => id?.toString())
+              .filter(Boolean)
+              .filter(id => !returnedIds.has(id));
+
+            if (missingIds.length > 0) {
+              // Remove all cart lines for missing products (including color variants)
+              cart
+                .filter(it => missingIds.includes(it.productId?.toString()))
+                .forEach(it => removeFromCart(it.productId, it.selectedColor || null));
+
+              toast.error(`${missingIds.length} item${missingIds.length !== 1 ? 's were' : ' was'} removed (no longer available).`);
+            }
           }
         } catch (error) {
           console.error('Failed to fetch cart products:', error);
@@ -107,12 +127,14 @@ export default function CartDrawer({ isOpen, onClose }) {
   };
 
   const handleWhatsAppCheckout = async () => {
-    const cartItemsForEnquiry = cartItems.map(item => ({
-      productId: item.productId,
-      productName: item.product.title || item.product.name || 'Product',
-      quantity: item.quantity,
-      color: item.selectedColor?.colorName,
-    }));
+    const cartItemsForEnquiry = cartItems
+      .filter(item => item.product) // skip deleted/unavailable products
+      .map(item => ({
+        productId: item.productId,
+        productName: item.product.title || item.product.name || 'Product',
+        quantity: item.quantity,
+        color: item.selectedColor?.colorName,
+      }));
 
     // If user has saved profile, skip modal and go directly to WhatsApp
     if (savedProfile && savedProfile.phone) {
@@ -144,12 +166,14 @@ export default function CartDrawer({ isOpen, onClose }) {
   };
 
   const handleChangeInfo = () => {
-    const cartItemsForEnquiry = cartItems.map(item => ({
-      productId: item.productId,
-      productName: item.product.title || item.product.name || 'Product',
-      quantity: item.quantity,
-      color: item.selectedColor?.colorName,
-    }));
+    const cartItemsForEnquiry = cartItems
+      .filter(item => item.product) // skip deleted/unavailable products
+      .map(item => ({
+        productId: item.productId,
+        productName: item.product.title || item.product.name || 'Product',
+        quantity: item.quantity,
+        color: item.selectedColor?.colorName,
+      }));
 
     handleEnquiry({
       source: 'cart',

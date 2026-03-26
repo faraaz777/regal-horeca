@@ -123,7 +123,8 @@ export default function ProductDetailClient({ initialProduct = null }) {
   const [loading, setLoading] = useState(!initialProduct);
   const [activeTab, setActiveTab] = useState('specs');
   const [selectedColor, setSelectedColor] = useState(null);
-  const [selectedSize, setSelectedSize] = useState('');
+  const [selectedSizeKey, setSelectedSizeKey] = useState('');
+  const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [frequentlyOrderedProducts, setFrequentlyOrderedProducts] = useState([]);
   const [mounted, setMounted] = useState(false);
@@ -408,6 +409,36 @@ export default function ProductDetailClient({ initialProduct = null }) {
     setFrequentlyOrderedProducts([]);
   }, [product]);
 
+  const priceBySize = useMemo(() => {
+    const rows = Array.isArray(product?.priceBySize) ? product.priceBySize : [];
+    return rows
+      .map((r) => ({
+        price: Number(r?.price || 0),
+        size: String(r?.size || '').trim(),
+        unit: String(r?.unit || '').trim(),
+      }))
+      .filter((r) => Number.isFinite(r.price) && r.price > 0);
+  }, [product?.priceBySize]);
+
+  useEffect(() => {
+    if (priceBySize.length === 0) return;
+    const firstKey = `${priceBySize[0].size}__${priceBySize[0].unit}`;
+    setSelectedSizeKey((prev) => prev || firstKey);
+  }, [priceBySize]);
+
+  const selectedTier = useMemo(() => {
+    if (priceBySize.length === 0) return null;
+    if (selectedSizeKey) {
+      return priceBySize.find((r) => `${r.size}__${r.unit}` === selectedSizeKey) || null;
+    }
+    return priceBySize[0];
+  }, [priceBySize, selectedSizeKey]);
+
+  const displayPrice = selectedTier?.price ?? product?.price;
+  const displayUnitSuffix = selectedTier?.unit ? `/${selectedTier.unit}` : '';
+  const isPriceOnRequest = displayPrice == null || displayPrice === 0;
+  const summaryText = stripHtml(product?.summary || '').trim();
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white">
@@ -448,7 +479,6 @@ export default function ProductDetailClient({ initialProduct = null }) {
   const isLiked = isInWishlist(productId);
   const { primary: primaryTitle, secondary: secondaryTitle } = splitProductTitle(product.title);
   const secondaryIsLabel = isLikelyLabel(secondaryTitle);
-  const isPriceOnRequest = product.price == null || product.price === 0;
 
   const getDisplayImages = () => {
     if (selectedColor && selectedColor.images && selectedColor.images.length > 0) {
@@ -508,7 +538,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
       toast.success('Removed from quote');
       return;
     }
-    addToCart(id, 1, { selectedColor: selectedColor || null, price: product?.price || null });
+    addToCart(id, 1, { selectedColor: selectedColor || null, price: displayPrice || null });
     toast.success('Added to quote');
     openCartDrawer();
   };
@@ -905,7 +935,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
 
   return (
     <div className="min-h-screen bg-white animate-in font-montserrat selection:bg-royal-gold selection:text-white">
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 pb-20 sm:pb-12">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2 sm:pt-3 pb-10 sm:pb-12">
         <nav className="flex text-xs uppercase tracking-widest text-black/40 mb-3 sm:mb-4" aria-label="Breadcrumb">
           <ol className="flex items-center flex-wrap gap-2">
             <li><Link href="/" className="hover:text-royal-gold transition-colors">Home</Link></li>
@@ -965,10 +995,10 @@ export default function ProductDetailClient({ initialProduct = null }) {
           </div>
 
           {/* Right column scrolls normally while left image stays sticky */}
-          <div className="lg:col-span-6 flex flex-col h-full lg:-mt-14">
+          <div className="lg:col-span-6 flex flex-col h-full lg:-mt-8">
             <div className="animate-in slide-in-from-right-8 duration-700 delay-100">
               {product.brand && (
-                <div className="mb-4">
+                <div className="mb-2">
                   <span className="inline-flex items-center px-3 py-1 border border-black rounded-full text-[11px] font-bold text-black bg-white">
                     {product.brand}
                   </span>
@@ -976,7 +1006,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
               )}
 
               <h1 className="mb-2">
-                <span className="block font-sans text-xl sm:text-xl lg:text-[32px] font-semibold leading-tight tracking-tight" style={{ color: '#1C273C' }}>
+                <span className="block font-sans text-xl sm:text-xl lg:text-[28px] font-semibold leading-tight tracking-tight" style={{ color: '#1C273C' }}>
                   {primaryTitle || product.title}
                 </span>
                 {secondaryTitle && (
@@ -984,7 +1014,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
                 )}
               </h1>
 
-              <div className="flex flex-wrap items-center gap-x-2 text-sm text-[#5F748D] mb-4">
+              <div className="flex flex-wrap items-center gap-x-2 text-sm text-[#5F748D] mb-2">
                 {product.sku && <span>SKU: {product.sku}</span>}
                 {product.sku && product.barcode && <span className="text-[#D7DCE1]">|</span>}
                 {product.barcode && <span>Barcode: {product.barcode}</span>}
@@ -1010,25 +1040,25 @@ export default function ProductDetailClient({ initialProduct = null }) {
                 </span>
               </div>
 
-              <hr className="border-0 h-px bg-[#D7DCE1] mb-6" />
+              <hr className="border-0 h-px bg-[#D7DCE1] mb-2" />
 
               {/* Price section + Blog | Testimonials | FAQ */}
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 mb-1 sm:mb-2">
                 <div>
-                  <p className="text-[10px] sm:text-xs uppercase tracking-widest text-black/50 mb-1">
+                  <p className="text-[10px] sm:text-xs uppercase tracking-wide  text-black/50 mb-1">
                     Starting from
                   </p>
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                     <span className="text-xl sm:text-2xl font-bold text-accent">
-                      {isPriceOnRequest ? 'Price on request' : `${formatPrice(product.price)}/kg`}
+                      {isPriceOnRequest ? 'Price on request' : `${formatPrice(displayPrice)}${displayUnitSuffix}`}
                     </span>
-                    {!isPriceOnRequest && product.price != null && product.price > 0 && (
+                    {!isPriceOnRequest && displayPrice != null && displayPrice > 0 && (
                       <span className="text-sm text-[#5F748D]">
-                        ≈ ${(product.price / 84).toFixed(1)}/kg
+                        ≈ ${(displayPrice / 84).toFixed(1)}{displayUnitSuffix }
                       </span>
                     )}
                   </div>
-                  {/* {product.summary && (
+                  {/* {product.summary && ( 
                     <p className="text-sm text-[#5F748D] mt-1.5">
                       {stripHtml(product.summary).slice(0, 60)}
                       {(stripHtml(product.summary).length > 60) ? '…' : ''}
@@ -1070,37 +1100,30 @@ export default function ProductDetailClient({ initialProduct = null }) {
                 </div>
               </div>
 
-              {/* Product description - right below price with a little gap */}
-              {(product.description || product.summary) && (
-                <div className="mt-5 mb-8">
+              {/* Short description (Summary) - 3 lines with More/Less */}
+              {summaryText && (
+                <div className="mt-2 sm:mt-5 mb-2 sm:mb-4">
                   <div className="text-sm sm:text-base text-[#5F748D] leading-relaxed">
-                    {product.description ? (
-                      isHtml(product.description) ? (
-                        <div
-                          className="product-description-html prose prose-sm max-w-none prose-p:text-[#5F748D] prose-p:my-2"
-                          dangerouslySetInnerHTML={{
-                            __html: DOMPurify.sanitize(product.description, {
-                              ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'a'],
-                              ALLOWED_ATTR: ['href'],
-                            }),
-                          }}
-                        />
-                      ) : (
-                        <div className="prose prose-sm max-w-none prose-p:text-[#5F748D] prose-p:my-2">
-                          <ReactMarkdown>{product.description}</ReactMarkdown>
-                        </div>
-                      )
-                    ) : (
-                      <p>{stripHtml(product.summary || '')}</p>
+                    <p className={`${isSummaryExpanded ? '' : 'line-clamp-3'} whitespace-pre-line`}>
+                      {summaryText}
+                    </p>
+                    {summaryText.length > 140 && (
+                      <button
+                        type="button"
+                        onClick={() => setIsSummaryExpanded((v) => !v)}
+                        className="mt-1 text-xs font-semibold text-accent text-s tracking-wide underline hover:no-underline"
+                      >
+                        {isSummaryExpanded ? '...Read less' : '...Read more'}
+                      </button>
                     )}
                   </div>
                 </div>
               )}
 
               {/* Colour (left) + Attachments (right) - one row below description, aligned */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8 items-start">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6 mb-4 sm:mb-2 items-start">
                 <div className="flex flex-col">
-                  <p className="text-md font-bold text-rich-black  t mb-2 min-h-[1.25rem] flex items-center">
+                  <p className="text-sm font-bold text-rich-black  t mb-2 min-h-[1.25rem] flex items-center">
                     Colour: <span className="font-normal normal-case text-black/60 ml-0.5">{selectedColor ? selectedColor.colorName : '—'}</span>
                   </p>
                   {product.colorVariants && product.colorVariants.length > 0 ? (
@@ -1131,7 +1154,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
                 </div>
                 {(product.sizeChartUrl || product.brochureUrl) ? (
                   <div className="flex flex-col">
-                    <p className="text-md font-bold text-rich-black   mb-2 min-h-[1.25rem] flex items-center">
+                    <p className="text-sm font-bold text-rich-black mt-1 sm:mt-2 mb-2 min-h-[1.25rem] flex items-center">
                       Attachments
                     </p>
                     <div className="flex flex-wrap gap-3 items-center min-h-[2.5rem]">
@@ -1163,56 +1186,57 @@ export default function ProductDetailClient({ initialProduct = null }) {
                 )}
               </div>
 
-              {/* Sizes - full width right below Colour + Attachments */}
-              {product.availableSizes && product.availableSizes.trim() && (() => {
-                const sizes = product.availableSizes.split(',').map(s => s.trim()).filter(Boolean);
-                if (sizes.length === 0) return null;
-                return (
-                  <div className="mb-8">
-                    <label className="block text-sm font-bold text-rich-black  mb-2">
-                      Size
-                    </label>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                      {sizes.map((size) => (
+              {/* Sizes + pricing (derived from admin Price by Size) */}
+              {priceBySize.length > 0 && (
+                <div className="mb-2 sm:mb-4">
+                  <label className="block text-sm font-bold text-rich-black  mb-2">
+                    Size
+                  </label>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                    {priceBySize.map((row, idx) => {
+                      const key = `${row.size}__${row.unit}`;
+                      const label = `${row.size}`.trim() || `Option ${idx + 1}`;
+                      const active = selectedSizeKey === key;
+                      return (
                         <button
-                          key={size}
+                          key={key || idx}
                           type="button"
-                          onClick={() => setSelectedSize(size)}
+                          onClick={() => setSelectedSizeKey(key)}
                           className={`px-3 py-2 text-xs font-semibold rounded-md border transition-colors ${
-                            selectedSize === size
+                            active
                               ? 'bg-accent text-white border-accent'
                               : 'bg-white text-black/70 border-black/10 hover:border-accent hover:text-accent'
                           }`}
                         >
-                          {size}
+                          {label}
                         </button>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-                );
-              })()}
+                </div>
+              )}
 
               {/* Moving delivery banner directly below Sizes */}
-              <div className="mb-8 -mx-4 sm:mx-0">
-                <div className="relative overflow-hidden rounded-lg bg-[#F6F7F9] shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
-                  <div className="py-3 sm:py-2.5 px-4 sm:px-4">
+              <div className="mb-1 sm:mb-4 -mx-4 sm:mx-0">
+                <div className="relative overflow-hidden  bg-[#F6F7F9] shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                  <div className="py-4 sm:py-2.5 px-4 sm:px-4">
                     <div className="flex items-center gap-10 whitespace-nowrap banner-track">
                       <div className="inline-flex items-center gap-2.5 text-sm sm:text-sm font-medium text-black/70">
-                        <Truck size={18} className="text-accent flex-shrink-0" />
+                        <Truck size={20} className="text-accent flex-shrink-0" />
                         <span>
                           <span className="font-semibold">Telangana:</span> Same-day delivery
                         </span>
                       </div>
                       <span className="mx-1 text-black/20" aria-hidden>|</span>
                       <div className="inline-flex items-center gap-2.5 text-sm sm:text-sm font-medium text-black/70">
-                        <Truck size={18} className="text-accent flex-shrink-0" />
+                        <Truck size={20} className="text-accent flex-shrink-0" />
                         <span>
                           <span className="font-semibold">Other states:</span> 3–4 days
                         </span>
                       </div>
                       <span className="mx-1 text-black/20" aria-hidden>|</span>
                       <div className="inline-flex items-center gap-2.5 text-sm sm:text-sm font-medium text-black/70">
-                        <Globe2 size={18} className="text-accent flex-shrink-0" />
+                        <Globe2 size={20} className="text-accent flex-shrink-0" />
                         <span>
                           <span className="font-semibold">International:</span> 10–15 days
                         </span>
@@ -1220,21 +1244,21 @@ export default function ProductDetailClient({ initialProduct = null }) {
                       {/* Duplicate set for seamless loop */}
                       <span className="mx-1 text-black/20" aria-hidden>|</span>
                       <div className="inline-flex items-center gap-2.5 text-sm sm:text-sm font-medium text-black/70">
-                        <Truck size={18} className="text-accent flex-shrink-0" />
+                        <Truck size={20} className="text-accent flex-shrink-0" />
                         <span>
                           <span className="font-semibold">Telangana:</span> Same-day delivery
                         </span>
                       </div>
                       <span className="mx-1 text-black/20" aria-hidden>|</span>
                       <div className="inline-flex items-center gap-2.5 text-sm sm:text-sm font-medium text-black/70">
-                        <Truck size={18} className="text-accent flex-shrink-0" />
+                        <Truck size={20} className="text-accent flex-shrink-0" />
                         <span>
                           <span className="font-semibold">Other states:</span> 3–4 days
                         </span>
                       </div>
                       <span className="mx-1 text-black/20" aria-hidden>|</span>
                       <div className="inline-flex items-center gap-2.5 text-sm sm:text-sm font-medium text-black/70">
-                        <Globe2 size={18} className="text-accent flex-shrink-0" />
+                        <Globe2 size={20} className="text-accent flex-shrink-0" />
                         <span>
                           <span className="font-semibold">International:</span> 10–15 days
                         </span>

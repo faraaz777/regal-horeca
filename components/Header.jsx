@@ -481,22 +481,34 @@ function DepartmentsBar({
     { name: 'Enquiry', href: '/enquiry' },
   ];
 
-  // Ref for More button to position dropdown
   const moreButtonRef = useRef(null);
-  const [dropdownRight, setDropdownRight] = useState(0);
+  const [moreDropdownLeft, setMoreDropdownLeft] = useState(0);
 
-  // Calculate More dropdown position
+  // Keep popup aligned with "More" button while rendering outside nav flow.
   useEffect(() => {
-    if (isMoreDropdownOpen && moreButtonRef.current) {
-      const buttonRect = moreButtonRef.current.getBoundingClientRect();
-      const container = moreButtonRef.current.closest('.w-full.relative');
-      if (container) {
-        const containerRect = container.getBoundingClientRect();
-        // Calculate distance from right edge of container to right edge of button
-        const rightOffset = containerRect.right - buttonRect.right;
-        setDropdownRight(rightOffset);
-      }
-    }
+    if (!isMoreDropdownOpen || !moreButtonRef.current) return;
+
+    const updatePosition = () => {
+      const triggerRect = moreButtonRef.current.getBoundingClientRect();
+      const navContainer = moreButtonRef.current.closest('.w-full.relative');
+      if (!navContainer) return;
+
+      const containerRect = navContainer.getBoundingClientRect();
+      const dropdownWidth = 176; // w-44
+      const rawLeft = triggerRect.right - containerRect.left - dropdownWidth;
+      const maxLeft = Math.max(0, containerRect.width - dropdownWidth);
+      const clampedLeft = Math.max(0, Math.min(rawLeft, maxLeft));
+      setMoreDropdownLeft(clampedLeft);
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
   }, [isMoreDropdownOpen]);
 
   return (
@@ -544,14 +556,14 @@ function DepartmentsBar({
             <span className="absolute bottom-[-1px] left-0 w-0 h-[2px] bg-accent transition-all duration-300 group-hover:w-full"></span>
           </Link>
 
-          {/* More Dropdown */}
+          {/* More Trigger */}
           <div
             ref={moreButtonRef}
-            className="relative flex items-center"
+            className="relative z-[100] flex items-center"
             onMouseEnter={() => setIsMoreDropdownOpen(true)}
             onMouseLeave={() => setIsMoreDropdownOpen(false)}
           >
-            <button className={`${navLinkClass} flex items-center gap-1`}>
+            <button type="button" className={`${navLinkClass} flex items-center gap-1`}>
               <span>More</span>
               <ChevronDownIcon className={`w-3 h-3 transition-transform ${isMoreDropdownOpen ? 'rotate-180' : ''}`} />
               <span
@@ -561,26 +573,24 @@ function DepartmentsBar({
           </div>
         </nav>
 
-        {/* More Dropdown - Positioned outside nav, below the More button */}
+        {/* More Popup (outside nav; doesn't affect nav scroll width) */}
         <AnimatePresence>
           {isMoreDropdownOpen && (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
               onMouseEnter={() => setIsMoreDropdownOpen(true)}
               onMouseLeave={() => setIsMoreDropdownOpen(false)}
-              className="absolute top-full mt-1 w-48 bg-white border border-black/10 shadow-lg rounded-lg overflow-hidden py-2 z-[100]"
-              style={{
-                right: `${dropdownRight}px`
-              }}
+              className="absolute top-full  w-44 bg-white border border-black/10 shadow-lg rounded-lg overflow-hidden py-1 z-[100]"
+              style={{ left: `${moreDropdownLeft}px` }}
             >
               {moreLinks.map((link) => (
                 <LoadingLink
                   key={link.href}
                   href={link.href}
-                  className="block px-6 py-3 text-xs font-bold uppercase tracking-widest text-black/70 hover:bg-gray-50 hover:text-accent transition-colors"
+                  className="!flex !w-full !justify-start px-8 py-2 text-xs font-bold uppercase tracking-widest text-black/70 hover:bg-gray-50 hover:text-accent transition-colors leading-tight"
                 >
                   {link.name}
                 </LoadingLink>

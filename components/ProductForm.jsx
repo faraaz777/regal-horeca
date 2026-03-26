@@ -469,6 +469,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     usageAndCare: '',
     whyBuyFrom: '',
     price: 0,
+    priceBySize: [],
     originalPrice: null,
     businessTypeSlugs: [],
     heroImage: '',
@@ -512,6 +513,24 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
   const autoTagDebounceRef = useRef(null);
   const [relatedProductsSearchQuery, setRelatedProductsSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+
+  // Price-by-size helpers
+  const addPriceBySizeRow = () => {
+    const next = [...(formData.priceBySize || []), { price: '', size: '', unit: '' }];
+    setFormData((prev) => ({ ...prev, priceBySize: next }));
+  };
+
+  const removePriceBySizeRow = (index) => {
+    const next = (formData.priceBySize || []).filter((_, i) => i !== index);
+    setFormData((prev) => ({ ...prev, priceBySize: next }));
+  };
+
+  const handlePriceBySizeChange = (index, field, value) => {
+    const next = (formData.priceBySize || []).map((row, i) =>
+      i === index ? { ...row, [field]: value } : row
+    );
+    setFormData((prev) => ({ ...prev, priceBySize: next }));
+  };
   
   // Debounce search query to avoid too many API calls
   useEffect(() => {
@@ -1803,17 +1822,15 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
   };
 
   /**
-   * Convert specifications array and available sizes to JSON string
+   * Convert specifications array to JSON string
    */
   const convertSpecsToJson = () => {
     try {
       const specs = formData.specifications || [];
-      const availableSizes = formData.availableSizes || '';
       
       // Build the JSON object
       const jsonObject = {
-        specifications: [],
-        availableSizes: availableSizes.trim()
+        specifications: []
       };
       
       // Handle empty array
@@ -1834,12 +1851,12 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       return JSON.stringify(jsonObject, null, 2);
     } catch (error) {
       console.error('Error converting specs to JSON:', error);
-      return JSON.stringify({ specifications: [], availableSizes: '' }, null, 2);
+      return JSON.stringify({ specifications: [] }, null, 2);
     }
   };
 
   /**
-   * Validate and parse JSON specifications (including available sizes)
+   * Validate and parse JSON specifications
    */
   const validateAndParseSpecJson = (jsonString) => {
     // Reset error
@@ -1847,31 +1864,24 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     
     // Handle empty/whitespace-only input
     if (!jsonString || !jsonString.trim()) {
-      return { specifications: [], availableSizes: '' };
+      return { specifications: [] };
     }
 
     try {
       // Parse JSON
       const parsed = JSON.parse(jsonString.trim());
       
-      // Handle both formats: object with specifications/availableSizes OR array (legacy)
+      // Handle both formats: object with specifications OR array (legacy)
       let specifications = [];
-      let availableSizes = '';
       
       if (Array.isArray(parsed)) {
         // Legacy format: just an array of specifications
         specifications = parsed;
       } else if (typeof parsed === 'object' && parsed !== null) {
-        // New format: object with specifications and availableSizes
+        // Object format: { specifications: [...] }
         specifications = parsed.specifications || [];
-        availableSizes = parsed.availableSizes || '';
-        
-        // Validate availableSizes is a string
-        if (availableSizes !== null && availableSizes !== undefined && typeof availableSizes !== 'string') {
-          availableSizes = String(availableSizes);
-        }
       } else {
-        setSpecJsonError('JSON must be an object with "specifications" array and optional "availableSizes" string, or an array of specification objects');
+        setSpecJsonError('JSON must be an object with "specifications" array, or an array of specification objects');
         return null;
       }
 
@@ -1907,7 +1917,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         setSpecJsonError('Some specifications were invalid and have been filtered out');
       }
 
-      return { specifications: validatedSpecs, availableSizes: availableSizes.trim() };
+      return { specifications: validatedSpecs };
     } catch (error) {
       // Handle various JSON parsing errors
       if (error instanceof SyntaxError) {
@@ -2263,15 +2273,63 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       })
       .filter(f => f.key && f.key.trim() && f.values.length > 0);
 
+    const normalizedPriceBySize = (formData.priceBySize || [])
+      .filter(row => row && typeof row === 'object')
+      .map(row => ({
+        price: Number(row.price || 0),
+        size: String(row.size || '').trim(),
+        unit: String(row.unit || '').trim(),
+      }))
+      .filter(row => Number.isFinite(row.price) && row.price > 0);
+
+    // Keep sidebar/catalog Size filter aligned with Price by Size rows.
+    const sizeValuesFromPriceBySize = Array.from(
+      new Set(
+        normalizedPriceBySize
+          .map(row => row.size)
+          .filter(Boolean)
+      )
+    );
+
+    const filtersWithSizeFromPricing = (() => {
+      const nextFilters = [...filters];
+      const sizeFilterIndex = nextFilters.findIndex(
+        f => String(f.key || '').toLowerCase() === 'size'
+      );
+
+      if (sizeValuesFromPriceBySize.length === 0) return nextFilters;
+
+      if (sizeFilterIndex >= 0) {
+        const existing = Array.isArray(nextFilters[sizeFilterIndex].values)
+          ? nextFilters[sizeFilterIndex].values
+          : [];
+        const mergedValues = Array.from(new Set([...existing, ...sizeValuesFromPriceBySize]));
+        nextFilters[sizeFilterIndex] = {
+          ...nextFilters[sizeFilterIndex],
+          values: mergedValues,
+        };
+        return nextFilters;
+      }
+
+      nextFilters.push({ key: 'Size', values: sizeValuesFromPriceBySize });
+      return nextFilters;
+    })();
+
+    const derivedBasePrice =
+      normalizedPriceBySize.length > 0
+        ? Math.min(...normalizedPriceBySize.map(r => r.price))
+        : Number(formData.price || 0);
+
     const finalProduct = {
       ...formData,
       brandCategoryId: updatedBrandCategoryId || formData.brandCategoryId,
-      price: Number(formData.price),
+      priceBySize: normalizedPriceBySize,
+      price: Number.isFinite(derivedBasePrice) ? derivedBasePrice : 0,
       originalPrice: formData.originalPrice && Number(formData.originalPrice) > 0 ? Number(formData.originalPrice) : null,
       tags,
       categoryIds,
       brandCategoryIds,
-      filters
+      filters: filtersWithSizeFromPricing
     };
     
     // Remove temporary input fields
@@ -2364,8 +2422,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   minHeight="120px"
                 />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="relative" ref={brandInputRef}>
+              <div className="relative" ref={brandInputRef}>
                   <label className="block text-sm font-medium mb-2 text-gray-700">Brand</label>
                   <input 
                     name="brand" 
@@ -2417,21 +2474,6 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                       <span>Linked to brand category</span>
                     </div>
                   )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700">Manufacturer</label>
-                  <RichTextEditor
-                    value={formData.manufacturer || ''}
-                    onChange={(html) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        manufacturer: html,
-                      }))
-                    }
-                    placeholder="Enter manufacturer details"
-                    minHeight="120px"
-                  />
-                </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -2489,34 +2531,72 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   </select>
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-2 text-gray-700">Price (₹)</label>
-                <input 
-                  type="number" 
-                  name="price" 
-                  value={formData.price || ''} 
-                  onChange={handleChange} 
-                  className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors" 
-                  min="0" 
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2 text-gray-700">
-                  Original Price (₹) <span className="text-gray-500 text-xs font-normal">(Optional - for showing discount)</span>
-                </label>
-                <input 
-                  type="number" 
-                  name="originalPrice" 
-                  value={formData.originalPrice || ''} 
-                  onChange={handleChange} 
-                  className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors" 
-                  min="0" 
-                  placeholder="Leave empty to auto-calculate (20% higher)"
-                />
-                {formData.originalPrice && formData.price && formData.originalPrice <= formData.price && (
-                  <p className="mt-1 text-xs text-red-600">Original price must be higher than current price</p>
-                )}
+              <div className="md:col-span-2">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">Price by Size</label>
+                  <button
+                    type="button"
+                    onClick={addPriceBySizeRow}
+                    className="text-xs font-semibold text-primary hover:underline"
+                  >
+                    + Add row
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {(formData.priceBySize || []).length === 0 ? (
+                    <div className="p-3 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
+                      No size pricing added yet. Add rows like: price + size + unit (example: 1200, 5, kg).
+                    </div>
+                  ) : (
+                    (formData.priceBySize || []).map((row, index) => (
+                      <div
+                        key={index}
+                        className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center p-3 rounded-lg border border-gray-200 bg-white"
+                      >
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="Price (₹)"
+                          value={row.price ?? ''}
+                          onChange={(e) => handlePriceBySizeChange(index, 'price', e.target.value)}
+                          className="md:col-span-4 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
+                        />
+                        <input
+                          placeholder="Size (e.g., 5)"
+                          value={row.size ?? ''}
+                          onChange={(e) => handlePriceBySizeChange(index, 'size', e.target.value)}
+                          className="md:col-span-4 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
+                        />
+                        <input
+                          placeholder="Unit (e.g., kg / pcs)"
+                          value={row.unit ?? ''}
+                          onChange={(e) => handlePriceBySizeChange(index, 'unit', e.target.value)}
+                          list="priceBySizeUnitOptions"
+                          className="md:col-span-3 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removePriceBySizeRow(index)}
+                          className="md:col-span-1 text-red-500 hover:text-red-700 justify-self-center"
+                          title="Remove row"
+                        >
+                          <TrashIcon />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <datalist id="priceBySizeUnitOptions">
+                  <option value="kg" />
+                  <option value="g" />
+                  <option value="pcs" />
+                  <option value="pc" />
+                  <option value="set" />
+                  <option value="pack" />
+                  <option value="box" />
+                  <option value="pair" />
+                </datalist>
               </div>
               <div className="flex items-center space-x-2 pt-2">
                 <input 
@@ -2602,6 +2682,20 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   }
                   placeholder="Enter why buy from content"
                   minHeight="160px"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 text-gray-700">Manufacturer</label>
+                <RichTextEditor
+                  value={formData.manufacturer || ''}
+                  onChange={(html) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      manufacturer: html,
+                    }))
+                  }
+                  placeholder="Enter manufacturer details"
+                  minHeight="120px"
                 />
               </div>
               </div>
@@ -3515,9 +3609,11 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
               )}
         </FormSection>
         
-            <FormSection title="Specifications">
+        <FormSection title="Specifications">
           <p className="text-xs text-gray-600 mb-4">
-            <strong className="text-gray-700">Available sizes</strong> is a default optional field. If provided, it will appear as a dropdown on the product detail page. It will not be shown in the specifications table.
+            Add product specifications (these appear on the product detail page).{" "}
+            <strong className="text-gray-700">Available sizes</strong> was removed — sizes are now controlled via{" "}
+            <strong className="text-gray-700">Price by Size</strong>.
           </p>
           
           {/* Mode Toggle */}
@@ -3561,20 +3657,6 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
           </div>
 
           <div className="space-y-3">
-            {/* Available Sizes - Default Optional Field */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <label className="md:col-span-3 text-sm font-medium text-gray-700">
-                Available sizes
-              </label>
-              <input 
-                name="availableSizes" 
-                placeholder="Values (comma-separated, e.g., 22,24,26,28,30)" 
-                value={formData.availableSizes || ''} 
-                onChange={e => setFormData({ ...formData, availableSizes: e.target.value })} 
-                className="md:col-span-9 p-2.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-primary focus:border-primary" 
-              />
-            </div>
-
             {specJsonMode ? (
               /* JSON Mode */
               <div className="space-y-2">
@@ -3593,8 +3675,8 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                 <textarea
                   value={specJsonInput}
                   onChange={(e) => handleSpecJsonChange(e.target.value)}
-                  placeholder={`{\n  "specifications": [\n    {\n      "label": "Diameter",\n      "value": "24",\n      "unit": "cm"\n    },\n    {\n      "label": "Height",\n      "value": "12",\n      "unit": "cm"\n    }\n  ],\n  "availableSizes": "22,24,26,28,30"\n}`}
-                  className={`w-full p-3 border rounded-md font-mono text-sm min-h-[250px] focus:ring-2 focus:ring-primary focus:border-primary ${
+                  placeholder={`{\n  \"specifications\": [\n    {\n      \"label\": \"Diameter\",\n      \"value\": \"24\",\n      \"unit\": \"cm\"\n    }\n  ]\n}`}
+                  className={`w-full p-3 border rounded-md font-mono text-sm min-h-[220px] focus:ring-2 focus:ring-primary focus:border-primary ${
                     specJsonError ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                   spellCheck={false}
@@ -3602,9 +3684,6 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                 {specJsonError && (
                   <div className="p-2 bg-red-50 border border-red-200 rounded-md">
                     <p className="text-xs text-red-700 font-medium">Error: {specJsonError}</p>
-                    <p className="text-xs text-red-600 mt-1">
-                      Expected format: Object with "specifications" array and optional "availableSizes" string
-                    </p>
                   </div>
                 )}
                 {!specJsonError && specJsonInput.trim() && (
@@ -3612,18 +3691,6 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     <p className="text-xs text-green-700 font-medium">✓ Valid JSON</p>
                   </div>
                 )}
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <p className="text-xs text-blue-700 font-medium mb-1">JSON Format Guide:</p>
-                  <ul className="text-xs text-blue-600 space-y-1 list-disc list-inside">
-                    <li>Must be a valid JSON object with "specifications" and optional "availableSizes"</li>
-                    <li>"specifications" must be an array of objects</li>
-                    <li>Each specification object should have "label", "value", and optional "unit" fields</li>
-                    <li>"availableSizes" should be a comma-separated string (e.g., "22,24,26,28,30")</li>
-                    <li>Empty strings are allowed for any field</li>
-                    <li>Null/undefined items will be converted to empty objects</li>
-                    <li>Legacy format: Array of specification objects is also supported</li>
-                  </ul>
-                </div>
               </div>
             ) : (
               /* Form Mode - draggable specification tiles */
@@ -3965,51 +4032,6 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
           </div>
         </FormSection>
 
-            <FormSection title="Availability">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 items-start">
-            <div>
-              <label className="block text-sm font-medium mb-1">Status</label>
-              <select 
-                name="status" 
-                value={formData.status} 
-                onChange={handleChange} 
-                className="w-full mt-1 p-2.5 sm:p-2 border border-gray-300 rounded-md shadow-sm text-base"
-              >
-                <option value="In Stock">In Stock</option>
-                <option value="Out of Stock">Out of Stock</option>
-                <option value="Pre-Order">Pre-Order</option>
-              </select>
-            </div>
-            <div className="space-y-3 pt-1">
-              <div className="flex items-center space-x-2">
-                <input 
-                  type="checkbox" 
-                  name="featured" 
-                  id="featured" 
-                  checked={!!formData.featured} 
-                  onChange={handleChange} 
-                  className="h-4 w-4 rounded text-primary focus:ring-primary" 
-                />
-                <label htmlFor="featured" className="text-sm font-medium">Featured Product</label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <input 
-                  type="checkbox" 
-                  name="isPremium" 
-                  id="isPremium" 
-                  checked={!!formData.isPremium} 
-                  onChange={handleChange} 
-                  className="h-4 w-4 rounded text-primary focus:ring-primary" 
-                />
-                <label htmlFor="isPremium" className="text-sm font-medium flex items-center gap-2">
-                  <StarIcon className="w-4 h-4 text-yellow-500" />
-                  Premium Collection
-                </label>
-              </div>
-            </div>
-          </div>
-        </FormSection>
-
         <FormSection title="Frequently Ordered Together">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-4">
             <div className="flex-1">
@@ -4065,6 +4087,51 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                 </p>
               </div>
             )}
+          </div>
+        </FormSection>
+
+        <FormSection title="Availability">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 items-start">
+            <div>
+              <label className="block text-sm font-medium mb-1">Status</label>
+              <select 
+                name="status" 
+                value={formData.status} 
+                onChange={handleChange} 
+                className="w-full mt-1 p-2.5 sm:p-2 border border-gray-300 rounded-md shadow-sm text-base"
+              >
+                <option value="In Stock">In Stock</option>
+                <option value="Out of Stock">Out of Stock</option>
+                <option value="Pre-Order">Pre-Order</option>
+              </select>
+            </div>
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center space-x-2">
+                <input 
+                  type="checkbox" 
+                  name="featured" 
+                  id="featured" 
+                  checked={!!formData.featured} 
+                  onChange={handleChange} 
+                  className="h-4 w-4 rounded text-primary focus:ring-primary" 
+                />
+                <label htmlFor="featured" className="text-sm font-medium">Featured Product</label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input 
+                  type="checkbox" 
+                  name="isPremium" 
+                  id="isPremium" 
+                  checked={!!formData.isPremium} 
+                  onChange={handleChange} 
+                  className="h-4 w-4 rounded text-primary focus:ring-primary" 
+                />
+                <label htmlFor="isPremium" className="text-sm font-medium flex items-center gap-2">
+                  <StarIcon className="w-4 h-4 text-yellow-500" />
+                  Premium Collection
+                </label>
+              </div>
+            </div>
           </div>
         </FormSection>
 

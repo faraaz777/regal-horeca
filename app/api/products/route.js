@@ -220,6 +220,19 @@ export async function POST(request) {
     if (!productData.tags) {
       productData.tags = [];
     }
+    // Handle priceBySize - optional array of {price,size,unit}
+    if (!Array.isArray(productData.priceBySize)) {
+      productData.priceBySize = [];
+    } else {
+      productData.priceBySize = productData.priceBySize
+        .filter(row => row && typeof row === 'object')
+        .map(row => ({
+          price: Number(row.price || 0),
+          size: String(row.size || '').trim(),
+          unit: String(row.unit || '').trim(),
+        }))
+        .filter(row => Number.isFinite(row.price) && row.price > 0);
+    }
     // Handle availableSizes - optional field, trim and set to empty string if not provided
     if (productData.availableSizes === undefined || productData.availableSizes === null) {
       productData.availableSizes = '';

@@ -863,10 +863,33 @@ export default function ProductDetailClient({ initialProduct = null }) {
     }
 
     if (activeTab === 'usage') {
+      const raw = product.usageAndCare;
+      const has = raw && String(raw).replace(/<[^>]+>/g, '').trim();
       return (
-        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 text-sm text-black/60">
-          <p className="mb-2 font-medium text-rich-black">Usage & Care</p>
-          <p>Add usage/care instructions for this product here.</p>
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 max-w-3xl">
+          <div className="prose prose-base prose-p:text-black/60 prose-p:leading-relaxed prose-headings:text-black prose-strong:text-black prose-ul:text-black prose-li:text-black/60 max-w-none">
+            {has ? (
+              isHtml(raw) ? (
+                <div
+                  className="product-description-html"
+                  dangerouslySetInnerHTML={{
+                    __html: mounted
+                      ? DOMPurify.sanitize(raw, {
+                          ALLOWED_TAGS: [
+                            'p', 'br', 'strong', 'em', 'u', 's', 'ul', 'ol', 'li',
+                            'table', 'thead', 'tbody', 'tr', 'th', 'td', 'h1', 'h2', 'h3',
+                          ],
+                        })
+                      : raw,
+                  }}
+                />
+              ) : (
+                <ReactMarkdown>{raw}</ReactMarkdown>
+              )
+            ) : (
+              <p className="text-sm text-black/40">No usage &amp; care information for this product.</p>
+            )}
+          </div>
         </div>
       );
     }
@@ -905,19 +928,65 @@ export default function ProductDetailClient({ initialProduct = null }) {
     }
 
     if (activeTab === 'manufacturer') {
+      const raw = product.manufacturer;
+      const has = raw && String(raw).replace(/<[^>]+>/g, '').trim();
       return (
-        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 text-sm text-black/60">
-          <p className="mb-2 font-medium text-rich-black">Manufacturer</p>
-          <p>Manufacturer/brand information will appear here.</p>
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 max-w-3xl">
+          <div className="prose prose-base prose-p:text-black/60 prose-p:leading-relaxed prose-headings:text-black prose-strong:text-black prose-ul:text-black prose-li:text-black/60 max-w-none">
+            {has ? (
+              isHtml(raw) ? (
+                <div
+                  className="product-description-html"
+                  dangerouslySetInnerHTML={{
+                    __html: mounted
+                      ? DOMPurify.sanitize(raw, {
+                          ALLOWED_TAGS: [
+                            'p', 'br', 'strong', 'em', 'u', 's', 'ul', 'ol', 'li',
+                            'table', 'thead', 'tbody', 'tr', 'th', 'td', 'h1', 'h2', 'h3',
+                          ],
+                        })
+                      : raw,
+                  }}
+                />
+              ) : (
+                <ReactMarkdown>{raw}</ReactMarkdown>
+              )
+            ) : (
+              <p className="text-sm text-black/40">No manufacturer information for this product.</p>
+            )}
+          </div>
         </div>
       );
     }
 
     if (activeTab === 'why') {
+      const raw = product.whyBuyFrom;
+      const has = raw && String(raw).replace(/<[^>]+>/g, '').trim();
       return (
-        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 text-sm text-black/60">
-          <p className="mb-2 font-medium text-rich-black">Why Buy From Us</p>
-          <p>Key reasons to buy from Regal Horeca will appear here.</p>
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 max-w-3xl">
+          <div className="prose prose-base prose-p:text-black/60 prose-p:leading-relaxed prose-headings:text-black prose-strong:text-black prose-ul:text-black prose-li:text-black/60 max-w-none">
+            {has ? (
+              isHtml(raw) ? (
+                <div
+                  className="product-description-html"
+                  dangerouslySetInnerHTML={{
+                    __html: mounted
+                      ? DOMPurify.sanitize(raw, {
+                          ALLOWED_TAGS: [
+                            'p', 'br', 'strong', 'em', 'u', 's', 'ul', 'ol', 'li',
+                            'table', 'thead', 'tbody', 'tr', 'th', 'td', 'h1', 'h2', 'h3',
+                          ],
+                        })
+                      : raw,
+                  }}
+                />
+              ) : (
+                <ReactMarkdown>{raw}</ReactMarkdown>
+              )
+            ) : (
+              <p className="text-sm text-black/40">No &quot;why buy from us&quot; content for this product.</p>
+            )}
+          </div>
         </div>
       );
     }

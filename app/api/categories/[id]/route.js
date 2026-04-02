@@ -148,7 +148,7 @@ export async function DELETE(request, { params }) {
 
     // Check if category is used by products
     const Product = (await import('@/lib/models/Product')).default;
-    const productsUsingCategory = await Product.find({ categoryId: id });
+    const productsUsingCategory = await Product.find({ categoryId: id, deletedAt: null });
     if (productsUsingCategory.length > 0) {
       return NextResponse.json(
         { error: `Cannot delete category. ${productsUsingCategory.length} product(s) are using this category.` },

@@ -17,6 +17,7 @@ export async function GET(request) {
 
     // Use aggregation to get all stats in a single query
     const [statsResult] = await Product.aggregate([
+      { $match: { deletedAt: null } },
       {
         $facet: {
           total: [{ $count: 'count' }],
@@ -37,7 +38,7 @@ export async function GET(request) {
     ]);
 
     // Get recent products (only essential fields)
-    const recentProducts = await Product.find()
+    const recentProducts = await Product.find({ deletedAt: null })
       .select('title heroImage createdAt status slug')
       .sort({ createdAt: -1 })
       .limit(5)

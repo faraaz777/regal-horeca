@@ -59,6 +59,12 @@ export async function GET(request) {
     // Pagination
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '24');
+    const includeAll = searchParams.get('includeAll') === 'true';
+    const showDeleted = searchParams.get('showDeleted') === 'true';
+    let listMode = 'active';
+    if (includeAll) listMode = 'all';
+    else if (showDeleted) listMode = 'deleted';
+
     const { products, pagination } = await queryProducts({
       categorySlug,
       businessSlug,
@@ -75,6 +81,7 @@ export async function GET(request) {
       page,
       limit,
       includePopulates: true,
+      listMode,
     });
 
     return NextResponse.json({

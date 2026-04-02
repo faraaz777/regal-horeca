@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
-import { PlusIcon, EditIcon, TrashIcon, SearchIcon, ChevronLeftIcon, ChevronRightIcon, StarIcon, DuplicateIcon } from '@/components/Icons';
+import { PlusIcon, EditIcon, TrashIcon, SearchIcon, ChevronLeftIcon, ChevronRightIcon, StarIcon, DuplicateIcon, RestoreIcon } from '@/components/Icons';
 import ProductForm from '@/components/ProductForm';
 import { showToast } from '@/lib/utils/toast';
 import { apiClient, ApiError } from '@/lib/utils/apiClient';
@@ -64,19 +64,24 @@ export default function AdminProductsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedProducts, setSelectedProducts] = useState(new Set());
   const [isBulkMode, setIsBulkMode] = useState(false);
+  /** 'active' = catalog rows; 'deleted' = soft-deleted only */
+  const [listFilter, setListFilter] = useState('active');
 
   // Build URL with pagination and search
-  const getProductsUrl = (page, search) => {
+  const getProductsUrl = (page, search, filter) => {
     let url = `/api/products?limit=${ITEMS_PER_PAGE}&page=${page}`;
     if (search) {
       url += `&search=${encodeURIComponent(search)}`;
+    }
+    if (filter === 'deleted') {
+      url += '&showDeleted=true';
     }
     return url;
   };
 
   // Use SWR for data fetching with caching
   const { data, error, isLoading, mutate } = useSWR(
-    getProductsUrl(currentPage, searchTerm),
+    getProductsUrl(currentPage, searchTerm, listFilter),
     fetcher,
     {
       revalidateOnFocus: false,
@@ -84,7 +89,15 @@ export default function AdminProductsPage() {
     }
   );
 
+  // When viewing Deleted, related-product pickers still need an active catalog pool
+  const { data: activePickerData } = useSWR(
+    listFilter === 'deleted' ? '/api/products?limit=300&page=1' : null,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
+
   const products = data?.products || [];
+  const allProductsForForm = listFilter === 'deleted' ? (activePickerData?.products || []) : products;
   const totalProducts = data?.total || 0;
 
   // Handle search with debounce
@@ -99,6 +112,12 @@ export default function AdminProductsPage() {
 
     return () => clearTimeout(timer);
   }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setIsBulkMode(false);
+    setSelectedProducts(new Set());
+  }, [listFilter]);
 
   const handleAddProduct = () => {
     router.push('/admin/products/add');
@@ -135,11 +154,11 @@ export default function AdminProductsPage() {
   };
 
   const handleDeleteProduct = async (productId) => {
-    if (!window.confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
+    if (!window.confirm('Move this product to trash? You can restore it later from the Deleted tab.')) {
       return;
     }
 
-    const toastId = showToast.loading('Deleting product...');
+    const toastId = showToast.loading('Moving to trash...');
     setLoading(true);
 
     try {
@@ -147,7 +166,7 @@ export default function AdminProductsPage() {
         method: 'DELETE',
       });
 
-      showToast.success('Product deleted successfully');
+      showToast.success('Product moved to trash');
       mutate(); // Refresh data using SWR
     } catch (error) {
       if (error instanceof ApiError) {
@@ -155,6 +174,27 @@ export default function AdminProductsPage() {
       } else {
         showToast.error('Failed to delete product');
       }
+    } finally {
+      toast.dismiss(toastId);
+      setLoading(false);
+    }
+  };
+
+  const handleRestoreProduct = async (productId) => {
+    const toastId = showToast.loading('Restoring product...');
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/products/${productId}/restore`, { method: 'POST' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast.error(body.error || 'Failed to restore product');
+        return;
+      }
+      showToast.success('Product restored');
+      mutate();
+    } catch (err) {
+      console.error(err);
+      showToast.error('Failed to restore product');
     } finally {
       toast.dismiss(toastId);
       setLoading(false);
@@ -270,11 +310,11 @@ export default function AdminProductsPage() {
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to delete ${selectedProducts.size} product(s)? This action cannot be undone.`)) {
+    if (!window.confirm(`Move ${selectedProducts.size} product(s) to trash? You can restore them later from the Deleted tab.`)) {
       return;
     }
 
-    const toastId = showToast.loading(`Deleting ${selectedProducts.size} product(s)...`);
+    const toastId = showToast.loading(`Moving ${selectedProducts.size} product(s) to trash...`);
     setLoading(true);
 
     try {
@@ -283,7 +323,7 @@ export default function AdminProductsPage() {
       );
 
       await Promise.all(deletePromises);
-      showToast.success(`Successfully deleted ${selectedProducts.size} product(s)`);
+      showToast.success(`Moved ${selectedProducts.size} product(s) to trash`);
       setSelectedProducts(new Set());
       setIsBulkMode(false);
       mutate();
@@ -391,7 +431,37 @@ export default function AdminProductsPage() {
       <ErrorDisplay error={error} onRetry={() => mutate()} />
       
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 sm:mb-6 gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Manage Products</h1>
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Manage Products</h1>
+          <div className="flex gap-2 mt-3" role="tablist" aria-label="Product list filter">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={listFilter === 'active'}
+              onClick={() => setListFilter('active')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                listFilter === 'active'
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Active
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={listFilter === 'deleted'}
+              onClick={() => setListFilter('deleted')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                listFilter === 'deleted'
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Deleted
+            </button>
+          </div>
+        </div>
         <div className="flex gap-3 w-full md:w-auto flex-wrap">
           {isBulkMode && selectedProducts.size > 0 && (
             <div className="flex gap-2 flex-wrap w-full">
@@ -439,7 +509,7 @@ export default function AdminProductsPage() {
               <SearchIcon className="w-4 h-4" />
             </div>
           </div>
-          {!isBulkMode && (
+          {!isBulkMode && listFilter === 'active' && (
             <>
               <button
                 onClick={() => setIsBulkMode(true)}
@@ -454,6 +524,9 @@ export default function AdminProductsPage() {
                 <PlusIcon /> <span className="hidden sm:inline">Add Product</span><span className="sm:hidden">Add</span>
               </button>
             </>
+          )}
+          {!isBulkMode && listFilter === 'deleted' && (
+            <p className="text-sm text-gray-500 self-center">Restore products to show them on the store again.</p>
           )}
         </div>
       </div>
@@ -523,6 +596,11 @@ export default function AdminProductsPage() {
                               </div>
                               <div className="ml-4">
                                 <div className="text-sm font-medium text-gray-900">{product.title}</div>
+                                {listFilter === 'deleted' && product.deletedAt && (
+                                  <div className="text-xs text-gray-400 mt-0.5">
+                                    Removed {new Date(product.deletedAt).toLocaleString()}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </td>
@@ -548,7 +626,7 @@ export default function AdminProductsPage() {
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            {!isBulkMode && (
+                            {!isBulkMode && listFilter === 'active' && (
                               <>
                                 <button 
                                   onClick={() => handleEditProduct(product)} 
@@ -570,9 +648,29 @@ export default function AdminProductsPage() {
                                   onClick={() => handleDeleteProduct(productId)} 
                                   className="text-red-600 hover:text-red-900"
                                   disabled={loading}
-                                  title="Delete product"
+                                  title="Move to trash"
                                 >
                                   <TrashIcon />
+                                </button>
+                              </>
+                            )}
+                            {!isBulkMode && listFilter === 'deleted' && (
+                              <>
+                                <button 
+                                  onClick={() => handleRestoreProduct(productId)} 
+                                  className="text-emerald-600 hover:text-emerald-900 mr-4"
+                                  disabled={loading}
+                                  title="Restore product"
+                                >
+                                  <RestoreIcon />
+                                </button>
+                                <button 
+                                  onClick={() => handleEditProduct(product)} 
+                                  className="text-indigo-600 hover:text-indigo-900"
+                                  disabled={loading}
+                                  title="Edit (e.g. change slug if restore fails)"
+                                >
+                                  <EditIcon />
                                 </button>
                               </>
                             )}
@@ -583,7 +681,11 @@ export default function AdminProductsPage() {
                   ) : (
                     <tr>
                       <td colSpan={isBulkMode ? 7 : 6} className="px-6 py-8 text-center text-gray-500">
-                        {searchTerm ? `No products found matching "${searchTerm}"` : 'No products found'}
+                        {searchTerm
+                          ? `No products found matching "${searchTerm}"`
+                          : listFilter === 'deleted'
+                            ? 'No deleted products'
+                            : 'No products found'}
                       </td>
                     </tr>
                   )}
@@ -641,6 +743,11 @@ export default function AdminProductsPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="text-sm font-medium text-gray-900 mb-1 line-clamp-2">{product.title}</h3>
+                          {listFilter === 'deleted' && product.deletedAt && (
+                            <p className="text-xs text-gray-400 mb-1">
+                              Removed {new Date(product.deletedAt).toLocaleString()}
+                            </p>
+                          )}
                           <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-2">
                             <span>{product.brand}</span>
                             <span>•</span>
@@ -662,7 +769,7 @@ export default function AdminProductsPage() {
                             )}
                           </div>
                         </div>
-                        {!isBulkMode && (
+                        {!isBulkMode && listFilter === 'active' && (
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <button 
                               onClick={() => handleEditProduct(product)} 
@@ -684,9 +791,29 @@ export default function AdminProductsPage() {
                               onClick={() => handleDeleteProduct(productId)} 
                               className="text-red-600 hover:text-red-900 p-2"
                               disabled={loading}
-                              title="Delete product"
+                              title="Move to trash"
                             >
                               <TrashIcon />
+                            </button>
+                          </div>
+                        )}
+                        {!isBulkMode && listFilter === 'deleted' && (
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <button 
+                              onClick={() => handleRestoreProduct(productId)} 
+                              className="text-emerald-600 hover:text-emerald-900 p-2"
+                              disabled={loading}
+                              title="Restore product"
+                            >
+                              <RestoreIcon />
+                            </button>
+                            <button 
+                              onClick={() => handleEditProduct(product)} 
+                              className="text-indigo-600 hover:text-indigo-900 p-2"
+                              disabled={loading}
+                              title="Edit product"
+                            >
+                              <EditIcon />
                             </button>
                           </div>
                         )}
@@ -696,7 +823,11 @@ export default function AdminProductsPage() {
                 })
               ) : (
                 <div className="px-4 py-8 text-center text-gray-500 text-sm">
-                  {searchTerm ? `No products found matching "${searchTerm}"` : 'No products found'}
+                  {searchTerm
+                    ? `No products found matching "${searchTerm}"`
+                    : listFilter === 'deleted'
+                      ? 'No deleted products'
+                      : 'No products found'}
                 </div>
               )}
             </div>
@@ -760,7 +891,7 @@ export default function AdminProductsPage() {
             <div className="flex-grow overflow-y-auto p-2 sm:p-6">
               <ProductForm 
                 product={editingProduct} 
-                allProducts={products}
+                allProducts={allProductsForForm}
                 onSave={handleSaveEditedProduct}
                 onCancel={() => {
                   setIsEditModalOpen(false);

@@ -122,7 +122,8 @@ export async function DELETE(request, { params }) {
 
     // Check if brand is used by products
     const Product = (await import('@/lib/models/Product')).default;
-    const productsUsingBrand = await Product.find({ 
+    const productsUsingBrand = await Product.find({
+      deletedAt: null,
       $or: [
         { brandCategoryId: id },
         { brandCategoryIds: id }

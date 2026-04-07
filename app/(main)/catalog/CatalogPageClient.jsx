@@ -154,6 +154,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
   // Filter handlers - only update URL, no client-side filtering
   const handlePriceMinChange = useCallback((value) => {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete('page');
     if (value) params.set('priceMin', value);
     else params.delete('priceMin');
     router.push(`/catalog?${params.toString()}`, { scroll: false });
@@ -161,6 +162,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
 
   const handlePriceMaxChange = useCallback((value) => {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete('page');
     if (value) params.set('priceMax', value);
     else params.delete('priceMax');
     router.push(`/catalog?${params.toString()}`, { scroll: false });
@@ -168,6 +170,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
 
   const handleColorToggle = useCallback((color) => {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete('page');
     const newColors = selectedColors.includes(color)
       ? selectedColors.filter(c => c !== color)
       : [...selectedColors, color];
@@ -178,6 +181,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
 
   const handleBrandToggle = useCallback((brand) => {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete('page');
     const newBrands = selectedBrands.includes(brand)
       ? selectedBrands.filter(b => b !== brand)
       : [...selectedBrands, brand];
@@ -188,6 +192,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
 
   const handleFilterToggle = useCallback((filterKey, value) => {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete('page');
     const current = selectedFilters[filterKey] || [];
     const updated = current.includes(value)
       ? current.filter(v => v !== value)
@@ -209,6 +214,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
 
   const handleSortChange = useCallback((newSort) => {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete('page');
     if (newSort && newSort !== 'newest') params.set('sortBy', newSort);
     else params.delete('sortBy');
     router.push(`/catalog?${params.toString()}`, { scroll: false });
@@ -302,10 +308,20 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
   const totalProducts = pagination.total || 0;
   const paginatedProducts = products; // Products are already paginated from API
 
-  // Reset page to 1 when filters change (but keep current page if just changing page)
+  // Reset page state to 1 when filter context changes.
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedCategorySlug, selectedBusinessSlug, searchQuery, selectedColors, selectedBrands, selectedFilters, priceMin, priceMax, sortBy]);
+
+  // Safety net: if current page is out of range for new result set, go back to page 1.
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('page');
+      router.replace(`/catalog?${params.toString()}`, { scroll: false });
+      setCurrentPage(1);
+    }
+  }, [currentPage, totalPages, searchParams, router]);
 
   // Update currentPage when URL page param changes
   useEffect(() => {

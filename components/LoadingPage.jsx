@@ -14,19 +14,42 @@ export default function LoadingPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Hide loading after page is fully loaded
-    const handleLoad = () => {
-      setTimeout(() => {
+    // Show loader once per browser session to avoid repeated overlays.
+    const SESSION_KEY = 'regal_loader_seen';
+    try {
+      if (sessionStorage.getItem(SESSION_KEY) === '1') {
         setIsLoading(false);
-      }, 1000); // Show for 1.5 seconds minimum
+        return;
+      }
+    } catch (_) {
+      // Ignore storage issues in restrictive environments.
+    }
+
+    let timeoutId;
+    const hideLoader = () => {
+      timeoutId = setTimeout(() => {
+        setIsLoading(false);
+        try {
+          sessionStorage.setItem(SESSION_KEY, '1');
+        } catch (_) {
+          // Non-fatal: loader still hides.
+        }
+      }, 220);
     };
 
-    if (document.readyState === 'complete') {
-      handleLoad();
-    } else {
-      window.addEventListener('load', handleLoad);
-      return () => window.removeEventListener('load', handleLoad);
+    // Do not wait for all assets; hide right after initial DOM readiness.
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', hideLoader, { once: true });
+      return () => {
+        document.removeEventListener('DOMContentLoaded', hideLoader);
+        if (timeoutId) clearTimeout(timeoutId);
+      };
     }
+
+    hideLoader();
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, []);
 
   if (!isLoading) return null;

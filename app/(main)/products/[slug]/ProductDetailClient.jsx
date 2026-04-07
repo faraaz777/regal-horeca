@@ -1121,11 +1121,6 @@ export default function ProductDetailClient({ initialProduct = null }) {
                     <span className="text-xl sm:text-2xl font-bold text-accent">
                       {isPriceOnRequest ? 'Price on request' : `${formatPrice(displayPrice)}${displayUnitSuffix}`}
                     </span>
-                    {!isPriceOnRequest && displayPrice != null && displayPrice > 0 && (
-                      <span className="text-sm text-[#5F748D]">
-                        ≈ ${(displayPrice / 84).toFixed(1)}{displayUnitSuffix }
-                      </span>
-                    )}
                   </div>
                   {/* {product.summary && ( 
                     <p className="text-sm text-[#5F748D] mt-1.5">

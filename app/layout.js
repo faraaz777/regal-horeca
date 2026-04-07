@@ -40,8 +40,21 @@ export const metadata = {
   },
 };
 
+async function getInitialCategoriesFast() {
+  const timeoutMs = 350;
+  try {
+    return await Promise.race([
+      getCategories(),
+      new Promise((resolve) => setTimeout(() => resolve([]), timeoutMs)),
+    ]);
+  } catch (error) {
+    console.error('RootLayout categories fast-path failed:', error);
+    return [];
+  }
+}
+
 export default async function RootLayout({ children }) {
-  const initialCategories = await getCategories();
+  const initialCategories = await getInitialCategoriesFast();
   const organizationSchema = generateOrganizationSchema();
   const websiteSchema = generateWebSiteSchema();
 

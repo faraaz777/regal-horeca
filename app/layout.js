@@ -65,6 +65,10 @@ export default async function RootLayout({ children }) {
           name="google-site-verification"
           content="RXUWFb3zOQhYOdYjfvs6PjNXe1LjmRZeV72wtbusTcI"
         />
+        <meta
+          name="p:domain_verify"
+          content="be3684d1bd78dcecbae55658878acd0a"
+        />
       </head>
       <body suppressHydrationWarning>
         <script

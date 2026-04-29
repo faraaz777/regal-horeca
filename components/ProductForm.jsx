@@ -451,7 +451,7 @@ const FormSection = ({ title, children }) => (
   </div>
 );
 
-export default function ProductForm({ product, allProducts, onSave, onCancel, onCategoryChange }) {
+export default function ProductForm({ product, allProducts, onSave, onCancel, onCategoryChange, onVariantsOnlyChange }) {
   const { categories, brands, businessTypes } = useAppContext();
   
   const [formData, setFormData] = useState({
@@ -513,6 +513,86 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
   const autoTagDebounceRef = useRef(null);
   const [relatedProductsSearchQuery, setRelatedProductsSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [showAddVariantsPanel, setShowAddVariantsPanel] = useState(false);
+  const [variantFieldSelection, setVariantFieldSelection] = useState({
+    size: false,
+    color: false,
+    weight: false,
+    unitCount: false,
+  });
+  const [variantBuilderInputs, setVariantBuilderInputs] = useState({
+    size: '',
+    color: '',
+    weight: '',
+    unitCount: '',
+  });
+  const [variantDraftValue, setVariantDraftValue] = useState({
+    size: '',
+    color: '',
+    weight: '',
+    unitCount: '',
+  });
+  const [variantRows, setVariantRows] = useState([]);
+  const [selectedVariantRowIndex, setSelectedVariantRowIndex] = useState(null);
+  const [showVariantsOnly, setShowVariantsOnly] = useState(false);
+  const [recentlyDeletedVariantRow, setRecentlyDeletedVariantRow] = useState(null);
+  const isCreatingMultipleVariants = (variantRows || []).length > 0;
+
+  useEffect(() => {
+    if (typeof onVariantsOnlyChange === 'function') {
+      onVariantsOnlyChange(showVariantsOnly);
+    }
+  }, [showVariantsOnly, onVariantsOnlyChange]);
+
+  useEffect(() => {
+    // Parent SKU/Barcode should stay empty when variant-level SKU/Barcode are used.
+    if (!isCreatingMultipleVariants) return;
+    setFormData((prev) => {
+      if (!prev?.sku && !prev?.barcode) return prev;
+      return {
+        ...prev,
+        sku: '',
+        barcode: '',
+      };
+    });
+  }, [isCreatingMultipleVariants]);
+
+  useEffect(() => {
+    const incomingVariants = Array.isArray(product?.variants) ? product.variants : [];
+    if (incomingVariants.length === 0) {
+      setVariantRows([]);
+      return;
+    }
+
+    const normalized = incomingVariants.map((variant) => ({
+      _rowId: createVariantRowId(),
+      name: String(variant?.name || '').trim() || String(product?.title || ''),
+      size: String(variant?.size || '').trim(),
+      color: String(variant?.color || '').trim(),
+      unitCount: String(variant?.unitCount || '').trim(),
+      weight: String(variant?.weight || '').trim(),
+      isDefault: Boolean(variant?.isDefault),
+      images: Array.isArray(variant?.images) ? variant.images.filter(Boolean) : [],
+      sku: String(variant?.sku || '').trim(),
+      barcode: String(variant?.barcode || '').trim(),
+      hsnCode: String(variant?.hsnCode || '').trim(),
+      gstPercent: Number(variant?.gstPercent || 0),
+      mrp: Number(variant?.mrp || 0),
+      sellingPrice: Number(variant?.sellingPrice || variant?.price || 0),
+      discountPercent: Number(variant?.discountPercent || 0),
+      marginPrice: Number(variant?.marginPrice || 0),
+      price: Number(variant?.sellingPrice || variant?.price || 0),
+    }));
+
+    setVariantRows(normalized);
+
+    setVariantFieldSelection({
+      size: normalized.some((row) => row.size),
+      color: normalized.some((row) => row.color),
+      unitCount: normalized.some((row) => row.unitCount),
+      weight: normalized.some((row) => row.weight),
+    });
+  }, [product]);
 
   // Price-by-size helpers
   const addPriceBySizeRow = () => {
@@ -530,6 +610,219 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       i === index ? { ...row, [field]: value } : row
     );
     setFormData((prev) => ({ ...prev, priceBySize: next }));
+  };
+
+  const selectedColorNames = (formData.colorVariants || [])
+    .map((variant) => String(variant?.colorName || '').trim())
+    .filter(Boolean);
+
+  const handleVariantFieldToggle = (field) => {
+    setVariantFieldSelection((prev) => ({
+      ...prev,
+      [field]: !prev[field],
+    }));
+  };
+
+  const addVariantOptionValue = (field) => {
+    const nextValue = String(variantDraftValue[field] || '').trim();
+    if (!nextValue) return;
+
+    const existing = parseOptionValues(variantBuilderInputs[field]);
+    const exists = existing.some((value) => value.toLowerCase() === nextValue.toLowerCase());
+    const nextList = exists ? existing : [...existing, nextValue];
+
+    setVariantBuilderInputs((prev) => ({
+      ...prev,
+      [field]: nextList.join(', '),
+    }));
+    setVariantDraftValue((prev) => ({
+      ...prev,
+      [field]: '',
+    }));
+  };
+
+  const parseOptionValues = (raw) =>
+    String(raw || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+  const getVariantCombinationKey = (combo) =>
+    [combo.size || '', combo.color || '', combo.weight || '', combo.unitCount || '']
+      .map((value) => String(value).toLowerCase())
+      .join('|');
+
+  const createVariantRowId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+  const createEmptyVariantRow = () => ({
+    _rowId: createVariantRowId(),
+    name: formData.title || '',
+    size: '',
+    color: '',
+    unitCount: '',
+    weight: '',
+    isDefault: false,
+    images: [],
+    sku: '',
+    barcode: '',
+    hsnCode: '',
+    gstPercent: 0,
+    mrp: 0,
+    sellingPrice: 0,
+    discountPercent: 0,
+    marginPrice: 0,
+    price: '',
+  });
+
+  const handleGenerateVariantRows = () => {
+    const dimensions = [];
+
+    if (variantFieldSelection.size) {
+      const values = parseOptionValues(variantBuilderInputs.size);
+      if (values.length === 0) {
+        setError('Please enter at least one Size value.');
+        return;
+      }
+      dimensions.push({ key: 'size', values });
+    }
+
+    if (variantFieldSelection.color) {
+      const values = selectedColorNames.length > 0 ? selectedColorNames : parseOptionValues(variantBuilderInputs.color);
+      if (values.length === 0) {
+        setError('Please enter at least one Color value or select colors in Color Variants.');
+        return;
+      }
+      dimensions.push({ key: 'color', values });
+    }
+
+    if (variantFieldSelection.weight) {
+      const values = parseOptionValues(variantBuilderInputs.weight);
+      if (values.length === 0) {
+        setError('Please enter at least one Weight value.');
+        return;
+      }
+      dimensions.push({ key: 'weight', values });
+    }
+
+    if (variantFieldSelection.unitCount) {
+      const values = parseOptionValues(variantBuilderInputs.unitCount);
+      if (values.length === 0) {
+        setError('Please enter at least one Unit Count value.');
+        return;
+      }
+      dimensions.push({ key: 'unitCount', values });
+    }
+
+    if (dimensions.length === 0) {
+      setError('Please tick at least one variant field to generate variants.');
+      return;
+    }
+
+    const combos = dimensions.reduce(
+      (acc, dim) => acc.flatMap((base) => dim.values.map((value) => ({ ...base, [dim.key]: value }))),
+      [{}]
+    );
+
+    const existingByKey = new Map((variantRows || []).map((row) => [getVariantCombinationKey(row), row]));
+
+    const nextRows = combos.map((combo) => {
+      const key = getVariantCombinationKey(combo);
+      const existing = existingByKey.get(key);
+      if (existing) return existing;
+
+      return {
+        ...createEmptyVariantRow(),
+        size: combo.size || '',
+        color: combo.color || '',
+        unitCount: combo.unitCount || '',
+        weight: combo.weight || '',
+      };
+    });
+
+    setError('');
+    setVariantRows(nextRows);
+  };
+
+  const handleVariantRowChange = (index, field, value) => {
+    setVariantRows((prev) =>
+      prev.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row))
+    );
+  };
+
+  const handleSetDefaultVariantRow = (index) => {
+    setVariantRows((prev) =>
+      prev.map((row, rowIndex) => ({
+        ...row,
+        isDefault: rowIndex === index,
+      }))
+    );
+  };
+
+  const handleVariantRowImageUpload = async (e, index) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
+    setError('');
+    try {
+      const uploadPromises = Array.from(files).map((file) => uploadToR2(file));
+      const uploadedUrls = await Promise.all(uploadPromises);
+      setVariantRows((prev) =>
+        prev.map((row, rowIndex) =>
+          rowIndex === index
+            ? { ...row, images: [...(row.images || []), ...uploadedUrls] }
+            : row
+        )
+      );
+    } catch (error) {
+      console.error('Variant image upload failed', error);
+      setError(`Variant image upload failed: ${error.message}`);
+    } finally {
+      setIsUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveVariantRowImage = (rowIndex, imageIndex) => {
+    setVariantRows((prev) =>
+      prev.map((row, idx) =>
+        idx === rowIndex
+          ? { ...row, images: (row.images || []).filter((_, i) => i !== imageIndex) }
+          : row
+      )
+    );
+  };
+
+  const handleAddSingleVariantRow = () => {
+    setVariantRows((prev) => [...prev, createEmptyVariantRow()]);
+    setError('');
+  };
+
+  const handleDeleteVariantRow = (index) => {
+    const rowToDelete = variantRows[index];
+    if (!rowToDelete) return;
+
+    const confirmed = window.confirm('Delete this variant row? You can undo this action.');
+    if (!confirmed) return;
+
+    setVariantRows((prev) => prev.filter((_, rowIndex) => rowIndex !== index));
+    setRecentlyDeletedVariantRow({ row: rowToDelete, index });
+    setSelectedVariantRowIndex((prev) => {
+      if (prev === null) return null;
+      if (prev === index) return null;
+      return prev > index ? prev - 1 : prev;
+    });
+  };
+
+  const handleUndoDeleteVariantRow = () => {
+    if (!recentlyDeletedVariantRow) return;
+    const { row, index } = recentlyDeletedVariantRow;
+    setVariantRows((prev) => {
+      const next = [...prev];
+      const safeIndex = Math.max(0, Math.min(index, next.length));
+      next.splice(safeIndex, 0, row);
+      return next;
+    });
+    setRecentlyDeletedVariantRow(null);
   };
   
   // Debounce search query to avoid too many API calls
@@ -2216,6 +2509,55 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
   };
 
   const handleSubmit = (e) => {
+    const colorImagesByName = new Map(
+      (formData.colorVariants || []).map((variant) => [
+        String(variant?.colorName || '').trim().toLowerCase(),
+        Array.isArray(variant?.images) ? variant.images.filter(Boolean) : [],
+      ])
+    );
+
+    const normalizedVariants = (variantRows || [])
+      .filter((row) => row && typeof row === 'object')
+      .map((row) => ({
+        images: (() => {
+          const explicitImages = Array.isArray(row.images) ? row.images.filter(Boolean) : [];
+          if (explicitImages.length > 0) return explicitImages;
+          const colorKey = String(row.color || '').trim().toLowerCase();
+          const matchedColorImages = colorKey ? (colorImagesByName.get(colorKey) || []) : [];
+          if (matchedColorImages.length > 0) return matchedColorImages;
+          return formData.heroImage ? [formData.heroImage] : [];
+        })(),
+        name: String(row.name || formData.title || '').trim(),
+        size: String(row.size || '').trim(),
+        color: String(row.color || '').trim(),
+        unitCount: String(row.unitCount || '').trim(),
+        weight: String(row.weight || '').trim(),
+        isDefault: Boolean(row.isDefault),
+        sku: String(row.sku || '').trim(),
+        barcode: String(row.barcode || '').trim(),
+        hsnCode: String(row.hsnCode || '').trim(),
+        gstPercent: Number(row.gstPercent || 0),
+        mrp: Number(row.mrp || 0),
+        sellingPrice: Number(row.sellingPrice || 0),
+        discountPercent: Number(row.discountPercent || 0),
+        marginPrice: Number(row.marginPrice || 0),
+        price: Number(row.sellingPrice || row.price || 0),
+      }))
+      .filter((row) => row.name || row.sku || row.color || row.size || row.weight || row.unitCount);
+
+    if (normalizedVariants.length > 0) {
+      const explicitDefaultIndex = normalizedVariants.findIndex((row) => row.isDefault);
+      const resolvedDefaultIndex = explicitDefaultIndex >= 0 ? explicitDefaultIndex : 0;
+      const variantsWithSingleDefault = normalizedVariants.map((row, idx) => ({
+        ...row,
+        isDefault: idx === resolvedDefaultIndex,
+      }));
+      const defaultRow = variantsWithSingleDefault[resolvedDefaultIndex];
+      const nonDefaultRows = variantsWithSingleDefault.filter((_, idx) => idx !== resolvedDefaultIndex);
+      normalizedVariants.length = 0;
+      normalizedVariants.push(defaultRow, ...nonDefaultRows);
+    }
+
     e.preventDefault();
     setError('');
 
@@ -2316,12 +2658,15 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     })();
 
     const derivedBasePrice =
-      normalizedPriceBySize.length > 0
-        ? Math.min(...normalizedPriceBySize.map(r => r.price))
-        : Number(formData.price || 0);
+      normalizedVariants.length > 0
+        ? Math.min(...normalizedVariants.map((row) => Number(row.price || 0)))
+        : normalizedPriceBySize.length > 0
+          ? Math.min(...normalizedPriceBySize.map(r => r.price))
+          : Number(formData.price || 0);
 
     const finalProduct = {
       ...formData,
+      variants: normalizedVariants,
       brandCategoryId: updatedBrandCategoryId || formData.brandCategoryId,
       priceBySize: normalizedPriceBySize,
       price: Number.isFinite(derivedBasePrice) ? derivedBasePrice : 0,
@@ -2331,6 +2676,11 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       brandCategoryIds,
       filters: filtersWithSizeFromPricing
     };
+
+    if (normalizedVariants.length > 0) {
+      finalProduct.sku = '';
+      finalProduct.barcode = '';
+    }
     
     // Remove temporary input fields
     delete finalProduct.tagsInput;
@@ -2351,14 +2701,263 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm flex flex-col h-full">
+    <div className={`bg-white rounded-lg shadow-sm flex flex-col h-full ${showVariantsOnly ? 'w-full' : ''}`}>
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 text-sm">
           {error}
         </div>
       )}
-      <form id="product-form" onSubmit={handleSubmit} className="flex-grow">
+      <form id="product-form" onSubmit={handleSubmit} className={`flex-grow ${showVariantsOnly ? 'w-full' : ''}`}>
+        <div className="mb-5 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowVariantsOnly(false)}
+            className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${
+              !showVariantsOnly ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Full Product Form
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowVariantsOnly(true)}
+            className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${
+              showVariantsOnly ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Variants Section
+          </button>
+        </div>
+
+        {showVariantsOnly && (
+        <div className="w-full min-h-screen">
+        <FormSection title="Variants">
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={() => setShowAddVariantsPanel((prev) => !prev)}
+              className="px-4 py-2 text-sm font-semibold bg-primary text-white rounded-md hover:bg-primary-700 transition-colors"
+            >
+              {showAddVariantsPanel ? 'Close Variants Builder' : 'Add Variants'}
+            </button>
+          </div>
+
+          {showAddVariantsPanel && (
+            <div className="mb-4 p-4 border border-gray-200 rounded-md bg-gray-50">
+              <p className="text-sm font-semibold text-gray-800 mb-3">Choose variant fields</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={variantFieldSelection.size} onChange={() => handleVariantFieldToggle('size')} className="h-4 w-4 rounded text-primary focus:ring-primary" />Size</label>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={variantFieldSelection.color} onChange={() => handleVariantFieldToggle('color')} className="h-4 w-4 rounded text-primary focus:ring-primary" />Color</label>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={variantFieldSelection.weight} onChange={() => handleVariantFieldToggle('weight')} className="h-4 w-4 rounded text-primary focus:ring-primary" />Weight</label>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={variantFieldSelection.unitCount} onChange={() => handleVariantFieldToggle('unitCount')} className="h-4 w-4 rounded text-primary focus:ring-primary" />Unit Count</label>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {variantFieldSelection.size && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Size values</label>
+                    <div className="flex items-center gap-2">
+                      <input type="text" placeholder="Type one size and click ✓ Add" value={variantDraftValue.size} onChange={(e) => setVariantDraftValue((prev) => ({ ...prev, size: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addVariantOptionValue('size'); } }} className="w-full p-2 border border-gray-300 rounded-md" />
+                      <button type="button" onClick={() => addVariantOptionValue('size')} className="px-3 py-2 text-sm font-semibold bg-green-600 text-white rounded-md hover:bg-green-700">✓ Add</button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Selected: {variantBuilderInputs.size || '—'}</p>
+                  </div>
+                )}
+                {variantFieldSelection.color && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Color values</label>
+                    {selectedColorNames.length > 0 ? (
+                      <div className="p-2 border border-blue-200 rounded-md bg-blue-50 text-sm text-blue-700">Colors: {selectedColorNames.join(', ')}</div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <input type="text" placeholder="Type one color and click ✓ Add" value={variantDraftValue.color} onChange={(e) => setVariantDraftValue((prev) => ({ ...prev, color: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addVariantOptionValue('color'); } }} className="w-full p-2 border border-gray-300 rounded-md" />
+                          <button type="button" onClick={() => addVariantOptionValue('color')} className="px-3 py-2 text-sm font-semibold bg-green-600 text-white rounded-md hover:bg-green-700">✓ Add</button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Selected: {variantBuilderInputs.color || '—'}</p>
+                      </>
+                    )}
+                  </div>
+                )}
+                {variantFieldSelection.weight && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Weight values</label>
+                    <div className="flex items-center gap-2">
+                      <input type="text" placeholder="Type one weight and click ✓ Add" value={variantDraftValue.weight} onChange={(e) => setVariantDraftValue((prev) => ({ ...prev, weight: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addVariantOptionValue('weight'); } }} className="w-full p-2 border border-gray-300 rounded-md" />
+                      <button type="button" onClick={() => addVariantOptionValue('weight')} className="px-3 py-2 text-sm font-semibold bg-green-600 text-white rounded-md hover:bg-green-700">✓ Add</button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Selected: {variantBuilderInputs.weight || '—'}</p>
+                  </div>
+                )}
+                {variantFieldSelection.unitCount && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Unit Count values</label>
+                    <div className="flex items-center gap-2">
+                      <input type="text" placeholder="Type one unit count and click ✓ Add" value={variantDraftValue.unitCount} onChange={(e) => setVariantDraftValue((prev) => ({ ...prev, unitCount: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addVariantOptionValue('unitCount'); } }} className="w-full p-2 border border-gray-300 rounded-md" />
+                      <button type="button" onClick={() => addVariantOptionValue('unitCount')} className="px-3 py-2 text-sm font-semibold bg-green-600 text-white rounded-md hover:bg-green-700">✓ Add</button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Selected: {variantBuilderInputs.unitCount || '—'}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 flex items-center gap-3">
+                <button type="button" onClick={handleGenerateVariantRows} className="px-4 py-2 text-sm font-semibold bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">Generate Variants</button>
+                <button type="button" onClick={handleAddSingleVariantRow} className="px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">Add Single Row</button>
+                {variantRows.length > 0 && <span className="text-sm text-gray-600">Total variants: <span className="font-semibold">{variantRows.length}</span></span>}
+              </div>
+            </div>
+          )}
+
+          {recentlyDeletedVariantRow && (
+            <div className="mb-3 p-3 border border-amber-200 bg-amber-50 rounded-md flex items-center justify-between gap-3">
+              <span className="text-sm text-amber-800">Variant row deleted.</span>
+              <button
+                type="button"
+                onClick={handleUndoDeleteVariantRow}
+                className="px-3 py-1.5 text-xs font-semibold text-amber-900 border border-amber-300 rounded hover:bg-amber-100"
+              >
+                Undo
+              </button>
+            </div>
+          )}
+
+          <div className="w-full max-w-full overflow-x-auto border border-gray-200 rounded-md">
+            <table className="w-full min-w-[1700px] table-auto text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="w-14 px-2 py-2 text-center font-semibold text-gray-700 whitespace-nowrap">S.NO</th>
+                  <th className="w-12 px-0.5 py-2 text-center font-semibold text-gray-700 whitespace-nowrap">Default</th>
+                  <th className="w-[320px] min-w-[320px] px-2 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Name</th>
+                  {variantFieldSelection.size && <th className="w-[120px] min-w-[120px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Size</th>}
+                  {variantFieldSelection.color && <th className="w-[140px] min-w-[140px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Color</th>}
+                  {variantFieldSelection.unitCount && <th className="w-[130px] min-w-[130px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Unit Count</th>}
+                  {variantFieldSelection.weight && <th className="w-[130px] min-w-[130px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Weight</th>}
+                  <th className="w-[160px] min-w-[160px] px-2 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Images</th>
+                  <th className="w-[150px] min-w-[150px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">SKU</th>
+                  <th className="w-[150px] min-w-[150px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">BARCODE</th>
+                  <th className="w-[140px] min-w-[140px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">HSN CODE</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-700 break-words">GST%</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-700 break-words">MRP</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-700 break-words">SELLING PRICE</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-700 break-words">DISCOUNT %</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-700 break-words">MARGIN PRICE</th>
+                  <th className="w-20 px-2 py-2 text-center font-semibold text-gray-700 whitespace-nowrap">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {variantRows.length > 0 ? variantRows.map((row, index) => (
+                  <tr
+                    key={row._rowId || index}
+                    onClick={() => setSelectedVariantRowIndex(index)}
+                    className={`border-b border-gray-100 cursor-pointer transition-colors ${
+                      selectedVariantRowIndex === index ? 'bg-blue-50' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <td className="w-14 px-2 py-2 text-gray-700 font-medium text-center">{index + 1}</td>
+                    <td className="w-12 px-0.5 py-2 text-center">
+                      <input
+                        type="radio"
+                        name="default-variant-row"
+                        checked={Boolean(row.isDefault)}
+                        onChange={() => handleSetDefaultVariantRow(index)}
+                        onClick={(e) => e.stopPropagation()}
+                        title="Set as default variant"
+                        className="h-4 w-4 text-primary focus:ring-primary"
+                      />
+                    </td>
+                    <td className="w-[320px] min-w-[320px] px-2 py-2"><input type="text" value={row.name || ''} onChange={(e) => handleVariantRowChange(index, 'name', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>
+                    {variantFieldSelection.size && <td className="w-[120px] min-w-[120px] px-3 py-2"><input type="text" value={row.size || ''} onChange={(e) => handleVariantRowChange(index, 'size', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>}
+                    {variantFieldSelection.color && <td className="w-[140px] min-w-[140px] px-3 py-2"><input type="text" value={row.color || ''} onChange={(e) => handleVariantRowChange(index, 'color', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>}
+                    {variantFieldSelection.unitCount && <td className="w-[130px] min-w-[130px] px-3 py-2"><input type="text" value={row.unitCount || ''} onChange={(e) => handleVariantRowChange(index, 'unitCount', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>}
+                    {variantFieldSelection.weight && <td className="w-[130px] min-w-[130px] px-3 py-2"><input type="text" value={row.weight || ''} onChange={(e) => handleVariantRowChange(index, 'weight', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>}
+                    <td className="w-[160px] min-w-[160px] px-2 py-2">
+                      <div className="space-y-2">
+                        <input
+                          id={`variant-row-images-${row._rowId || index}`}
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleVariantRowImageUpload(e, index)}
+                        />
+                        <label
+                          htmlFor={`variant-row-images-${row._rowId || index}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold border border-gray-300 rounded-md bg-white hover:bg-gray-50 cursor-pointer"
+                        >
+                          {isUploading ? 'Uploading...' : 'Upload'}
+                        </label>
+                        {(row.images || []).length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {(row.images || []).slice(0, 4).map((url, imageIndex) => (
+                              <div key={`${url}-${imageIndex}`} className="relative">
+                                <Image
+                                  src={url}
+                                  alt="Variant preview"
+                                  width={34}
+                                  height={34}
+                                  unoptimized
+                                  className="h-8 w-8 rounded border border-gray-200 object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveVariantRowImage(index, imageIndex);
+                                  }}
+                                  className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-600 text-white text-[10px] leading-4"
+                                  title="Remove image"
+                                  aria-label="Remove image"
+                                >
+                                  x
+                                </button>
+                              </div>
+                            ))}
+                            {(row.images || []).length > 4 && (
+                              <span className="text-[11px] text-gray-500 self-center">+{(row.images || []).length - 4}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-gray-500">Will use color images or hero image fallback.</p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="w-[150px] min-w-[150px] px-3 py-2"><input type="text" value={row.sku || ''} onChange={(e) => handleVariantRowChange(index, 'sku', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>
+                    <td className="w-[150px] min-w-[150px] px-3 py-2"><input type="text" value={row.barcode || ''} onChange={(e) => handleVariantRowChange(index, 'barcode', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>
+                    <td className="w-[140px] min-w-[140px] px-3 py-2"><input type="text" value={row.hsnCode || ''} onChange={(e) => handleVariantRowChange(index, 'hsnCode', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.gstPercent ?? ''} onChange={(e) => handleVariantRowChange(index, 'gstPercent', e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.mrp ?? ''} onChange={(e) => handleVariantRowChange(index, 'mrp', e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.sellingPrice ?? ''} onChange={(e) => handleVariantRowChange(index, 'sellingPrice', e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.discountPercent ?? ''} onChange={(e) => handleVariantRowChange(index, 'discountPercent', e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.marginPrice ?? ''} onChange={(e) => handleVariantRowChange(index, 'marginPrice', e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" /></td>
+                    <td className="w-20 px-2 py-2 text-center">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteVariantRow(index);
+                        }}
+                        className="inline-flex items-center justify-center p-2 text-red-600 border border-red-300 rounded hover:bg-red-50"
+                        title="Remove row"
+                        aria-label="Remove row"
+                      >
+                        <TrashIcon />
+                      </button>
+                    </td>
+                  </tr>
+                )) : (
+                  <tr><td colSpan={13 + (variantFieldSelection.size ? 1 : 0) + (variantFieldSelection.color ? 1 : 0) + (variantFieldSelection.unitCount ? 1 : 0) + (variantFieldSelection.weight ? 1 : 0)} className="px-3 py-4 text-center text-sm text-gray-500">No variants generated yet. Select fields and click <span className="font-semibold">Generate Variants</span>.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </FormSection>
+        </div>
+        )}
+
         {/* Desktop: Two-column layout, Mobile: Single column */}
+        {!showVariantsOnly && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-6">
           {/* Left Column */}
           <div className="space-y-5 sm:space-y-6">
@@ -2482,20 +3081,23 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     name="sku" 
                     value={formData.sku || ''} 
                     onChange={handleChange} 
-                    className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors" 
-                    placeholder="Enter SKU"
+                    disabled={isCreatingMultipleVariants}
+                    className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed" 
+                    placeholder={isCreatingMultipleVariants ? 'SKU is managed per variant row' : 'Enter SKU'}
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700">Barcode</label>
-                  <input
-                    name="barcode"
-                    value={formData.barcode || ''}
-                    onChange={handleChange}
-                    className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
-                    placeholder="Enter Barcode"
-                  />
-                </div>
+                {!isCreatingMultipleVariants && (
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-gray-700">Barcode</label>
+                    <input
+                      name="barcode"
+                      value={formData.barcode || ''}
+                      onChange={handleChange}
+                      className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+                      placeholder="Enter Barcode"
+                    />
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -2537,11 +3139,17 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   <button
                     type="button"
                     onClick={addPriceBySizeRow}
-                    className="text-xs font-semibold text-primary hover:underline"
+                    disabled={isCreatingMultipleVariants}
+                    className="text-xs font-semibold text-primary hover:underline disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed"
                   >
                     + Add row
                   </button>
                 </div>
+                {isCreatingMultipleVariants && (
+                  <p className="mb-2 text-xs text-amber-700">
+                    Price by Size is locked because variants are enabled. Existing values are preserved.
+                  </p>
+                )}
 
                 <div className="space-y-2">
                   {(formData.priceBySize || []).length === 0 ? (
@@ -2560,25 +3168,29 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                           placeholder="Price (₹)"
                           value={row.price ?? ''}
                           onChange={(e) => handlePriceBySizeChange(index, 'price', e.target.value)}
-                          className="md:col-span-4 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
+                          disabled={isCreatingMultipleVariants}
+                          className="md:col-span-4 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                         />
                         <input
                           placeholder="Size (e.g., 5)"
                           value={row.size ?? ''}
                           onChange={(e) => handlePriceBySizeChange(index, 'size', e.target.value)}
-                          className="md:col-span-4 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
+                          disabled={isCreatingMultipleVariants}
+                          className="md:col-span-4 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                         />
                         <input
                           placeholder="Unit (e.g., kg / pcs)"
                           value={row.unit ?? ''}
                           onChange={(e) => handlePriceBySizeChange(index, 'unit', e.target.value)}
                           list="priceBySizeUnitOptions"
-                          className="md:col-span-3 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
+                          disabled={isCreatingMultipleVariants}
+                          className="md:col-span-3 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                         />
                         <button
                           type="button"
                           onClick={() => removePriceBySizeRow(index)}
-                          className="md:col-span-1 text-red-500 hover:text-red-700 justify-self-center"
+                          disabled={isCreatingMultipleVariants}
+                          className="md:col-span-1 text-red-500 hover:text-red-700 justify-self-center disabled:text-gray-400 disabled:cursor-not-allowed"
                           title="Remove row"
                         >
                           <TrashIcon />
@@ -4137,6 +4749,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
 
           </div>
         </div>
+        )}
 
         {isUploading && (
           <div className="text-blue-600 font-medium text-center mt-6">Uploading files, please wait...</div>

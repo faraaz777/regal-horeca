@@ -58,6 +58,7 @@ export default function AdminProductsPage() {
   const router = useRouter();
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isVariantsOnlyView, setIsVariantsOnlyView] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -140,6 +141,7 @@ export default function AdminProductsPage() {
       
       if (data.success && data.product) {
         setEditingProduct(data.product);
+        setIsVariantsOnlyView(false);
         setIsEditModalOpen(true);
       } else {
         showToast.error(data.error || 'Failed to load product details');
@@ -378,6 +380,7 @@ export default function AdminProductsPage() {
 
       showToast.success('Product updated successfully');
       setIsEditModalOpen(false);
+      setIsVariantsOnlyView(false);
       setEditingProduct(null);
       mutate();
     } catch (error) {
@@ -596,6 +599,24 @@ export default function AdminProductsPage() {
                               </div>
                               <div className="ml-4">
                                 <div className="text-sm font-medium text-gray-900">{product.title}</div>
+                                {Array.isArray(product.variants) && product.variants.length > 0 && (
+                                  <div className="mt-1">
+                                    <select
+                                      className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700"
+                                      defaultValue=""
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <option value="" disabled>
+                                        Variants ({product.variants.length})
+                                      </option>
+                                      {product.variants.map((variant, idx) => (
+                                        <option key={`${variant?.sku || 'variant'}-${idx}`} value={variant?.sku || `${idx}`}>
+                                          {variant?.name || 'Variant'} | {variant?.size || '-'} | {variant?.color || '-'} | SKU: {variant?.sku || '-'}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                )}
                                 {listFilter === 'deleted' && product.deletedAt && (
                                   <div className="text-xs text-gray-400 mt-0.5">
                                     Removed {new Date(product.deletedAt).toLocaleString()}
@@ -743,6 +764,24 @@ export default function AdminProductsPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="text-sm font-medium text-gray-900 mb-1 line-clamp-2">{product.title}</h3>
+                          {Array.isArray(product.variants) && product.variants.length > 0 && (
+                            <div className="mb-1">
+                              <select
+                                className="w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700"
+                                defaultValue=""
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <option value="" disabled>
+                                  Variants ({product.variants.length})
+                                </option>
+                                {product.variants.map((variant, idx) => (
+                                  <option key={`${variant?.sku || 'variant'}-${idx}`} value={variant?.sku || `${idx}`}>
+                                    {variant?.name || 'Variant'} | {variant?.size || '-'} | {variant?.color || '-'} | SKU: {variant?.sku || '-'}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
                           {listFilter === 'deleted' && product.deletedAt && (
                             <p className="text-xs text-gray-400 mb-1">
                               Removed {new Date(product.deletedAt).toLocaleString()}
@@ -884,7 +923,7 @@ export default function AdminProductsPage() {
 
       {isEditModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col overflow-hidden">
+          <div className={`bg-white rounded-lg shadow-xl w-full max-h-[95vh] flex flex-col overflow-hidden ${isVariantsOnlyView ? 'max-w-[96vw] 2xl:max-w-[1800px]' : 'max-w-4xl'}`}>
             <div className="p-4 sm:p-6 border-b">
               <h2 className="text-xl sm:text-2xl font-bold">Edit Product</h2>
             </div>
@@ -893,7 +932,9 @@ export default function AdminProductsPage() {
                 product={editingProduct} 
                 allProducts={allProductsForForm}
                 onSave={handleSaveEditedProduct}
+                onVariantsOnlyChange={setIsVariantsOnlyView}
                 onCancel={() => {
+                  setIsVariantsOnlyView(false);
                   setIsEditModalOpen(false);
                   setEditingProduct(null);
                 }} 

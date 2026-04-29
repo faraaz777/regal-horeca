@@ -123,6 +123,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
   const [loading, setLoading] = useState(!initialProduct);
   const [activeTab, setActiveTab] = useState('specs');
   const [selectedColor, setSelectedColor] = useState(null);
+  const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
   const [selectedSizeKey, setSelectedSizeKey] = useState('');
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
   const [relatedProducts, setRelatedProducts] = useState([]);
@@ -409,7 +410,52 @@ export default function ProductDetailClient({ initialProduct = null }) {
     setFrequentlyOrderedProducts([]);
   }, [product]);
 
+  const hasGeneratedVariants = Array.isArray(product?.variants) && product.variants.length > 0;
+  const activeVariant = hasGeneratedVariants
+    ? (product.variants[selectedVariantIndex] || product.variants[0] || null)
+    : null;
+
+  useEffect(() => {
+    if (!hasGeneratedVariants) {
+      setSelectedVariantIndex(0);
+      return;
+    }
+    const defaultIndex = (product?.variants || []).findIndex((variant) => Boolean(variant?.isDefault));
+    setSelectedVariantIndex(defaultIndex >= 0 ? defaultIndex : 0);
+  }, [hasGeneratedVariants, product?.variants]);
+
+  useEffect(() => {
+    if (!hasGeneratedVariants) return;
+    const variants = product?.variants || [];
+    const active = variants[selectedVariantIndex] || null;
+    const activeColor = String(active?.color || '').trim().toLowerCase();
+    if (!activeColor) return;
+    const matchedColor = (product?.colorVariants || []).find(
+      (colorVariant) => String(colorVariant?.colorName || '').trim().toLowerCase() === activeColor
+    );
+    if (matchedColor && selectedColor?.colorName !== matchedColor.colorName) {
+      setSelectedColor(matchedColor);
+    }
+  }, [hasGeneratedVariants, product?.variants, selectedVariantIndex, product?.colorVariants, selectedColor?.colorName]);
+
+  useEffect(() => {
+    if (!hasGeneratedVariants || !selectedColor) return;
+    const selectedColorName = String(selectedColor.colorName || '').trim().toLowerCase();
+    if (!selectedColorName) return;
+    const variants = product?.variants || [];
+    const active = variants[selectedVariantIndex] || null;
+    const activeColor = String(active?.color || '').trim().toLowerCase();
+    if (active && activeColor === selectedColorName) return;
+    const nextIndex = variants.findIndex(
+      (variant) => String(variant?.color || '').trim().toLowerCase() === selectedColorName
+    );
+    if (nextIndex >= 0) {
+      setSelectedVariantIndex(nextIndex);
+    }
+  }, [hasGeneratedVariants, selectedColor, product?.variants, selectedVariantIndex]);
+
   const priceBySize = useMemo(() => {
+    if (hasGeneratedVariants) return [];
     const rows = Array.isArray(product?.priceBySize) ? product.priceBySize : [];
     return rows
       .map((r) => ({
@@ -418,7 +464,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
         unit: String(r?.unit || '').trim(),
       }))
       .filter((r) => Number.isFinite(r.price) && r.price > 0);
-  }, [product?.priceBySize]);
+  }, [product?.priceBySize, hasGeneratedVariants]);
 
   useEffect(() => {
     if (priceBySize.length === 0) return;
@@ -434,7 +480,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
     return priceBySize[0];
   }, [priceBySize, selectedSizeKey]);
 
-  const displayPrice = selectedTier?.price ?? product?.price;
+  const displayPrice = activeVariant?.price ?? selectedTier?.price ?? product?.price;
   const displayUnitSuffix = selectedTier?.unit ? `/${selectedTier.unit}` : '';
   const isPriceOnRequest = displayPrice == null || displayPrice === 0;
   const summaryText = stripHtml(product?.summary || '').trim();
@@ -481,6 +527,24 @@ export default function ProductDetailClient({ initialProduct = null }) {
   const secondaryIsLabel = isLikelyLabel(secondaryTitle);
 
   const getDisplayImages = () => {
+    if (activeVariant) {
+      const variantImages = Array.isArray(activeVariant.images) ? activeVariant.images.filter(Boolean) : [];
+      if (variantImages.length > 0) return variantImages;
+
+      const activeVariantColor = String(activeVariant.color || '').trim().toLowerCase();
+      if (activeVariantColor) {
+        const matchedColorVariant = (product?.colorVariants || []).find(
+          (variant) => String(variant?.colorName || '').trim().toLowerCase() === activeVariantColor
+        );
+        const matchedColorImages = Array.isArray(matchedColorVariant?.images)
+          ? matchedColorVariant.images.filter(Boolean)
+          : [];
+        if (matchedColorImages.length > 0) return matchedColorImages;
+      }
+
+      // For remaining variants without image data, fallback to main hero image only.
+      return [product?.heroImage].filter(Boolean);
+    }
     if (selectedColor && selectedColor.images && selectedColor.images.length > 0) {
       return selectedColor.images.filter(Boolean);
     }
@@ -520,7 +584,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
   const handleContactNow = () => {
     if (typeof window === 'undefined') return;
     const url = window.location.href;
-    const msg = `Hi, I'm interested in this product:\n\n${product?.title || 'Product'}\nSKU: ${product?.sku || '—'}\n\n${url}\n\nPlease share pricing and availability.`;
+    const msg = `Hi, I'm interested in this product:\n\n${product?.title || 'Product'}\nSKU: ${activeVariant?.sku || product?.sku || '—'}\n\n${url}\n\nPlease share pricing and availability.`;
     openWhatsAppLink(getWhatsAppBusinessLink(msg));
   };
 
@@ -538,14 +602,26 @@ export default function ProductDetailClient({ initialProduct = null }) {
       toast.success('Removed from quote');
       return;
     }
-    addToCart(id, 1, { selectedColor: selectedColor || null, price: displayPrice || null });
+    addToCart(id, 1, { selectedColor: selectedColor || null, selectedVariant: activeVariant || null, price: displayPrice || null });
     toast.success('Added to quote');
     openCartDrawer();
   };
 
   const handleColorSelect = (variant) => {
-    if (selectedColor?.colorName === variant.colorName) setSelectedColor(null);
-    else setSelectedColor(variant);
+    if (selectedColor?.colorName === variant.colorName) {
+      setSelectedColor(null);
+      return;
+    }
+    setSelectedColor(variant);
+    if (hasGeneratedVariants) {
+      const targetColor = String(variant?.colorName || '').trim().toLowerCase();
+      const nextIndex = (product?.variants || []).findIndex(
+        (row) => String(row?.color || '').trim().toLowerCase() === targetColor
+      );
+      if (nextIndex >= 0) {
+        setSelectedVariantIndex(nextIndex);
+      }
+    }
   };
 
   const formatPrice = (price) => {
@@ -1084,28 +1160,28 @@ export default function ProductDetailClient({ initialProduct = null }) {
               </h1>
 
               <div className="flex flex-wrap items-center gap-x-2 text-sm text-[#5F748D] mb-2">
-                {product.sku && <span>SKU: {product.sku}</span>}
-                {product.sku && product.barcode && <span className="text-[#D7DCE1]">|</span>}
-                {product.barcode && <span>Barcode: {product.barcode}</span>}
-                {(product.sku || product.barcode) && <span className="text-[#D7DCE1]">|</span>}
+                {(activeVariant?.sku || product.sku) && <span>SKU: {activeVariant?.sku || product.sku}</span>}
+                {(activeVariant?.sku || product.sku) && (activeVariant?.barcode || product.barcode) && <span className="text-[#D7DCE1]">|</span>}
+                {(activeVariant?.barcode || product.barcode) && <span>Barcode: {activeVariant?.barcode || product.barcode}</span>}
+                {(activeVariant?.sku || product.sku || activeVariant?.barcode || product.barcode) && <span className="text-[#D7DCE1]">|</span>}
                 <span className="inline-flex items-center gap-1.5">
                   <span
                     className="w-2 h-2 rounded-full flex-shrink-0"
                     style={{
                       backgroundColor:
-                        product.status === 'In Stock'
+                        (activeVariant?.status || product.status) === 'In Stock'
                           ? '#4CAF50'
-                          : product.status === 'Pre-Order'
+                          : (activeVariant?.status || product.status) === 'Pre-Order'
                             ? '#FF9800'
                             : '#9E9E9E',
                     }}
                     aria-hidden
                   />
-                  {product.status === 'In Stock'
+                  {(activeVariant?.status || product.status) === 'In Stock'
                     ? 'Usually Available'
-                    : product.status === 'Pre-Order'
+                    : (activeVariant?.status || product.status) === 'Pre-Order'
                       ? 'Pre-Order'
-                      : product.status || 'Usually Available'}
+                      : activeVariant?.status || product.status || 'Usually Available'}
                 </span>
               </div>
 
@@ -1250,8 +1326,46 @@ export default function ProductDetailClient({ initialProduct = null }) {
                 )}
               </div>
 
-              {/* Sizes + pricing (derived from admin Price by Size) */}
-              {priceBySize.length > 0 && (
+              {/* Variant selector from admin variants table */}
+              {hasGeneratedVariants && (
+                <div className="mb-2 sm:mb-4">
+                  <label className="block text-sm font-bold text-rich-black  mb-2">
+                    Variants
+                  </label>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                    {(product?.variants || [])
+                      .map((variant, idx) => ({ variant, idx }))
+                      .filter(({ variant }) => {
+                        if (!selectedColor) return true;
+                        const selectedColorName = String(selectedColor?.colorName || '').trim().toLowerCase();
+                        if (!selectedColorName) return true;
+                        return String(variant?.color || '').trim().toLowerCase() === selectedColorName;
+                      })
+                      .map(({ variant, idx }) => {
+                      const labelParts = [variant?.size, variant?.color, variant?.weight, variant?.unitCount].filter(Boolean);
+                      const label = labelParts.join(' / ') || variant?.name || `Variant ${idx + 1}`;
+                      const active = idx === selectedVariantIndex;
+                      return (
+                        <button
+                          key={`${variant?.sku || 'variant'}-${idx}`}
+                          type="button"
+                          onClick={() => setSelectedVariantIndex(idx)}
+                          className={`px-3 py-2 text-xs font-semibold rounded-md border transition-colors ${
+                            active
+                              ? 'bg-accent text-white border-accent'
+                              : 'bg-white text-black/70 border-black/10 hover:border-accent hover:text-accent'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Legacy Price by Size (only when generated variants are not present) */}
+              {!hasGeneratedVariants && priceBySize.length > 0 && (
                 <div className="mb-2 sm:mb-4">
                   <label className="block text-sm font-bold text-rich-black  mb-2">
                     Size

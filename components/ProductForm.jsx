@@ -19,6 +19,7 @@ import Image from 'next/image';
 import ColorPicker from './ColorPicker';
 import useSWR from 'swr';
 import RichTextEditor from './RichTextEditor';
+import toast from 'react-hot-toast';
 
 function getTextLength(str) {
   if (!str || typeof str !== 'string') return 0;
@@ -33,6 +34,25 @@ function plainTextToHtml(text) {
     .split(/\n\n+/)
     .map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`)
     .join('');
+}
+
+function sanitizeNumberInput(value) {
+  return String(value ?? '')
+    .replace(/,/g, '')
+    .replace(/[^\d.]/g, '');
+}
+
+function formatIndianNumberInput(value) {
+  const cleaned = sanitizeNumberInput(value);
+  if (!cleaned) return '';
+  const [integerPartRaw, decimalPart] = cleaned.split('.');
+  const integerPart = integerPartRaw || '0';
+  const lastThree = integerPart.slice(-3);
+  const otherNumbers = integerPart.slice(0, -3);
+  const formattedInteger = otherNumbers
+    ? `${otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ',')},${lastThree}`
+    : lastThree;
+  return decimalPart !== undefined ? `${formattedInteger}.${decimalPart}` : formattedInteger;
 }
 
 const AVAILABLE_COLORS = [
@@ -460,6 +480,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     manufacturer: '',
     sku: '',
     barcode: '',
+    hsnCode: '',
     brandCategoryId: '',
     brandCategoryIds: [],
     categoryId: '',
@@ -537,6 +558,18 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
   const [showVariantsOnly, setShowVariantsOnly] = useState(false);
   const [recentlyDeletedVariantRow, setRecentlyDeletedVariantRow] = useState(null);
   const isCreatingMultipleVariants = (variantRows || []).length > 0;
+  const selectedVariantFieldCount = Object.values(variantFieldSelection).filter(Boolean).length;
+  const [bulkVariantInputs, setBulkVariantInputs] = useState({
+    name: '',
+    sku: '',
+    barcode: '',
+    hsnCode: '',
+    gstPercent: '',
+    mrp: '',
+    sellingPrice: '',
+    discountPercent: '',
+    marginPrice: '',
+  });
 
   useEffect(() => {
     if (typeof onVariantsOnlyChange === 'function') {
@@ -617,10 +650,27 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     .filter(Boolean);
 
   const handleVariantFieldToggle = (field) => {
-    setVariantFieldSelection((prev) => ({
-      ...prev,
-      [field]: !prev[field],
-    }));
+    setVariantFieldSelection((prev) => {
+      if (prev[field]) {
+        setError('');
+        return {
+          ...prev,
+          [field]: false,
+        };
+      }
+
+      const selectedCount = Object.values(prev).filter(Boolean).length;
+      if (selectedCount >= 2) {
+        setError('You can select only 2 variant fields at a time.');
+        return prev;
+      }
+
+      setError('');
+      return {
+        ...prev,
+        [field]: true,
+      };
+    });
   };
 
   const addVariantOptionValue = (field) => {
@@ -718,6 +768,11 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       return;
     }
 
+    if (dimensions.length !== 2) {
+      setError('Please select exactly 2 variant fields to generate variants.');
+      return;
+    }
+
     const combos = dimensions.reduce(
       (acc, dim) => acc.flatMap((base) => dim.values.map((value) => ({ ...base, [dim.key]: value }))),
       [{}]
@@ -745,7 +800,118 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
 
   const handleVariantRowChange = (index, field, value) => {
     setVariantRows((prev) =>
-      prev.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row))
+      prev.map((row, rowIndex) => {
+        if (rowIndex !== index) return row;
+
+        const normalizedValue = ['mrp', 'sellingPrice', 'marginPrice'].includes(field)
+          ? sanitizeNumberInput(value)
+          : value;
+        const nextRow = { ...row, [field]: normalizedValue };
+
+        // Auto-calculate discount when MRP/Selling Price changes.
+        if (field === 'mrp' || field === 'sellingPrice') {
+          const mrpValue = Number(nextRow.mrp || 0);
+          const sellingValue = Number(nextRow.sellingPrice || 0);
+          if (Number.isFinite(mrpValue) && mrpValue > 0 && Number.isFinite(sellingValue)) {
+            const rawDiscount = ((mrpValue - sellingValue) / mrpValue) * 100;
+            const normalizedDiscount = Math.max(0, rawDiscount);
+            nextRow.discountPercent = Number(normalizedDiscount.toFixed(2));
+          } else {
+            nextRow.discountPercent = 0;
+          }
+        }
+
+        return nextRow;
+      })
+    );
+  };
+
+  const handleBulkVariantInputChange = (field, value) => {
+    const normalizedValue = ['mrp', 'sellingPrice', 'marginPrice'].includes(field)
+      ? sanitizeNumberInput(value)
+      : value;
+    setBulkVariantInputs((prev) => ({ ...prev, [field]: normalizedValue }));
+
+    const isFieldEmptyForRow = (row, key) => {
+      const raw = row?.[key];
+      if (raw === null || raw === undefined) return true;
+      if (typeof raw === 'number') return raw === 0;
+      return String(raw).trim() === '';
+    };
+
+    setVariantRows((prev) => {
+      const allRowsEmptyForField = prev.every((row) => isFieldEmptyForRow(row, field));
+      if (!allRowsEmptyForField) return prev;
+
+      return prev.map((row) => {
+        const nextRow = { ...row, [field]: normalizedValue };
+        if (field === 'mrp' || field === 'sellingPrice') {
+          const mrpValue = Number(nextRow.mrp || 0);
+          const sellingValue = Number(nextRow.sellingPrice || 0);
+          if (Number.isFinite(mrpValue) && mrpValue > 0 && Number.isFinite(sellingValue)) {
+            const rawDiscount = ((mrpValue - sellingValue) / mrpValue) * 100;
+            const normalizedDiscount = Math.max(0, rawDiscount);
+            nextRow.discountPercent = Number(normalizedDiscount.toFixed(2));
+          } else {
+            nextRow.discountPercent = 0;
+          }
+        }
+        return nextRow;
+      });
+    });
+  };
+
+  const handleApplyBulkInputs = () => {
+    const targetFields = ['name', 'sku', 'barcode', 'hsnCode', 'gstPercent', 'mrp', 'sellingPrice', 'discountPercent', 'marginPrice'];
+    const fieldsToApply = targetFields.filter((field) => {
+      const value = bulkVariantInputs[field];
+      return String(value ?? '').trim() !== '';
+    });
+
+    if (fieldsToApply.length === 0) {
+      toast.error('Enter at least one Apply value first.');
+      return;
+    }
+
+    const isFieldEmptyForRow = (row, key) => {
+      const raw = row?.[key];
+      if (raw === null || raw === undefined) return true;
+      if (typeof raw === 'number') return raw === 0;
+      return String(raw).trim() === '';
+    };
+
+    const willOverwrite = (variantRows || []).some((row) =>
+      fieldsToApply.some((field) => !isFieldEmptyForRow(row, field))
+    );
+    if (willOverwrite) {
+      const proceed = window.confirm('Some variant fields already have values. Apply will overwrite them for all rows. Continue?');
+      if (!proceed) return;
+    }
+
+    setVariantRows((prev) =>
+      prev.map((row) => {
+        const nextRow = { ...row };
+        fieldsToApply.forEach((field) => {
+          const rawValue = bulkVariantInputs[field];
+          const normalizedValue = ['mrp', 'sellingPrice', 'marginPrice'].includes(field)
+            ? sanitizeNumberInput(rawValue)
+            : rawValue;
+          nextRow[field] = normalizedValue;
+        });
+
+        if (fieldsToApply.includes('mrp') || fieldsToApply.includes('sellingPrice')) {
+          const mrpValue = Number(nextRow.mrp || 0);
+          const sellingValue = Number(nextRow.sellingPrice || 0);
+          if (Number.isFinite(mrpValue) && mrpValue > 0 && Number.isFinite(sellingValue)) {
+            const rawDiscount = ((mrpValue - sellingValue) / mrpValue) * 100;
+            const normalizedDiscount = Math.max(0, rawDiscount);
+            nextRow.discountPercent = Number(normalizedDiscount.toFixed(2));
+          } else {
+            nextRow.discountPercent = 0;
+          }
+        }
+        return nextRow;
+      })
     );
   };
 
@@ -790,6 +956,19 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
           : row
       )
     );
+  };
+
+  const getVariantPricingErrors = (row) => {
+    const mrp = Number(row?.mrp || 0);
+    const sellingPrice = Number(row?.sellingPrice || 0);
+    const marginPrice = Number(row?.marginPrice || 0);
+    const discountPercent = Number(row?.discountPercent || 0);
+
+    return {
+      sellingPrice: Number.isFinite(sellingPrice) && Number.isFinite(mrp) && sellingPrice > mrp,
+      marginPrice: Number.isFinite(marginPrice) && Number.isFinite(sellingPrice) && marginPrice > sellingPrice,
+      discountPercent: Number.isFinite(discountPercent) && discountPercent >= 100,
+    };
   };
 
   const handleAddSingleVariantRow = () => {
@@ -1161,6 +1340,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         description: product.description || '',
         manufacturer: product.manufacturer || '',
         barcode: product.barcode || '',
+        hsnCode: product.hsnCode || '',
         usageAndCare: product.usageAndCare || '',
         whyBuyFrom: product.whyBuyFrom || '',
         sizeChartUrl: product.sizeChartUrl || '',
@@ -2576,6 +2756,29 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       setError("Detail Page Photos must be either 0 or exactly 3 images.");
       return;
     }
+
+    if (normalizedVariants.length > 0) {
+      const firstInvalidIndex = normalizedVariants.findIndex((row) => {
+        const rowErrors = getVariantPricingErrors(row);
+        return rowErrors.sellingPrice || rowErrors.marginPrice || rowErrors.discountPercent;
+      });
+
+      if (firstInvalidIndex >= 0) {
+        const invalidRow = normalizedVariants[firstInvalidIndex];
+        const rowErrors = getVariantPricingErrors(invalidRow);
+        let message = `Variant #${firstInvalidIndex + 1} has invalid pricing.`;
+        if (rowErrors.sellingPrice) {
+          message = `Variant #${firstInvalidIndex + 1}: Selling Price cannot exceed MRP.`;
+        } else if (rowErrors.marginPrice) {
+          message = `Variant #${firstInvalidIndex + 1}: Margin Price cannot exceed Selling Price.`;
+        } else if (rowErrors.discountPercent) {
+          message = `Variant #${firstInvalidIndex + 1}: Discount must be less than 100%.`;
+        }
+        setError(message);
+        toast.error(message);
+        return;
+      }
+    }
     
     // Auto-link brand category if brand text matches a department (check synchronously)
     let updatedBrandCategoryId = formData.brandCategoryId;
@@ -2745,11 +2948,12 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
           {showAddVariantsPanel && (
             <div className="mb-4 p-4 border border-gray-200 rounded-md bg-gray-50">
               <p className="text-sm font-semibold text-gray-800 mb-3">Choose variant fields</p>
+              <p className="text-xs text-gray-500 mb-3">Select any 2 fields only.</p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={variantFieldSelection.size} onChange={() => handleVariantFieldToggle('size')} className="h-4 w-4 rounded text-primary focus:ring-primary" />Size</label>
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={variantFieldSelection.color} onChange={() => handleVariantFieldToggle('color')} className="h-4 w-4 rounded text-primary focus:ring-primary" />Color</label>
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={variantFieldSelection.weight} onChange={() => handleVariantFieldToggle('weight')} className="h-4 w-4 rounded text-primary focus:ring-primary" />Weight</label>
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={variantFieldSelection.unitCount} onChange={() => handleVariantFieldToggle('unitCount')} className="h-4 w-4 rounded text-primary focus:ring-primary" />Unit Count</label>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={variantFieldSelection.size} disabled={!variantFieldSelection.size && selectedVariantFieldCount >= 2} onChange={() => handleVariantFieldToggle('size')} className="h-4 w-4 rounded text-primary focus:ring-primary disabled:cursor-not-allowed" />Size</label>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={variantFieldSelection.color} disabled={!variantFieldSelection.color && selectedVariantFieldCount >= 2} onChange={() => handleVariantFieldToggle('color')} className="h-4 w-4 rounded text-primary focus:ring-primary disabled:cursor-not-allowed" />Color</label>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={variantFieldSelection.weight} disabled={!variantFieldSelection.weight && selectedVariantFieldCount >= 2} onChange={() => handleVariantFieldToggle('weight')} className="h-4 w-4 rounded text-primary focus:ring-primary disabled:cursor-not-allowed" />Weight</label>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={variantFieldSelection.unitCount} disabled={!variantFieldSelection.unitCount && selectedVariantFieldCount >= 2} onChange={() => handleVariantFieldToggle('unitCount')} className="h-4 w-4 rounded text-primary focus:ring-primary disabled:cursor-not-allowed" />Unit Count</label>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -2758,7 +2962,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     <label className="block text-xs font-medium text-gray-600 mb-1">Size values</label>
                     <div className="flex items-center gap-2">
                       <input type="text" placeholder="Type one size and click ✓ Add" value={variantDraftValue.size} onChange={(e) => setVariantDraftValue((prev) => ({ ...prev, size: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addVariantOptionValue('size'); } }} className="w-full p-2 border border-gray-300 rounded-md" />
-                      <button type="button" onClick={() => addVariantOptionValue('size')} className="px-3 py-2 text-sm font-semibold bg-green-600 text-white rounded-md hover:bg-green-700">✓ Add</button>
+                      <button type="button" onClick={() => addVariantOptionValue('size')} className="px-2 py-1.5 text-xs font-semibold bg-green-600 text-white rounded-md hover:bg-green-700">✓ Add</button>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">Selected: {variantBuilderInputs.size || '—'}</p>
                   </div>
@@ -2772,7 +2976,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                       <>
                         <div className="flex items-center gap-2">
                           <input type="text" placeholder="Type one color and click ✓ Add" value={variantDraftValue.color} onChange={(e) => setVariantDraftValue((prev) => ({ ...prev, color: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addVariantOptionValue('color'); } }} className="w-full p-2 border border-gray-300 rounded-md" />
-                          <button type="button" onClick={() => addVariantOptionValue('color')} className="px-3 py-2 text-sm font-semibold bg-green-600 text-white rounded-md hover:bg-green-700">✓ Add</button>
+                          <button type="button" onClick={() => addVariantOptionValue('color')} className="px-2 py-1.5 text-xs font-semibold bg-green-600 text-white rounded-md hover:bg-green-700">✓ Add</button>
                         </div>
                         <p className="text-xs text-gray-500 mt-1">Selected: {variantBuilderInputs.color || '—'}</p>
                       </>
@@ -2784,7 +2988,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     <label className="block text-xs font-medium text-gray-600 mb-1">Weight values</label>
                     <div className="flex items-center gap-2">
                       <input type="text" placeholder="Type one weight and click ✓ Add" value={variantDraftValue.weight} onChange={(e) => setVariantDraftValue((prev) => ({ ...prev, weight: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addVariantOptionValue('weight'); } }} className="w-full p-2 border border-gray-300 rounded-md" />
-                      <button type="button" onClick={() => addVariantOptionValue('weight')} className="px-3 py-2 text-sm font-semibold bg-green-600 text-white rounded-md hover:bg-green-700">✓ Add</button>
+                      <button type="button" onClick={() => addVariantOptionValue('weight')} className="px-2 py-1.5 text-xs font-semibold bg-green-600 text-white rounded-md hover:bg-green-700">✓ Add</button>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">Selected: {variantBuilderInputs.weight || '—'}</p>
                   </div>
@@ -2794,7 +2998,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     <label className="block text-xs font-medium text-gray-600 mb-1">Unit Count values</label>
                     <div className="flex items-center gap-2">
                       <input type="text" placeholder="Type one unit count and click ✓ Add" value={variantDraftValue.unitCount} onChange={(e) => setVariantDraftValue((prev) => ({ ...prev, unitCount: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addVariantOptionValue('unitCount'); } }} className="w-full p-2 border border-gray-300 rounded-md" />
-                      <button type="button" onClick={() => addVariantOptionValue('unitCount')} className="px-3 py-2 text-sm font-semibold bg-green-600 text-white rounded-md hover:bg-green-700">✓ Add</button>
+                      <button type="button" onClick={() => addVariantOptionValue('unitCount')} className="px-2 py-1.5 text-xs font-semibold bg-green-600 text-white rounded-md hover:bg-green-700">✓ Add</button>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">Selected: {variantBuilderInputs.unitCount || '—'}</p>
                   </div>
@@ -2837,12 +3041,57 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   <th className="w-[150px] min-w-[150px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">SKU</th>
                   <th className="w-[150px] min-w-[150px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">BARCODE</th>
                   <th className="w-[140px] min-w-[140px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">HSN CODE</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-700 break-words">GST%</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-700 break-words">MRP</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-700 break-words">SELLING PRICE</th>
+                  <th className="w-[120px] min-w-[120px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">GST%</th>
+                  <th className="w-[130px] min-w-[130px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">MRP</th>
+                  <th className="w-[170px] min-w-[170px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">SELLING PRICE</th>
                   <th className="px-3 py-2 text-left font-semibold text-gray-700 break-words">DISCOUNT %</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-700 break-words">MARGIN PRICE</th>
+                  <th className="w-[170px] min-w-[170px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">MARGIN PRICE</th>
                   <th className="w-20 px-2 py-2 text-center font-semibold text-gray-700 whitespace-nowrap">Action</th>
+                </tr>
+                <tr>
+                  <th className="px-2 py-2 text-center text-[11px] text-gray-500">All</th>
+                  <th className="px-2 py-2 text-center text-[11px] text-gray-400">—</th>
+                  <th className="w-[320px] min-w-[320px] px-2 py-2">
+                    <input type="text" value={bulkVariantInputs.name} onChange={(e) => handleBulkVariantInputChange('name', e.target.value)} placeholder="Apply Name" className="w-full p-1.5 border border-gray-300 rounded text-xs" />
+                  </th>
+                  {variantFieldSelection.size && <th className="px-2 py-2 text-center text-[11px] text-gray-400">—</th>}
+                  {variantFieldSelection.color && <th className="px-2 py-2 text-center text-[11px] text-gray-400">—</th>}
+                  {variantFieldSelection.unitCount && <th className="px-2 py-2 text-center text-[11px] text-gray-400">—</th>}
+                  {variantFieldSelection.weight && <th className="px-2 py-2 text-center text-[11px] text-gray-400">—</th>}
+                  <th className="w-[160px] min-w-[160px] px-2 py-2 text-center text-[11px] text-gray-400">—</th>
+                  <th className="w-[150px] min-w-[150px] px-3 py-2">
+                    <input type="text" value={bulkVariantInputs.sku} onChange={(e) => handleBulkVariantInputChange('sku', e.target.value)} placeholder="Apply SKU" className="w-full p-1.5 border border-gray-300 rounded text-xs" />
+                  </th>
+                  <th className="w-[150px] min-w-[150px] px-3 py-2">
+                    <input type="text" value={bulkVariantInputs.barcode} onChange={(e) => handleBulkVariantInputChange('barcode', e.target.value)} placeholder="Apply Barcode" className="w-full p-1.5 border border-gray-300 rounded text-xs" />
+                  </th>
+                  <th className="w-[140px] min-w-[140px] px-3 py-2">
+                    <input type="text" value={bulkVariantInputs.hsnCode} onChange={(e) => handleBulkVariantInputChange('hsnCode', e.target.value)} placeholder="Apply HSN" className="w-full p-1.5 border border-gray-300 rounded text-xs" />
+                  </th>
+                  <th className="w-[120px] min-w-[120px] px-3 py-2">
+                    <input type="number" value={bulkVariantInputs.gstPercent} onChange={(e) => handleBulkVariantInputChange('gstPercent', e.target.value)} placeholder="Apply GST%" className="w-full p-1.5 border border-gray-300 rounded text-xs" />
+                  </th>
+                  <th className="w-[130px] min-w-[130px] px-3 py-2">
+                    <input type="text" value={formatIndianNumberInput(bulkVariantInputs.mrp)} onChange={(e) => handleBulkVariantInputChange('mrp', e.target.value)} placeholder="Apply MRP" className="w-full p-1.5 border border-gray-300 rounded text-xs" />
+                  </th>
+                  <th className="w-[170px] min-w-[170px] px-3 py-2">
+                    <input type="text" value={formatIndianNumberInput(bulkVariantInputs.sellingPrice)} onChange={(e) => handleBulkVariantInputChange('sellingPrice', e.target.value)} placeholder="Apply Selling" className="w-full p-1.5 border border-gray-300 rounded text-xs" />
+                  </th>
+                  <th className="px-3 py-2">
+                    <input type="number" value={bulkVariantInputs.discountPercent} onChange={(e) => handleBulkVariantInputChange('discountPercent', e.target.value)} placeholder="Apply Discount%" className="w-full p-1.5 border border-gray-300 rounded text-xs" />
+                  </th>
+                  <th className="w-[170px] min-w-[170px] px-3 py-2">
+                    <input type="text" value={formatIndianNumberInput(bulkVariantInputs.marginPrice)} onChange={(e) => handleBulkVariantInputChange('marginPrice', e.target.value)} placeholder="Apply Margin" className="w-full p-1.5 border border-gray-300 rounded text-xs" />
+                  </th>
+                  <th className="w-20 px-2 py-2 text-center">
+                    <button
+                      type="button"
+                      onClick={handleApplyBulkInputs}
+                      className="px-2 py-1 text-[11px] font-semibold text-primary border border-primary/30 rounded hover:bg-primary/10"
+                    >
+                      Apply
+                    </button>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -2926,11 +3175,11 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     <td className="w-[150px] min-w-[150px] px-3 py-2"><input type="text" value={row.sku || ''} onChange={(e) => handleVariantRowChange(index, 'sku', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>
                     <td className="w-[150px] min-w-[150px] px-3 py-2"><input type="text" value={row.barcode || ''} onChange={(e) => handleVariantRowChange(index, 'barcode', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>
                     <td className="w-[140px] min-w-[140px] px-3 py-2"><input type="text" value={row.hsnCode || ''} onChange={(e) => handleVariantRowChange(index, 'hsnCode', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.gstPercent ?? ''} onChange={(e) => handleVariantRowChange(index, 'gstPercent', e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.mrp ?? ''} onChange={(e) => handleVariantRowChange(index, 'mrp', e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.sellingPrice ?? ''} onChange={(e) => handleVariantRowChange(index, 'sellingPrice', e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.discountPercent ?? ''} onChange={(e) => handleVariantRowChange(index, 'discountPercent', e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" /></td>
-                    <td className="px-3 py-2"><input type="number" value={row.marginPrice ?? ''} onChange={(e) => handleVariantRowChange(index, 'marginPrice', e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" /></td>
+                    <td className="w-[120px] min-w-[120px] px-3 py-2"><input type="number" value={row.gstPercent ?? ''} onChange={(e) => handleVariantRowChange(index, 'gstPercent', e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" /></td>
+                    <td className="w-[130px] min-w-[130px] px-3 py-2"><input type="text" value={formatIndianNumberInput(row.mrp ?? '')} onChange={(e) => handleVariantRowChange(index, 'mrp', e.target.value)} className="w-full p-2 border border-gray-300 rounded-md" /></td>
+                    <td className="w-[170px] min-w-[170px] px-3 py-2"><input type="text" value={formatIndianNumberInput(row.sellingPrice ?? '')} onChange={(e) => handleVariantRowChange(index, 'sellingPrice', e.target.value)} className={`w-full p-2 border rounded-md ${getVariantPricingErrors(row).sellingPrice ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} /></td>
+                    <td className="px-3 py-2"><input type="number" value={row.discountPercent ?? ''} onChange={(e) => handleVariantRowChange(index, 'discountPercent', e.target.value)} className={`w-full p-2 border rounded-md ${getVariantPricingErrors(row).discountPercent ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} /></td>
+                    <td className="w-[170px] min-w-[170px] px-3 py-2"><input type="text" value={formatIndianNumberInput(row.marginPrice ?? '')} onChange={(e) => handleVariantRowChange(index, 'marginPrice', e.target.value)} className={`w-full p-2 border rounded-md ${getVariantPricingErrors(row).marginPrice ? 'border-red-500 bg-red-50' : 'border-gray-300'}`} /></td>
                     <td className="w-20 px-2 py-2 text-center">
                       <button
                         type="button"
@@ -3099,6 +3348,20 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   </div>
                 )}
               </div>
+              {!isCreatingMultipleVariants && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-gray-700">HSN Code</label>
+                    <input
+                      name="hsnCode"
+                      value={formData.hsnCode || ''}
+                      onChange={handleChange}
+                      className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+                      placeholder="Enter HSN Code"
+                    />
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-700">Category *</label>

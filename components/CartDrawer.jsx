@@ -14,6 +14,12 @@ import { useAppContext } from '@/context/AppContext';
 import { PlusIcon, MinusIcon, XIcon, WhatsAppIcon } from '@/components/Icons';
 import { LoadingButton } from '@/components/ui/LoadingCTA';
 import { getWhatsAppBusinessLink } from '@/lib/utils/whatsapp';
+import {
+  createCartItemKey,
+  formatCartVariantSummary,
+  resolveCartLineImage,
+  buildProductHrefWithVariant,
+} from '@/lib/utils/cartItemKey';
 import { useEnquiry, createEnquiryAndRedirect } from '@/lib/hooks/useEnquiry';
 import LightCaptureModal, { getSavedLeadProfile } from './LightCaptureModal';
 import toast from 'react-hot-toast';
@@ -77,7 +83,9 @@ export default function CartDrawer({ isOpen, onClose }) {
               // Remove all cart lines for missing products (including color variants)
               cart
                 .filter(it => missingIds.includes(it.productId?.toString()))
-                .forEach(it => removeFromCart(it.productId, it.selectedColor || null));
+                .forEach((it) =>
+                  removeFromCart(it.productId, it.selectedColor || null, it.selectedVariant || null)
+                );
 
               toast.error(`${missingIds.length} item${missingIds.length !== 1 ? 's were' : ' was'} removed (no longer available).`);
             }
@@ -117,23 +125,25 @@ export default function CartDrawer({ isOpen, onClose }) {
       .replace('₹', '₹');
   };
 
-  const handleQuantityChange = (productId, newQuantity, selectedColor = null) => {
+  const handleQuantityChange = (productId, newQuantity, selectedColor = null, selectedVariant = null) => {
     if (newQuantity < 1) {
-      removeFromCart(productId, selectedColor);
+      removeFromCart(productId, selectedColor, selectedVariant);
       toast.success('Item removed from cart');
     } else {
-      updateCartQuantity(productId, newQuantity, selectedColor);
+      updateCartQuantity(productId, newQuantity, selectedColor, selectedVariant);
     }
   };
 
   const handleWhatsAppCheckout = async () => {
     const cartItemsForEnquiry = cartItems
       .filter(item => item.product) // skip deleted/unavailable products
-      .map(item => ({
+      .map((item) => ({
         productId: item.productId,
         productName: item.product.title || item.product.name || 'Product',
         quantity: item.quantity,
         color: item.selectedColor?.colorName,
+        sku: item.selectedVariant?.sku || undefined,
+        variantLabel: formatCartVariantSummary(item.selectedVariant) || undefined,
       }));
 
     // If user has saved profile, skip modal and go directly to WhatsApp
@@ -168,11 +178,13 @@ export default function CartDrawer({ isOpen, onClose }) {
   const handleChangeInfo = () => {
     const cartItemsForEnquiry = cartItems
       .filter(item => item.product) // skip deleted/unavailable products
-      .map(item => ({
+      .map((item) => ({
         productId: item.productId,
         productName: item.product.title || item.product.name || 'Product',
         quantity: item.quantity,
         color: item.selectedColor?.colorName,
+        sku: item.selectedVariant?.sku || undefined,
+        variantLabel: formatCartVariantSummary(item.selectedVariant) || undefined,
       }));
 
     handleEnquiry({
@@ -281,8 +293,8 @@ export default function CartDrawer({ isOpen, onClose }) {
                 // Skeleton Loader for items being fetched
                 if (!product) {
                   return (
-                    <div 
-                      key={`skeleton_${item.productId}`} 
+                    <div
+                      key={`skeleton_${createCartItemKey(item.productId, item.selectedColor, item.selectedVariant)}`}
                       className="bg-white rounded-lg border border-black/5 p-3 animate-pulse"
                     >
                       <div className="flex gap-3">
@@ -298,25 +310,28 @@ export default function CartDrawer({ isOpen, onClose }) {
                 }
 
                 const productId = product._id || product.id;
-                const productImage = product.heroImage || product.image || (product.images && product.images[0]) || '/placeholder-product.jpg';
+                const productImage = resolveCartLineImage(item, product);
                 const productName = product.title || product.name || 'Product';
 
                 // Get product slug with fallback - use ID if slug is missing (API handles both)
                 const productSlug = product.slug || productId?.toString();
+                const productHref = buildProductHrefWithVariant(productSlug, item.selectedVariant);
 
                 // Get stock info if available
                 const stock = product.stock || product.inStock;
                 const stockText = stock !== undefined ? `${stock} in stock` : null;
 
+                const variantSummary = formatCartVariantSummary(item.selectedVariant);
+
                 return (
-                  <div 
-                    key={`${productId}_${item.selectedColor?.colorName || 'default'}`} 
+                  <div
+                    key={createCartItemKey(item.productId, item.selectedColor, item.selectedVariant)}
                     className="group bg-white rounded-lg border border-black/5 shadow-sm hover:shadow-md transition-all duration-200 p-3"
                   >
                     <div className="flex gap-3">
                       {/* Product Image */}
                       <Link
-                        href={`/products/${productSlug}`}
+                        href={productHref}
                         className="flex-shrink-0 relative"
                         onClick={onClose}
                       >
@@ -336,7 +351,7 @@ export default function CartDrawer({ isOpen, onClose }) {
                         <div className="flex-1">
                           <div className="flex items-start justify-between gap-2 mb-1.5">
                             <Link
-                              href={`/products/${productSlug}`}
+                              href={productHref}
                               onClick={onClose}
                               className="flex-1 min-w-0"
                             >
@@ -345,7 +360,9 @@ export default function CartDrawer({ isOpen, onClose }) {
                               </h3>
                             </Link>
                             <button
-                              onClick={() => handleQuantityChange(productId, 0, item.selectedColor)}
+                              onClick={() =>
+                                handleQuantityChange(productId, 0, item.selectedColor, item.selectedVariant)
+                              }
                               className="flex-shrink-0 text-black/30 hover:text-accent hover:bg-accent/5 transition-all duration-200 p-1.5 rounded-full"
                               aria-label="Remove item"
                             >
@@ -370,6 +387,20 @@ export default function CartDrawer({ isOpen, onClose }) {
                               </div>
                             )}
 
+                            {variantSummary ? (
+                              <div className="text-xs text-black/60">
+                                <span className="font-medium text-black/50">Variant:</span>{' '}
+                                <span className="font-medium text-black/75">{variantSummary}</span>
+                              </div>
+                            ) : null}
+
+                            {item.selectedVariant?.sku ? (
+                              <div className="text-xs text-black/60">
+                                <span className="font-medium text-black/50">SKU:</span>{' '}
+                                <span className="font-medium text-black/75">{item.selectedVariant.sku}</span>
+                              </div>
+                            ) : null}
+
                             {/* Stock Info */}
                             {stockText && (
                               <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-green-50 border border-green-200 rounded-full">
@@ -388,7 +419,14 @@ export default function CartDrawer({ isOpen, onClose }) {
                             <span className="text-xs text-black/50 font-medium">Quantity:</span>
                             <div className="flex items-center bg-warm-white border-2 border-black/10 rounded-lg overflow-hidden shadow-sm">
                               <button
-                                onClick={() => handleQuantityChange(productId, item.quantity - 1, item.selectedColor)}
+                                onClick={() =>
+                                  handleQuantityChange(
+                                    productId,
+                                    item.quantity - 1,
+                                    item.selectedColor,
+                                    item.selectedVariant
+                                  )
+                                }
                                 className="p-2 hover:bg-black/5 active:bg-black/10 transition-colors text-black/70 hover:text-black touch-manipulation"
                                 aria-label="Decrease quantity"
                               >
@@ -398,7 +436,14 @@ export default function CartDrawer({ isOpen, onClose }) {
                                 <span className="text-sm font-bold text-black">{item.quantity}</span>
                               </div>
                               <button
-                                onClick={() => handleQuantityChange(productId, item.quantity + 1, item.selectedColor)}
+                                onClick={() =>
+                                  handleQuantityChange(
+                                    productId,
+                                    item.quantity + 1,
+                                    item.selectedColor,
+                                    item.selectedVariant
+                                  )
+                                }
                                 className="p-2 hover:bg-black/5 active:bg-black/10 transition-colors text-black/70 hover:text-black touch-manipulation"
                                 aria-label="Increase quantity"
                               >

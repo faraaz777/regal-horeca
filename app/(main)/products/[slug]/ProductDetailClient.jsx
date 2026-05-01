@@ -118,6 +118,8 @@ export default function ProductDetailClient({ initialProduct = null }) {
   const params = useParams();
   const searchParams = useSearchParams();
   const { slug } = params;
+  const variantIdFromUrl = searchParams?.get('variantId')?.trim() || '';
+  const skuFromUrl = searchParams?.get('sku')?.trim() || '';
   const { isInWishlist, addToWishlist, removeFromWishlist, categories, addToCart, removeFromCart, isInCart } = useAppContext();
   const [product, setProduct] = useState(initialProduct);
   const [loading, setLoading] = useState(!initialProduct);
@@ -321,11 +323,6 @@ export default function ProductDetailClient({ initialProduct = null }) {
         if (cancelled) return;
         if (data.success) {
           setProduct(data.product);
-          const productData = data.product;
-          if (productData.colorVariants && productData.colorVariants.length > 0) {
-            const defaultVariant = productData.colorVariants.find(v => v.isDefault) || productData.colorVariants[0];
-            setSelectedColor(defaultVariant);
-          }
         }
       } catch (error) {
         if (!cancelled) console.error('Error fetching product:', error);
@@ -337,12 +334,15 @@ export default function ProductDetailClient({ initialProduct = null }) {
     return () => { cancelled = true; };
   }, [slug, initialProduct]);
 
-  // Set default color variant when product has colorVariants (for initialProduct from server)
+  // Default colour swatch when not driven by a variant deep-link (?variantId= / ?sku=)
   useEffect(() => {
     if (!product?.colorVariants?.length || selectedColor != null) return;
+    const hasGenVariants = Array.isArray(product.variants) && product.variants.length > 0;
+    const deepLinkVariant = hasGenVariants && (!!variantIdFromUrl || !!skuFromUrl);
+    if (deepLinkVariant) return;
     const defaultVariant = product.colorVariants.find(v => v.isDefault) || product.colorVariants[0];
     setSelectedColor(defaultVariant);
-  }, [product?.colorVariants, selectedColor]);
+  }, [product?.colorVariants, product?.variants, selectedColor, variantIdFromUrl, skuFromUrl]);
 
   // Fetch related products
   useEffect(() => {
@@ -416,13 +416,28 @@ export default function ProductDetailClient({ initialProduct = null }) {
     : null;
 
   useEffect(() => {
-    if (!hasGeneratedVariants) {
+    if (!product) return;
+    const variants = Array.isArray(product.variants) ? product.variants : [];
+    if (variants.length === 0) {
       setSelectedVariantIndex(0);
       return;
     }
-    const defaultIndex = (product?.variants || []).findIndex((variant) => Boolean(variant?.isDefault));
+
+    let idx = -1;
+    if (variantIdFromUrl) {
+      idx = variants.findIndex((v) => String(v?.variantId || '').trim() === variantIdFromUrl);
+    }
+    if (idx < 0 && skuFromUrl) {
+      idx = variants.findIndex((v) => String(v?.sku || '').trim() === skuFromUrl);
+    }
+    if (idx >= 0) {
+      setSelectedVariantIndex(idx);
+      return;
+    }
+
+    const defaultIndex = variants.findIndex((variant) => Boolean(variant?.isDefault));
     setSelectedVariantIndex(defaultIndex >= 0 ? defaultIndex : 0);
-  }, [hasGeneratedVariants, product?.variants]);
+  }, [product, variantIdFromUrl, skuFromUrl]);
 
   useEffect(() => {
     if (!hasGeneratedVariants) return;
@@ -483,6 +498,9 @@ export default function ProductDetailClient({ initialProduct = null }) {
   const displayPrice = activeVariant?.price ?? selectedTier?.price ?? product?.price;
   const displayUnitSuffix = selectedTier?.unit ? `/${selectedTier.unit}` : '';
   const isPriceOnRequest = displayPrice == null || displayPrice === 0;
+
+  /** Cart line identity: SKU rows when `variants[]` exist; otherwise colour-only / base product. */
+  const cartVariantOption = hasGeneratedVariants ? (activeVariant || null) : null;
   const summaryText = stripHtml(product?.summary || '').trim();
 
   if (loading) {
@@ -596,13 +614,17 @@ export default function ProductDetailClient({ initialProduct = null }) {
   const handleAddToQuote = () => {
     const id = product?._id || product?.id;
     if (!id) return;
-    const alreadyInCart = isInCart(id, selectedColor || null);
+    const alreadyInCart = isInCart(id, selectedColor || null, cartVariantOption);
     if (alreadyInCart) {
-      removeFromCart(id, selectedColor || null);
+      removeFromCart(id, selectedColor || null, cartVariantOption);
       toast.success('Removed from quote');
       return;
     }
-    addToCart(id, 1, { selectedColor: selectedColor || null, selectedVariant: activeVariant || null, price: displayPrice || null });
+    addToCart(id, 1, {
+      selectedColor: selectedColor || null,
+      selectedVariant: cartVariantOption,
+      price: displayPrice ?? null,
+    });
     toast.success('Added to quote');
     openCartDrawer();
   };
@@ -1464,7 +1486,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
                   >
                     <FileText size={18} className="text-black" />
                     <span>
-                      {isInCart(productId, selectedColor || null) ? 'Remove from Quote' : 'Add to Quote'}
+                      {isInCart(productId, selectedColor || null, cartVariantOption) ? 'Remove from Quote' : 'Add to Quote'}
                     </span>
                   </button>
                 </div>
@@ -2376,7 +2398,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
                 className="inline-flex items-center justify-center gap-2 h-10 rounded-lg border border-black/10 bg-white text-rich-black text-xs font-semibold"
               >
                 <FileText size={16} className="text-black/70" />
-                {isInCart(productId, selectedColor || null) ? 'Remove from Quote' : 'Add to Quote'}
+                {isInCart(productId, selectedColor || null, cartVariantOption) ? 'Remove from Quote' : 'Add to Quote'}
               </button>
               <button
                 type="button"

@@ -130,8 +130,13 @@ export default function ProductCard({ product, onAdd, hidePrice = false, transpa
   // Get product slug with fallback - use ID if slug is missing (API handles both)
   const productSlug = product.slug || productId?.toString();
 
+  const defaultCatalogVariant =
+    Array.isArray(product?.variants) && product.variants.length > 0
+      ? product.variants.find((v) => v.isDefault) || product.variants[0]
+      : null;
+
   const isLiked = isInWishlist(productId);
-  const inCart = isInCart(productId, null);
+  const inCart = isInCart(productId, null, defaultCatalogVariant);
 
   // Get brand and category
   const brand = product.brand || product.brandCategory?.name || '';
@@ -166,11 +171,15 @@ export default function ProductCard({ product, onAdd, hidePrice = false, transpa
     e.preventDefault();
     e.stopPropagation();
     if (inCart) {
-      removeFromCart(productId, null);
+      removeFromCart(productId, null, defaultCatalogVariant);
       toast.success('Removed from cart!');
     } else {
       addToCart(productId, 1, {
-        price: product.price
+        selectedVariant: defaultCatalogVariant,
+        price:
+          defaultCatalogVariant != null
+            ? defaultCatalogVariant.price ?? product.price ?? null
+            : product.price ?? null,
       });
       toast.success('Added to cart!');
     }

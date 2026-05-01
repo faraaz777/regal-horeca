@@ -42,6 +42,13 @@ function sanitizeNumberInput(value) {
     .replace(/[^\d.]/g, '');
 }
 
+function generatePersistedVariantId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
 function formatIndianNumberInput(value) {
   const cleaned = sanitizeNumberInput(value);
   if (!cleaned) return '';
@@ -599,6 +606,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
 
     const normalized = incomingVariants.map((variant) => ({
       _rowId: createVariantRowId(),
+      variantId: String(variant?.variantId || '').trim() || generatePersistedVariantId(),
       name: String(variant?.name || '').trim() || String(product?.title || ''),
       size: String(variant?.size || '').trim(),
       color: String(variant?.color || '').trim(),
@@ -706,6 +714,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
 
   const createEmptyVariantRow = () => ({
     _rowId: createVariantRowId(),
+    variantId: generatePersistedVariantId(),
     name: formData.title || '',
     size: '',
     color: '',
@@ -783,7 +792,10 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     const nextRows = combos.map((combo) => {
       const key = getVariantCombinationKey(combo);
       const existing = existingByKey.get(key);
-      if (existing) return existing;
+      if (existing) {
+        const vid = String(existing.variantId || '').trim();
+        return vid ? existing : { ...existing, variantId: generatePersistedVariantId() };
+      }
 
       return {
         ...createEmptyVariantRow(),
@@ -2699,6 +2711,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     const normalizedVariants = (variantRows || [])
       .filter((row) => row && typeof row === 'object')
       .map((row) => ({
+        variantId: String(row.variantId || '').trim() || generatePersistedVariantId(),
         images: (() => {
           const explicitImages = Array.isArray(row.images) ? row.images.filter(Boolean) : [];
           if (explicitImages.length > 0) return explicitImages;
@@ -3034,7 +3047,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   <th className="w-12 px-0.5 py-2 text-center font-semibold text-gray-700 whitespace-nowrap">Default</th>
                   <th className="w-[320px] min-w-[320px] px-2 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Name</th>
                   {variantFieldSelection.size && <th className="w-[120px] min-w-[120px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Size</th>}
-                  {variantFieldSelection.color && <th className="w-[140px] min-w-[140px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Color</th>}
+                  {variantFieldSelection.color && <th className="w-[160px] min-w-[160px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Color</th>}
                   {variantFieldSelection.unitCount && <th className="w-[130px] min-w-[130px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Unit Count</th>}
                   {variantFieldSelection.weight && <th className="w-[130px] min-w-[130px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Weight</th>}
                   <th className="w-[160px] min-w-[160px] px-2 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Images</th>
@@ -3117,7 +3130,61 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     </td>
                     <td className="w-[320px] min-w-[320px] px-2 py-2"><input type="text" value={row.name || ''} onChange={(e) => handleVariantRowChange(index, 'name', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>
                     {variantFieldSelection.size && <td className="w-[120px] min-w-[120px] px-3 py-2"><input type="text" value={row.size || ''} onChange={(e) => handleVariantRowChange(index, 'size', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>}
-                    {variantFieldSelection.color && <td className="w-[140px] min-w-[140px] px-3 py-2"><input type="text" value={row.color || ''} onChange={(e) => handleVariantRowChange(index, 'color', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>}
+                    {variantFieldSelection.color && (
+                      <td className="w-[160px] min-w-[160px] px-3 py-7 align-top">
+                        {selectedColorNames.length > 0 ? (
+                          <div className="space-y-1.5">
+                            <select
+                              value={(() => {
+                                const raw = String(row.color || '').trim();
+                                if (!raw) return '';
+                                const match = selectedColorNames.find(
+                                  (n) => n.toLowerCase() === raw.toLowerCase()
+                                );
+                                return match || '__other__';
+                              })()}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                if (v === '') handleVariantRowChange(index, 'color', '');
+                                else if (v === '__other__') handleVariantRowChange(index, 'color', row.color || '');
+                                else handleVariantRowChange(index, 'color', v);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                            >
+                              <option value="">— Match Color Variant</option>
+                              {selectedColorNames.map((name) => (
+                                <option key={name} value={name}>
+                                  {name}
+                                </option>
+                              ))}
+                              <option value="__other__">Other (custom)…</option>
+                            </select>
+                            {(() => {
+                              const raw = String(row.color || '').trim();
+                              const inList = selectedColorNames.some((n) => n.toLowerCase() === raw.toLowerCase());
+                              return !inList;
+                            })() && (
+                              <input
+                                type="text"
+                                value={row.color || ''}
+                                onChange={(e) => handleVariantRowChange(index, 'color', e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                placeholder="Custom color name"
+                                className="w-full p-2 border border-gray-300 rounded-md text-xs"
+                              />
+                            )}
+                          </div>
+                        ) : (
+                          <input
+                            type="text"
+                            value={row.color || ''}
+                            onChange={(e) => handleVariantRowChange(index, 'color', e.target.value)}
+                            className="w-full p-2.5 border border-gray-300 rounded-md"
+                          />
+                        )}
+                      </td>
+                    )}
                     {variantFieldSelection.unitCount && <td className="w-[130px] min-w-[130px] px-3 py-2"><input type="text" value={row.unitCount || ''} onChange={(e) => handleVariantRowChange(index, 'unitCount', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>}
                     {variantFieldSelection.weight && <td className="w-[130px] min-w-[130px] px-3 py-2"><input type="text" value={row.weight || ''} onChange={(e) => handleVariantRowChange(index, 'weight', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>}
                     <td className="w-[160px] min-w-[160px] px-2 py-2">
@@ -3138,16 +3205,17 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                           {isUploading ? 'Uploading...' : 'Upload'}
                         </label>
                         {(row.images || []).length > 0 ? (
-                          <div className="flex flex-wrap gap-1.5">
+                          <div className="flex flex-wrap items-start gap-1.5">
                             {(row.images || []).slice(0, 4).map((url, imageIndex) => (
-                              <div key={`${url}-${imageIndex}`} className="relative">
-                                <Image
+                              <div key={`${url}-${imageIndex}`} className="relative h-8 w-8">
+                                <img
                                   src={url}
-                                  alt="Variant preview"
-                                  width={34}
-                                  height={34}
-                                  unoptimized
-                                  className="h-8 w-8 rounded border border-gray-200 object-cover"
+                                  alt=""
+                                  className="block h-8 w-8 rounded border border-gray-200 object-cover bg-gray-100"
+                                  onError={(e) => {
+                                    e.currentTarget.onerror = null;
+                                    e.currentTarget.src = '/placeholder-product.jpg';
+                                  }}
                                 />
                                 <button
                                   type="button"

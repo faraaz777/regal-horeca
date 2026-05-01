@@ -3057,7 +3057,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   <th className="w-[120px] min-w-[120px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">GST%</th>
                   <th className="w-[130px] min-w-[130px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">MRP</th>
                   <th className="w-[170px] min-w-[170px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">SELLING PRICE</th>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-700 break-words">DISCOUNT %</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-700 break-words"> MAX DISCOUNT %</th>
                   <th className="w-[170px] min-w-[170px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">MARGIN PRICE</th>
                   <th className="w-20 px-2 py-2 text-center font-semibold text-gray-700 whitespace-nowrap">Action</th>
                 </tr>

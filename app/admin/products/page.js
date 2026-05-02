@@ -611,7 +611,7 @@ export default function AdminProductsPage() {
                                       </option>
                                       {product.variants.map((variant, idx) => (
                                         <option key={`${variant?.sku || 'variant'}-${idx}`} value={variant?.sku || `${idx}`}>
-                                          {variant?.name || 'Variant'} | {variant?.size || '-'} | {variant?.color || '-'} | SKU: {variant?.sku || '-'}
+                                          {variant?.name || 'Variant'} | {variant?.size || '-'} | {variant?.unit || '-'} | {variant?.color || '-'} | SKU: {variant?.sku || '-'}
                                         </option>
                                       ))}
                                     </select>
@@ -776,7 +776,7 @@ export default function AdminProductsPage() {
                                 </option>
                                 {product.variants.map((variant, idx) => (
                                   <option key={`${variant?.sku || 'variant'}-${idx}`} value={variant?.sku || `${idx}`}>
-                                    {variant?.name || 'Variant'} | {variant?.size || '-'} | {variant?.color || '-'} | SKU: {variant?.sku || '-'}
+                                    {variant?.name || 'Variant'} | {variant?.size || '-'} | {variant?.unit || '-'} | {variant?.color || '-'} | SKU: {variant?.sku || '-'}
                                   </option>
                                 ))}
                               </select>

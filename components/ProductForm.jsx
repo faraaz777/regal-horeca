@@ -568,6 +568,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
   const selectedVariantFieldCount = Object.values(variantFieldSelection).filter(Boolean).length;
   const [bulkVariantInputs, setBulkVariantInputs] = useState({
     name: '',
+    unit: '',
     sku: '',
     barcode: '',
     hsnCode: '',
@@ -609,6 +610,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       variantId: String(variant?.variantId || '').trim() || generatePersistedVariantId(),
       name: String(variant?.name || '').trim() || String(product?.title || ''),
       size: String(variant?.size || '').trim(),
+      unit: String(variant?.unit || '').trim(),
       color: String(variant?.color || '').trim(),
       unitCount: String(variant?.unitCount || '').trim(),
       weight: String(variant?.weight || '').trim(),
@@ -717,6 +719,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     variantId: generatePersistedVariantId(),
     name: formData.title || '',
     size: '',
+    unit: '',
     color: '',
     unitCount: '',
     weight: '',
@@ -800,6 +803,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       return {
         ...createEmptyVariantRow(),
         size: combo.size || '',
+        unit: '',
         color: combo.color || '',
         unitCount: combo.unitCount || '',
         weight: combo.weight || '',
@@ -874,7 +878,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
   };
 
   const handleApplyBulkInputs = () => {
-    const targetFields = ['name', 'sku', 'barcode', 'hsnCode', 'gstPercent', 'mrp', 'sellingPrice', 'discountPercent', 'marginPrice'];
+    const targetFields = ['name', 'unit', 'sku', 'barcode', 'hsnCode', 'gstPercent', 'mrp', 'sellingPrice', 'discountPercent', 'marginPrice'];
     const fieldsToApply = targetFields.filter((field) => {
       const value = bulkVariantInputs[field];
       return String(value ?? '').trim() !== '';
@@ -2722,6 +2726,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         })(),
         name: String(row.name || formData.title || '').trim(),
         size: String(row.size || '').trim(),
+        unit: String(row.unit || '').trim(),
         color: String(row.color || '').trim(),
         unitCount: String(row.unitCount || '').trim(),
         weight: String(row.weight || '').trim(),
@@ -2736,7 +2741,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         marginPrice: Number(row.marginPrice || 0),
         price: Number(row.sellingPrice || row.price || 0),
       }))
-      .filter((row) => row.name || row.sku || row.color || row.size || row.weight || row.unitCount);
+      .filter((row) => row.name || row.sku || row.color || row.size || row.unit || row.weight || row.unitCount);
 
     if (normalizedVariants.length > 0) {
       const explicitDefaultIndex = normalizedVariants.findIndex((row) => row.isDefault);
@@ -3040,13 +3045,14 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
           )}
 
           <div className="w-full max-w-full overflow-x-auto border border-gray-200 rounded-md">
-            <table className="w-full min-w-[1700px] table-auto text-sm">
+            <table className="w-full min-w-[1780px] table-auto text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="w-14 px-2 py-2 text-center font-semibold text-gray-700 whitespace-nowrap">S.NO</th>
                   <th className="w-12 px-0.5 py-2 text-center font-semibold text-gray-700 whitespace-nowrap">Default</th>
                   <th className="w-[320px] min-w-[320px] px-2 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Name</th>
                   {variantFieldSelection.size && <th className="w-[120px] min-w-[120px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Size</th>}
+                  <th className="w-[110px] min-w-[110px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Unit</th>
                   {variantFieldSelection.color && <th className="w-[160px] min-w-[160px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Color</th>}
                   {variantFieldSelection.unitCount && <th className="w-[130px] min-w-[130px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Unit Count</th>}
                   {variantFieldSelection.weight && <th className="w-[130px] min-w-[130px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Weight</th>}
@@ -3068,6 +3074,16 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     <input type="text" value={bulkVariantInputs.name} onChange={(e) => handleBulkVariantInputChange('name', e.target.value)} placeholder="Apply Name" className="w-full p-1.5 border border-gray-300 rounded text-xs" />
                   </th>
                   {variantFieldSelection.size && <th className="px-2 py-2 text-center text-[11px] text-gray-400">—</th>}
+                  <th className="w-[110px] min-w-[110px] px-3 py-">
+                    <input
+                      type="text"
+                      value={bulkVariantInputs.unit}
+                      onChange={(e) => handleBulkVariantInputChange('unit', e.target.value)}
+                      placeholder="Apply Unit"
+                      list="variantUnitOptions"
+                      className="w-full p-1.5 border border-gray-300 rounded text-xs"
+                    />
+                  </th>
                   {variantFieldSelection.color && <th className="px-2 py-2 text-center text-[11px] text-gray-400">—</th>}
                   {variantFieldSelection.unitCount && <th className="px-2 py-2 text-center text-[11px] text-gray-400">—</th>}
                   {variantFieldSelection.weight && <th className="px-2 py-2 text-center text-[11px] text-gray-400">—</th>}
@@ -3130,6 +3146,16 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     </td>
                     <td className="w-[320px] min-w-[320px] px-2 py-2"><input type="text" value={row.name || ''} onChange={(e) => handleVariantRowChange(index, 'name', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>
                     {variantFieldSelection.size && <td className="w-[120px] min-w-[120px] px-3 py-2"><input type="text" value={row.size || ''} onChange={(e) => handleVariantRowChange(index, 'size', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>}
+                    <td className="w-[110px] min-w-[110px] px-3 py-7 align-top">
+                      <input
+                        type="text"
+                        value={row.unit || ''}
+                        onChange={(e) => handleVariantRowChange(index, 'unit', e.target.value)}
+                        placeholder="kg, pc…"
+                        list="variantUnitOptions"
+                        className="w-full p-2.5 border border-gray-300 rounded-md"
+                      />
+                    </td>
                     {variantFieldSelection.color && (
                       <td className="w-[160px] min-w-[160px] px-3 py-7 align-top">
                         {selectedColorNames.length > 0 ? (
@@ -3264,10 +3290,21 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     </td>
                   </tr>
                 )) : (
-                  <tr><td colSpan={13 + (variantFieldSelection.size ? 1 : 0) + (variantFieldSelection.color ? 1 : 0) + (variantFieldSelection.unitCount ? 1 : 0) + (variantFieldSelection.weight ? 1 : 0)} className="px-3 py-4 text-center text-sm text-gray-500">No variants generated yet. Select fields and click <span className="font-semibold">Generate Variants</span>.</td></tr>
+                  <tr><td colSpan={14 + (variantFieldSelection.size ? 1 : 0) + (variantFieldSelection.color ? 1 : 0) + (variantFieldSelection.unitCount ? 1 : 0) + (variantFieldSelection.weight ? 1 : 0)} className="px-3 py-4 text-center text-sm text-gray-500">No variants generated yet. Select fields and click <span className="font-semibold">Generate Variants</span>.</td></tr>
                 )}
               </tbody>
             </table>
+            <datalist id="variantUnitOptions">
+              <option value="kg" />
+              <option value="g" />
+              <option value="gm" />
+              <option value="pcs" />
+              <option value="pc" />
+              <option value="set" />
+              <option value="pack" />
+              <option value="box" />
+              <option value="pair" />
+            </datalist>
           </div>
         </FormSection>
         </div>

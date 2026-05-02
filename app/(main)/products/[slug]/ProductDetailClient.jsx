@@ -496,7 +496,16 @@ export default function ProductDetailClient({ initialProduct = null }) {
   }, [priceBySize, selectedSizeKey]);
 
   const displayPrice = activeVariant?.price ?? selectedTier?.price ?? product?.price;
-  const displayUnitSuffix = selectedTier?.unit ? `/${selectedTier.unit}` : '';
+  const variantUnitTrimmed = hasGeneratedVariants
+    ? String(activeVariant?.unit || '').trim()
+    : '';
+  const displayUnitSuffix = hasGeneratedVariants
+    ? variantUnitTrimmed
+      ? `/${variantUnitTrimmed}`
+      : ''
+    : selectedTier?.unit
+      ? `/${selectedTier.unit}`
+      : '';
   const isPriceOnRequest = displayPrice == null || displayPrice === 0;
 
   /** Cart line identity: SKU rows when `variants[]` exist; otherwise colour-only / base product. */
@@ -1294,15 +1303,17 @@ export default function ProductDetailClient({ initialProduct = null }) {
                         <button
                           key={index}
                           onClick={() => handleColorSelect(variant)}
-                          className={`group relative w-9 h-9 rounded-[10px] border transition-all duration-300 flex-shrink-0 ${
+                          type="button"
+                          className={`group relative h-9 w-9 shrink-0 overflow-hidden rounded-[10px] border-2  outline-none transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent ${
                             selectedColor?.colorName === variant.colorName
-                              ? 'border-accent ring-1 ring-accent/40 bg-accent/5'
-                              : 'border-black/10 hover:border-accent hover:bg-accent/5'
+                              ? 'border-black'
+                              : 'border-black/45 hover:border-accent active:border-accent'
                           }`}
                           title={`${variant.colorName}${variant.isDefault ? ' (Default)' : ''}`}
+                          aria-pressed={selectedColor?.colorName === variant.colorName}
                         >
                           <span
-                            className="absolute inset-0 rounded-[10px] shadow-sm border border-black/5"
+                            className="absolute inset-0 block"
                             style={{ backgroundColor: variant.colorHex }}
                           />
                         </button>
@@ -1364,8 +1375,10 @@ export default function ProductDetailClient({ initialProduct = null }) {
                         return String(variant?.color || '').trim().toLowerCase() === selectedColorName;
                       })
                       .map(({ variant, idx }) => {
-                      const labelParts = [variant?.size, variant?.color, variant?.weight, variant?.unitCount].filter(Boolean);
-                      const label = labelParts.join(' / ') || variant?.name || `Variant ${idx + 1}`;
+                      const label =
+                        String(variant?.size || '').trim() ||
+                        String(variant?.sku || '').trim() ||
+                        `Variant ${idx + 1}`;
                       const active = idx === selectedVariantIndex;
                       return (
                         <button

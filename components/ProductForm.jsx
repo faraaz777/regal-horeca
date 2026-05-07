@@ -847,34 +847,6 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       ? sanitizeNumberInput(value)
       : value;
     setBulkVariantInputs((prev) => ({ ...prev, [field]: normalizedValue }));
-
-    const isFieldEmptyForRow = (row, key) => {
-      const raw = row?.[key];
-      if (raw === null || raw === undefined) return true;
-      if (typeof raw === 'number') return raw === 0;
-      return String(raw).trim() === '';
-    };
-
-    setVariantRows((prev) => {
-      const allRowsEmptyForField = prev.every((row) => isFieldEmptyForRow(row, field));
-      if (!allRowsEmptyForField) return prev;
-
-      return prev.map((row) => {
-        const nextRow = { ...row, [field]: normalizedValue };
-        if (field === 'mrp' || field === 'sellingPrice') {
-          const mrpValue = Number(nextRow.mrp || 0);
-          const sellingValue = Number(nextRow.sellingPrice || 0);
-          if (Number.isFinite(mrpValue) && mrpValue > 0 && Number.isFinite(sellingValue)) {
-            const rawDiscount = ((mrpValue - sellingValue) / mrpValue) * 100;
-            const normalizedDiscount = Math.max(0, rawDiscount);
-            nextRow.discountPercent = Number(normalizedDiscount.toFixed(2));
-          } else {
-            nextRow.discountPercent = 0;
-          }
-        }
-        return nextRow;
-      });
-    });
   };
 
   const handleApplyBulkInputs = () => {

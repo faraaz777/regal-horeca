@@ -25,6 +25,7 @@ import { useAppContext } from '@/context/AppContext';
 import ProductForm from '@/components/ProductForm';
 import { showToast } from '@/lib/utils/toast';
 import { apiClient, ApiError } from '@/lib/utils/apiClient';
+import { saveProductChildren } from '@/lib/utils/saveProductChildren';
 
 // SWR fetcher function
 const fetcher = (url) => fetch(url).then(res => res.json());
@@ -92,7 +93,6 @@ export default function AdminAddProductPage() {
     setError('');
 
     try {
-      // Generate slug from title if not provided
       if (!productData.slug) {
         productData.slug = productData.title
           .toLowerCase()
@@ -100,12 +100,35 @@ export default function AdminAddProductPage() {
           .replace(/(^-|-$)/g, '');
       }
 
-      await apiClient.requestWithRetry('/api/products', {
+      // Pull form-only metadata before sending to the parent endpoint.
+      const variantRows = Array.isArray(productData._variantRows) ? productData._variantRows : [];
+      const variationTheme = Array.isArray(productData.variationTheme) ? productData.variationTheme : [];
+
+      const response = await apiClient.requestWithRetry('/api/products', {
         method: 'POST',
         body: productData,
       });
 
-      showToast.success('Product created successfully');
+      const createdProduct = response?.product || response?.data?.product;
+      const parentId = createdProduct?._id || createdProduct?.id;
+
+      if (variantRows.length > 0 && parentId) {
+        const result = await saveProductChildren({
+          parentId,
+          variantRows,
+          variationTheme,
+        });
+        if (result.errors.length > 0) {
+          showToast.error(`${result.errors.length} variant(s) failed to save. See console for details.`);
+          console.error('Variant save errors:', result.errors);
+        }
+      }
+
+      showToast.success(
+        variantRows.length > 0
+          ? `Product created with ${variantRows.length} variant(s)`
+          : 'Product created successfully'
+      );
       await refreshProducts();
       router.push('/admin/products');
     } catch (error) {

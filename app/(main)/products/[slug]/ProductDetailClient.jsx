@@ -8,7 +8,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Share2,
@@ -114,14 +114,53 @@ function splitProductTitle(rawTitle) {
   return { primary: title, secondary: '' };
 }
 
+// Convert parent/child resolved product (with `children` array) into the variant-row
+// shape the existing PDP UI consumes via `product.variants`. Each row is decorated
+// with `_childSlug` and `_childProductId` so swatch picks can navigate to the child.
+function normalizeProductForPDP(input) {
+  if (!input) return input;
+  const children = Array.isArray(input.children) ? input.children : [];
+  if (children.length === 0) return input;
+
+  const synthesized = children.map((child) => {
+    const attrs = child.variationAttributes || {};
+    const isDefault = String(input.defaultChildProductId || '') === String(child._id || '');
+    return {
+      variantId: '',
+      name: child.title,
+      size: attrs.size || '',
+      unit: '',
+      color: attrs.color || '',
+      unitCount: attrs.unitCount || '',
+      weight: attrs.weight || '',
+      isDefault,
+      images: Array.isArray(child.gallery) ? child.gallery.filter(Boolean) : (child.heroImage ? [child.heroImage] : []),
+      sku: child.sku || '',
+      barcode: child.barcode || '',
+      hsnCode: child.hsnCode || '',
+      gstPercent: Number(child.gstPercent || 0),
+      mrp: Number(child.mrp || 0),
+      sellingPrice: Number(child.sellingPrice || child.price || 0),
+      discountPercent: Number(child.discountPercent || 0),
+      marginPrice: Number(child.marginPrice || 0),
+      price: Number(child.sellingPrice || child.price || 0),
+      _childProductId: String(child._id || ''),
+      _childSlug: child.slug || '',
+    };
+  });
+
+  return { ...input, variants: synthesized };
+}
+
 export default function ProductDetailClient({ initialProduct = null }) {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { slug } = params;
   const variantIdFromUrl = searchParams?.get('variantId')?.trim() || '';
   const skuFromUrl = searchParams?.get('sku')?.trim() || '';
   const { isInWishlist, addToWishlist, removeFromWishlist, categories, addToCart, removeFromCart, isInCart } = useAppContext();
-  const [product, setProduct] = useState(initialProduct);
+  const [product, setProduct] = useState(() => normalizeProductForPDP(initialProduct));
   const [loading, setLoading] = useState(!initialProduct);
   const [activeTab, setActiveTab] = useState('specs');
   const [selectedColor, setSelectedColor] = useState(null);
@@ -322,7 +361,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
         const data = await response.json();
         if (cancelled) return;
         if (data.success) {
-          setProduct(data.product);
+          setProduct(normalizeProductForPDP(data.product));
         }
       } catch (error) {
         if (!cancelled) console.error('Error fetching product:', error);
@@ -1384,7 +1423,16 @@ export default function ProductDetailClient({ initialProduct = null }) {
                         <button
                           key={`${variant?.sku || 'variant'}-${idx}`}
                           type="button"
-                          onClick={() => setSelectedVariantIndex(idx)}
+                          onClick={() => {
+                            // For parent/child products each swatch corresponds to a real
+                            // child product with its own canonical URL. Navigate so the
+                            // address bar, canonical, and metadata stay in sync.
+                            if (variant?._childSlug && variant._childSlug !== slug) {
+                              router.push(`/products/${variant._childSlug}`);
+                              return;
+                            }
+                            setSelectedVariantIndex(idx);
+                          }}
                           className={`px-3 py-2 text-xs font-semibold rounded-md border transition-colors ${
                             active
                               ? 'bg-accent text-white border-accent'

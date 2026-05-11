@@ -12,8 +12,9 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
 import { generateUniqueSlug } from '@/lib/utils/slug';
-import { revalidateHomepage, revalidatePath, revalidateProducts } from '@/lib/utils/revalidate';
+import { revalidateHomepage, revalidatePath, revalidateProducts, revalidateProductSlugs } from '@/lib/utils/revalidate';
 import { normalizeFilterValues } from '@/lib/utils/normalizeFilterValue';
+import { resolveProduct, getSiblingChildren } from '@/lib/server/products/resolveProduct';
 import mongoose from 'mongoose';
 
 /**
@@ -91,6 +92,26 @@ export async function GET(request, { params }) {
         { error: 'Product not found' },
         { status: 404 }
       );
+    }
+
+    // Resolve parent/child inheritance so callers (cart drawer, related products,
+    // ProductCard, etc.) get the merged shape regardless of whether the row is a
+    // child variant. Standalones pass through unchanged.
+    const productType = product.productType || 'standalone';
+    if (productType === 'child' || productType === 'parent') {
+      const resolved = await resolveProduct(product);
+      if (resolved) {
+        product = resolved;
+      }
+      if (productType === 'parent' || productType === 'child') {
+        const parentIdForSiblings =
+          productType === 'parent'
+            ? product._id
+            : product.parentProductId || product.parent?._id;
+        if (parentIdForSiblings) {
+          product.children = await getSiblingChildren(parentIdForSiblings);
+        }
+      }
     }
 
     // Normalize filters (convert old object format to array format if needed)
@@ -176,6 +197,12 @@ export async function PUT(request, { params }) {
 
     const { id } = params;
     const updateData = await request.json();
+
+    // `_variantRows` is form-side metadata used by the admin caller to create child
+    // product documents after the parent is saved. Strip before applying updates.
+    if (updateData._variantRows) {
+      delete updateData._variantRows;
+    }
 
     // Handle categoryId - only remove if it's truly empty/null/undefined
     // If it's a valid string (ObjectId), MongoDB will convert it automatically
@@ -406,6 +433,11 @@ export async function PUT(request, { params }) {
 /**
  * DELETE /api/products/[id]
  * Soft-deletes a product (sets deletedAt). Images remain in R2 so restore keeps assets.
+ *
+ * Cascade rules:
+ * - Deleting a 'parent' soft-deletes all its non-deleted children atomically so the
+ *   storefront doesn't end up with orphaned children pointing at a hidden parent.
+ * - Deleting a 'child' or 'standalone' deletes only that row.
  */
 export async function DELETE(request, { params }) {
   try {
@@ -429,21 +461,37 @@ export async function DELETE(request, { params }) {
     }
 
     const productSlug = product.slug;
+    const now = new Date();
 
-    product.deletedAt = new Date();
+    const slugsToRevalidate = [productSlug];
+    let cascadeCount = 0;
+
+    if (product.productType === 'parent') {
+      const children = await Product.find({ parentProductId: product._id, deletedAt: null })
+        .select('_id slug')
+        .lean();
+      cascadeCount = children.length;
+      if (cascadeCount > 0) {
+        await Product.updateMany(
+          { parentProductId: product._id, deletedAt: null },
+          { $set: { deletedAt: now } }
+        );
+        children.forEach((c) => slugsToRevalidate.push(c.slug));
+      }
+    }
+
+    product.deletedAt = now;
     await product.save();
 
-    revalidateHomepage();
-    revalidateProducts();
-
-    if (productSlug) {
-      revalidatePath(`/products/${productSlug}`);
-    }
-    revalidatePath('/sitemap.xml');
+    revalidateProductSlugs(slugsToRevalidate);
 
     return NextResponse.json({
       success: true,
-      message: 'Product moved to trash. You can restore it from the Deleted tab.',
+      cascadeDeleted: cascadeCount,
+      message:
+        cascadeCount > 0
+          ? `Product and ${cascadeCount} variant(s) moved to trash. You can restore from the Deleted tab.`
+          : 'Product moved to trash. You can restore it from the Deleted tab.',
     });
   } catch (error) {
     console.error('Error deleting product:', error);

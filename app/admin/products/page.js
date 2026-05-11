@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import useSWR from 'swr';
@@ -9,6 +9,7 @@ import { PlusIcon, EditIcon, TrashIcon, SearchIcon, ChevronLeftIcon, ChevronRigh
 import ProductForm from '@/components/ProductForm';
 import { showToast } from '@/lib/utils/toast';
 import { apiClient, ApiError } from '@/lib/utils/apiClient';
+import { saveProductChildren } from '@/lib/utils/saveProductChildren';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -67,10 +68,13 @@ export default function AdminProductsPage() {
   const [isBulkMode, setIsBulkMode] = useState(false);
   /** 'active' = catalog rows; 'deleted' = soft-deleted only */
   const [listFilter, setListFilter] = useState('active');
+  /** Parent _id -> bool (expanded). Drives the variant child rows. */
+  const [expandedParents, setExpandedParents] = useState({});
 
-  // Build URL with pagination and search
+  // Admin list endpoint: returns parents/children/standalones in one shot, ignoring
+  // the storefront visibility filter so admins see hidden variants.
   const getProductsUrl = (page, search, filter) => {
-    let url = `/api/products?limit=${ITEMS_PER_PAGE}&page=${page}`;
+    let url = `/api/admin/products?limit=${ITEMS_PER_PAGE}&page=${page}`;
     if (search) {
       url += `&search=${encodeURIComponent(search)}`;
     }
@@ -90,7 +94,8 @@ export default function AdminProductsPage() {
     }
   );
 
-  // When viewing Deleted, related-product pickers still need an active catalog pool
+  // When viewing Deleted, related-product pickers still need an active catalog pool.
+  // The picker pool intentionally uses the public route (which already excludes parents).
   const { data: activePickerData } = useSWR(
     listFilter === 'deleted' ? '/api/products?limit=300&page=1' : null,
     fetcher,
@@ -98,6 +103,131 @@ export default function AdminProductsPage() {
   );
 
   const products = data?.products || [];
+
+  // Group children by parent for grouped table rendering. We read the source array
+  // straight from `data` inside the memo so its identity is stable per SWR refresh
+  // (avoids the no-op-but-noisy react-hooks/exhaustive-deps warning).
+  const childrenByParent = useMemo(() => {
+    const list = data?.attachedChildren || [];
+    const map = new Map();
+    list.forEach((child) => {
+      const pid = child.parentProductId?.toString?.() || String(child.parentProductId || '');
+      if (!pid) return;
+      if (!map.has(pid)) map.set(pid, []);
+      map.get(pid).push(child);
+    });
+    return map;
+  }, [data]);
+
+  // Exact-match detection. The server uses substring regex, which is great for
+  // discovery, but admins typing a full SKU/barcode/HSN expect to *land* on that
+  // row. We compute case-insensitive exact matches client-side and:
+  //   - mark the matching product (or variant) row for visual highlight
+  //   - auto-expand any parent whose embedded variant or child matches exactly
+  //     so the highlighted row is actually visible without an extra click
+  const normalizedSearch = searchTerm ? String(searchTerm).trim().toLowerCase() : '';
+  const exactMatchInfo = useMemo(() => {
+    if (!normalizedSearch) return { productIds: new Set(), childKeys: new Set(), parentIdsToExpand: new Set() };
+
+    const productIds = new Set();
+    const childKeys = new Set();
+    const parentIdsToExpand = new Set();
+
+    const eq = (value) => String(value || '').trim().toLowerCase() === normalizedSearch;
+
+    // Reading from `data?.products` keeps the dep array stable per SWR refresh.
+    (data?.products || []).forEach((p) => {
+      const pid = String(p._id || p.id || '');
+      if (!pid) return;
+      const productMatches =
+        eq(p.sku) || eq(p.barcode) || eq(p.hsnCode) || eq(p.title) || eq(p.brand) || eq(p.legacyParentVariantId);
+      if (productMatches) productIds.add(pid);
+
+      // Legacy embedded variants: scan in-place.
+      if (Array.isArray(p.variants)) {
+        p.variants.forEach((v, idx) => {
+          if (!v) return;
+          if (eq(v.sku) || eq(v.barcode) || eq(v.hsnCode) || eq(v.name)) {
+            childKeys.add(`${pid}::legacy::${idx}`);
+            parentIdsToExpand.add(pid);
+          }
+        });
+      }
+    });
+
+    // Real child products (already separate documents — they live in `attachedChildren`
+    // for their visible parents, but they may also appear at the top level of
+    // `products` when the search matched them directly).
+    (data?.attachedChildren || []).forEach((c) => {
+      const cid = String(c._id || c.id || '');
+      if (!cid) return;
+      if (eq(c.sku) || eq(c.barcode) || eq(c.hsnCode) || eq(c.title) || eq(c.legacyParentVariantId)) {
+        childKeys.add(cid);
+        const parentPid = c.parentProductId?.toString?.() || String(c.parentProductId || '');
+        if (parentPid) parentIdsToExpand.add(parentPid);
+      }
+    });
+
+    return { productIds, childKeys, parentIdsToExpand };
+  }, [normalizedSearch, data]);
+
+  // Auto-expand parents that contain a variant matching the current search term.
+  // Use a ref-like effect so the user can still manually collapse afterwards
+  // (we only force-expand on a *change* in match set).
+  useEffect(() => {
+    if (exactMatchInfo.parentIdsToExpand.size === 0) return;
+    setExpandedParents((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      exactMatchInfo.parentIdsToExpand.forEach((pid) => {
+        if (!next[pid]) {
+          next[pid] = true;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [exactMatchInfo]);
+
+  // Optimistic toggle for child.visibleOnClient. Falls back to a refetch on error.
+  const toggleChildVisibility = async (child) => {
+    const childId = child._id || child.id;
+    if (!childId) return;
+    const next = !(child.visibleOnClient ?? true);
+
+    try {
+      await mutate(
+        async (current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            attachedChildren: (current.attachedChildren || []).map((c) =>
+              (c._id || c.id) === childId ? { ...c, visibleOnClient: next } : c
+            ),
+          };
+        },
+        { revalidate: false }
+      );
+
+      const res = await fetch(`/api/admin/products/children/${childId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visibleOnClient: next }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to update visibility');
+      }
+      mutate();
+    } catch (err) {
+      showToast.error(err?.message || 'Failed to update visibility');
+      mutate();
+    }
+  };
+
+  const toggleParentExpanded = (parentId) => {
+    setExpandedParents((prev) => ({ ...prev, [parentId]: !prev[parentId] }));
+  };
   const allProductsForForm = listFilter === 'deleted' ? (activePickerData?.products || []) : products;
   const totalProducts = data?.total || 0;
 
@@ -131,16 +261,36 @@ export default function AdminProductsPage() {
       return;
     }
 
-    // Fetch full product data with all fields
     const toastId = showToast.loading('Loading product details...');
     setLoading(true);
-    
+
     try {
       const response = await fetch(`/api/products/${productId}`);
       const data = await response.json();
-      
+
       if (data.success && data.product) {
-        setEditingProduct(data.product);
+        let editingPayload = data.product;
+
+        // For parents, the public product route already returns merged content
+        // (because resolveProduct picks the default child) — but for the EDIT
+        // form we want the parent's own copy + the canonical list of children
+        // so the variant table can render. Refetch via the admin children endpoint.
+        if (product.productType === 'parent') {
+          try {
+            const childrenRes = await fetch(`/api/admin/products/${productId}/children`);
+            const childrenData = await childrenRes.json().catch(() => ({}));
+            if (childrenRes.ok && childrenData?.success) {
+              editingPayload = {
+                ...childrenData.parent,
+                children: childrenData.children,
+              };
+            }
+          } catch (e) {
+            console.error('Failed to load variant children:', e);
+          }
+        }
+
+        setEditingProduct(editingPayload);
         setIsVariantsOnlyView(false);
         setIsEditModalOpen(true);
       } else {
@@ -373,12 +523,31 @@ export default function AdminProductsPage() {
 
     try {
       const productId = editingProduct._id || editingProduct.id;
+      const variantRows = Array.isArray(productData._variantRows) ? productData._variantRows : [];
+      const variationTheme = Array.isArray(productData.variationTheme) ? productData.variationTheme : [];
+
       await apiClient.requestWithRetry(`/api/products/${productId}`, {
         method: 'PUT',
         body: productData,
       });
 
-      showToast.success('Product updated successfully');
+      if (variantRows.length > 0) {
+        const result = await saveProductChildren({
+          parentId: productId,
+          variantRows,
+          variationTheme,
+        });
+        if (result.errors.length > 0) {
+          showToast.error(`${result.errors.length} variant(s) failed to save. See console for details.`);
+          console.error('Variant save errors:', result.errors);
+        }
+      }
+
+      showToast.success(
+        variantRows.length > 0
+          ? `Product updated. Synced ${variantRows.length} variant(s).`
+          : 'Product updated successfully'
+      );
       setIsEditModalOpen(false);
       setIsVariantsOnlyView(false);
       setEditingProduct(null);
@@ -567,11 +736,59 @@ export default function AdminProductsPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {products.length > 0 ? (
-                    products.map(product => {
+                    products.flatMap(product => {
                       const productId = product._id || product.id;
                       const isSelected = selectedProducts.has(productId);
-                      return (
-                        <tr key={productId} className={`hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''}`}>
+                      const isParent = product.productType === 'parent';
+
+                      // Unify "real children" and "legacy embedded variants" so both render
+                      // as expandable rows under the carrier. Legacy rows are reshaped to look
+                      // like children (image / title / brand / price / status) and are flagged
+                      // with `__legacy: true` so action handlers know they aren't yet promoted
+                      // to standalone child documents.
+                      const childRows = isParent ? (childrenByParent.get(String(productId)) || []) : [];
+                      const legacyVariants = !isParent && Array.isArray(product.variants) ? product.variants : [];
+                      const legacyChildRows = legacyVariants.map((v, i) => {
+                        const attrs = {
+                          size: String(v?.size || '').trim(),
+                          color: String(v?.color || '').trim(),
+                          weight: String(v?.weight || '').trim(),
+                          unitCount: String(v?.unitCount || '').trim(),
+                        };
+                        const tail = ['size', 'color', 'weight', 'unitCount']
+                          .map((k) => attrs[k])
+                          .filter(Boolean)
+                          .join(' / ');
+                        return {
+                          _id: `${productId}::legacy::${i}`,
+                          __legacy: true,
+                          title: tail ? `${product.title} - ${tail}` : (v?.name || product.title),
+                          heroImage: (Array.isArray(v?.images) && v.images.find(Boolean)) || product.heroImage,
+                          gallery: Array.isArray(v?.images) ? v.images.filter(Boolean) : [],
+                          brand: product.brand,
+                          price: Number(v?.sellingPrice ?? v?.price ?? product.price ?? 0),
+                          status: product.status,
+                          sku: String(v?.sku || '').trim(),
+                          variationAttributes: attrs,
+                          visibleOnClient: true,
+                        };
+                      });
+                      const displayChildren = isParent ? childRows : legacyChildRows;
+                      const variantCount = displayChildren.length;
+                      const isExpandable = variantCount > 0;
+                      const isExpanded = !!expandedParents[String(productId)];
+                      const isCarrier = isParent || legacyChildRows.length > 0;
+
+                      const rows = [];
+                      const isExactMatch = exactMatchInfo.productIds.has(String(productId));
+                      const rowHighlight = isExactMatch
+                        ? 'bg-yellow-50 ring-1 ring-inset ring-yellow-300'
+                        : isSelected
+                          ? 'bg-blue-50'
+                          : '';
+
+                      rows.push(
+                        <tr key={productId} className={`hover:bg-gray-50 ${rowHighlight}`}>
                           {isBulkMode && (
                             <td className="px-6 py-4">
                               <input
@@ -584,39 +801,64 @@ export default function AdminProductsPage() {
                           )}
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
+                              {isExpandable ? (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleParentExpanded(String(productId))}
+                                  className="mr-2 inline-flex items-center justify-center w-5 h-5 rounded text-gray-600 hover:text-gray-900"
+                                  aria-label={isExpanded ? 'Collapse variants' : 'Expand variants'}
+                                  title={isExpanded ? 'Collapse variants' : 'Expand variants'}
+                                >
+                                  <svg
+                                    viewBox="0 0 12 12"
+                                    className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                                    fill="currentColor"
+                                  >
+                                    <path d="M3 1.5l6 4.5-6 4.5z" />
+                                  </svg>
+                                </button>
+                              ) : (
+                                <span className="mr-2 inline-block w-5" />
+                              )}
                               <div className="relative h-10 w-10 flex-shrink-0">
-                                <Image 
-                                  src={product.heroImage} 
-                                  alt={product.title} 
-                                  fill
-                                  sizes="40px"
-                                  unoptimized
-                                  className="rounded-md object-cover"
-                                  loading="lazy"
-                                  placeholder="blur"
-                                  blurDataURL={blurDataURL}
-                                />
+                                {product.heroImage ? (
+                                  <Image
+                                    src={product.heroImage}
+                                    alt={product.title}
+                                    fill
+                                    sizes="40px"
+                                    unoptimized
+                                    className="rounded-md object-cover"
+                                    loading="lazy"
+                                    placeholder="blur"
+                                    blurDataURL={blurDataURL}
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-md bg-gray-100 border border-dashed border-gray-300" />
+                                )}
                               </div>
                               <div className="ml-4">
-                                <div className="text-sm font-medium text-gray-900">{product.title}</div>
-                                {Array.isArray(product.variants) && product.variants.length > 0 && (
-                                  <div className="mt-1">
-                                    <select
-                                      className="text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700"
-                                      defaultValue=""
-                                      onClick={(e) => e.stopPropagation()}
+                                <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                                  <span>{product.title}</span>
+                                  {isExactMatch && (
+                                    <span
+                                      className="inline-flex items-center px-2 py-0.5 text-[10px] font-bold rounded-full bg-yellow-200 text-yellow-900"
+                                      title={`Exact match for "${searchTerm}"`}
                                     >
-                                      <option value="" disabled>
-                                        Variants ({product.variants.length})
-                                      </option>
-                                      {product.variants.map((variant, idx) => (
-                                        <option key={`${variant?.sku || 'variant'}-${idx}`} value={variant?.sku || `${idx}`}>
-                                          {variant?.name || 'Variant'} | {variant?.size || '-'} | {variant?.unit || '-'} | {variant?.color || '-'} | SKU: {variant?.sku || '-'}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                )}
+                                      Match
+                                    </span>
+                                  )}
+                                  {isExpandable && (
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleParentExpanded(String(productId))}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-full bg-indigo-100 text-indigo-800 hover:bg-indigo-200 transition-colors"
+                                      title={isExpanded ? 'Hide variants' : 'Show variants'}
+                                    >
+                                      Variations ({variantCount})
+                                    </button>
+                                  )}
+                                </div>
                                 {listFilter === 'deleted' && product.deletedAt && (
                                   <div className="text-xs text-gray-400 mt-0.5">
                                     Removed {new Date(product.deletedAt).toLocaleString()}
@@ -626,7 +868,7 @@ export default function AdminProductsPage() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.brand}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{product.price}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{isCarrier ? '—' : `₹${product.price}`}</td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                               product.status === 'In Stock' 
@@ -649,44 +891,52 @@ export default function AdminProductsPage() {
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             {!isBulkMode && listFilter === 'active' && (
                               <>
-                                <button 
-                                  onClick={() => handleEditProduct(product)} 
+                                <button
+                                  onClick={() => handleEditProduct(product)}
                                   className="text-indigo-600 hover:text-indigo-900 mr-4"
                                   disabled={loading}
                                   title="Edit product"
                                 >
                                   <EditIcon />
                                 </button>
-                                <button 
-                                  onClick={() => handleDuplicateProduct(product)} 
-                                  className="text-blue-600 hover:text-blue-900 mr-4"
-                                  disabled={loading}
-                                  title="Duplicate product"
-                                >
-                                  <DuplicateIcon />
-                                </button>
-                                <button 
-                                  onClick={() => handleDeleteProduct(productId)} 
-                                  className="text-red-600 hover:text-red-900"
-                                  disabled={loading}
-                                  title="Move to trash"
-                                >
-                                  <TrashIcon />
-                                </button>
+                                {/* Variant carriers (new parents AND legacy products with embedded
+                                    variants) only get Edit. Duplicate/Delete is hidden here so
+                                    admins can't orphan variants from the list view; both flows
+                                    are owned by the parent edit modal. */}
+                                {!isCarrier && (
+                                  <>
+                                    <button
+                                      onClick={() => handleDuplicateProduct(product)}
+                                      className="text-blue-600 hover:text-blue-900 mr-4"
+                                      disabled={loading}
+                                      title="Duplicate product"
+                                    >
+                                      <DuplicateIcon />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteProduct(productId)}
+                                      className="text-red-600 hover:text-red-900"
+                                      disabled={loading}
+                                      title="Move to trash"
+                                    >
+                                      <TrashIcon />
+                                    </button>
+                                  </>
+                                )}
                               </>
                             )}
                             {!isBulkMode && listFilter === 'deleted' && (
                               <>
-                                <button 
-                                  onClick={() => handleRestoreProduct(productId)} 
+                                <button
+                                  onClick={() => handleRestoreProduct(productId)}
                                   className="text-emerald-600 hover:text-emerald-900 mr-4"
                                   disabled={loading}
                                   title="Restore product"
                                 >
                                   <RestoreIcon />
                                 </button>
-                                <button 
-                                  onClick={() => handleEditProduct(product)} 
+                                <button
+                                  onClick={() => handleEditProduct(product)}
                                   className="text-indigo-600 hover:text-indigo-900"
                                   disabled={loading}
                                   title="Edit (e.g. change slug if restore fails)"
@@ -698,6 +948,123 @@ export default function AdminProductsPage() {
                           </td>
                         </tr>
                       );
+
+                      if (isExpanded && displayChildren.length > 0) {
+                        displayChildren.forEach((child) => {
+                          const childId = child._id || child.id;
+                          const isLegacy = Boolean(child.__legacy);
+                          const childKey = String(childId);
+                          const isChildExactMatch = exactMatchInfo.childKeys.has(childKey);
+                          const attrs = child.variationAttributes || {};
+                          const attrChips = ['size', 'color', 'weight', 'unitCount']
+                            .map((k) => (attrs[k] ? `${k}: ${attrs[k]}` : null))
+                            .filter(Boolean);
+                          const childImage =
+                            child.heroImage ||
+                            (Array.isArray(child.gallery) && child.gallery[0]) ||
+                            product.heroImage;
+                          const childStatus = child.status || product.status;
+                          const childRowClass = isChildExactMatch
+                            ? 'bg-yellow-50 ring-1 ring-inset ring-yellow-300'
+                            : 'bg-gray-50/60';
+                          rows.push(
+                            <tr key={`${productId}::child::${childId}`} className={childRowClass}>
+                              {isBulkMode && <td className="px-6 py-3" />}
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center pl-9">
+                                  {/* Same image / title block as parent so the row reads as a sibling. */}
+                                  <span className="mr-2 inline-block w-5" />
+                                  <div className="relative h-10 w-10 flex-shrink-0">
+                                    {childImage ? (
+                                      <Image
+                                        src={childImage}
+                                        alt={child.title || 'Variant'}
+                                        fill
+                                        sizes="40px"
+                                        unoptimized
+                                        className="rounded-md object-cover"
+                                        loading="lazy"
+                                      />
+                                    ) : (
+                                      <div className="w-10 h-10 rounded-md bg-gray-100 border border-dashed border-gray-300" />
+                                    )}
+                                  </div>
+                                  <div className="ml-4">
+                                    <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                                      <span>{child.title || 'Variant'}</span>
+                                      {isChildExactMatch && (
+                                        <span
+                                          className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-yellow-200 text-yellow-900"
+                                          title={`Exact match for "${searchTerm}"`}
+                                        >
+                                          Match
+                                        </span>
+                                      )}
+                                      {isLegacy && (
+                                        <span
+                                          className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-800"
+                                          title="Embedded variant (pre-migration). Run npm run migrate:variants to promote it to a real child product."
+                                        >
+                                          Legacy
+                                        </span>
+                                      )}
+                                    </div>
+                                    {(attrChips.length > 0 || child.sku) && (
+                                      <div className="text-[11px] text-gray-500 flex flex-wrap gap-1 mt-0.5">
+                                        {attrChips.map((chip) => (
+                                          <span key={chip} className="px-1.5 py-0.5 bg-white border border-gray-200 rounded">{chip}</span>
+                                        ))}
+                                        {child.sku ? <span className="px-1.5 py-0.5 bg-white border border-gray-200 rounded">SKU: {child.sku}</span> : null}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{child.brand || product.brand}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{child.price ?? 0}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                  childStatus === 'In Stock'
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {childStatus || '—'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {/* Featured-on-storefront isn't a child concept — variants inherit
+                                    it from the parent, so we render a placeholder here to keep
+                                    the column alignment with the parent row. */}
+                                {isLegacy ? (
+                                  <span className="text-xs text-gray-400">—</span>
+                                ) : (
+                                  <label className="inline-flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={child.visibleOnClient ?? true}
+                                      onChange={() => toggleChildVisibility(child)}
+                                      className="rounded border-gray-300 text-primary focus:ring-primary"
+                                    />
+                                    Visible
+                                  </label>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button
+                                  onClick={() => handleEditProduct(product)}
+                                  className="text-indigo-600 hover:text-indigo-900"
+                                  disabled={loading}
+                                  title="Edit variant via parent"
+                                >
+                                  <EditIcon />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      }
+
+                      return rows;
                     })
                   ) : (
                     <tr>
@@ -733,10 +1100,49 @@ export default function AdminProductsPage() {
                 products.map(product => {
                   const productId = product._id || product.id;
                   const isSelected = selectedProducts.has(productId);
+                  const isParent = product.productType === 'parent';
+                  const childRows = isParent ? (childrenByParent.get(String(productId)) || []) : [];
+                  const legacyVariants = !isParent && Array.isArray(product.variants) ? product.variants : [];
+                  const legacyChildRows = legacyVariants.map((v, i) => {
+                    const attrs = {
+                      size: String(v?.size || '').trim(),
+                      color: String(v?.color || '').trim(),
+                      weight: String(v?.weight || '').trim(),
+                      unitCount: String(v?.unitCount || '').trim(),
+                    };
+                    const tail = ['size', 'color', 'weight', 'unitCount']
+                      .map((k) => attrs[k])
+                      .filter(Boolean)
+                      .join(' / ');
+                    return {
+                      _id: `${productId}::legacy::${i}`,
+                      __legacy: true,
+                      title: tail ? `${product.title} - ${tail}` : (v?.name || product.title),
+                      heroImage: (Array.isArray(v?.images) && v.images.find(Boolean)) || product.heroImage,
+                      gallery: Array.isArray(v?.images) ? v.images.filter(Boolean) : [],
+                      brand: product.brand,
+                      price: Number(v?.sellingPrice ?? v?.price ?? product.price ?? 0),
+                      status: product.status,
+                      sku: String(v?.sku || '').trim(),
+                      variationAttributes: attrs,
+                      visibleOnClient: true,
+                    };
+                  });
+                  const displayChildren = isParent ? childRows : legacyChildRows;
+                  const variantCount = displayChildren.length;
+                  const isExpandable = variantCount > 0;
+                  const isExpanded = !!expandedParents[String(productId)];
+                  const isCarrier = isParent || legacyChildRows.length > 0;
+                  const isExactMatch = exactMatchInfo.productIds.has(String(productId));
+                  const cardHighlight = isExactMatch
+                    ? 'bg-yellow-50 ring-2 ring-yellow-300'
+                    : isSelected
+                      ? 'bg-blue-50'
+                      : 'bg-white';
                   return (
-                    <div 
-                      key={productId} 
-                      className={`p-4 hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : 'bg-white'}`}
+                    <div
+                      key={productId}
+                      className={`p-4 hover:bg-gray-50 transition-colors ${cardHighlight}`}
                     >
                       <div className="flex items-start gap-3">
                         {isBulkMode && (
@@ -750,38 +1156,41 @@ export default function AdminProductsPage() {
                           </div>
                         )}
                         <div className="relative h-16 w-16 flex-shrink-0">
-                          <Image 
-                            src={product.heroImage} 
-                            alt={product.title} 
-                            fill
-                            sizes="64px"
-                            unoptimized
-                            className="rounded-md object-cover"
-                            loading="lazy"
-                            placeholder="blur"
-                            blurDataURL={blurDataURL}
-                          />
+                          {product.heroImage ? (
+                            <Image
+                              src={product.heroImage}
+                              alt={product.title}
+                              fill
+                              sizes="64px"
+                              unoptimized
+                              className="rounded-md object-cover"
+                              loading="lazy"
+                              placeholder="blur"
+                              blurDataURL={blurDataURL}
+                            />
+                          ) : (
+                            <div className="w-16 h-16 rounded-md bg-gray-100 border border-dashed border-gray-300" />
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-medium text-gray-900 mb-1 line-clamp-2">{product.title}</h3>
-                          {Array.isArray(product.variants) && product.variants.length > 0 && (
-                            <div className="mb-1">
-                              <select
-                                className="w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white text-gray-700"
-                                defaultValue=""
-                                onClick={(e) => e.stopPropagation()}
+                          <h3 className="text-sm font-medium text-gray-900 mb-1 line-clamp-2 flex items-center gap-2">
+                            <span>{product.title}</span>
+                            {isExactMatch && (
+                              <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-bold rounded-full bg-yellow-200 text-yellow-900">
+                                Match
+                              </span>
+                            )}
+                            {isExpandable && (
+                              <button
+                                type="button"
+                                onClick={() => toggleParentExpanded(String(productId))}
+                                className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-indigo-100 text-indigo-800 hover:bg-indigo-200 transition-colors"
+                                title={isExpanded ? 'Hide variants' : 'Show variants'}
                               >
-                                <option value="" disabled>
-                                  Variants ({product.variants.length})
-                                </option>
-                                {product.variants.map((variant, idx) => (
-                                  <option key={`${variant?.sku || 'variant'}-${idx}`} value={variant?.sku || `${idx}`}>
-                                    {variant?.name || 'Variant'} | {variant?.size || '-'} | {variant?.unit || '-'} | {variant?.color || '-'} | SKU: {variant?.sku || '-'}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
+                                Variations ({variantCount})
+                              </button>
+                            )}
+                          </h3>
                           {listFilter === 'deleted' && product.deletedAt && (
                             <p className="text-xs text-gray-400 mb-1">
                               Removed {new Date(product.deletedAt).toLocaleString()}
@@ -789,8 +1198,12 @@ export default function AdminProductsPage() {
                           )}
                           <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-2">
                             <span>{product.brand}</span>
-                            <span>•</span>
-                            <span className="font-semibold text-gray-900">₹{product.price}</span>
+                            {!isCarrier && (
+                              <>
+                                <span>•</span>
+                                <span className="font-semibold text-gray-900">₹{product.price}</span>
+                              </>
+                            )}
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
                             <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
@@ -810,30 +1223,37 @@ export default function AdminProductsPage() {
                         </div>
                         {!isBulkMode && listFilter === 'active' && (
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            <button 
-                              onClick={() => handleEditProduct(product)} 
+                            <button
+                              onClick={() => handleEditProduct(product)}
                               className="text-indigo-600 hover:text-indigo-900 p-2"
                               disabled={loading}
                               title="Edit product"
                             >
                               <EditIcon />
                             </button>
-                            <button 
-                              onClick={() => handleDuplicateProduct(product)} 
-                              className="text-blue-600 hover:text-blue-900 p-2"
-                              disabled={loading}
-                              title="Duplicate product"
-                            >
-                              <DuplicateIcon />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteProduct(productId)} 
-                              className="text-red-600 hover:text-red-900 p-2"
-                              disabled={loading}
-                              title="Move to trash"
-                            >
-                              <TrashIcon />
-                            </button>
+                            {/* Carriers (new parents OR legacy products with embedded variants)
+                                only get Edit. Variants are managed inside the parent edit modal.
+                                Standalones keep the full action set. */}
+                            {!isCarrier && (
+                              <>
+                                <button
+                                  onClick={() => handleDuplicateProduct(product)}
+                                  className="text-blue-600 hover:text-blue-900 p-2"
+                                  disabled={loading}
+                                  title="Duplicate product"
+                                >
+                                  <DuplicateIcon />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteProduct(productId)}
+                                  className="text-red-600 hover:text-red-900 p-2"
+                                  disabled={loading}
+                                  title="Move to trash"
+                                >
+                                  <TrashIcon />
+                                </button>
+                              </>
+                            )}
                           </div>
                         )}
                         {!isBulkMode && listFilter === 'deleted' && (
@@ -857,6 +1277,102 @@ export default function AdminProductsPage() {
                           </div>
                         )}
                       </div>
+
+                      {isExpanded && displayChildren.length > 0 && (
+                        <div className="mt-3 pl-4 border-l-2 border-indigo-100 space-y-2">
+                          {displayChildren.map((child) => {
+                            const childId = child._id || child.id;
+                            const isLegacy = Boolean(child.__legacy);
+                            const isChildExactMatch = exactMatchInfo.childKeys.has(String(childId));
+                            const attrs = child.variationAttributes || {};
+                            const attrChips = ['size', 'color', 'weight', 'unitCount']
+                              .map((k) => (attrs[k] ? `${k}: ${attrs[k]}` : null))
+                              .filter(Boolean);
+                            const childImage =
+                              child.heroImage ||
+                              (Array.isArray(child.gallery) && child.gallery[0]) ||
+                              product.heroImage;
+                            const childStatus = child.status || product.status;
+                            const childCardClass = isChildExactMatch
+                              ? 'bg-yellow-50 ring-2 ring-yellow-300'
+                              : 'bg-gray-50';
+                            return (
+                              <div key={`m::child::${childId}`} className={`${childCardClass} rounded-md p-3 flex items-start gap-3`}>
+                                <div className="relative h-14 w-14 flex-shrink-0">
+                                  {childImage ? (
+                                    <Image
+                                      src={childImage}
+                                      alt={child.title || 'Variant'}
+                                      fill
+                                      sizes="56px"
+                                      unoptimized
+                                      className="rounded-md object-cover"
+                                      loading="lazy"
+                                    />
+                                  ) : (
+                                    <div className="w-14 h-14 rounded-md bg-white border border-dashed border-gray-300" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-semibold text-gray-900 flex items-center gap-2 line-clamp-2">
+                                    <span>{child.title || 'Variant'}</span>
+                                    {isChildExactMatch && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-yellow-200 text-yellow-900">
+                                        Match
+                                      </span>
+                                    )}
+                                    {isLegacy && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-800">
+                                        Legacy
+                                      </span>
+                                    )}
+                                  </div>
+                                  {(attrChips.length > 0 || child.sku) && (
+                                    <div className="text-[11px] text-gray-500 flex flex-wrap gap-1 mt-1">
+                                      {attrChips.map((chip) => (
+                                        <span key={chip} className="px-1.5 py-0.5 bg-white border border-gray-200 rounded">{chip}</span>
+                                      ))}
+                                      {child.sku ? <span className="px-1.5 py-0.5 bg-white border border-gray-200 rounded">SKU: {child.sku}</span> : null}
+                                    </div>
+                                  )}
+                                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                                    <span>{child.brand || product.brand}</span>
+                                    <span>•</span>
+                                    <span className="font-semibold text-gray-900">₹{child.price ?? 0}</span>
+                                  </div>
+                                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <span className={`px-2 py-0.5 text-[11px] font-semibold rounded-full ${
+                                      childStatus === 'In Stock'
+                                        ? 'bg-green-100 text-green-800'
+                                        : 'bg-red-100 text-red-800'
+                                    }`}>
+                                      {childStatus || '—'}
+                                    </span>
+                                    {!isLegacy && (
+                                      <label className="inline-flex items-center gap-1 text-[11px] text-gray-700">
+                                        <input
+                                          type="checkbox"
+                                          checked={child.visibleOnClient ?? true}
+                                          onChange={() => toggleChildVisibility(child)}
+                                          className="rounded border-gray-300 text-primary focus:ring-primary"
+                                        />
+                                        Visible
+                                      </label>
+                                    )}
+                                    <button
+                                      onClick={() => handleEditProduct(product)}
+                                      className="ml-auto text-indigo-600"
+                                      title="Edit variant via parent"
+                                    >
+                                      <EditIcon />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })

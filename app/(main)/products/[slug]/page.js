@@ -6,6 +6,7 @@
  */
 
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { getFullProductBySlug } from '@/lib/utils/getProductBySlug';
 import ProductDetailClient from './ProductDetailClient';
 
@@ -29,6 +30,12 @@ export default async function ProductPage({ params }) {
   }
 
   const product = await getFullProductBySlug(slug);
+  // If the requested slug points at a parent variant carrier, the resolver attaches
+  // a `redirectTo` slug pointing at the default child. 308 keeps method semantics
+  // for any future POST/Form scenarios while still being permanent for SEO.
+  if (product?.redirectTo && product.redirectTo !== slug) {
+    redirect(`/products/${product.redirectTo}`);
+  }
   if (!product) {
     return (
       <div className="min-h-screen bg-white">

@@ -1,3 +1,10 @@
+---
+name: ""
+overview: ""
+todos: []
+isProject: false
+---
+
 # SEO Optimization Plan for Regal Horeca
 
 ## Overview
@@ -261,43 +268,47 @@ Consider adding:
 **Required Changes:**
 
 1. **Product Creation (POST)** - File: `app/api/products/route.js`
+  - After line 453 (`revalidateHomepage()`), add:
 
-   - After line 453 (`revalidateHomepage()`), add:
-     ```javascript
+```javascript
      // Revalidate product page for SEO
      revalidatePath(`/products/${product.slug}`);
      // Revalidate sitemap to include new product
      revalidatePath('/sitemap.xml');
-     ```
+     
 
+```
 
-2. **Product Update (PUT)** - File: `app/api/products/[id]/route.js`
+1. **Product Update (PUT)** - File: `app/api/products/[id]/route.js`
+  - After line 293 (`revalidateHomepage()`), add:
 
-   - After line 293 (`revalidateHomepage()`), add:
-     ```javascript
+```javascript
      // Revalidate product page for SEO
      revalidatePath(`/products/${product.slug}`);
      // Revalidate sitemap
      revalidatePath('/sitemap.xml');
-     ```
+     
 
+```
 
-3. **Product Deletion (DELETE)** - File: `app/api/products/[id]/route.js`
+1. **Product Deletion (DELETE)** - File: `app/api/products/[id]/route.js`
+  - After line 356 (`revalidateHomepage()`), add:
 
-   - After line 356 (`revalidateHomepage()`), add:
-     ```javascript
+```javascript
      // Revalidate sitemap to remove deleted product
      revalidatePath('/sitemap.xml');
-     ```
+     
 
+```
 
-4. **Import Statement**
+1. **Import Statement**
+  - Ensure both files import `revalidatePath`:
 
-   - Ensure both files import `revalidatePath`:
-     ```javascript
+```javascript
      import { revalidateHomepage, revalidatePath } from '@/lib/utils/revalidate';
-     ```
+     
 
+```
 
 **Why This Matters:**
 
@@ -345,22 +356,22 @@ Consider adding:
 
 **High Priority:**
 
-5. Homepage metadata and content optimization
-6. About page metadata and content enhancement
-7. BreadcrumbList schema
-8. Product schema markup
+1. Homepage metadata and content optimization
+2. About page metadata and content enhancement
+3. BreadcrumbList schema
+4. Product schema markup
 
 **Medium Priority:**
 
-9. Catalog page metadata
-10. Image alt text audit
-11. Internal linking improvements
+1. Catalog page metadata
+2. Image alt text audit
+3. Internal linking improvements
 
 **Nice to Have:**
 
-12. Location-specific pages
-13. Services page
-14. Blog/content section for ongoing SEO
+1. Location-specific pages
+2. Services page
+3. Blog/content section for ongoing SEO
 
 ## Expected SEO Improvements
 
@@ -381,3 +392,4 @@ Consider adding:
 - Maintain user experience while optimizing for SEO
 - Test schema markup with Google's Rich Results Test
 - Submit sitemap to Google Search Console after implementation
+

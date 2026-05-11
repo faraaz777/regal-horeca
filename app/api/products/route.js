@@ -116,6 +116,13 @@ export async function POST(request) {
 
     const productData = await request.json();
 
+    // The form passes `_variantRows` out-of-band so the caller can create child
+    // products after the parent is saved. The Product schema doesn't define it,
+    // so we strip it here to keep validation clean.
+    if (productData._variantRows) {
+      delete productData._variantRows;
+    }
+
     // Validate required fields
     if (!productData.title || !productData.heroImage) {
       return NextResponse.json(

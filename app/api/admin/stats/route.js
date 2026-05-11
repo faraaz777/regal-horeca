@@ -15,9 +15,11 @@ export async function GET(request) {
   try {
     await connectToDatabase();
 
-    // Use aggregation to get all stats in a single query
+    // Stats exclude parent variant carriers because they are non-buyable, hidden
+    // listings — counting them inflates the dashboard's "Total Products" number.
+    // Children are counted (each is a real, individually buyable variant).
     const [statsResult] = await Product.aggregate([
-      { $match: { deletedAt: null } },
+      { $match: { deletedAt: null, productType: { $ne: 'parent' } } },
       {
         $facet: {
           total: [{ $count: 'count' }],
@@ -37,8 +39,8 @@ export async function GET(request) {
       }
     ]);
 
-    // Get recent products (only essential fields)
-    const recentProducts = await Product.find({ deletedAt: null })
+    // Recent products: also skip parents so the "Recently added" widget never shows a hidden carrier.
+    const recentProducts = await Product.find({ deletedAt: null, productType: { $ne: 'parent' } })
       .select('title heroImage createdAt status slug')
       .sort({ createdAt: -1 })
       .limit(5)

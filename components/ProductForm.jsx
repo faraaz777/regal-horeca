@@ -599,7 +599,42 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
   }, [isCreatingMultipleVariants]);
 
   useEffect(() => {
-    const incomingVariants = Array.isArray(product?.variants) ? product.variants : [];
+    // New parent/child variants take precedence over legacy embedded variants.
+    // `product.children` is populated by the admin edit flow; if it's missing on
+    // an existing parent we fall back to fetching it here.
+    const childRows = Array.isArray(product?.children) ? product.children : null;
+    const legacyVariants = Array.isArray(product?.variants) ? product.variants : [];
+
+    let incomingVariants = legacyVariants;
+    if (childRows && childRows.length > 0) {
+      incomingVariants = childRows.map((child) => {
+        const attrs = child.variationAttributes || {};
+        return {
+          variantId: '',
+          name: child.title,
+          size: attrs.size || '',
+          unit: '',
+          color: attrs.color || '',
+          unitCount: attrs.unitCount || '',
+          weight: attrs.weight || '',
+          isDefault: String(product?.defaultChildProductId || '') === String(child._id || ''),
+          visibleOnClient: child.visibleOnClient !== false,
+          images: Array.isArray(child.gallery) ? child.gallery.filter(Boolean) : [],
+          sku: child.sku || '',
+          barcode: child.barcode || '',
+          hsnCode: child.hsnCode || '',
+          gstPercent: Number(child.gstPercent || 0),
+          mrp: Number(child.mrp || 0),
+          sellingPrice: Number(child.sellingPrice || child.price || 0),
+          discountPercent: Number(child.discountPercent || 0),
+          marginPrice: Number(child.marginPrice || 0),
+          price: Number(child.sellingPrice || child.price || 0),
+          _childProductId: child._id || null,
+          _legacyParentVariantId: child.legacyParentVariantId || '',
+        };
+      });
+    }
+
     if (incomingVariants.length === 0) {
       setVariantRows([]);
       return;
@@ -615,6 +650,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       unitCount: String(variant?.unitCount || '').trim(),
       weight: String(variant?.weight || '').trim(),
       isDefault: Boolean(variant?.isDefault),
+      visibleOnClient: variant?.visibleOnClient === false ? false : true,
       images: Array.isArray(variant?.images) ? variant.images.filter(Boolean) : [],
       sku: String(variant?.sku || '').trim(),
       barcode: String(variant?.barcode || '').trim(),
@@ -625,6 +661,10 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       discountPercent: Number(variant?.discountPercent || 0),
       marginPrice: Number(variant?.marginPrice || 0),
       price: Number(variant?.sellingPrice || variant?.price || 0),
+      // Persist child product id when hydrating from `product.children` so callers
+      // can issue PATCH/DELETE against the existing variant rather than recreating it.
+      _childProductId: variant?._childProductId || null,
+      _legacyParentVariantId: variant?._legacyParentVariantId || '',
     }));
 
     setVariantRows(normalized);
@@ -724,6 +764,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     unitCount: '',
     weight: '',
     isDefault: false,
+    visibleOnClient: true,
     images: [],
     sku: '',
     barcode: '',
@@ -2703,6 +2744,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         unitCount: String(row.unitCount || '').trim(),
         weight: String(row.weight || '').trim(),
         isDefault: Boolean(row.isDefault),
+        visibleOnClient: row.visibleOnClient === false ? false : true,
         sku: String(row.sku || '').trim(),
         barcode: String(row.barcode || '').trim(),
         hsnCode: String(row.hsnCode || '').trim(),
@@ -2712,6 +2754,8 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         discountPercent: Number(row.discountPercent || 0),
         marginPrice: Number(row.marginPrice || 0),
         price: Number(row.sellingPrice || row.price || 0),
+        _childProductId: row._childProductId || null,
+        _legacyParentVariantId: row._legacyParentVariantId || '',
       }))
       .filter((row) => row.name || row.sku || row.color || row.size || row.unit || row.weight || row.unitCount);
 
@@ -2857,9 +2901,21 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
           ? Math.min(...normalizedPriceBySize.map(r => r.price))
           : Number(formData.price || 0);
 
+    // Strip the row-only book-keeping fields before sending to the API. We forward
+    // them out-of-band as `_variantRows` so the consumer (add page / admin edit)
+    // can create/update real child product documents after saving the parent.
+    const variantRowsForChildren = normalizedVariants.map((row) => {
+      const { _childProductId, _legacyParentVariantId, ...rest } = row;
+      return { ...rest, _childProductId: _childProductId || null, _legacyParentVariantId: _legacyParentVariantId || '' };
+    });
+
+    // Don't persist row-private fields on the embedded `variants[]` payload.
+    const variantsForLegacyEmbed = variantRowsForChildren.map(({ _childProductId, _legacyParentVariantId, ...rest }) => rest);
+
     const finalProduct = {
       ...formData,
-      variants: normalizedVariants,
+      variants: variantsForLegacyEmbed,
+      _variantRows: variantRowsForChildren,
       brandCategoryId: updatedBrandCategoryId || formData.brandCategoryId,
       priceBySize: normalizedPriceBySize,
       price: Number.isFinite(derivedBasePrice) ? derivedBasePrice : 0,
@@ -2867,15 +2923,20 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       tags,
       categoryIds,
       brandCategoryIds,
-      filters: filtersWithSizeFromPricing
+      filters: filtersWithSizeFromPricing,
     };
 
+    // Mark this product as a parent carrier so the storefront chokepoint hides it.
     if (normalizedVariants.length > 0) {
       finalProduct.sku = '';
       finalProduct.barcode = '';
+      finalProduct.productType = 'parent';
+      finalProduct.visibleOnClient = false;
+      finalProduct.variationTheme = Object.entries(variantFieldSelection || {})
+        .filter(([, on]) => on)
+        .map(([k]) => k);
     }
-    
-    // Remove temporary input fields
+
     delete finalProduct.tagsInput;
 
     // Ensure categoryId is included if it exists (even if empty string, API will handle it)
@@ -3022,6 +3083,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                 <tr>
                   <th className="w-14 px-2 py-2 text-center font-semibold text-gray-700 whitespace-nowrap">S.NO</th>
                   <th className="w-12 px-0.5 py-2 text-center font-semibold text-gray-700 whitespace-nowrap">Default</th>
+                  <th className="w-14 px-1 py-2 text-center font-semibold text-gray-700 whitespace-nowrap" title="Show on client side">Visible</th>
                   <th className="w-[320px] min-w-[320px] px-2 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Name</th>
                   {variantFieldSelection.size && <th className="w-[120px] min-w-[120px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Size</th>}
                   <th className="w-[110px] min-w-[110px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Unit</th>
@@ -3042,6 +3104,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                 <tr>
                   <th className="px-2 py-2 text-center text-[11px] text-gray-500">All</th>
                   <th className="px-2 py-2 text-center text-[11px] text-gray-400">—</th>
+                  <th className="px-1 py-2 text-center text-[11px] text-gray-400">—</th>
                   <th className="w-[320px] min-w-[320px] px-2 py-2">
                     <input type="text" value={bulkVariantInputs.name} onChange={(e) => handleBulkVariantInputChange('name', e.target.value)} placeholder="Apply Name" className="w-full p-1.5 border border-gray-300 rounded text-xs" />
                   </th>
@@ -3114,6 +3177,16 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                         onClick={(e) => e.stopPropagation()}
                         title="Set as default variant"
                         className="h-4 w-4 text-primary focus:ring-primary"
+                      />
+                    </td>
+                    <td className="w-14 px-1 py-2 text-center">
+                      <input
+                        type="checkbox"
+                        checked={row.visibleOnClient !== false}
+                        onChange={(e) => handleVariantRowChange(index, 'visibleOnClient', e.target.checked)}
+                        onClick={(e) => e.stopPropagation()}
+                        title="Show this variant on the client side"
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                       />
                     </td>
                     <td className="w-[320px] min-w-[320px] px-2 py-2"><input type="text" value={row.name || ''} onChange={(e) => handleVariantRowChange(index, 'name', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>

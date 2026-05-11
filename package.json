@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "migrate:variants": "node scripts/migrateVariantsToChildren.mjs",
+    "migrate:variants:dry": "node scripts/migrateVariantsToChildren.mjs --dry-run"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.540.0",

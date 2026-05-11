@@ -35,7 +35,10 @@ export async function generateMetadata({ params }) {
   }
 
   const { title: cardTitle, description } = productCardMeta(product);
-  const canonicalUrl = `${SITE_CONFIG.baseUrl}/products/${slug}`;
+  // Canonical points to the resolved slug (`redirectTo` is set when this slug is a
+  // parent carrier). Children point to themselves; standalones point to themselves.
+  const canonicalSlug = product.redirectTo || slug;
+  const canonicalUrl = `${SITE_CONFIG.baseUrl}/products/${canonicalSlug}`;
 
   // Single source for image URL: correct construction + fallback (heroImage → gallery → og-default → favicon)
   const ogImageUrl = getProductOgImageUrl(product, SITE_CONFIG);

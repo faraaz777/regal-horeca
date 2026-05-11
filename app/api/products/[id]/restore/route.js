@@ -6,7 +6,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
-import { revalidateHomepage, revalidatePath, revalidateProducts } from '@/lib/utils/revalidate';
+import { revalidateProductSlugs } from '@/lib/utils/revalidate';
 
 export async function POST(_request, { params }) {
   try {
@@ -44,16 +44,45 @@ export async function POST(_request, { params }) {
     product.deletedAt = null;
     await product.save();
 
-    revalidateHomepage();
-    revalidateProducts();
-    if (product.slug) {
-      revalidatePath(`/products/${product.slug}`);
+    const slugsToRevalidate = [product.slug];
+    let cascadeRestored = 0;
+
+    if (product.productType === 'parent') {
+      const children = await Product.find({ parentProductId: product._id, deletedAt: { $ne: null } })
+        .select('_id slug')
+        .lean();
+      if (children.length > 0) {
+        // Skip restoration for any child whose slug is now claimed by an active row.
+        const childIds = children.map((c) => c._id);
+        const activeChildSlugs = await Product.find({
+          _id: { $nin: childIds },
+          slug: { $in: children.map((c) => c.slug).filter(Boolean) },
+          deletedAt: null,
+        })
+          .select('slug')
+          .lean();
+        const blocked = new Set(activeChildSlugs.map((s) => s.slug));
+        const restorable = children.filter((c) => !blocked.has(c.slug));
+        if (restorable.length > 0) {
+          await Product.updateMany(
+            { _id: { $in: restorable.map((c) => c._id) } },
+            { $set: { deletedAt: null } }
+          );
+          cascadeRestored = restorable.length;
+          restorable.forEach((c) => slugsToRevalidate.push(c.slug));
+        }
+      }
     }
-    revalidatePath('/sitemap.xml');
+
+    revalidateProductSlugs(slugsToRevalidate);
 
     return NextResponse.json({
       success: true,
-      message: 'Product restored',
+      cascadeRestored,
+      message:
+        cascadeRestored > 0
+          ? `Product and ${cascadeRestored} variant(s) restored.`
+          : 'Product restored',
       product: await Product.findById(id)
         .populate('categoryId')
         .populate('categoryIds', 'name slug level')

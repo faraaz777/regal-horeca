@@ -3,7 +3,7 @@
  *
  * PATCH  /api/admin/products/children/[childId]
  *   Update fields on a single child variant. Allowed fields are pricing/sku/etc.
- *   plus visibleOnClient and isDefault. Mirrored fields (categoryId, brand) cannot
+ *   plus visibleOnClient, showInCatalog, and isDefault. Mirrored fields (categoryId, brand) cannot
  *   be set directly here — they propagate from the parent.
  *
  * DELETE /api/admin/products/children/[childId]
@@ -35,6 +35,7 @@ const ALLOWED_FIELDS = [
   'gallery',
   'status',
   'visibleOnClient',
+  'showInCatalog',
 ];
 
 function pickAllowed(body) {

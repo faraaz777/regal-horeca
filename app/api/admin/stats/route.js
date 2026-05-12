@@ -10,6 +10,7 @@ import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
 import Category from '@/lib/models/Category';
 import BusinessType from '@/lib/models/BusinessType';
+import { mongoStorefrontCatalogListingTypes } from '@/lib/utils/storefrontCatalogFilter';
 
 export async function GET(request) {
   try {
@@ -18,8 +19,13 @@ export async function GET(request) {
     // Stats exclude parent variant carriers because they are non-buyable, hidden
     // listings — counting them inflates the dashboard's "Total Products" number.
     // Children are counted (each is a real, individually buyable variant).
+    // Stats: exclude parent carriers and child variants that are not opted into their
+    // own storefront catalog row (aligned with public product listings).
+    const storefrontCatalogMatch = {
+      $and: [{ deletedAt: null }, { productType: { $ne: 'parent' } }, mongoStorefrontCatalogListingTypes()],
+    };
     const [statsResult] = await Product.aggregate([
-      { $match: { deletedAt: null, productType: { $ne: 'parent' } } },
+      { $match: storefrontCatalogMatch },
       {
         $facet: {
           total: [{ $count: 'count' }],
@@ -40,7 +46,7 @@ export async function GET(request) {
     ]);
 
     // Recent products: also skip parents so the "Recently added" widget never shows a hidden carrier.
-    const recentProducts = await Product.find({ deletedAt: null, productType: { $ne: 'parent' } })
+    const recentProducts = await Product.find(storefrontCatalogMatch)
       .select('title heroImage createdAt status slug')
       .sort({ createdAt: -1 })
       .limit(5)

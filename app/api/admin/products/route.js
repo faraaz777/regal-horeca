@@ -13,6 +13,7 @@
  *   showDeleted=true|false
  *   productType=parent|child|standalone
  *   parentProductId=<id>
+ *   adminListFilter=all|parents|children|catalog_visible|hidden_catalog
  */
 
 import { NextResponse } from 'next/server';
@@ -39,6 +40,7 @@ export async function GET(request) {
     const includeAll = searchParams.get('includeAll') === 'true';
     const productType = searchParams.get('productType');
     const parentProductId = searchParams.get('parentProductId');
+    const adminListFilter = searchParams.get('adminListFilter') || 'all';
 
     let listMode = 'active';
     if (includeAll) listMode = 'all';
@@ -52,6 +54,7 @@ export async function GET(request) {
       listMode,
       productType,
       parentProductId,
+      adminListFilter,
       sortBy: 'newest',
     });
 
@@ -67,7 +70,7 @@ export async function GET(request) {
       if (listMode !== 'all') childMatch.deletedAt = listMode === 'deleted' ? { $ne: null } : null;
       attachedChildren = await Product.find(childMatch)
         .select(
-          'title slug heroImage gallery price brand status sku barcode hsnCode productType parentProductId variationAttributes variationTheme visibleOnClient defaultChildProductId legacyParentVariantId createdAt deletedAt'
+          'title slug heroImage gallery price brand status sku barcode hsnCode productType parentProductId variationAttributes variationTheme visibleOnClient showInCatalog defaultChildProductId legacyParentVariantId createdAt deletedAt'
         )
         .sort({ createdAt: 1 })
         .lean();

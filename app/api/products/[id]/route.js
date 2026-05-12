@@ -250,6 +250,13 @@ export async function PUT(request, { params }) {
       );
     }
 
+    const resolvedProductType = product.productType || 'standalone';
+    if (resolvedProductType === 'child') {
+      delete updateData.variants;
+      delete updateData.variationTheme;
+      if (updateData.productType === 'parent') delete updateData.productType;
+    }
+
     // Store original slug before update (for revalidation)
     const oldSlug = product.slug;
 

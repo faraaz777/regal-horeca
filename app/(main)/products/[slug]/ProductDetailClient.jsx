@@ -373,6 +373,29 @@ export default function ProductDetailClient({ initialProduct = null }) {
     return () => { cancelled = true; };
   }, [slug, initialProduct]);
 
+  // Soft client navigations between `/products/[slug]` still deliver a new `initialProduct`
+  // from the server; keep local state in sync (avoids stale PDP if the instance is reused).
+  useEffect(() => {
+    if (!initialProduct) return;
+    setProduct(normalizeProductForPDP(initialProduct));
+    setLoading(false);
+  }, [slug, initialProduct]);
+
+  // Warm the RSC cache for sibling variant URLs so size/color switches feel snappier.
+  useEffect(() => {
+    const variants = product?.variants;
+    if (!Array.isArray(variants) || variants.length === 0) return;
+    for (const v of variants) {
+      const s = v?._childSlug;
+      if (!s || s === slug) continue;
+      try {
+        router.prefetch(`/products/${s}`);
+      } catch {
+        // ignore prefetch failures (offline, etc.)
+      }
+    }
+  }, [product?.variants, slug, router]);
+
   // Default colour swatch when not driven by a variant deep-link (?variantId= / ?sku=)
   useEffect(() => {
     if (!product?.colorVariants?.length || selectedColor != null) return;
@@ -1419,25 +1442,36 @@ export default function ProductDetailClient({ initialProduct = null }) {
                         String(variant?.sku || '').trim() ||
                         `Variant ${idx + 1}`;
                       const active = idx === selectedVariantIndex;
+                      const chipClass = `inline-flex w-full min-h-[2.5rem] items-center justify-center px-3 py-2 text-xs font-semibold rounded-md border transition-colors ${
+                        active
+                          ? 'bg-accent text-white border-accent'
+                          : 'bg-white text-black/70 border-black/10 hover:border-accent hover:text-accent'
+                      }`;
+                      const childSlug = variant?._childSlug;
+                      const navigatesToChild =
+                        childSlug && String(childSlug) !== String(slug);
+
+                      if (navigatesToChild) {
+                        return (
+                          <Link
+                            key={`${variant?.sku || 'variant'}-${idx}`}
+                            href={`/products/${childSlug}`}
+                            prefetch
+                            scroll={false}
+                            className={chipClass}
+                            aria-current={active ? 'true' : undefined}
+                          >
+                            {label}
+                          </Link>
+                        );
+                      }
+
                       return (
                         <button
                           key={`${variant?.sku || 'variant'}-${idx}`}
                           type="button"
-                          onClick={() => {
-                            // For parent/child products each swatch corresponds to a real
-                            // child product with its own canonical URL. Navigate so the
-                            // address bar, canonical, and metadata stay in sync.
-                            if (variant?._childSlug && variant._childSlug !== slug) {
-                              router.push(`/products/${variant._childSlug}`);
-                              return;
-                            }
-                            setSelectedVariantIndex(idx);
-                          }}
-                          className={`px-3 py-2 text-xs font-semibold rounded-md border transition-colors ${
-                            active
-                              ? 'bg-accent text-white border-accent'
-                              : 'bg-white text-black/70 border-black/10 hover:border-accent hover:text-accent'
-                          }`}
+                          onClick={() => setSelectedVariantIndex(idx)}
+                          className={chipClass}
                         >
                           {label}
                         </button>

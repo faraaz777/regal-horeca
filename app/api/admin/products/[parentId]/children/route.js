@@ -110,6 +110,7 @@ export async function POST(request, { params }) {
       variationTheme: parent.variationTheme,
       variationAttributes,
       visibleOnClient: body.visibleOnClient !== false,
+      showInCatalog: body.showInCatalog === true,
       // Mirrored query-critical fields.
       categoryId: parent.categoryId || null,
       categoryIds: Array.isArray(parent.categoryIds) ? parent.categoryIds : [],

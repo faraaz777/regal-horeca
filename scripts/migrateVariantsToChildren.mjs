@@ -170,6 +170,7 @@ async function main() {
         variationTheme,
         variationAttributes,
         visibleOnClient: true,
+        showInCatalog: true,
         categoryId: parent.categoryId || null,
         categoryIds: Array.isArray(parent.categoryIds) ? parent.categoryIds : [],
         brand: parent.brand || '',

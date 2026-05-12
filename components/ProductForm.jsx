@@ -478,7 +478,7 @@ const FormSection = ({ title, children }) => (
   </div>
 );
 
-export default function ProductForm({ product, allProducts, onSave, onCancel, onCategoryChange, onVariantsOnlyChange }) {
+export default function ProductForm({ product, allProducts, onSave, onCancel, onCategoryChange, onVariantsOnlyChange, onOpenParent }) {
   const { categories, brands, businessTypes } = useAppContext();
   
   const [formData, setFormData] = useState({
@@ -579,6 +579,9 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     marginPrice: '',
   });
 
+  /** Child variant rows are edited as a single SKU; only parents/standalones host the variant matrix. */
+  const isChildProduct = useMemo(() => product?.productType === 'child', [product?.productType]);
+
   useEffect(() => {
     if (typeof onVariantsOnlyChange === 'function') {
       onVariantsOnlyChange(showVariantsOnly);
@@ -599,6 +602,14 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
   }, [isCreatingMultipleVariants]);
 
   useEffect(() => {
+    if (product?.productType === 'child') {
+      setVariantRows([]);
+      setShowVariantsOnly(false);
+      setShowAddVariantsPanel(false);
+      setVariantFieldSelection({ size: false, color: false, weight: false, unitCount: false });
+      return;
+    }
+
     // New parent/child variants take precedence over legacy embedded variants.
     // `product.children` is populated by the admin edit flow; if it's missing on
     // an existing parent we fall back to fetching it here.
@@ -618,7 +629,9 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
           unitCount: attrs.unitCount || '',
           weight: attrs.weight || '',
           isDefault: String(product?.defaultChildProductId || '') === String(child._id || ''),
-          visibleOnClient: child.visibleOnClient !== false,
+          showInCatalog:
+            child.showInCatalog === true ||
+            (child.showInCatalog == null && child.visibleOnClient !== false),
           images: Array.isArray(child.gallery) ? child.gallery.filter(Boolean) : [],
           sku: child.sku || '',
           barcode: child.barcode || '',
@@ -650,7 +663,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       unitCount: String(variant?.unitCount || '').trim(),
       weight: String(variant?.weight || '').trim(),
       isDefault: Boolean(variant?.isDefault),
-      visibleOnClient: variant?.visibleOnClient === false ? false : true,
+      showInCatalog: variant?.showInCatalog === true,
       images: Array.isArray(variant?.images) ? variant.images.filter(Boolean) : [],
       sku: String(variant?.sku || '').trim(),
       barcode: String(variant?.barcode || '').trim(),
@@ -764,7 +777,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     unitCount: '',
     weight: '',
     isDefault: false,
-    visibleOnClient: true,
+    showInCatalog: false,
     images: [],
     sku: '',
     barcode: '',
@@ -2725,7 +2738,8 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       ])
     );
 
-    const normalizedVariants = (variantRows || [])
+    const rowsForVariantSubmit = isChildProduct ? [] : (variantRows || []);
+    const normalizedVariants = rowsForVariantSubmit
       .filter((row) => row && typeof row === 'object')
       .map((row) => ({
         variantId: String(row.variantId || '').trim() || generatePersistedVariantId(),
@@ -2744,7 +2758,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         unitCount: String(row.unitCount || '').trim(),
         weight: String(row.weight || '').trim(),
         isDefault: Boolean(row.isDefault),
-        visibleOnClient: row.visibleOnClient === false ? false : true,
+        showInCatalog: row.showInCatalog === true,
         sku: String(row.sku || '').trim(),
         barcode: String(row.barcode || '').trim(),
         hsnCode: String(row.hsnCode || '').trim(),
@@ -2972,18 +2986,48 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
           >
             Full Product Form
           </button>
-          <button
-            type="button"
-            onClick={() => setShowVariantsOnly(true)}
-            className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${
-              showVariantsOnly ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Variants Section
-          </button>
+          {!isChildProduct && (
+            <button
+              type="button"
+              onClick={() => setShowVariantsOnly(true)}
+              className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${
+                showVariantsOnly ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Variants Section
+            </button>
+          )}
         </div>
 
-        {showVariantsOnly && (
+        {isChildProduct && !showVariantsOnly && (
+          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <p>
+              This row is a <strong>variant (child) product</strong>. You cannot add a variant matrix here — edit variants on the{' '}
+              <strong>parent</strong> product.
+            </p>
+            {product?.parentProductId && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="text-amber-900">
+                  Parent:{' '}
+                  <strong className="font-semibold text-amber-950">
+                    {product?.parent?.title || 'Parent product'}
+                  </strong>
+                </span>
+                {typeof onOpenParent === 'function' && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenParent(String(product.parentProductId))}
+                    className="inline-flex items-center rounded-md border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950 hover:bg-amber-100"
+                  >
+                    Open parent editor
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!isChildProduct && showVariantsOnly && (
         <div className="w-full min-h-screen">
         <FormSection title="Variants">
           <div className="mb-4">
@@ -3083,7 +3127,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                 <tr>
                   <th className="w-14 px-2 py-2 text-center font-semibold text-gray-700 whitespace-nowrap">S.NO</th>
                   <th className="w-12 px-0.5 py-2 text-center font-semibold text-gray-700 whitespace-nowrap">Default</th>
-                  <th className="w-14 px-1 py-2 text-center font-semibold text-gray-700 whitespace-nowrap" title="Show on client side">Visible</th>
+                  <th className="w-14 px-1 py-2 text-center font-semibold text-gray-700 whitespace-nowrap" title="List this variant as its own product card in the storefront catalog">Catalog</th>
                   <th className="w-[320px] min-w-[320px] px-2 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Name</th>
                   {variantFieldSelection.size && <th className="w-[120px] min-w-[120px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Size</th>}
                   <th className="w-[110px] min-w-[110px] px-3 py-2 text-left font-semibold text-gray-700 whitespace-nowrap">Unit</th>
@@ -3182,10 +3226,10 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     <td className="w-14 px-1 py-2 text-center">
                       <input
                         type="checkbox"
-                        checked={row.visibleOnClient !== false}
-                        onChange={(e) => handleVariantRowChange(index, 'visibleOnClient', e.target.checked)}
+                        checked={row.showInCatalog === true}
+                        onChange={(e) => handleVariantRowChange(index, 'showInCatalog', e.target.checked)}
                         onClick={(e) => e.stopPropagation()}
-                        title="Show this variant on the client side"
+                        title="Show as its own product card in the catalog (parent PDP still lists all variants)"
                         className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                       />
                     </td>

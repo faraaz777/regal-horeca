@@ -10,8 +10,41 @@ import ProductForm from '@/components/ProductForm';
 import { showToast } from '@/lib/utils/toast';
 import { apiClient, ApiError } from '@/lib/utils/apiClient';
 import { saveProductChildren } from '@/lib/utils/saveProductChildren';
+import { childRowListedInStorefrontCatalog } from '@/lib/utils/storefrontCatalogFilter';
 
 const ITEMS_PER_PAGE = 20;
+
+/** Emerald “In catalog” pill: opens storefront PDP for this row’s slug in a new tab. */
+function StorefrontInCatalogBadge({ slug, size = 'md' }) {
+  const trimmed = slug != null ? String(slug).trim() : '';
+  const href = trimmed ? `/products/${encodeURIComponent(trimmed)}` : '';
+  const className =
+    'inline-flex items-center font-semibold rounded-full bg-emerald-100 text-emerald-900 ' +
+    (size === 'sm' ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-0.5 text-[10px]') +
+    (href ? ' hover:bg-emerald-200 cursor-pointer' : '');
+  if (!href) {
+    return (
+      <span
+        className={className}
+        title="Listed in storefront catalog — add a slug on this variant to open its product page"
+      >
+        In catalog
+      </span>
+    );
+  }
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={className}
+      title="View this product on the storefront (opens in a new tab)"
+      onClick={(e) => e.stopPropagation()}
+    >
+      In catalog
+    </a>
+  );
+}
 
 // SWR fetcher
 const fetcher = async (url) => {
@@ -68,12 +101,14 @@ export default function AdminProductsPage() {
   const [isBulkMode, setIsBulkMode] = useState(false);
   /** 'active' = catalog rows; 'deleted' = soft-deleted only */
   const [listFilter, setListFilter] = useState('active');
+  /** Admin-only row kind filter (Active list only). Passed to `adminListFilter` query. */
+  const [adminListFilter, setAdminListFilter] = useState('all');
   /** Parent _id -> bool (expanded). Drives the variant child rows. */
   const [expandedParents, setExpandedParents] = useState({});
 
   // Admin list endpoint: returns parents/children/standalones in one shot, ignoring
   // the storefront visibility filter so admins see hidden variants.
-  const getProductsUrl = (page, search, filter) => {
+  const getProductsUrl = (page, search, filter, rowKind) => {
     let url = `/api/admin/products?limit=${ITEMS_PER_PAGE}&page=${page}`;
     if (search) {
       url += `&search=${encodeURIComponent(search)}`;
@@ -81,12 +116,15 @@ export default function AdminProductsPage() {
     if (filter === 'deleted') {
       url += '&showDeleted=true';
     }
+    if (filter === 'active' && rowKind && rowKind !== 'all') {
+      url += `&adminListFilter=${encodeURIComponent(rowKind)}`;
+    }
     return url;
   };
 
   // Use SWR for data fetching with caching
   const { data, error, isLoading, mutate } = useSWR(
-    getProductsUrl(currentPage, searchTerm, listFilter),
+    getProductsUrl(currentPage, searchTerm, listFilter, adminListFilter),
     fetcher,
     {
       revalidateOnFocus: false,
@@ -118,6 +156,15 @@ export default function AdminProductsPage() {
     });
     return map;
   }, [data]);
+
+  const productByIdOnPage = useMemo(() => {
+    const m = new Map();
+    (products || []).forEach((p) => {
+      const id = p?._id || p?.id;
+      if (id != null) m.set(String(id), p);
+    });
+    return m;
+  }, [products]);
 
   // Exact-match detection. The server uses substring regex, which is great for
   // discovery, but admins typing a full SKU/barcode/HSN expect to *land* on that
@@ -189,11 +236,17 @@ export default function AdminProductsPage() {
     });
   }, [exactMatchInfo]);
 
-  // Optimistic toggle for child.visibleOnClient. Falls back to a refetch on error.
-  const toggleChildVisibility = async (child) => {
+  useEffect(() => {
+    if (listFilter === 'deleted') {
+      setAdminListFilter('all');
+    }
+  }, [listFilter]);
+
+  // Optimistic toggle for child.showInCatalog (storefront catalog card, not PDP visibility).
+  const toggleChildCatalogListing = async (child) => {
     const childId = child._id || child.id;
     if (!childId) return;
-    const next = !(child.visibleOnClient ?? true);
+    const nextListed = !childRowListedInStorefrontCatalog(child);
 
     try {
       await mutate(
@@ -202,7 +255,7 @@ export default function AdminProductsPage() {
           return {
             ...current,
             attachedChildren: (current.attachedChildren || []).map((c) =>
-              (c._id || c.id) === childId ? { ...c, visibleOnClient: next } : c
+              (c._id || c.id) === childId ? { ...c, showInCatalog: nextListed } : c
             ),
           };
         },
@@ -212,15 +265,15 @@ export default function AdminProductsPage() {
       const res = await fetch(`/api/admin/products/children/${childId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ visibleOnClient: next }),
+        body: JSON.stringify({ showInCatalog: nextListed }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || 'Failed to update visibility');
+        throw new Error(body.error || 'Failed to update catalog visibility');
       }
       mutate();
     } catch (err) {
-      showToast.error(err?.message || 'Failed to update visibility');
+      showToast.error(err?.message || 'Failed to update catalog visibility');
       mutate();
     }
   };
@@ -248,7 +301,7 @@ export default function AdminProductsPage() {
     setCurrentPage(1);
     setIsBulkMode(false);
     setSelectedProducts(new Set());
-  }, [listFilter]);
+  }, [listFilter, adminListFilter]);
 
   const handleAddProduct = () => {
     router.push('/admin/products/add');
@@ -682,6 +735,23 @@ export default function AdminProductsPage() {
             </div>
           </div>
           {!isBulkMode && listFilter === 'active' && (
+            <select
+              value={adminListFilter}
+              onChange={(e) => {
+                setAdminListFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full md:w-56 border border-gray-300 rounded-md px-3 py-2.5 sm:py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+              aria-label="Filter product rows"
+            >
+              <option value="all">All products</option>
+              <option value="parents">Parents only</option>
+              <option value="children">Variants only</option>
+              <option value="catalog_visible">Catalog-visible</option>
+              <option value="hidden_catalog">Hidden from catalog (variants)</option>
+            </select>
+          )}
+          {!isBulkMode && listFilter === 'active' && (
             <>
               <button
                 onClick={() => setIsBulkMode(true)}
@@ -740,6 +810,13 @@ export default function AdminProductsPage() {
                       const productId = product._id || product.id;
                       const isSelected = selectedProducts.has(productId);
                       const isParent = product.productType === 'parent';
+                      const childRowParentId =
+                        product.productType === 'child'
+                          ? product.parentProductId?.toString?.() || String(product.parentProductId || '')
+                          : '';
+                      const parentProductOnPage = childRowParentId
+                        ? productByIdOnPage.get(childRowParentId)
+                        : null;
 
                       // Unify "real children" and "legacy embedded variants" so both render
                       // as expandable rows under the carrier. Legacy rows are reshaped to look
@@ -775,6 +852,8 @@ export default function AdminProductsPage() {
                       });
                       const displayChildren = isParent ? childRows : legacyChildRows;
                       const variantCount = displayChildren.length;
+                      const anyChildInCatalog =
+                        isParent && childRows.some((c) => childRowListedInStorefrontCatalog(c));
                       const isExpandable = variantCount > 0;
                       const isExpanded = !!expandedParents[String(productId)];
                       const isCarrier = isParent || legacyChildRows.length > 0;
@@ -838,8 +917,50 @@ export default function AdminProductsPage() {
                                 )}
                               </div>
                               <div className="ml-4">
-                                <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                                <div className="text-sm font-medium text-gray-900 flex items-center gap-2 flex-wrap">
                                   <span>{product.title}</span>
+                                  {product.productType === 'child' && (
+                                    <>
+                                      <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                                        Variant
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (!childRowParentId) return;
+                                          void handleEditProduct(
+                                            parentProductOnPage || { _id: childRowParentId, productType: 'parent' }
+                                          );
+                                        }}
+                                        className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-gray-200 text-gray-800 hover:bg-gray-300 transition-colors cursor-pointer"
+                                        title="Open parent product (variant matrix is edited there)"
+                                      >
+                                        Child product
+                                      </button>
+                                      {childRowListedInStorefrontCatalog(product) && (
+                                        <StorefrontInCatalogBadge slug={product.slug} />
+                                      )}
+                                    </>
+                                  )}
+                                  {isParent && (
+                                    <>
+                                      <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-violet-100 text-violet-800">
+                                        Parent
+                                      </span>
+                                      <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-slate-100 text-slate-700">
+                                        Has variants
+                                      </span>
+                                      {anyChildInCatalog && (
+                                        <span
+                                          className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-100 text-emerald-900"
+                                          title="At least one variant is also listed as its own product card in the storefront catalog"
+                                        >
+                                          Visible in catalog
+                                        </span>
+                                      )}
+                                    </>
+                                  )}
                                   {isExactMatch && (
                                     <span
                                       className="inline-flex items-center px-2 py-0.5 text-[10px] font-bold rounded-full bg-yellow-200 text-yellow-900"
@@ -859,6 +980,23 @@ export default function AdminProductsPage() {
                                     </button>
                                   )}
                                 </div>
+                                {product.productType === 'child' && childRowParentId && (
+                                  <div className="text-xs text-gray-600 mt-1 max-w-md">
+                                    <span className="text-gray-500">Parent:</span>{' '}
+                                    <button
+                                      type="button"
+                                      className="text-primary font-semibold hover:underline text-left"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        void handleEditProduct(
+                                          parentProductOnPage || { _id: childRowParentId, productType: 'parent' }
+                                        );
+                                      }}
+                                    >
+                                      {parentProductOnPage?.title || 'Open parent product'}
+                                    </button>
+                                  </div>
+                                )}
                                 {listFilter === 'deleted' && product.deletedAt && (
                                   <div className="text-xs text-gray-400 mt-0.5">
                                     Removed {new Date(product.deletedAt).toLocaleString()}
@@ -990,7 +1128,7 @@ export default function AdminProductsPage() {
                                     )}
                                   </div>
                                   <div className="ml-4">
-                                    <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                                    <div className="text-sm font-medium text-gray-900 flex items-center gap-2 flex-wrap">
                                       <span>{child.title || 'Variant'}</span>
                                       {isChildExactMatch && (
                                         <span
@@ -1008,7 +1146,43 @@ export default function AdminProductsPage() {
                                           Legacy
                                         </span>
                                       )}
+                                      {!isLegacy && (
+                                        <>
+                                          <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                                            Variant
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              void handleEditProduct(product);
+                                            }}
+                                            className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-gray-200 text-gray-800 hover:bg-gray-300 cursor-pointer"
+                                            title="Open parent product"
+                                          >
+                                            Child product
+                                          </button>
+                                          {childRowListedInStorefrontCatalog(child) && (
+                                            <StorefrontInCatalogBadge slug={child.slug} size="sm" />
+                                          )}
+                                        </>
+                                      )}
                                     </div>
+                                    {!isLegacy && (
+                                      <div className="text-[11px] text-gray-600 mt-1">
+                                        Parent:{' '}
+                                        <button
+                                          type="button"
+                                          className="text-primary font-semibold hover:underline"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            void handleEditProduct(product);
+                                          }}
+                                        >
+                                          {product.title}
+                                        </button>
+                                      </div>
+                                    )}
                                     {(attrChips.length > 0 || child.sku) && (
                                       <div className="text-[11px] text-gray-500 flex flex-wrap gap-1 mt-0.5">
                                         {attrChips.map((chip) => (
@@ -1041,11 +1215,11 @@ export default function AdminProductsPage() {
                                   <label className="inline-flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
                                     <input
                                       type="checkbox"
-                                      checked={child.visibleOnClient ?? true}
-                                      onChange={() => toggleChildVisibility(child)}
+                                      checked={childRowListedInStorefrontCatalog(child)}
+                                      onChange={() => toggleChildCatalogListing(child)}
                                       className="rounded border-gray-300 text-primary focus:ring-primary"
                                     />
-                                    Visible
+                                    In catalog
                                   </label>
                                 )}
                               </td>
@@ -1101,6 +1275,13 @@ export default function AdminProductsPage() {
                   const productId = product._id || product.id;
                   const isSelected = selectedProducts.has(productId);
                   const isParent = product.productType === 'parent';
+                  const mobileChildParentId =
+                    product.productType === 'child'
+                      ? product.parentProductId?.toString?.() || String(product.parentProductId || '')
+                      : '';
+                  const mobileParentOnPage = mobileChildParentId
+                    ? productByIdOnPage.get(mobileChildParentId)
+                    : null;
                   const childRows = isParent ? (childrenByParent.get(String(productId)) || []) : [];
                   const legacyVariants = !isParent && Array.isArray(product.variants) ? product.variants : [];
                   const legacyChildRows = legacyVariants.map((v, i) => {
@@ -1130,6 +1311,8 @@ export default function AdminProductsPage() {
                   });
                   const displayChildren = isParent ? childRows : legacyChildRows;
                   const variantCount = displayChildren.length;
+                  const anyChildInCatalog =
+                    isParent && childRows.some((c) => childRowListedInStorefrontCatalog(c));
                   const isExpandable = variantCount > 0;
                   const isExpanded = !!expandedParents[String(productId)];
                   const isCarrier = isParent || legacyChildRows.length > 0;
@@ -1173,8 +1356,49 @@ export default function AdminProductsPage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-medium text-gray-900 mb-1 line-clamp-2 flex items-center gap-2">
+                          <h3 className="text-sm font-medium text-gray-900 mb-1 line-clamp-2 flex items-center gap-2 flex-wrap">
                             <span>{product.title}</span>
+                            {product.productType === 'child' && (
+                              <>
+                                <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                                  Variant
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!mobileChildParentId) return;
+                                    void handleEditProduct(
+                                      mobileParentOnPage || { _id: mobileChildParentId, productType: 'parent' }
+                                    );
+                                  }}
+                                  className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-gray-200 text-gray-800 hover:bg-gray-300"
+                                  title="Open parent product"
+                                >
+                                  Child product
+                                </button>
+                                {childRowListedInStorefrontCatalog(product) && (
+                                  <StorefrontInCatalogBadge slug={product.slug} />
+                                )}
+                              </>
+                            )}
+                            {isParent && (
+                              <>
+                                <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-violet-100 text-violet-800">
+                                  Parent
+                                </span>
+                                <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-slate-100 text-slate-700">
+                                  Has variants
+                                </span>
+                                {anyChildInCatalog && (
+                                  <span
+                                    className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full bg-emerald-100 text-emerald-900"
+                                    title="At least one variant is also listed as its own product card in the storefront catalog"
+                                  >
+                                    Visible in catalog
+                                  </span>
+                                )}
+                              </>
+                            )}
                             {isExactMatch && (
                               <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-bold rounded-full bg-yellow-200 text-yellow-900">
                                 Match
@@ -1191,6 +1415,22 @@ export default function AdminProductsPage() {
                               </button>
                             )}
                           </h3>
+                          {product.productType === 'child' && mobileChildParentId && (
+                            <p className="text-xs text-gray-600 mb-1">
+                              Parent:{' '}
+                              <button
+                                type="button"
+                                className="text-primary font-semibold hover:underline"
+                                onClick={() =>
+                                  void handleEditProduct(
+                                    mobileParentOnPage || { _id: mobileChildParentId, productType: 'parent' }
+                                  )
+                                }
+                              >
+                                {mobileParentOnPage?.title || 'Open parent product'}
+                              </button>
+                            </p>
+                          )}
                           {listFilter === 'deleted' && product.deletedAt && (
                             <p className="text-xs text-gray-400 mb-1">
                               Removed {new Date(product.deletedAt).toLocaleString()}
@@ -1314,7 +1554,7 @@ export default function AdminProductsPage() {
                                   )}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-sm font-semibold text-gray-900 flex items-center gap-2 line-clamp-2">
+                                  <div className="text-sm font-semibold text-gray-900 flex items-center gap-2 line-clamp-2 flex-wrap">
                                     <span>{child.title || 'Variant'}</span>
                                     {isChildExactMatch && (
                                       <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-yellow-200 text-yellow-900">
@@ -1326,7 +1566,37 @@ export default function AdminProductsPage() {
                                         Legacy
                                       </span>
                                     )}
+                                    {!isLegacy && (
+                                      <>
+                                        <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-indigo-100 text-indigo-800">
+                                          Variant
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => void handleEditProduct(product)}
+                                          className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-gray-200 text-gray-800 hover:bg-gray-300"
+                                          title="Open parent product"
+                                        >
+                                          Child product
+                                        </button>
+                                        {childRowListedInStorefrontCatalog(child) && (
+                                          <StorefrontInCatalogBadge slug={child.slug} size="sm" />
+                                        )}
+                                      </>
+                                    )}
                                   </div>
+                                  {!isLegacy && (
+                                    <div className="text-[11px] text-gray-600 mt-1">
+                                      Parent:{' '}
+                                      <button
+                                        type="button"
+                                        className="text-primary font-semibold hover:underline"
+                                        onClick={() => void handleEditProduct(product)}
+                                      >
+                                        {product.title}
+                                      </button>
+                                    </div>
+                                  )}
                                   {(attrChips.length > 0 || child.sku) && (
                                     <div className="text-[11px] text-gray-500 flex flex-wrap gap-1 mt-1">
                                       {attrChips.map((chip) => (
@@ -1352,11 +1622,11 @@ export default function AdminProductsPage() {
                                       <label className="inline-flex items-center gap-1 text-[11px] text-gray-700">
                                         <input
                                           type="checkbox"
-                                          checked={child.visibleOnClient ?? true}
-                                          onChange={() => toggleChildVisibility(child)}
+                                          checked={childRowListedInStorefrontCatalog(child)}
+                                          onChange={() => toggleChildCatalogListing(child)}
                                           className="rounded border-gray-300 text-primary focus:ring-primary"
                                         />
-                                        Visible
+                                        In catalog
                                       </label>
                                     )}
                                     <button
@@ -1449,6 +1719,10 @@ export default function AdminProductsPage() {
                 allProducts={allProductsForForm}
                 onSave={handleSaveEditedProduct}
                 onVariantsOnlyChange={setIsVariantsOnlyView}
+                onOpenParent={(parentId) => {
+                  if (!parentId) return;
+                  void handleEditProduct({ _id: parentId, productType: 'parent' });
+                }}
                 onCancel={() => {
                   setIsVariantsOnlyView(false);
                   setIsEditModalOpen(false);

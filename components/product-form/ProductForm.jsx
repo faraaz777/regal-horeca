@@ -14,11 +14,11 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '@/context/AppContext';
-import { PlusIcon, TrashIcon, MagicIcon, StarIcon, DragHandleIcon, SearchIcon } from './Icons';
+import { PlusIcon, TrashIcon, MagicIcon, StarIcon, DragHandleIcon, SearchIcon } from '@/components/Icons';
 import Image from 'next/image';
-import ColorPicker from './ColorPicker';
+import ColorPicker from '@/components/ColorPicker';
 import useSWR from 'swr';
-import RichTextEditor from './RichTextEditor';
+import RichTextEditor from '@/components/RichTextEditor';
 import toast from 'react-hot-toast';
 
 function getTextLength(str) {

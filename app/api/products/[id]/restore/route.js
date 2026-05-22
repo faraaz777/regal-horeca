@@ -7,8 +7,12 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
 import { revalidateProductSlugs } from '@/lib/utils/revalidate';
+import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
 
 export async function POST(_request, { params }) {
+  const authError = assertAdmin(_request);
+  if (authError) return authError;
+
   try {
     await connectToDatabase();
 

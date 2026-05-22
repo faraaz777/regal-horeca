@@ -13,9 +13,12 @@ import { saveProductChildren } from '@/lib/utils/saveProductChildren';
 
 const ITEMS_PER_PAGE = 20;
 
-// SWR fetcher
+// SWR fetcher — attaches admin JWT when present
 const fetcher = async (url) => {
-  const response = await fetch(url);
+  const token = typeof window !== 'undefined' ? localStorage.getItem('regal_admin_token') : null;
+  const response = await fetch(url, {
+    ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+  });
   if (!response.ok) {
     const error = new Error('Failed to fetch');
     error.info = await response.json();
@@ -24,6 +27,12 @@ const fetcher = async (url) => {
   }
   return response.json();
 };
+
+function adminAuthHeaderObj() {
+  if (typeof window === 'undefined') return {};
+  const token = localStorage.getItem('regal_admin_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 // Error Display Component with Retry
 const ErrorDisplay = ({ error, onRetry }) => {
@@ -211,7 +220,7 @@ export default function AdminProductsPage() {
 
       const res = await fetch(`/api/admin/products/children/${childId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...adminAuthHeaderObj() },
         body: JSON.stringify({ visibleOnClient: next }),
       });
       if (!res.ok) {
@@ -277,7 +286,9 @@ export default function AdminProductsPage() {
         // so the variant table can render. Refetch via the admin children endpoint.
         if (product.productType === 'parent') {
           try {
-            const childrenRes = await fetch(`/api/admin/products/${productId}/children`);
+            const childrenRes = await fetch(`/api/admin/products/${productId}/children`, {
+              headers: { ...adminAuthHeaderObj() },
+            });
             const childrenData = await childrenRes.json().catch(() => ({}));
             if (childrenRes.ok && childrenData?.success) {
               editingPayload = {
@@ -336,7 +347,10 @@ export default function AdminProductsPage() {
     const toastId = showToast.loading('Restoring product...');
     setLoading(true);
     try {
-      const res = await fetch(`/api/products/${productId}/restore`, { method: 'POST' });
+      const res = await fetch(`/api/products/${productId}/restore`, {
+        method: 'POST',
+        headers: { ...adminAuthHeaderObj() },
+      });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
         showToast.error(body.error || 'Failed to restore product');
@@ -1038,14 +1052,17 @@ export default function AdminProductsPage() {
                                 {isLegacy ? (
                                   <span className="text-xs text-gray-400">—</span>
                                 ) : (
-                                  <label className="inline-flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                                  <label
+                                    className="inline-flex items-center gap-2 text-xs text-gray-700 cursor-pointer"
+                                    title="Show on catalog and sitemap (separate product card)"
+                                  >
                                     <input
                                       type="checkbox"
                                       checked={child.visibleOnClient ?? true}
                                       onChange={() => toggleChildVisibility(child)}
                                       className="rounded border-gray-300 text-primary focus:ring-primary"
                                     />
-                                    Visible
+                                    Catalog
                                   </label>
                                 )}
                               </td>
@@ -1349,14 +1366,17 @@ export default function AdminProductsPage() {
                                       {childStatus || '—'}
                                     </span>
                                     {!isLegacy && (
-                                      <label className="inline-flex items-center gap-1 text-[11px] text-gray-700">
+                                      <label
+                                        className="inline-flex items-center gap-1 text-[11px] text-gray-700"
+                                        title="Show on catalog and sitemap (separate product card)"
+                                      >
                                         <input
                                           type="checkbox"
                                           checked={child.visibleOnClient ?? true}
                                           onChange={() => toggleChildVisibility(child)}
                                           className="rounded border-gray-300 text-primary focus:ring-primary"
                                         />
-                                        Visible
+                                        Catalog
                                       </label>
                                     )}
                                     <button

@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "migrate:variants": "node scripts/migrateVariantsToChildren.mjs",
-    "migrate:variants:dry": "node scripts/migrateVariantsToChildren.mjs --dry-run"
+    "migrate:variants:dry": "node scripts/migrateVariantsToChildren.mjs --dry-run",
+    "migrate:product-filters": "node scripts/migrateProductFilters.mjs",
+    "migrate:product-filters:dry": "node scripts/migrateProductFilters.mjs --dry-run"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.540.0",
@@ -37,6 +39,7 @@
     "react-hot-toast": "^2.6.0",
     "react-icons": "^5.5.0",
     "react-markdown": "^10.1.0",
+    "server-only": "^0.0.1",
     "sharp": "^0.34.5",
     "swr": "^2.3.6",
     "uuid": "^13.0.0"

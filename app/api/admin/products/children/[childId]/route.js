@@ -16,6 +16,7 @@ import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
 import { generateUniqueSlug } from '@/lib/utils/slug';
 import { revalidateProductSlugs } from '@/lib/utils/revalidate';
+import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +49,9 @@ function pickAllowed(body) {
 }
 
 export async function PATCH(request, { params }) {
+  const authError = assertAdmin(request);
+  if (authError) return authError;
+
   try {
     await connectToDatabase();
     const { childId } = params;
@@ -130,6 +134,9 @@ export async function PATCH(request, { params }) {
 }
 
 export async function DELETE(_request, { params }) {
+  const authError = assertAdmin(_request);
+  if (authError) return authError;
+
   try {
     await connectToDatabase();
     const { childId } = params;

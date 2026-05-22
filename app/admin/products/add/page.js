@@ -31,7 +31,7 @@ import { saveProductChildren } from '@/lib/utils/saveProductChildren';
 const fetcher = (url) => fetch(url).then(res => res.json());
 
 export default function AdminAddProductPage() {
-  const { refreshProducts, categories } = useAppContext();
+  const { categories } = useAppContext();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -129,7 +129,6 @@ export default function AdminAddProductPage() {
           ? `Product created with ${variantRows.length} variant(s)`
           : 'Product created successfully'
       );
-      await refreshProducts();
       router.push('/admin/products');
     } catch (error) {
       if (error instanceof ApiError) {

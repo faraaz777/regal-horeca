@@ -18,6 +18,7 @@
 import { NextResponse } from 'next/server';
 import Product from '@/lib/models/Product';
 import { queryProducts } from '@/lib/server/products/queryProducts';
+import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -29,6 +30,9 @@ const NO_STORE_HEADERS = {
 };
 
 export async function GET(request) {
+  const authError = assertAdmin(request);
+  if (authError) return authError;
+
   try {
     const { searchParams } = new URL(request.url);
 

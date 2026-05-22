@@ -13,8 +13,9 @@ import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
 import { generateUniqueSlug } from '@/lib/utils/slug';
 import { revalidateHomepage, revalidatePath, revalidateProducts, revalidateProductSlugs } from '@/lib/utils/revalidate';
-import { normalizeFilterValues } from '@/lib/utils/normalizeFilterValue';
 import { resolveProduct, getSiblingChildren } from '@/lib/server/products/resolveProduct';
+import { normalizeProductPayloadForUpdate, normalizeFiltersField } from '@/lib/server/products/normalizeProductInput';
+import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
 import mongoose from 'mongoose';
 
 /**
@@ -109,44 +110,13 @@ export async function GET(request, { params }) {
             ? product._id
             : product.parentProductId || product.parent?._id;
         if (parentIdForSiblings) {
-          product.children = await getSiblingChildren(parentIdForSiblings);
+          product.children = await getSiblingChildren(parentIdForSiblings, { visibleOnly: false });
         }
       }
     }
 
-    // Normalize filters (convert old object format to array format if needed)
     try {
-      if (product.filters && !Array.isArray(product.filters)) {
-        // Convert old object format {material: [], color: [], usage: []} to new array format
-        const oldFilters = product.filters;
-        product.filters = [];
-        if (oldFilters && typeof oldFilters === 'object') {
-          if (oldFilters.material && Array.isArray(oldFilters.material) && oldFilters.material.length > 0) {
-            product.filters.push({ key: 'Material', values: oldFilters.material });
-          }
-          if (oldFilters.size && Array.isArray(oldFilters.size) && oldFilters.size.length > 0) {
-            product.filters.push({ key: 'Size', values: oldFilters.size });
-          }
-          if (oldFilters.color && Array.isArray(oldFilters.color) && oldFilters.color.length > 0) {
-            product.filters.push({ key: 'Color', values: oldFilters.color });
-          }
-          if (oldFilters.usage && Array.isArray(oldFilters.usage) && oldFilters.usage.length > 0) {
-            product.filters.push({ key: 'Usage', values: oldFilters.usage });
-          }
-          // Handle any other keys
-          Object.keys(oldFilters).forEach(key => {
-            if (!['material', 'size', 'color', 'usage'].includes(key.toLowerCase()) && 
-                Array.isArray(oldFilters[key]) && oldFilters[key].length > 0) {
-              product.filters.push({ 
-                key: key.charAt(0).toUpperCase() + key.slice(1), 
-                values: oldFilters[key] 
-              });
-            }
-          });
-        }
-      } else if (!product.filters) {
-        product.filters = [];
-      }
+      product.filters = normalizeFiltersField(product.filters);
     } catch (filterError) {
       console.warn('Error normalizing filters:', filterError.message);
       product.filters = [];
@@ -192,54 +162,16 @@ export async function GET(request, { params }) {
  * - Duplicate slugs auto-increment (e.g., "red-mug-1")
  */
 export async function PUT(request, { params }) {
+  const authError = assertAdmin(request);
+  if (authError) return authError;
+
   try {
     await connectToDatabase();
 
     const { id } = params;
     const updateData = await request.json();
 
-    // `_variantRows` is form-side metadata used by the admin caller to create child
-    // product documents after the parent is saved. Strip before applying updates.
-    if (updateData._variantRows) {
-      delete updateData._variantRows;
-    }
-
-    // Handle categoryId - only remove if it's truly empty/null/undefined
-    // If it's a valid string (ObjectId), MongoDB will convert it automatically
-    if (updateData.categoryId === '' || updateData.categoryId === null || updateData.categoryId === undefined) {
-      delete updateData.categoryId;
-    } else if (typeof updateData.categoryId === 'string' && updateData.categoryId.trim() === '') {
-      // Remove if it's a whitespace-only string
-      delete updateData.categoryId;
-    }
-    // If categoryId is a valid string (ObjectId format), keep it - MongoDB will handle conversion
-
-    // Handle categoryIds array
-    if (updateData.categoryIds !== undefined) {
-      if (!Array.isArray(updateData.categoryIds)) {
-        updateData.categoryIds = [];
-      } else {
-        // Filter out empty values
-        updateData.categoryIds = updateData.categoryIds.filter(id => id && id.trim() !== '');
-      }
-    }
-
-    // Handle brandCategoryId - only remove if it's truly empty/null/undefined
-    if (updateData.brandCategoryId === '' || updateData.brandCategoryId === null || updateData.brandCategoryId === undefined) {
-      delete updateData.brandCategoryId;
-    } else if (typeof updateData.brandCategoryId === 'string' && updateData.brandCategoryId.trim() === '') {
-      delete updateData.brandCategoryId;
-    }
-
-    // Handle brandCategoryIds array
-    if (updateData.brandCategoryIds !== undefined) {
-      if (!Array.isArray(updateData.brandCategoryIds)) {
-        updateData.brandCategoryIds = [];
-      } else {
-        // Filter out empty values
-        updateData.brandCategoryIds = updateData.brandCategoryIds.filter(id => id && id.trim() !== '');
-      }
-    }
+    normalizeProductPayloadForUpdate(updateData);
 
     // Find product
     const product = await Product.findById(id);
@@ -279,106 +211,6 @@ export async function PUT(request, { params }) {
       }
     }
     // If title didn't change, slug remains unchanged (not included in updateData)
-
-    // Handle availableSizes - optional field, trim and set to empty string if not provided
-    if (updateData.availableSizes !== undefined) {
-      if (updateData.availableSizes === null || updateData.availableSizes === '') {
-        updateData.availableSizes = '';
-      } else {
-        updateData.availableSizes = String(updateData.availableSizes).trim();
-      }
-    }
-
-    // Normalize detailPhotos if provided (max 3)
-    if (updateData.detailPhotos !== undefined) {
-      if (!Array.isArray(updateData.detailPhotos)) {
-        updateData.detailPhotos = [];
-      } else {
-        updateData.detailPhotos = updateData.detailPhotos.map(String).filter(Boolean).slice(0, 3);
-      }
-    }
-
-    // Normalize FAQs if provided
-    if (updateData.faqs !== undefined) {
-      if (!Array.isArray(updateData.faqs)) {
-        updateData.faqs = [];
-      } else {
-        updateData.faqs = updateData.faqs
-          .filter(f => f && typeof f === 'object')
-          .map(f => ({
-            question: String(f.question || '').trim(),
-            answer: String(f.answer || '').trim(),
-          }))
-          .filter(f => f.question && f.answer);
-      }
-    }
-
-    // Normalize frequently ordered together ids if provided
-    if (updateData.frequentlyOrderedTogetherProductIds !== undefined) {
-      if (!Array.isArray(updateData.frequentlyOrderedTogetherProductIds)) {
-        updateData.frequentlyOrderedTogetherProductIds = [];
-      } else {
-        updateData.frequentlyOrderedTogetherProductIds = updateData.frequentlyOrderedTogetherProductIds
-          .filter(id => id && String(id).trim() !== '');
-      }
-    }
-
-    // Normalize testimonials if provided
-    if (updateData.testimonials !== undefined) {
-      if (!Array.isArray(updateData.testimonials)) {
-        updateData.testimonials = [];
-      } else {
-        updateData.testimonials = updateData.testimonials
-          .filter(t => t && typeof t === 'object')
-          .map(t => ({
-            quote: String(t.quote || '').trim(),
-            authorName: String(t.authorName || '').trim(),
-            authorRole: String(t.authorRole || '').trim(),
-            companyName: String(t.companyName || '').trim(),
-            companyLogo: String(t.companyLogo || '').trim(),
-          }))
-          .filter(t => t.quote);
-      }
-    }
-
-    // Normalize filters to array format if filters are being updated
-    if (updateData.filters !== undefined) {
-      if (!Array.isArray(updateData.filters)) {
-        // Convert old object format to new array format
-        const oldFilters = updateData.filters;
-        updateData.filters = [];
-        if (oldFilters.material && Array.isArray(oldFilters.material) && oldFilters.material.length > 0) {
-          updateData.filters.push({ key: 'Material', values: normalizeFilterValues(oldFilters.material) });
-        }
-        if (oldFilters.size && Array.isArray(oldFilters.size) && oldFilters.size.length > 0) {
-          updateData.filters.push({ key: 'Size', values: normalizeFilterValues(oldFilters.size) });
-        }
-        if (oldFilters.color && Array.isArray(oldFilters.color) && oldFilters.color.length > 0) {
-          updateData.filters.push({ key: 'Color', values: normalizeFilterValues(oldFilters.color) });
-        }
-        if (oldFilters.usage && Array.isArray(oldFilters.usage) && oldFilters.usage.length > 0) {
-          updateData.filters.push({ key: 'Usage', values: normalizeFilterValues(oldFilters.usage) });
-        }
-        // Handle any other keys
-        Object.keys(oldFilters).forEach(key => {
-          if (!['material', 'size', 'color', 'usage'].includes(key.toLowerCase()) && 
-              Array.isArray(oldFilters[key]) && oldFilters[key].length > 0) {
-            updateData.filters.push({ 
-              key: key.charAt(0).toUpperCase() + key.slice(1), 
-              values: normalizeFilterValues(oldFilters[key])
-            });
-          }
-        });
-      } else {
-        // Ensure it's a valid array with proper structure; normalize values for consistent sidebar filtering
-        updateData.filters = updateData.filters
-          .filter(f => f && f.key && Array.isArray(f.values))
-          .map(f => ({
-            key: f.key.trim(),
-            values: normalizeFilterValues(f.values.filter(v => v && v.trim()))
-          }));
-      }
-    }
 
     // Update product
     Object.assign(product, updateData);
@@ -440,6 +272,9 @@ export async function PUT(request, { params }) {
  * - Deleting a 'child' or 'standalone' deletes only that row.
  */
 export async function DELETE(request, { params }) {
+  const authError = assertAdmin(request);
+  if (authError) return authError;
+
   try {
     await connectToDatabase();
 

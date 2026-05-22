@@ -8,7 +8,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getFullProductBySlug } from '@/lib/utils/getProductBySlug';
-import ProductDetailClient from './ProductDetailClient';
+import ProductDetailClient from '@/components/product-detail/ProductDetailClient';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,5 +53,5 @@ export default async function ProductPage({ params }) {
 
   // Ensure serializable for client (ObjectId, Date, etc. become strings/ISO)
   const serializableProduct = JSON.parse(JSON.stringify(product));
-  return <ProductDetailClient initialProduct={serializableProduct} />;
+  return <ProductDetailClient key={slug} initialProduct={serializableProduct} />;
 }

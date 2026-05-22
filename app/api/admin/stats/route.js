@@ -11,8 +11,12 @@ import Product from '@/lib/models/Product';
 import Category from '@/lib/models/Category';
 import BusinessType from '@/lib/models/BusinessType';
 import { mongoStorefrontCatalogListingTypes } from '@/lib/utils/storefrontCatalogFilter';
+import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
 
 export async function GET(request) {
+  const authError = assertAdmin(request);
+  if (authError) return authError;
+
   try {
     await connectToDatabase();
 

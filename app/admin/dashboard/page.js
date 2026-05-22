@@ -15,7 +15,10 @@ import { PlusIcon } from '@/components/Icons';
 
 // Optimized stats fetcher - only gets counts, not full data
 const fetcher = async (url) => {
-  const response = await fetch(url);
+  const token = typeof window !== 'undefined' ? localStorage.getItem('regal_admin_token') : null;
+  const response = await fetch(url, {
+    ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+  });
   if (!response.ok) {
     throw new Error('Failed to fetch');
   }

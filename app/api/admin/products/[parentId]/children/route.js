@@ -16,6 +16,7 @@ import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
 import { generateUniqueSlug } from '@/lib/utils/slug';
 import { revalidateProductSlugs } from '@/lib/utils/revalidate';
+import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +40,9 @@ function deriveChildTitle(parentTitle, attrs) {
 }
 
 export async function GET(_request, { params }) {
+  const authError = assertAdmin(_request);
+  if (authError) return authError;
+
   try {
     await connectToDatabase();
     const { parentId } = params;
@@ -63,6 +67,9 @@ export async function GET(_request, { params }) {
 }
 
 export async function POST(request, { params }) {
+  const authError = assertAdmin(request);
+  if (authError) return authError;
+
   try {
     await connectToDatabase();
     const { parentId } = params;

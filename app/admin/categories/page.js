@@ -16,6 +16,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
+import { compressImageFile } from '@/lib/client/imageCompression';
 import { useAppContext } from '@/context/AppContext';
 import { PlusIcon, EditIcon, TrashIcon, ChevronRightIcon, ChevronDownIcon } from '@/components/Icons';
 import { showToast } from '@/lib/utils/toast';
@@ -477,9 +478,6 @@ export default function AdminCategoriesPage() {
  * Compresses images on frontend before upload to prevent HTTP 413 errors
  */
 async function uploadToR2(file, folder = 'categories') {
-  // Dynamically import compression library to keep bundle size small
-  const imageCompression = (await import('browser-image-compression')).default;
-  
   const MAX_INPUT_SIZE = 15 * 1024 * 1024; // 15MB - reject files larger than this
   const MAX_OUTPUT_SIZE = 1.5 * 1024 * 1024; // 1.5MB - only compress if larger than this
   
@@ -508,7 +506,7 @@ async function uploadToR2(file, folder = 'categories') {
           preserveExif: false, // Remove EXIF data to reduce size
         };
         
-        fileToUpload = await imageCompression(file, compressionOptions);
+        fileToUpload = await compressImageFile(file, compressionOptions);
         
         // Validate compressed file size before uploading
         if (fileToUpload.size > MAX_OUTPUT_SIZE * 1.1) { // Allow 10% buffer
@@ -529,9 +527,11 @@ async function uploadToR2(file, folder = 'categories') {
     formData.append('file', fileToUpload, file.name);
     
     // Upload to server
+    const token = typeof window !== 'undefined' ? localStorage.getItem('regal_admin_token') : null;
     const response = await fetch(`/api/upload?folder=${folder}`, {
       method: 'POST',
       body: formData,
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
     });
     
     const data = await response.json();

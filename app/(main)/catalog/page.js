@@ -8,6 +8,8 @@ import { Suspense } from 'react';
 import { SITE_CONFIG } from '@/lib/constants/seo';
 import { queryProducts } from '@/lib/server/products/queryProducts';
 import { queryProductFacets } from '@/lib/server/products/queryFacets';
+import CatalogPageClient from '@/components/catalog/CatalogPageClient';
+import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 
 // ISR: revalidate every 60s so catalog can be cached at edge between requests
 export const revalidate = 60;
@@ -21,8 +23,6 @@ export const metadata = {
   },
   alternates: { canonical: '/catalog' },
 };
-import CatalogPageClient from './CatalogPageClient';
-import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 
 // Server component wrapper that fetches initial data
 export default async function CatalogPage({ searchParams }) {

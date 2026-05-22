@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -152,6 +152,28 @@ function normalizeProductForPDP(input) {
   return { ...input, variants: synthesized };
 }
 
+/** Pick the swatch index for the current PDP URL (child slug wins over legacy query params). */
+function findVariantIndexForProductPage(variants, { slug, variantIdFromUrl, skuFromUrl }) {
+  const list = Array.isArray(variants) ? variants : [];
+  if (list.length === 0) return 0;
+
+  const slugStr = String(slug || '').trim();
+  if (slugStr) {
+    const bySlug = list.findIndex((v) => String(v?._childSlug || '').trim() === slugStr);
+    if (bySlug >= 0) return bySlug;
+  }
+  if (variantIdFromUrl) {
+    const byId = list.findIndex((v) => String(v?.variantId || '').trim() === variantIdFromUrl);
+    if (byId >= 0) return byId;
+  }
+  if (skuFromUrl) {
+    const bySku = list.findIndex((v) => String(v?.sku || '').trim() === skuFromUrl);
+    if (bySku >= 0) return bySku;
+  }
+  const defaultIndex = list.findIndex((v) => Boolean(v?.isDefault));
+  return defaultIndex >= 0 ? defaultIndex : 0;
+}
+
 export default function ProductDetailClient({ initialProduct = null }) {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -164,7 +186,17 @@ export default function ProductDetailClient({ initialProduct = null }) {
   const [loading, setLoading] = useState(!initialProduct);
   const [activeTab, setActiveTab] = useState('specs');
   const [selectedColor, setSelectedColor] = useState(null);
-  const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
+  const [selectedVariantIndex, setSelectedVariantIndex] = useState(() => {
+    const normalized = normalizeProductForPDP(initialProduct);
+    const variants = Array.isArray(normalized?.variants) ? normalized.variants : [];
+    if (variants.length === 0) return 0;
+    return findVariantIndexForProductPage(variants, {
+      slug: initialProduct?.slug || slug,
+      variantIdFromUrl: '',
+      skuFromUrl: '',
+    });
+  });
+  const lastSyncedSlugRef = useRef(null);
   const [selectedSizeKey, setSelectedSizeKey] = useState('');
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
   const [relatedProducts, setRelatedProducts] = useState([]);
@@ -351,6 +383,27 @@ export default function ProductDetailClient({ initialProduct = null }) {
     (product?.businessTypeSlugs && product.businessTypeSlugs.length > 0);
   const defaultUserType = isBusinessContext ? 'business' : 'unknown';
 
+  // Client navigation between child slugs: server passes new initialProduct; refresh local state.
+  useEffect(() => {
+    if (!initialProduct || !slug) return;
+    if (lastSyncedSlugRef.current === slug) return;
+    lastSyncedSlugRef.current = slug;
+    const normalized = normalizeProductForPDP(initialProduct);
+    setProduct(normalized);
+    setLoading(false);
+    setActiveDetailPhotoIndex(0);
+    setSelectedSizeKey('');
+    setSelectedColor(null);
+    const variants = Array.isArray(normalized?.variants) ? normalized.variants : [];
+    if (variants.length > 0) {
+      setSelectedVariantIndex(
+        findVariantIndexForProductPage(variants, { slug, variantIdFromUrl, skuFromUrl })
+      );
+    } else {
+      setSelectedVariantIndex(0);
+    }
+  }, [slug, initialProduct, variantIdFromUrl, skuFromUrl]);
+
   // When no initialProduct, fetch product (client navigation or fallback)
   useEffect(() => {
     if (initialProduct || !slug) return;
@@ -361,7 +414,16 @@ export default function ProductDetailClient({ initialProduct = null }) {
         const data = await response.json();
         if (cancelled) return;
         if (data.success) {
-          setProduct(normalizeProductForPDP(data.product));
+          const normalized = normalizeProductForPDP(data.product);
+          setProduct(normalized);
+          const variants = Array.isArray(normalized?.variants) ? normalized.variants : [];
+          if (variants.length > 0) {
+            setSelectedVariantIndex(
+              findVariantIndexForProductPage(variants, { slug, variantIdFromUrl, skuFromUrl })
+            );
+          }
+          setActiveDetailPhotoIndex(0);
+          setSelectedColor(null);
         }
       } catch (error) {
         if (!cancelled) console.error('Error fetching product:', error);
@@ -484,22 +546,10 @@ export default function ProductDetailClient({ initialProduct = null }) {
       setSelectedVariantIndex(0);
       return;
     }
-
-    let idx = -1;
-    if (variantIdFromUrl) {
-      idx = variants.findIndex((v) => String(v?.variantId || '').trim() === variantIdFromUrl);
-    }
-    if (idx < 0 && skuFromUrl) {
-      idx = variants.findIndex((v) => String(v?.sku || '').trim() === skuFromUrl);
-    }
-    if (idx >= 0) {
-      setSelectedVariantIndex(idx);
-      return;
-    }
-
-    const defaultIndex = variants.findIndex((variant) => Boolean(variant?.isDefault));
-    setSelectedVariantIndex(defaultIndex >= 0 ? defaultIndex : 0);
-  }, [product, variantIdFromUrl, skuFromUrl]);
+    setSelectedVariantIndex(
+      findVariantIndexForProductPage(variants, { slug, variantIdFromUrl, skuFromUrl })
+    );
+  }, [product, slug, variantIdFromUrl, skuFromUrl]);
 
   useEffect(() => {
     if (!hasGeneratedVariants) return;
@@ -517,9 +567,11 @@ export default function ProductDetailClient({ initialProduct = null }) {
 
   useEffect(() => {
     if (!hasGeneratedVariants || !selectedColor) return;
+    const variants = product?.variants || [];
+    // Parent/child variants navigate by URL; do not override index from color alone.
+    if (variants.some((v) => v?._childSlug)) return;
     const selectedColorName = String(selectedColor.colorName || '').trim().toLowerCase();
     if (!selectedColorName) return;
-    const variants = product?.variants || [];
     const active = variants[selectedVariantIndex] || null;
     const activeColor = String(active?.color || '').trim().toLowerCase();
     if (active && activeColor === selectedColorName) return;
@@ -1431,6 +1483,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
                     {(product?.variants || [])
                       .map((variant, idx) => ({ variant, idx }))
                       .filter(({ variant }) => {
+                        if (variant?._childSlug) return true;
                         if (!selectedColor) return true;
                         const selectedColorName = String(selectedColor?.colorName || '').trim().toLowerCase();
                         if (!selectedColorName) return true;
@@ -1439,17 +1492,20 @@ export default function ProductDetailClient({ initialProduct = null }) {
                       .map(({ variant, idx }) => {
                       const label =
                         String(variant?.size || '').trim() ||
+                        String(variant?.color || '').trim() ||
                         String(variant?.sku || '').trim() ||
                         `Variant ${idx + 1}`;
-                      const active = idx === selectedVariantIndex;
+                      const childSlug = String(variant?._childSlug || '').trim();
+                      const active = childSlug
+                        ? childSlug === String(slug || '').trim()
+                        : idx === selectedVariantIndex;
                       const chipClass = `inline-flex w-full min-h-[2.5rem] items-center justify-center px-3 py-2 text-xs font-semibold rounded-md border transition-colors ${
                         active
                           ? 'bg-accent text-white border-accent'
                           : 'bg-white text-black/70 border-black/10 hover:border-accent hover:text-accent'
                       }`;
-                      const childSlug = variant?._childSlug;
                       const navigatesToChild =
-                        childSlug && String(childSlug) !== String(slug);
+                        childSlug && childSlug !== String(slug || '').trim();
 
                       if (navigatesToChild) {
                         return (

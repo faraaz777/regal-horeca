@@ -1,421 +1,60 @@
 /**
- * App Context Provider
- * 
- * Global state management for the application.
- * Manages products, categories, wishlist, and admin authentication.
- * 
- * This context provides:
- * - Products data (fetched from API)
- * - Categories data (fetched from API)
- * - Business types data (fetched from API)
- * - Wishlist management (stored in localStorage)
- * - Admin authentication state (stored in localStorage)
+ * App provider composition + unified `useAppContext()` facade.
+ *
+ * Cart and wishlist live in dedicated providers (fewer unrelated re-renders).
+ * Taxonomy (categories, brands, business types) uses SWR with SSR fallback data.
  */
 
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { SWRProvider } from '@/lib/hooks/useSWRConfig';
-import { createCartItemKey } from '@/lib/utils/cartItemKey';
-
-const AppContext = createContext(undefined);
-
-const WISHLIST_KEY = 'regal_wishlist';
-const CART_KEY = 'regal_cart';
-const ADMIN_KEY = 'regal_admin_auth';
-const ADMIN_TOKEN_KEY = 'regal_admin_token';
+import { TaxonomyProvider } from '@/context/TaxonomyContext';
+import { WishlistProvider } from '@/context/WishlistContext';
+import { CartProvider } from '@/context/CartContext';
+import { useTaxonomy } from '@/context/TaxonomyContext';
+import { useWishlist } from '@/context/WishlistContext';
+import { useCart } from '@/context/CartContext';
 
 export function AppProvider({ children, initialCategories = [] }) {
-  // State for data
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState(initialCategories);
-  const [brands, setBrands] = useState([]);
-  const [businessTypes, setBusinessTypes] = useState([]);
-  
-  // State for UI
-  const [wishlist, setWishlist] = useState([]);
-  const [cart, setCart] = useState([]); // Cart items: [{ productId, quantity }, ...]
-  const [isAdmin] = useState(true); // Admin is always accessible (no authentication)
-  const [loading, setLoading] = useState(true);
-
-  // Load initial data from localStorage
-  useEffect(() => {
-    try {
-      // Load wishlist
-      const storedWishlist = localStorage.getItem(WISHLIST_KEY);
-      if (storedWishlist) {
-        setWishlist(JSON.parse(storedWishlist));
-      }
-      // Load cart
-      const storedCart = localStorage.getItem(CART_KEY);
-      if (storedCart) {
-        setCart(JSON.parse(storedCart));
-      }
-    } catch (error) {
-      console.error('Failed to load from localStorage', error);
-    }
-  }, []);
-
-  // Products are now loaded per-page for better scalability
-  // Keeping products state empty here for backward compatibility
-  // Individual pages/components will fetch products as needed
-  useEffect(() => {
-        setLoading(false);
-  }, []);
-
-  // Fetch categories from API (only if not provided server-side, or to refresh)
-  // This ensures categories are available immediately from server-side rendering
-  useEffect(() => {
-    // If we already have categories from server-side, skip initial fetch
-    // Only fetch if categories array is empty (fallback for client-side navigation)
-    if (categories.length > 0) {
-      return;
-    }
-
-    async function fetchCategories() {
-      try {
-        const response = await fetch('/api/categories?tree=true', {
-          next: { revalidate: 3600 }, // Revalidate every hour
-        });
-        const data = await response.json();
-        if (data.success) {
-          // Flatten tree structure for easier access
-          const flattenCategories = (cats) => {
-            let result = [];
-            cats.forEach(cat => {
-              result.push(cat);
-              if (cat.children && cat.children.length > 0) {
-                result = result.concat(flattenCategories(cat.children));
-              }
-            });
-            return result;
-          };
-          setCategories(flattenCategories(data.categories || []));
-        }
-      } catch (error) {
-        console.error('Failed to fetch categories:', error);
-      }
-    }
-
-    fetchCategories();
-  }, [categories.length]);
-
-  // Fetch brands from API
-  useEffect(() => {
-    async function fetchBrands() {
-      try {
-        const response = await fetch('/api/brands?tree=true', {
-          next: { revalidate: 3600 }, // Revalidate every hour
-        });
-        const data = await response.json();
-        if (data.success) {
-          // Flatten tree structure for easier access
-          const flattenBrands = (brs) => {
-            let result = [];
-            brs.forEach(brand => {
-              result.push(brand);
-              if (brand.children && brand.children.length > 0) {
-                result = result.concat(flattenBrands(brand.children));
-              }
-            });
-            return result;
-          };
-          setBrands(flattenBrands(data.brands || []));
-        }
-      } catch (error) {
-        console.error('Failed to fetch brands:', error);
-      }
-    }
-
-    fetchBrands();
-  }, []);
-
-  // Fetch business types from API
-  useEffect(() => {
-    async function fetchBusinessTypes() {
-      try {
-        const response = await fetch('/api/business-types');
-        const data = await response.json();
-        if (data.success) {
-          setBusinessTypes(data.businessTypes || []);
-        }
-      } catch (error) {
-        console.error('Failed to fetch business types:', error);
-      }
-    }
-
-    fetchBusinessTypes();
-  }, []);
-
-  // Wishlist functions
-  const updateWishlist = (newWishlist) => {
-    setWishlist(newWishlist);
-    localStorage.setItem(WISHLIST_KEY, JSON.stringify(newWishlist));
-  };
-
-  const addToWishlist = (productId) => {
-    if (!wishlist.includes(productId)) {
-      updateWishlist([...wishlist, productId]);
-    }
-  };
-
-  const removeFromWishlist = (productId) => {
-    updateWishlist(wishlist.filter(id => id !== productId));
-  };
-  
-  const isInWishlist = (productId) => {
-    return wishlist.includes(productId);
-  };
-
-  // Cart functions
-  const updateCart = (newCart) => {
-    setCart(newCart);
-    localStorage.setItem(CART_KEY, JSON.stringify(newCart));
-  };
-
-  const addToCart = (productId, quantity = 1, options = {}) => {
-    const productIdStr = productId?.toString();
-    const { selectedColor, selectedVariant, price } = options;
-
-    const itemKey = createCartItemKey(productIdStr, selectedColor, selectedVariant);
-
-    const existingItem = cart.find((item) => {
-      const itemKeyToCheck = createCartItemKey(item.productId, item.selectedColor, item.selectedVariant);
-      return itemKeyToCheck === itemKey;
-    });
-
-    if (existingItem) {
-      updateCart(
-        cart.map((item) => {
-          const itemKeyToCheck = createCartItemKey(item.productId, item.selectedColor, item.selectedVariant);
-          return itemKeyToCheck === itemKey ? { ...item, quantity: item.quantity + quantity } : item;
-        })
-      );
-    } else {
-      updateCart([
-        ...cart,
-        {
-          productId: productIdStr,
-          quantity,
-          selectedColor: selectedColor || null,
-          selectedVariant: selectedVariant || null,
-          price: price ?? null,
-        },
-      ]);
-    }
-  };
-
-  const removeFromCart = (productId, selectedColor = null, selectedVariant = null) => {
-    const productIdStr = productId?.toString();
-
-    const itemKeyToRemove = createCartItemKey(productIdStr, selectedColor, selectedVariant);
-
-    updateCart(
-      cart.filter((item) => {
-        const itemKey = createCartItemKey(item.productId, item.selectedColor, item.selectedVariant);
-        return itemKey !== itemKeyToRemove;
-      })
-    );
-  };
-
-  const updateCartQuantity = (productId, quantity, selectedColor = null, selectedVariant = null) => {
-    const productIdStr = productId?.toString();
-
-    const itemKeyToUpdate = createCartItemKey(productIdStr, selectedColor, selectedVariant);
-
-    if (quantity <= 0) {
-      removeFromCart(productIdStr, selectedColor, selectedVariant);
-    } else {
-      updateCart(
-        cart.map((item) => {
-          const itemKey = createCartItemKey(item.productId, item.selectedColor, item.selectedVariant);
-          return itemKey === itemKeyToUpdate ? { ...item, quantity } : item;
-        })
-      );
-    }
-  };
-
-  const getCartItemQuantity = (productId, selectedColor = null, selectedVariant = null) => {
-    const productIdStr = productId?.toString();
-
-    const itemKeyToFind = createCartItemKey(productIdStr, selectedColor, selectedVariant);
-
-    const item = cart.find((item) => {
-      const itemKey = createCartItemKey(item.productId, item.selectedColor, item.selectedVariant);
-      return itemKey === itemKeyToFind;
-    });
-    return item ? item.quantity : 0;
-  };
-
-  const isInCart = (productId, selectedColor = null, selectedVariant = null) => {
-    return getCartItemQuantity(productId, selectedColor, selectedVariant) > 0;
-  };
-
-  const getCartTotalItems = () => {
-    return cart.reduce((total, item) => total + item.quantity, 0);
-  };
-
-  const clearCart = () => {
-    updateCart([]);
-  };
-
-  // Admin authentication removed - admin panel is directly accessible
-
-  // Product management functions (for admin)
-  const addProduct = (product) => {
-    setProducts(prev => [...prev, product]);
-  };
-
-  const updateProduct = (updatedProduct) => {
-    setProducts(prev => prev.map(p => {
-      const pid = p._id || p.id;
-      const upid = updatedProduct._id || updatedProduct.id;
-      return pid === upid ? updatedProduct : p;
-    }));
-  };
-
-  const deleteProduct = (productId) => {
-    setProducts(prev => prev.filter(p => {
-      const pid = p._id || p.id;
-      return pid !== productId;
-    }));
-  };
-
-  // Refresh products - now just a placeholder for backward compatibility
-  // Individual pages handle their own product fetching
-  const refreshProducts = useCallback(async () => {
-    // No-op: products are fetched per-page now
-    console.log('refreshProducts called - products are now fetched per-page');
-  }, []);
-
-  // Refresh categories from API (admin endpoint = uncached, instant updates in Add Product)
-  const refreshCategories = useCallback(async () => {
-    try {
-      const response = await fetch('/api/admin/categories?tree=true');
-      const data = await response.json();
-      if (response.ok && data.success) {
-        const flattenCategories = (cats) => {
-          let result = [];
-          cats.forEach(cat => {
-            result.push(cat);
-            if (cat.children && cat.children.length > 0) {
-              result = result.concat(flattenCategories(cat.children));
-            }
-          });
-          return result;
-        };
-        setCategories(flattenCategories(data.categories || []));
-      }
-    } catch (error) {
-      console.error('Failed to refresh categories:', error);
-    }
-  }, []);
-
-  // Fast path for admin: update categories locally from API response (no refetch)
-  const upsertCategory = useCallback((category) => {
-    if (!category) return;
-    const id = (category._id || category.id)?.toString?.() ?? (category._id || category.id);
-    if (!id) return;
-
-    setCategories((prev) => {
-      const next = Array.isArray(prev) ? [...prev] : [];
-      const idx = next.findIndex((c) => (c._id || c.id)?.toString?.() === id);
-      if (idx >= 0) {
-        next[idx] = { ...next[idx], ...category };
-        return next;
-      }
-      return [...next, category];
-    });
-  }, []);
-
-  const removeCategory = useCallback((categoryId) => {
-    const id = categoryId?.toString?.() ?? categoryId;
-    if (!id) return;
-    setCategories((prev) => (Array.isArray(prev) ? prev.filter((c) => (c._id || c.id)?.toString?.() !== id) : []));
-  }, []);
-
-  // Refresh brands from API
-  const refreshBrands = useCallback(async () => {
-    try {
-      const response = await fetch('/api/brands?tree=true');
-      const data = await response.json();
-      if (data.success) {
-        // Flatten tree structure for easier access
-        const flattenBrands = (brs) => {
-          let result = [];
-          brs.forEach(brand => {
-            result.push(brand);
-            if (brand.children && brand.children.length > 0) {
-              result = result.concat(flattenBrands(brand.children));
-            }
-          });
-          return result;
-        };
-        setBrands(flattenBrands(data.brands || []));
-      }
-    } catch (error) {
-      console.error('Failed to refresh brands:', error);
-    }
-  }, []);
-
-  const value = {
-    // Data
-    products,
-    categories,
-    brands,
-    businessTypes,
-    loading,
-    
-    // Wishlist
-    wishlist,
-    addToWishlist,
-    removeFromWishlist,
-    isInWishlist,
-    
-    // Cart
-    cart,
-    addToCart,
-    removeFromCart,
-    updateCartQuantity,
-    getCartItemQuantity,
-    isInCart,
-    createCartItemKey,
-    getCartTotalItems,
-    clearCart,
-    
-    // Admin
-    isAdmin,
-    
-    // Product management
-    addProduct,
-    updateProduct,
-    deleteProduct,
-    refreshProducts,
-    refreshCategories,
-    upsertCategory,
-    removeCategory,
-    refreshBrands,
-  };
-
   return (
     <ErrorBoundary>
       <SWRProvider>
-        <AppContext.Provider value={value}>
-          {children}
-          <Toaster />
-        </AppContext.Provider>
+        <TaxonomyProvider initialCategories={initialCategories}>
+          <WishlistProvider>
+            <CartProvider>
+              {children}
+              <Toaster />
+            </CartProvider>
+          </WishlistProvider>
+        </TaxonomyProvider>
       </SWRProvider>
     </ErrorBoundary>
   );
 }
 
+/**
+ * @deprecated Prefer useCart / useWishlist / useTaxonomy for new code.
+ * Merged surface kept for existing components.
+ */
 export function useAppContext() {
-  const context = useContext(AppContext);
-  if (context === undefined) {
-    throw new Error('useAppContext must be used within an AppProvider');
-  }
-  return context;
-}
+  const taxonomy = useTaxonomy();
+  const wishlist = useWishlist();
+  const cart = useCart();
 
+  return {
+    products: [],
+    categories: taxonomy.categories,
+    brands: taxonomy.brands,
+    businessTypes: taxonomy.businessTypes,
+    loading: taxonomy.loading,
+    ...wishlist,
+    ...cart,
+    refreshCategories: taxonomy.refreshCategories,
+    upsertCategory: taxonomy.upsertCategory,
+    removeCategory: taxonomy.removeCategory,
+    refreshBrands: taxonomy.refreshBrands,
+    refreshProducts: async () => {},
+  };
+}

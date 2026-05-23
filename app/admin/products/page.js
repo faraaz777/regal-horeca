@@ -369,8 +369,57 @@ export default function AdminProductsPage() {
     }
   };
 
-  const handleDeleteProduct = async (productId) => {
-    if (!window.confirm('Move this product to trash? You can restore it later from the Deleted tab.')) {
+  const formatChildVariantSummary = (child) => {
+    const attrs = child?.variationAttributes || {};
+    const parts = [attrs.size, attrs.color, attrs.weight, attrs.unitCount]
+      .map((v) => String(v || '').trim())
+      .filter(Boolean);
+    const label = parts.join(' / ');
+    const title = String(child?.title || '').trim();
+    if (title && label) return `${title} (${label})`;
+    return title || label || String(child?.sku || '').trim() || 'Variant';
+  };
+
+  const buildDeleteProductConfirmMessage = (productId, productHint) => {
+    const deletedId = String(productId);
+    const isChild = productHint?.productType === 'child';
+    const linkedInOpenParentForm =
+      isEditModalOpen &&
+      editingProduct?.productType === 'parent' &&
+      Array.isArray(editingProduct?.children) &&
+      editingProduct.children.some((c) => String(c._id || c.id) === deletedId);
+
+    if (linkedInOpenParentForm) {
+      const child = editingProduct.children.find(
+        (c) => String(c._id || c.id) === deletedId
+      );
+      const summary = formatChildVariantSummary(child);
+      return (
+        'WARNING: This child product is linked to a variant row.\n\n' +
+        `Variant: ${summary}\n` +
+        (child?.sku ? `SKU: ${child.sku}\n` : '') +
+        `Child product ID: ${deletedId}\n\n` +
+        'Deleting will:\n' +
+        '• Move this child product to trash\n' +
+        '• Remove it from the Variants section in the open parent editor\n\n' +
+        'Continue?'
+      );
+    }
+
+    if (isChild) {
+      return (
+        'WARNING: Child variant product\n\n' +
+        'This product is a child variant (not a standalone listing). Deleting it removes the variant from the storefront and parent product page.\n\n' +
+        'If you edit the parent later, this variant will no longer appear in the Variants table.\n\n' +
+        'Continue?'
+      );
+    }
+
+    return 'Move this product to trash? You can restore it later from the Deleted tab.';
+  };
+
+  const handleDeleteProduct = async (productId, productHint = null) => {
+    if (!window.confirm(buildDeleteProductConfirmMessage(productId, productHint))) {
       return;
     }
 
@@ -383,6 +432,26 @@ export default function AdminProductsPage() {
       });
 
       showToast.success('Product moved to trash');
+
+      const deletedId = String(productId);
+      setEditingProduct((prev) => {
+        if (!prev?.children?.length) return prev;
+        const nextChildren = prev.children.filter(
+          (c) => String(c._id || c.id) !== deletedId
+        );
+        if (nextChildren.length === prev.children.length) return prev;
+        return { ...prev, children: nextChildren };
+      });
+      if (
+        isEditModalOpen &&
+        editingProduct &&
+        String(editingProduct._id || editingProduct.id) === deletedId
+      ) {
+        setIsEditModalOpen(false);
+        setIsVariantsOnlyView(false);
+        setEditingProduct(null);
+      }
+
       mutate(); // Refresh data using SWR
     } catch (error) {
       if (error instanceof ApiError) {
@@ -592,27 +661,31 @@ export default function AdminProductsPage() {
       const productId = editingProduct._id || editingProduct.id;
       const variantRows = Array.isArray(productData._variantRows) ? productData._variantRows : [];
       const variationTheme = Array.isArray(productData.variationTheme) ? productData.variationTheme : [];
+      const initialChildIds = Array.isArray(productData._initialChildIds)
+        ? productData._initialChildIds
+        : [];
 
       await apiClient.requestWithRetry(`/api/products/${productId}`, {
         method: 'PUT',
         body: productData,
       });
 
-      if (variantRows.length > 0) {
-        const result = await saveProductChildren({
-          parentId: productId,
-          variantRows,
-          variationTheme,
-        });
-        if (result.errors.length > 0) {
-          showToast.error(`${result.errors.length} variant(s) failed to save. See console for details.`);
-          console.error('Variant save errors:', result.errors);
-        }
+      const result = await saveProductChildren({
+        parentId: productId,
+        variantRows,
+        variationTheme,
+        initialChildIds,
+      });
+      if (result.errors.length > 0) {
+        showToast.error(`${result.errors.length} variant(s) failed to save. See console for details.`);
+        console.error('Variant save errors:', result.errors);
       }
 
+      const syncedCount = result.created + result.updated;
+      const deletedCount = result.deleted || 0;
       showToast.success(
-        variantRows.length > 0
-          ? `Product updated. Synced ${variantRows.length} variant(s).`
+        syncedCount > 0 || deletedCount > 0
+          ? `Product updated. Synced ${syncedCount} variant(s)${deletedCount > 0 ? `, removed ${deletedCount} from trash` : ''}.`
           : 'Product updated successfully'
       );
       setIsEditModalOpen(false);
@@ -1066,7 +1139,7 @@ export default function AdminProductsPage() {
                                       <DuplicateIcon />
                                     </button>
                                     <button
-                                      onClick={() => handleDeleteProduct(productId)}
+                                      onClick={() => handleDeleteProduct(productId, product)}
                                       className="text-red-600 hover:text-red-900"
                                       disabled={loading}
                                       title="Move to trash"
@@ -1502,7 +1575,7 @@ export default function AdminProductsPage() {
                                   <DuplicateIcon />
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteProduct(productId)}
+                                  onClick={() => handleDeleteProduct(productId, product)}
                                   className="text-red-600 hover:text-red-900 p-2"
                                   disabled={loading}
                                   title="Move to trash"

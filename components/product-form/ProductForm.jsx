@@ -142,10 +142,13 @@ async function uploadToR2(file, options = {}) {
     const formData = new FormData();
     formData.append('file', fileToUpload, file.name);
     
-    // Upload to server
+    // Upload to server (admin Bearer token required in production)
+    const token =
+      typeof window !== 'undefined' ? localStorage.getItem('regal_admin_token') : null;
     const response = await fetch(`/api/upload?folder=${encodeURIComponent(folder)}`, {
       method: 'POST',
       body: formData,
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
     });
     
     const data = await response.json();
@@ -564,6 +567,8 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
   const [selectedVariantRowIndex, setSelectedVariantRowIndex] = useState(null);
   const [showVariantsOnly, setShowVariantsOnly] = useState(false);
   const [recentlyDeletedVariantRow, setRecentlyDeletedVariantRow] = useState(null);
+  /** Child product ids loaded with this parent — used to soft-delete rows removed from the table. */
+  const initialChildIdsRef = useRef([]);
   const isCreatingMultipleVariants = (variantRows || []).length > 0;
   const selectedVariantFieldCount = Object.values(variantFieldSelection).filter(Boolean).length;
   const [bulkVariantInputs, setBulkVariantInputs] = useState({
@@ -603,6 +608,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
 
   useEffect(() => {
     if (product?.productType === 'child') {
+      initialChildIdsRef.current = [];
       setVariantRows([]);
       setShowVariantsOnly(false);
       setShowAddVariantsPanel(false);
@@ -649,6 +655,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     }
 
     if (incomingVariants.length === 0) {
+      initialChildIdsRef.current = [];
       setVariantRows([]);
       return;
     }
@@ -679,6 +686,11 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       _childProductId: variant?._childProductId || null,
       _legacyParentVariantId: variant?._legacyParentVariantId || '',
     }));
+
+    initialChildIdsRef.current = normalized
+      .map((row) => row._childProductId)
+      .filter(Boolean)
+      .map((id) => String(id));
 
     setVariantRows(normalized);
 
@@ -1018,15 +1030,88 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     setError('');
   };
 
-  const handleDeleteVariantRow = (index) => {
+  const formatVariantRowSummary = (row) => {
+    const parts = [row?.size, row?.color, row?.weight, row?.unitCount]
+      .map((v) => String(v || '').trim())
+      .filter(Boolean);
+    const attrs = parts.join(' / ');
+    const name = String(row?.name || '').trim();
+    const sku = String(row?.sku || '').trim();
+    if (name && attrs) return `${name} (${attrs})`;
+    if (name) return name;
+    if (attrs) return attrs;
+    if (sku) return `SKU ${sku}`;
+    return 'Unnamed variant';
+  };
+
+  const buildVariantDeleteConfirmMessage = (row) => {
+    const childId = row?._childProductId ? String(row._childProductId) : null;
+    const summary = formatVariantRowSummary(row);
+    const skuLine = row?.sku ? `SKU: ${row.sku}\n` : '';
+
+    if (childId) {
+      return (
+        'WARNING: A child product exists for this variant row.\n\n' +
+        `Variant: ${summary}\n` +
+        skuLine +
+        `Child product ID: ${childId}\n\n` +
+        'Deleting will:\n' +
+        '• Remove this row from the Variants table\n' +
+        '• Move the linked child product to trash (same as deleting the child product)\n\n' +
+        'This cannot be undone from the variant table.\n\n' +
+        'Continue?'
+      );
+    }
+
+    return (
+      'Remove this variant row?\n\n' +
+      `Variant: ${summary}\n` +
+      skuLine +
+      'No child product is linked yet — only this unsaved row will be removed. You can use Undo.\n\n' +
+      'Continue?'
+    );
+  };
+
+  const handleDeleteVariantRow = async (index) => {
     const rowToDelete = variantRows[index];
     if (!rowToDelete) return;
 
-    const confirmed = window.confirm('Delete this variant row? You can undo this action.');
-    if (!confirmed) return;
+    const childId = rowToDelete._childProductId
+      ? String(rowToDelete._childProductId)
+      : null;
+
+    if (!window.confirm(buildVariantDeleteConfirmMessage(rowToDelete))) return;
+
+    if (childId) {
+      const token =
+        typeof window !== 'undefined' ? localStorage.getItem('regal_admin_token') : null;
+      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+      try {
+        const res = await fetch(`/api/admin/products/children/${childId}`, {
+          method: 'DELETE',
+          headers: authHeaders,
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || 'Failed to delete variant');
+        }
+        initialChildIdsRef.current = initialChildIdsRef.current.filter(
+          (id) => String(id) !== childId
+        );
+      } catch (err) {
+        toast.error(err?.message || 'Failed to delete variant');
+        return;
+      }
+    }
 
     setVariantRows((prev) => prev.filter((_, rowIndex) => rowIndex !== index));
-    setRecentlyDeletedVariantRow({ row: rowToDelete, index });
+    // Only offer undo for unsaved rows — persisted children are already soft-deleted in the API.
+    if (!childId) {
+      setRecentlyDeletedVariantRow({ row: rowToDelete, index });
+    } else {
+      setRecentlyDeletedVariantRow(null);
+      toast.success('Variant row removed and linked child product moved to trash');
+    }
     setSelectedVariantRowIndex((prev) => {
       if (prev === null) return null;
       if (prev === index) return null;
@@ -2930,6 +3015,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       ...formData,
       variants: variantsForLegacyEmbed,
       _variantRows: variantRowsForChildren,
+      _initialChildIds: [...initialChildIdsRef.current],
       brandCategoryId: updatedBrandCategoryId || formData.brandCategoryId,
       priceBySize: normalizedPriceBySize,
       price: Number.isFinite(derivedBasePrice) ? derivedBasePrice : 0,
@@ -3211,7 +3297,17 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                       selectedVariantRowIndex === index ? 'bg-blue-50' : 'hover:bg-gray-50'
                     }`}
                   >
-                    <td className="w-14 px-2 py-2 text-gray-700 font-medium text-center">{index + 1}</td>
+                    <td className="w-14 px-2 py-2 text-gray-700 font-medium text-center">
+                      <span>{index + 1}</span>
+                      {row._childProductId ? (
+                        <span
+                          className="mt-0.5 block text-[9px] font-semibold leading-tight text-amber-800"
+                          title={`Linked child product ${row._childProductId}`}
+                        >
+                          Child
+                        </span>
+                      ) : null}
+                    </td>
                     <td className="w-12 px-0.5 py-2 text-center">
                       <input
                         type="radio"
@@ -3371,8 +3467,16 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                           handleDeleteVariantRow(index);
                         }}
                         className="inline-flex items-center justify-center p-2 text-red-600 border border-red-300 rounded hover:bg-red-50"
-                        title="Remove row"
-                        aria-label="Remove row"
+                        title={
+                          row._childProductId
+                            ? 'Delete variant row and linked child product (moves child to trash)'
+                            : 'Remove unsaved variant row'
+                        }
+                        aria-label={
+                          row._childProductId
+                            ? 'Delete variant and linked child product'
+                            : 'Remove variant row'
+                        }
                       >
                         <TrashIcon />
                       </button>

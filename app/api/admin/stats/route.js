@@ -10,8 +10,13 @@ import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
 import Category from '@/lib/models/Category';
 import BusinessType from '@/lib/models/BusinessType';
-import { mongoStorefrontCatalogListingTypes } from '@/lib/utils/storefrontCatalogFilter';
 import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
+
+/** Active rows that are real catalog SKUs: standalones + every child variant (not parent carriers). */
+const ADMIN_TOTAL_PRODUCTS_MATCH = {
+  deletedAt: null,
+  productType: { $ne: 'parent' },
+};
 
 export async function GET(request) {
   const authError = assertAdmin(request);
@@ -20,16 +25,10 @@ export async function GET(request) {
   try {
     await connectToDatabase();
 
-    // Stats exclude parent variant carriers because they are non-buyable, hidden
-    // listings — counting them inflates the dashboard's "Total Products" number.
-    // Children are counted (each is a real, individually buyable variant).
-    // Stats: exclude parent carriers and child variants that are not opted into their
-    // own storefront catalog row (aligned with public product listings).
-    const storefrontCatalogMatch = {
-      $and: [{ deletedAt: null }, { productType: { $ne: 'parent' } }, mongoStorefrontCatalogListingTypes()],
-    };
+    // Total = standalones + all child variants (each variant row is one product).
+    // Parent carriers are excluded — they are grouping shells, not sellable SKUs.
     const [statsResult] = await Product.aggregate([
-      { $match: storefrontCatalogMatch },
+      { $match: ADMIN_TOTAL_PRODUCTS_MATCH },
       {
         $facet: {
           total: [{ $count: 'count' }],
@@ -49,8 +48,8 @@ export async function GET(request) {
       }
     ]);
 
-    // Recent products: also skip parents so the "Recently added" widget never shows a hidden carrier.
-    const recentProducts = await Product.find(storefrontCatalogMatch)
+    // Recent products: standalones + variants only (no parent carriers).
+    const recentProducts = await Product.find(ADMIN_TOTAL_PRODUCTS_MATCH)
       .select('title heroImage createdAt status slug')
       .sort({ createdAt: -1 })
       .limit(5)

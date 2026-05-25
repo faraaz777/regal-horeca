@@ -119,8 +119,12 @@ export default function AdminAddProductPage() {
           variationTheme,
         });
         if (result.errors.length > 0) {
-          showToast.error(`${result.errors.length} variant(s) failed to save. See console for details.`);
+          const firstMsg = result.errors[0]?.message || 'Unknown error';
+          showToast.error(
+            `${result.errors.length} variant(s) failed to save: ${firstMsg}`
+          );
           console.error('Variant save errors:', result.errors);
+          return;
         }
       }
 

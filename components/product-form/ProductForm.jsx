@@ -20,6 +20,10 @@ import ColorPicker from '@/components/ColorPicker';
 import useSWR from 'swr';
 import RichTextEditor from '@/components/RichTextEditor';
 import toast from 'react-hot-toast';
+import {
+  findDuplicateBarcodesInRows,
+  validateVariantBarcodesAgainstCatalog,
+} from '@/lib/utils/validateVariantBarcodes';
 
 function getTextLength(str) {
   if (!str || typeof str !== 'string') return 0;
@@ -63,19 +67,34 @@ function formatIndianNumberInput(value) {
 }
 
 const AVAILABLE_COLORS = [
-  { name: 'Blue', hex: '#0000FF' }, 
-  { name: 'Green', hex: '#008000' }, 
+  { name: 'Blue', hex: '#0000FF' },
+  { name: 'Green', hex: '#008000' },
   { name: 'Red', hex: '#FF0000' },
-  { name: 'Yellow', hex: '#FFFF00' }, 
-  { name: 'Purple', hex: '#800080' }, 
+  { name: 'Yellow', hex: '#FFFF00' },
+  { name: 'Purple', hex: '#800080' },
   { name: 'Orange', hex: '#FFA500' },
-  { name: 'Pink', hex: '#FFC0CB' }, 
-  { name: 'Brown', hex: '#A52A2A' }, 
+  { name: 'Pink', hex: '#FFC0CB' },
+  { name: 'Brown', hex: '#A52A2A' },
   { name: 'Gray', hex: '#808080' },
-  { name: 'Black', hex: '#000000' }, 
-  { name: 'White', hex: '#FFFFFF' }, 
-  { name: 'Silver', hex: '#C0C0C0' }
+  { name: 'Black', hex: '#000000' },
+  { name: 'White', hex: '#FFFFFF' },
+  { name: 'Silver', hex: '#C0C0C0' },
+  { name: 'Transparent', hex: '#FFFFFF', swatch: 'transparent' },
+  { name: 'Multicolour', hex: '#888888', swatch: 'multicolour' },
+  { name: 'Gold', hex: '#D4AF37' },
+  { name: 'Rose Gold', hex: '#B76E79' },
+  { name: 'Beige', hex: '#F5F5DC' },
 ];
+
+function getPredefinedColorSwatchClassName(color) {
+  if (color.swatch === 'transparent') {
+    return 'bg-[length:6px_6px] bg-[position:0_0,3px_3px] bg-[image:linear-gradient(45deg,#ccc_25%,transparent_25%),linear-gradient(-45deg,#ccc_25%,transparent_25%)]';
+  }
+  if (color.swatch === 'multicolour') {
+    return 'bg-gradient-to-br from-red-500 via-yellow-400 to-blue-500';
+  }
+  return '';
+}
 
 /**
  * Uploads a file to Cloudflare R2 via the API.
@@ -208,7 +227,7 @@ function normalizeTag(tag) {
 }
 
 /**
- * Split compound values into parts (e.g., "30cm" ΓåÆ ["30cm", "30", "cm"])
+ * Split compound values into parts (e.g., "30cm"  ["30cm", "30", "cm"])
  */
 function splitCompoundValue(value) {
   if (!value || typeof value !== 'string') return [];
@@ -382,7 +401,7 @@ function extractSpecificationTags(specifications) {
           tags.add(`${normalizedLabel}-${normalizedValue}`);
         }
         
-        // Split compound values (e.g., "30cm" ΓåÆ ["30cm", "30", "cm"])
+        // Split compound values (e.g., "30cm"  ["30cm", "30", "cm"])
         const compoundParts = splitCompoundValue(spec.value);
         compoundParts.forEach(part => {
           if (part && part !== normalizedValue) tags.add(part);
@@ -582,6 +601,8 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     sellingPrice: '',
     discountPercent: '',
     marginPrice: '',
+    /** '' = skip on Apply | 'yes' = all in catalog | 'no' = all off */
+    showInCatalog: '',
   });
 
   /** Child variant rows are edited as a single SKU; only parents/standalones host the variant matrix. */
@@ -617,14 +638,17 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     }
 
     // New parent/child variants take precedence over legacy embedded variants.
-    // `product.children` is populated by the admin edit flow; if it's missing on
-    // an existing parent we fall back to fetching it here.
-    const childRows = Array.isArray(product?.children) ? product.children : null;
+    // Only active (non–soft-deleted) children belong in the edit table.
+    const allChildren = Array.isArray(product?.children) ? product.children : null;
+    const activeChildren = allChildren
+      ? allChildren.filter((child) => !child?.deletedAt)
+      : null;
     const legacyVariants = Array.isArray(product?.variants) ? product.variants : [];
+    const isParentCarrier = product?.productType === 'parent';
 
-    let incomingVariants = legacyVariants;
-    if (childRows && childRows.length > 0) {
-      incomingVariants = childRows.map((child) => {
+    let incomingVariants = [];
+    if (activeChildren && activeChildren.length > 0) {
+      incomingVariants = activeChildren.map((child) => {
         const attrs = child.variationAttributes || {};
         return {
           variantId: '',
@@ -652,6 +676,9 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
           _legacyParentVariantId: child.legacyParentVariantId || '',
         };
       });
+    } else if (!isParentCarrier && legacyVariants.length > 0) {
+      // Standalone products still using embedded variants only (not migrated to children).
+      incomingVariants = legacyVariants;
     }
 
     if (incomingVariants.length === 0) {
@@ -766,6 +793,92 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     }));
   };
 
+  const removeVariantOptionValue = (field, valueToRemove) => {
+    const nextList = parseOptionValues(variantBuilderInputs[field]).filter(
+      (value) => value.toLowerCase() !== String(valueToRemove || '').trim().toLowerCase()
+    );
+    setVariantBuilderInputs((prev) => ({
+      ...prev,
+      [field]: nextList.join(', '),
+    }));
+  };
+
+  const removeColorFromVariantBuilder = (colorName) => {
+    const key = String(colorName || '').trim().toLowerCase();
+    if (!key) return;
+    setFormData((prev) => ({
+      ...prev,
+      colorVariants: (prev.colorVariants || []).filter(
+        (variant) => String(variant?.colorName || '').trim().toLowerCase() !== key
+      ),
+    }));
+  };
+
+  const openProductFormColorSection = () => {
+    setShowVariantsOnly(false);
+    setError('');
+    requestAnimationFrame(() => {
+      document
+        .getElementById('product-form-color-variants')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  const renderVariantOptionValueChips = (field) => {
+    const values = parseOptionValues(variantBuilderInputs[field]);
+    if (values.length === 0) {
+      return <p className="text-xs text-gray-400 mt-2">No values yet — add one above.</p>;
+    }
+    return (
+      <ul className="flex flex-wrap gap-1.5 mt-2 list-none">
+        {values.map((value) => (
+          <li
+            key={`${field}-${value}`}
+            className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 text-xs font-medium text-gray-800 bg-white border border-gray-300 rounded-full"
+          >
+            <span>{value}</span>
+            <button
+              type="button"
+              onClick={() => removeVariantOptionValue(field, value)}
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-500 hover:bg-red-50 hover:text-red-600"
+              title={`Remove ${value}`}
+              aria-label={`Remove ${value}`}
+            >
+              ×
+            </button>
+          </li>
+        ))}
+      </ul>
+    );
+  };
+
+  const renderColorVariantBuilderChips = () => {
+    if (selectedColorNames.length === 0) {
+      return null;
+    }
+    return (
+      <ul className="flex flex-wrap gap-1.5 mt-2 list-none">
+        {selectedColorNames.map((name) => (
+          <li
+            key={`builder-color-${name}`}
+            className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 text-xs font-medium text-blue-900 bg-blue-50 border border-blue-200 rounded-full"
+          >
+            <span>{name}</span>
+            <button
+              type="button"
+              onClick={() => removeColorFromVariantBuilder(name)}
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full text-blue-700 hover:bg-red-50 hover:text-red-600"
+              title={`Remove ${name}`}
+              aria-label={`Remove color ${name}`}
+            >
+              ×
+            </button>
+          </li>
+        ))}
+      </ul>
+    );
+  };
+
   const parseOptionValues = (raw) =>
     String(raw || '')
       .split(',')
@@ -789,7 +902,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     unitCount: '',
     weight: '',
     isDefault: false,
-    showInCatalog: false,
+    showInCatalog: true,
     images: [],
     sku: '',
     barcode: '',
@@ -815,9 +928,9 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     }
 
     if (variantFieldSelection.color) {
-      const values = selectedColorNames.length > 0 ? selectedColorNames : parseOptionValues(variantBuilderInputs.color);
+      const values = selectedColorNames;
       if (values.length === 0) {
-        setError('Please enter at least one Color value or select colors in Color Variants.');
+        setError('Add at least one color in the Color Variants section (use the link below).');
         return;
       }
       dimensions.push({ key: 'color', values });
@@ -921,9 +1034,12 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       const value = bulkVariantInputs[field];
       return String(value ?? '').trim() !== '';
     });
+    const catalogBulk = bulkVariantInputs.showInCatalog;
+    const applyCatalog = catalogBulk === 'yes' || catalogBulk === 'no';
+    const catalogValue = catalogBulk === 'yes';
 
-    if (fieldsToApply.length === 0) {
-      toast.error('Enter at least one Apply value first.');
+    if (fieldsToApply.length === 0 && !applyCatalog) {
+      toast.error('Enter at least one Apply value or choose a catalog option first.');
       return;
     }
 
@@ -934,11 +1050,17 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       return String(raw).trim() === '';
     };
 
-    const willOverwrite = (variantRows || []).some((row) =>
+    const willOverwriteFields = (variantRows || []).some((row) =>
       fieldsToApply.some((field) => !isFieldEmptyForRow(row, field))
     );
-    if (willOverwrite) {
-      const proceed = window.confirm('Some variant fields already have values. Apply will overwrite them for all rows. Continue?');
+    const willOverwriteCatalog =
+      applyCatalog &&
+      (variantRows || []).some((row) => row.showInCatalog !== catalogValue);
+
+    if (willOverwriteFields || willOverwriteCatalog) {
+      const proceed = window.confirm(
+        'Some variant fields already have values. Apply will overwrite them for all rows. Continue?'
+      );
       if (!proceed) return;
     }
 
@@ -952,6 +1074,10 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
             : rawValue;
           nextRow[field] = normalizedValue;
         });
+
+        if (applyCatalog) {
+          nextRow.showInCatalog = catalogValue;
+        }
 
         if (fieldsToApply.includes('mrp') || fieldsToApply.includes('sellingPrice')) {
           const mrpValue = Number(nextRow.mrp || 0);
@@ -967,6 +1093,12 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         return nextRow;
       })
     );
+
+    if (applyCatalog) {
+      toast.success(
+        catalogValue ? 'All variants set to show in catalog' : 'Catalog listing turned off for all variants'
+      );
+    }
   };
 
   const handleSetDefaultVariantRow = (index) => {
@@ -1082,6 +1214,8 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
 
     if (!window.confirm(buildVariantDeleteConfirmMessage(rowToDelete))) return;
 
+    let variantWasAlreadyInTrash = false;
+
     if (childId) {
       const token =
         typeof window !== 'undefined' ? localStorage.getItem('regal_admin_token') : null;
@@ -1091,10 +1225,16 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
           method: 'DELETE',
           headers: authHeaders,
         });
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
+        const body = await res.json().catch(() => ({}));
+        variantWasAlreadyInTrash =
+          body.alreadyDeleted === true ||
+          (res.status === 400 &&
+            String(body.error || '').toLowerCase().includes('already deleted'));
+
+        if (!res.ok && !variantWasAlreadyInTrash) {
           throw new Error(body.error || 'Failed to delete variant');
         }
+
         initialChildIdsRef.current = initialChildIdsRef.current.filter(
           (id) => String(id) !== childId
         );
@@ -1110,7 +1250,11 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       setRecentlyDeletedVariantRow({ row: rowToDelete, index });
     } else {
       setRecentlyDeletedVariantRow(null);
-      toast.success('Variant row removed and linked child product moved to trash');
+      toast.success(
+        variantWasAlreadyInTrash
+          ? 'Variant was already in trash — removed from this list'
+          : 'Variant row removed and linked child product moved to trash'
+      );
     }
     setSelectedVariantRowIndex((prev) => {
       if (prev === null) return null;
@@ -2815,7 +2959,10 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     setFormData({ ...formData, faqs: next });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
     const colorImagesByName = new Map(
       (formData.colorVariants || []).map((variant) => [
         String(variant?.colorName || '').trim().toLowerCase(),
@@ -2856,7 +3003,18 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         _childProductId: row._childProductId || null,
         _legacyParentVariantId: row._legacyParentVariantId || '',
       }))
-      .filter((row) => row.name || row.sku || row.color || row.size || row.unit || row.weight || row.unitCount);
+      .filter(
+        (row) =>
+          row.name ||
+          row.sku ||
+          row.barcode ||
+          row.hsnCode ||
+          row.color ||
+          row.size ||
+          row.unit ||
+          row.weight ||
+          row.unitCount
+      );
 
     if (normalizedVariants.length > 0) {
       const explicitDefaultIndex = normalizedVariants.findIndex((row) => row.isDefault);
@@ -2871,19 +3029,61 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       normalizedVariants.push(defaultRow, ...nonDefaultRows);
     }
 
-    e.preventDefault();
-    setError('');
-
     // Only title and hero image are required - everything else can be added later
     if (!formData.title || !formData.heroImage) {
       setError("Please provide a Title and a Hero Image.");
       return;
     }
 
+    const parentOrSelfId = product?._id || product?.id || null;
+
+    if (normalizedVariants.length > 0) {
+      const duplicateBarcodeMsg = findDuplicateBarcodesInRows(normalizedVariants);
+      if (duplicateBarcodeMsg) {
+        setError(duplicateBarcodeMsg);
+        toast.error(duplicateBarcodeMsg);
+        return;
+      }
+      const catalogBarcodeMsg = await validateVariantBarcodesAgainstCatalog(normalizedVariants, {
+        parentProductId: parentOrSelfId,
+      });
+      if (catalogBarcodeMsg) {
+        setError(catalogBarcodeMsg);
+        toast.error(catalogBarcodeMsg);
+        return;
+      }
+    } else if (!isChildProduct) {
+      const standaloneBarcode = String(formData.barcode || '').trim();
+      if (standaloneBarcode) {
+        const catalogBarcodeMsg = await validateVariantBarcodesAgainstCatalog(
+          [{ barcode: standaloneBarcode, _childProductId: parentOrSelfId }],
+          { parentProductId: parentOrSelfId }
+        );
+        if (catalogBarcodeMsg) {
+          setError(catalogBarcodeMsg);
+          toast.error(catalogBarcodeMsg);
+          return;
+        }
+      }
+    } else {
+      const childBarcode = String(formData.barcode || '').trim();
+      if (childBarcode) {
+        const catalogBarcodeMsg = await validateVariantBarcodesAgainstCatalog(
+          [{ barcode: childBarcode, _childProductId: parentOrSelfId }],
+          { parentProductId: product?.parentProductId || null }
+        );
+        if (catalogBarcodeMsg) {
+          setError(catalogBarcodeMsg);
+          toast.error(catalogBarcodeMsg);
+          return;
+        }
+      }
+    }
+
     // Detail photos are optional:
     // - allow 0 photos
     // - allow exactly 3 photos
-    // - disallow 1ΓÇô2 photos (incomplete set for the UI)
+    // - disallow 1 2 photos (incomplete set for the UI)
     const detailPhotosCount = (formData.detailPhotos || []).filter(Boolean).length;
     if (detailPhotosCount !== 0 && detailPhotosCount !== 3) {
       setError("Detail Page Photos must be either 0 or exactly 3 images.");
@@ -3088,7 +3288,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         {isChildProduct && !showVariantsOnly && (
           <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <p>
-              This row is a <strong>variant (child) product</strong>. You cannot add a variant matrix here ΓÇö edit variants on the{' '}
+              This row is a <strong>variant (child) product</strong>. You cannot add a variant matrix here edit variants on the{' '}
               <strong>parent</strong> product.
             </p>
             {product?.parentProductId && (
@@ -3142,25 +3342,47 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Size values</label>
                     <div className="flex items-center gap-2">
-                      <input type="text" placeholder="Type one size and click Γ£ô Add" value={variantDraftValue.size} onChange={(e) => setVariantDraftValue((prev) => ({ ...prev, size: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addVariantOptionValue('size'); } }} className="w-full p-2 border border-gray-300 rounded-md" />
-                      <button type="button" onClick={() => addVariantOptionValue('size')} className="px-2 py-1.5 text-xs font-semibold bg-green-600 text-white rounded-md hover:bg-green-700">Γ£ô Add</button>
+                      <input type="text" placeholder="Type one size and click  Add" value={variantDraftValue.size} onChange={(e) => setVariantDraftValue((prev) => ({ ...prev, size: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addVariantOptionValue('size'); } }} className="w-full p-2 border border-gray-300 rounded-md" />
+                      <button type="button" onClick={() => addVariantOptionValue('size')} className="px-2 py-1.5 text-xs font-semibold bg-green-600 text-white rounded-md hover:bg-green-700"> Add</button>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Selected: {variantBuilderInputs.size || 'ΓÇö'}</p>
+                    {renderVariantOptionValueChips('size')}
                   </div>
                 )}
                 {variantFieldSelection.color && (
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Color values</label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Colors come from the{' '}
+                      <button
+                        type="button"
+                        onClick={openProductFormColorSection}
+                        className="font-semibold text-primary underline hover:text-primary-700"
+                      >
+                        Color Variants
+                      </button>{' '}
+                      section of the product form.
+                    </p>
                     {selectedColorNames.length > 0 ? (
-                      <div className="p-2 border border-blue-200 rounded-md bg-blue-50 text-sm text-blue-700">Colors: {selectedColorNames.join(', ')}</div>
-                    ) : (
                       <>
-                        <div className="flex items-center gap-2">
-                          <input type="text" placeholder="Type one color and click Γ£ô Add" value={variantDraftValue.color} onChange={(e) => setVariantDraftValue((prev) => ({ ...prev, color: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addVariantOptionValue('color'); } }} className="w-full p-2 border border-gray-300 rounded-md" />
-                          <button type="button" onClick={() => addVariantOptionValue('color')} className="px-2 py-1.5 text-xs font-semibold bg-green-600 text-white rounded-md hover:bg-green-700">Γ£ô Add</button>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">Selected: {variantBuilderInputs.color || 'ΓÇö'}</p>
+                        <p className="text-xs text-blue-700 mb-1">Selected colors — click × to remove:</p>
+                        {renderColorVariantBuilderChips()}
+                        <button
+                          type="button"
+                          onClick={openProductFormColorSection}
+                          className="mt-2 text-xs font-semibold text-primary underline hover:text-primary-700"
+                        >
+                          Add or edit more colors
+                        </button>
                       </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={openProductFormColorSection}
+                        className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-primary border border-primary/40 rounded-md bg-primary/5 hover:bg-primary/10"
+                      >
+                        <PlusIcon className="w-3.5 h-3.5" />
+                        Add colors in Color Variants section
+                      </button>
                     )}
                   </div>
                 )}
@@ -3168,20 +3390,20 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Weight values</label>
                     <div className="flex items-center gap-2">
-                      <input type="text" placeholder="Type one weight and click Γ£ô Add" value={variantDraftValue.weight} onChange={(e) => setVariantDraftValue((prev) => ({ ...prev, weight: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addVariantOptionValue('weight'); } }} className="w-full p-2 border border-gray-300 rounded-md" />
-                      <button type="button" onClick={() => addVariantOptionValue('weight')} className="px-2 py-1.5 text-xs font-semibold bg-green-600 text-white rounded-md hover:bg-green-700">Γ£ô Add</button>
+                      <input type="text" placeholder="Type one weight and click Add" value={variantDraftValue.weight} onChange={(e) => setVariantDraftValue((prev) => ({ ...prev, weight: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addVariantOptionValue('weight'); } }} className="w-full p-2 border border-gray-300 rounded-md" />
+                      <button type="button" onClick={() => addVariantOptionValue('weight')} className="px-2 py-1.5 text-xs font-semibold bg-green-600 text-white rounded-md hover:bg-green-700">Add</button>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Selected: {variantBuilderInputs.weight || 'ΓÇö'}</p>
+                    {renderVariantOptionValueChips('weight')}
                   </div>
                 )}
                 {variantFieldSelection.unitCount && (
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Unit Count values</label>
                     <div className="flex items-center gap-2">
-                      <input type="text" placeholder="Type one unit count and click Γ£ô Add" value={variantDraftValue.unitCount} onChange={(e) => setVariantDraftValue((prev) => ({ ...prev, unitCount: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addVariantOptionValue('unitCount'); } }} className="w-full p-2 border border-gray-300 rounded-md" />
-                      <button type="button" onClick={() => addVariantOptionValue('unitCount')} className="px-2 py-1.5 text-xs font-semibold bg-green-600 text-white rounded-md hover:bg-green-700">Γ£ô Add</button>
+                      <input type="text" placeholder="Type one unit count and click Add" value={variantDraftValue.unitCount} onChange={(e) => setVariantDraftValue((prev) => ({ ...prev, unitCount: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addVariantOptionValue('unitCount'); } }} className="w-full p-2 border border-gray-300 rounded-md" />
+                      <button type="button" onClick={() => addVariantOptionValue('unitCount')} className="px-2 py-1.5 text-xs font-semibold bg-green-600 text-white rounded-md hover:bg-green-700"> Add</button>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Selected: {variantBuilderInputs.unitCount || 'ΓÇö'}</p>
+                    {renderVariantOptionValueChips('unitCount')}
                   </div>
                 )}
               </div>
@@ -3233,12 +3455,23 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                 </tr>
                 <tr>
                   <th className="px-2 py-2 text-center text-[11px] text-gray-500">All</th>
-                  <th className="px-2 py-2 text-center text-[11px] text-gray-400">ΓÇö</th>
-                  <th className="px-1 py-2 text-center text-[11px] text-gray-400">ΓÇö</th>
+                  <th className="px-2 py-2 text-center text-[11px] text-gray-400"></th>
+                  <th className="px-1 py-2 text-center">
+                    <select
+                      value={bulkVariantInputs.showInCatalog}
+                      onChange={(e) => handleBulkVariantInputChange('showInCatalog', e.target.value)}
+                      className="w-full max-w-[88px] mx-auto p-1 border border-gray-300 rounded text-[11px]"
+                      title="Apply catalog visibility to every variant row"
+                    >
+                      <option value="">—</option>
+                      <option value="yes">All on</option>
+                      <option value="no">All off</option>
+                    </select>
+                  </th>
                   <th className="w-[320px] min-w-[320px] px-2 py-2">
                     <input type="text" value={bulkVariantInputs.name} onChange={(e) => handleBulkVariantInputChange('name', e.target.value)} placeholder="Apply Name" className="w-full p-1.5 border border-gray-300 rounded text-xs" />
                   </th>
-                  {variantFieldSelection.size && <th className="px-2 py-2 text-center text-[11px] text-gray-400">ΓÇö</th>}
+                  {variantFieldSelection.size && <th className=" text-center text-[11px] text-gray-400">Empty</th>}
                   <th className="w-[110px] min-w-[110px] px-3 py-">
                     <input
                       type="text"
@@ -3249,10 +3482,10 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                       className="w-full p-1.5 border border-gray-300 rounded text-xs"
                     />
                   </th>
-                  {variantFieldSelection.color && <th className="px-2 py-2 text-center text-[11px] text-gray-400">ΓÇö</th>}
-                  {variantFieldSelection.unitCount && <th className="px-2 py-2 text-center text-[11px] text-gray-400">ΓÇö</th>}
-                  {variantFieldSelection.weight && <th className="px-2 py-2 text-center text-[11px] text-gray-400">ΓÇö</th>}
-                  <th className="w-[160px] min-w-[160px] px-2 py-2 text-center text-[11px] text-gray-400">ΓÇö</th>
+                  {variantFieldSelection.color && <th className="px-2 py-2 text-center text-[11px] text-gray-400">Empty</th>}
+                  {variantFieldSelection.unitCount && <th className="px-2 py-2 text-center text-[11px] text-gray-400">Empty</th>}
+                  {variantFieldSelection.weight && <th className="px-2 py-2 text-center text-[11px] text-gray-400">Empty</th>}
+                  <th className="w-[160px] min-w-[160px] px-2 py-2 text-center text-[11px] text-gray-400">Empty</th>
                   <th className="w-[150px] min-w-[150px] px-3 py-2">
                     <input type="text" value={bulkVariantInputs.sku} onChange={(e) => handleBulkVariantInputChange('sku', e.target.value)} placeholder="Apply SKU" className="w-full p-1.5 border border-gray-300 rounded text-xs" />
                   </th>
@@ -3336,7 +3569,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                         type="text"
                         value={row.unit || ''}
                         onChange={(e) => handleVariantRowChange(index, 'unit', e.target.value)}
-                        placeholder="kg, pcΓÇª"
+                        placeholder="kg, pc"
                         list="variantUnitOptions"
                         className="w-full p-2.5 border border-gray-300 rounded-md"
                       />
@@ -3363,13 +3596,13 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                               onClick={(e) => e.stopPropagation()}
                               className="w-full p-2 border border-gray-300 rounded-md text-sm"
                             >
-                              <option value="">ΓÇö Match Color Variant</option>
+                              <option value="">Match Color Variant</option>
                               {selectedColorNames.map((name) => (
                                 <option key={name} value={name}>
                                   {name}
                                 </option>
                               ))}
-                              <option value="__other__">Other (custom)ΓÇª</option>
+                              <option value="__other__">Other (custom)</option>
                             </select>
                             {(() => {
                               const raw = String(row.color || '').trim();
@@ -3726,7 +3959,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                         <input
                           type="number"
                           min="0"
-                          placeholder="Price (Γé╣)"
+                          placeholder="Price "
                           value={row.price ?? ''}
                           onChange={(e) => handlePriceBySizeChange(index, 'price', e.target.value)}
                           disabled={isCreatingMultipleVariants}
@@ -4271,7 +4504,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                       onClick={() => setShowTagsPreview(false)}
                       className="text-xs text-indigo-600 hover:text-indigo-800"
                     >
-                      Γ£ò Hide
+                       Hide
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
@@ -4358,7 +4591,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                             onClick={() => handleRemoveGalleryImage(index)}
                             className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-md hover:bg-red-600 transition-colors"
                           >
-                            ├ù
+                            <TrashIcon className="w-4 h-4" />
                           </button>
                         </div>
                       ))}
@@ -4404,7 +4637,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                             onClick={() => handleRemoveDetailPhoto(index)}
                             className="absolute -top-2 -right-2 z-10 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-md hover:bg-red-600 transition-colors"
                           >
-                            ├ù
+                            <TrashIcon className="w-4 h-4" />
                           </button>
                         </div>
                       ))}
@@ -4481,10 +4714,10 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     value={formData.blogUrl || ''}
                     onChange={handleChange}
                     className="w-full p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors bg-white"
-                    placeholder="https://ΓÇª"
+                    placeholder="https://..."
                   />
                   <p className="mt-1 text-xs text-gray-500">
-                    If provided, a ΓÇ£BlogΓÇ¥ link will appear on the product detail page.
+                    If provided, a Blog link will appear on the product detail page.
                   </p>
                 </div>
               </div>
@@ -4538,6 +4771,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
               </button>
             </FormSection>
 
+            <div id="product-form-color-variants" className="scroll-mt-4">
             <FormSection title="Color Variants">
               <div className="space-y-5">
                 <p className="text-sm text-gray-600 mb-4">Select the available colors for the product.</p>
@@ -4545,13 +4779,14 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                 {/* Predefined Colors */}
                 <div>
                   <p className="text-xs font-medium text-gray-700 mb-3 uppercase tracking-wide">Predefined Colors</p>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-2 sm:gap-3">
                     {AVAILABLE_COLORS.map(color => {
                       const isSelected = formData.colorVariants?.some(v => v.colorName === color.name);
                       return (
                         <label 
                           key={color.name} 
-                          className={`flex items-center gap-2 cursor-pointer p-2.5 rounded-lg border-2 transition-all ${
+                          title={color.name}
+                          className={`flex items-start gap-2 cursor-pointer p-2.5 rounded-lg border-2 transition-all min-w-0 ${
                             isSelected 
                               ? 'border-primary bg-primary/5 shadow-sm' 
                               : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
@@ -4561,13 +4796,23 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                             type="checkbox" 
                             checked={isSelected} 
                             onChange={() => handleColorChange(color)} 
-                            className="rounded h-4 w-4 text-primary focus:ring-primary border-gray-300"
+                            className="mt-0.5 rounded h-4 w-4 flex-shrink-0 text-primary focus:ring-primary border-gray-300"
                           />
-                          <span 
-                            style={{ backgroundColor: color.hex }} 
-                            className="w-6 h-6 rounded-full border-2 border-gray-300 shadow-sm flex-shrink-0"
-                          ></span>
-                          <span className={`text-sm font-medium ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>
+                          <span
+                            style={
+                              color.swatch
+                                ? undefined
+                                : { backgroundColor: color.hex }
+                            }
+                            className={`w-6 h-6 rounded-full border-2 border-gray-300 shadow-sm flex-shrink-0 ${getPredefinedColorSwatchClassName(color)} ${
+                              color.swatch === 'transparent' ? 'border-dashed' : ''
+                            }`}
+                          />
+                          <span
+                            className={`min-w-0 flex-1 text-sm font-medium leading-snug break-words ${
+                              isSelected ? 'text-gray-900' : 'text-gray-700'
+                            }`}
+                          >
                             {color.name}
                           </span>
                         </label>
@@ -4703,7 +4948,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   <div className="flex items-center justify-between">
                     <label className="block text-sm font-medium text-gray-700">Upload images for selected colors:</label>
                     <p className="text-xs text-gray-500">
-                      Γ¡É = Default color (shown when page loads)
+                         = Default color (shown when page loads)
                     </p>
                   </div>
                   {formData.colorVariants.map(variant => (
@@ -4726,7 +4971,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                           <p className="font-semibold text-sm text-gray-900">{variant.colorName}</p>
                           {variant.isDefault && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-200 text-amber-800">
-                              Γ¡É Default
+                               Default
                             </span>
                           )}
                         </div>
@@ -4769,7 +5014,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                                   onClick={() => handleRemoveColorImage(variant.colorName, index)}
                                   className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-md hover:bg-red-600 transition-colors"
                                 >
-                                  ├ù
+                                  <TrashIcon className="w-4 h-4" />
                                 </button>
                               </div>
                             ))}
@@ -4781,11 +5026,12 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                 </div>
               )}
         </FormSection>
+            </div>
         
         <FormSection title="Specifications">
           <p className="text-xs text-gray-600 mb-4">
             Add product specifications (these appear on the product detail page).{" "}
-            <strong className="text-gray-700">Available sizes</strong> was removed ΓÇö sizes are now controlled via{" "}
+            <strong className="text-gray-700">Available sizes</strong> was removed sizes are now controlled via{" "}
             <strong className="text-gray-700">Price by Size</strong>.
           </p>
           
@@ -4861,7 +5107,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                 )}
                 {!specJsonError && specJsonInput.trim() && (
                   <div className="p-2 bg-green-50 border border-green-200 rounded-md">
-                    <p className="text-xs text-green-700 font-medium">Γ£ô Valid JSON</p>
+                    <p className="text-xs text-green-700 font-medium">Valid JSON</p>
                   </div>
                 )}
               </div>
@@ -5111,7 +5357,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
                     title="Clear search"
                   >
-                    <span className="text-lg leading-none">├ù</span>
+                    <span className="text-lg leading-none"><TrashIcon className="w-4 h-4" /></span>
                   </button>
                 )}
               </div>
@@ -5212,7 +5458,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                 Select together products manually
               </label>
               <p className="text-xs text-gray-500 mb-3">
-                Uses the same product search list as ΓÇ£Related ProductsΓÇ¥.
+                Uses the same product search list as Related Products.
               </p>
             </div>
           </div>

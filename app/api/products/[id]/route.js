@@ -12,10 +12,13 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
 import { generateUniqueSlug } from '@/lib/utils/slug';
+import { archiveSlugOnSoftDelete } from '@/lib/server/products/slugArchive';
 import { revalidateHomepage, revalidatePath, revalidateProducts, revalidateProductSlugs } from '@/lib/utils/revalidate';
 import { resolveProduct, getSiblingChildren } from '@/lib/server/products/resolveProduct';
 import { normalizeProductPayloadForUpdate, normalizeFiltersField } from '@/lib/server/products/normalizeProductInput';
 import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
+import { findBarcodeConflicts, normalizeBarcode } from '@/lib/server/products/barcodeValidation';
+import { syncParentEmbeddedVariantFromChild } from '@/lib/server/products/syncParentEmbeddedVariants';
 import mongoose from 'mongoose';
 
 /**
@@ -219,9 +222,41 @@ export async function PUT(request, { params }) {
     }
     // If title didn't change, slug remains unchanged (not included in updateData)
 
-    // Update product
+    if (Object.prototype.hasOwnProperty.call(updateData, 'barcode')) {
+      const nextBarcode = normalizeBarcode(updateData.barcode);
+      if (nextBarcode) {
+        const conflicts = await findBarcodeConflicts([nextBarcode], {
+          excludeProductIds: [String(id)],
+        });
+        if (conflicts.length > 0) {
+          const hit = conflicts[0];
+          return NextResponse.json(
+            {
+              error: `Barcode "${nextBarcode}" is already used by "${hit.title}".`,
+              conflicts,
+            },
+            { status: 400 }
+          );
+        }
+      }
+      updateData.barcode = nextBarcode;
+    }
+
+    // Update product (retry once on optimistic concurrency conflicts)
     Object.assign(product, updateData);
-    await product.save();
+    try {
+      await product.save();
+    } catch (saveError) {
+      if (saveError?.name !== 'VersionError') throw saveError;
+      const fresh = await Product.findById(id);
+      if (!fresh) throw saveError;
+      Object.assign(fresh, updateData);
+      await fresh.save();
+    }
+
+    if (resolvedProductType === 'child' && product.parentProductId) {
+      await syncParentEmbeddedVariantFromChild(product.parentProductId, product);
+    }
 
     // Get the new slug (either from updateData if changed, or old slug)
     const newSlug = product.slug || oldSlug;
@@ -314,15 +349,19 @@ export async function DELETE(request, { params }) {
         .lean();
       cascadeCount = children.length;
       if (cascadeCount > 0) {
-        await Product.updateMany(
-          { parentProductId: product._id, deletedAt: null },
-          { $set: { deletedAt: now } }
-        );
-        children.forEach((c) => slugsToRevalidate.push(c.slug));
+        for (const child of children) {
+          const doc = await Product.findById(child._id);
+          if (!doc) continue;
+          doc.deletedAt = now;
+          await archiveSlugOnSoftDelete(doc);
+          await doc.save();
+          slugsToRevalidate.push(child.slug);
+        }
       }
     }
 
     product.deletedAt = now;
+    await archiveSlugOnSoftDelete(product);
     await product.save();
 
     revalidateProductSlugs(slugsToRevalidate);

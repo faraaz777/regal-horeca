@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
-import { PlusIcon, EditIcon, TrashIcon, SearchIcon, ChevronLeftIcon, ChevronRightIcon, StarIcon, DuplicateIcon, RestoreIcon } from '@/components/Icons';
+import { PlusIcon, EditIcon, TrashIcon, SearchIcon, ChevronLeftIcon, ChevronRightIcon, DuplicateIcon, RestoreIcon } from '@/components/Icons';
 import ProductForm from '@/components/ProductForm';
 import { showToast } from '@/lib/utils/toast';
 import { apiClient, ApiError } from '@/lib/utils/apiClient';
@@ -623,36 +623,6 @@ export default function AdminProductsPage() {
     }
   };
 
-  const handleBulkFeaturedToggle = async (featured) => {
-    if (selectedProducts.size === 0) {
-      showToast.error('Please select products');
-      return;
-    }
-
-    const toastId = showToast.loading(`Updating ${selectedProducts.size} product(s)...`);
-    setLoading(true);
-
-    try {
-      const updatePromises = Array.from(selectedProducts).map(id =>
-        apiClient.request(`/api/products/${id}`, {
-          method: 'PUT',
-          body: { featured },
-        })
-      );
-
-      await Promise.all(updatePromises);
-      showToast.success(`Successfully updated ${selectedProducts.size} product(s)`);
-      setSelectedProducts(new Set());
-      setIsBulkMode(false);
-      mutate();
-    } catch (error) {
-      showToast.error('Failed to update some products. Please try again.');
-    } finally {
-      toast.dismiss(toastId);
-      setLoading(false);
-    }
-  };
-    
   const handleSaveEditedProduct = async (productData) => {
     const toastId = showToast.loading('Saving product...');
     setLoading(true);
@@ -677,8 +647,12 @@ export default function AdminProductsPage() {
         initialChildIds,
       });
       if (result.errors.length > 0) {
-        showToast.error(`${result.errors.length} variant(s) failed to save. See console for details.`);
+        const firstMsg = result.errors[0]?.message || 'Unknown error';
+        showToast.error(
+          `${result.errors.length} variant(s) failed to save: ${firstMsg}`
+        );
         console.error('Variant save errors:', result.errors);
+        return;
       }
 
       const syncedCount = result.created + result.updated;
@@ -778,20 +752,6 @@ export default function AdminProductsPage() {
           {isBulkMode && selectedProducts.size > 0 && (
             <div className="flex gap-2 flex-wrap w-full">
               <button
-                onClick={() => handleBulkFeaturedToggle(true)}
-                className="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-3 sm:px-4 rounded-md text-xs sm:text-sm transition-colors flex-1 sm:flex-none min-w-[120px]"
-                disabled={loading}
-              >
-                Mark ({selectedProducts.size})
-              </button>
-              <button
-                onClick={() => handleBulkFeaturedToggle(false)}
-                className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-3 sm:px-4 rounded-md text-xs sm:text-sm transition-colors flex-1 sm:flex-none min-w-[120px]"
-                disabled={loading}
-              >
-                Unmark ({selectedProducts.size})
-              </button>
-              <button
                 onClick={handleBulkDelete}
                 className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-3 sm:px-4 rounded-md text-xs sm:text-sm transition-colors flex-1 sm:flex-none min-w-[120px]"
                 disabled={loading}
@@ -886,8 +846,7 @@ export default function AdminProductsPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Brand</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Featured</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Catalog</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
@@ -1095,23 +1054,7 @@ export default function AdminProductsPage() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.brand}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{isCarrier ? '—' : `₹${product.price}`}</td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              product.status === 'In Stock' 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {product.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {product.featured ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                <StarIcon className="w-3 h-3" filled={true} />
-                                Featured
-                              </span>
-                            ) : (
-                              <span className="text-xs text-gray-400">—</span>
-                            )}
+                            <span className="text-xs text-gray-400">—</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             {!isBulkMode && listFilter === 'active' && (
@@ -1188,7 +1131,6 @@ export default function AdminProductsPage() {
                             child.heroImage ||
                             (Array.isArray(child.gallery) && child.gallery[0]) ||
                             product.heroImage;
-                          const childStatus = child.status || product.status;
                           const childRowClass = isChildExactMatch
                             ? 'bg-yellow-50 ring-1 ring-inset ring-yellow-300'
                             : 'bg-gray-50/60';
@@ -1284,18 +1226,6 @@ export default function AdminProductsPage() {
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{child.brand || product.brand}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{child.price ?? 0}</td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                  childStatus === 'In Stock'
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {childStatus || '—'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {/* Featured-on-storefront isn't a child concept — variants inherit
-                                    it from the parent, so we render a placeholder here to keep
-                                    the column alignment with the parent row. */}
                                 {isLegacy ? (
                                   <span className="text-xs text-gray-400">—</span>
                                 ) : (
@@ -1332,7 +1262,7 @@ export default function AdminProductsPage() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={isBulkMode ? 7 : 6} className="px-6 py-8 text-center text-gray-500">
+                      <td colSpan={isBulkMode ? 6 : 5} className="px-6 py-8 text-center text-gray-500">
                         {searchTerm
                           ? `No products found matching "${searchTerm}"`
                           : listFilter === 'deleted'
@@ -1535,21 +1465,6 @@ export default function AdminProductsPage() {
                               </>
                             )}
                           </div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                              product.status === 'In Stock' 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {product.status}
-                            </span>
-                            {product.featured && (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                <StarIcon className="w-3 h-3" filled={true} />
-                                Featured
-                              </span>
-                            )}
-                          </div>
                         </div>
                         {!isBulkMode && listFilter === 'active' && (
                           <div className="flex items-center gap-2 flex-shrink-0">
@@ -1622,7 +1537,6 @@ export default function AdminProductsPage() {
                               child.heroImage ||
                               (Array.isArray(child.gallery) && child.gallery[0]) ||
                               product.heroImage;
-                            const childStatus = child.status || product.status;
                             const childCardClass = isChildExactMatch
                               ? 'bg-yellow-50 ring-2 ring-yellow-300'
                               : 'bg-gray-50';
@@ -1701,13 +1615,6 @@ export default function AdminProductsPage() {
                                     <span className="font-semibold text-gray-900">₹{child.price ?? 0}</span>
                                   </div>
                                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                                    <span className={`px-2 py-0.5 text-[11px] font-semibold rounded-full ${
-                                      childStatus === 'In Stock'
-                                        ? 'bg-green-100 text-green-800'
-                                        : 'bg-red-100 text-red-800'
-                                    }`}>
-                                      {childStatus || '—'}
-                                    </span>
                                     {!isLegacy && (
                                       <label
                                         className="inline-flex items-center gap-1 text-[11px] text-gray-700"

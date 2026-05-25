@@ -8,6 +8,7 @@ import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
 import { revalidateProductSlugs } from '@/lib/utils/revalidate';
 import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
+import { restoreCanonicalSlugOnUndelete } from '@/lib/server/products/slugArchive';
 
 export async function POST(_request, { params }) {
   const authError = assertAdmin(_request);
@@ -25,6 +26,8 @@ export async function POST(_request, { params }) {
     if (!product.deletedAt) {
       return NextResponse.json({ error: 'Product is not deleted' }, { status: 400 });
     }
+
+    await restoreCanonicalSlugOnUndelete(product);
 
     const conflict = await Product.findOne({
       _id: { $ne: product._id },
@@ -68,12 +71,23 @@ export async function POST(_request, { params }) {
         const blocked = new Set(activeChildSlugs.map((s) => s.slug));
         const restorable = children.filter((c) => !blocked.has(c.slug));
         if (restorable.length > 0) {
-          await Product.updateMany(
-            { _id: { $in: restorable.map((c) => c._id) } },
-            { $set: { deletedAt: null } }
-          );
-          cascadeRestored = restorable.length;
-          restorable.forEach((c) => slugsToRevalidate.push(c.slug));
+          for (const childRef of restorable) {
+            const childDoc = await Product.findById(childRef._id);
+            if (!childDoc) continue;
+            await restoreCanonicalSlugOnUndelete(childDoc);
+            const childConflict = await Product.findOne({
+              _id: { $ne: childDoc._id },
+              slug: childDoc.slug,
+              deletedAt: null,
+            })
+              .select('_id')
+              .lean();
+            if (childConflict) continue;
+            childDoc.deletedAt = null;
+            await childDoc.save();
+            cascadeRestored += 1;
+            slugsToRevalidate.push(childDoc.slug);
+          }
         }
       }
     }

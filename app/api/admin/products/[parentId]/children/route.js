@@ -17,6 +17,8 @@ import Product from '@/lib/models/Product';
 import { generateUniqueSlug } from '@/lib/utils/slug';
 import { revalidateProductSlugs } from '@/lib/utils/revalidate';
 import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
+import { assertVariantBarcodesUnique, normalizeBarcode } from '@/lib/server/products/barcodeValidation';
+import { syncParentEmbeddedVariantFromChild } from '@/lib/server/products/syncParentEmbeddedVariants';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,22 +41,27 @@ function deriveChildTitle(parentTitle, attrs) {
   return `${parentTitle} - ${tail}`;
 }
 
-export async function GET(_request, { params }) {
-  const authError = assertAdmin(_request);
+export async function GET(request, { params }) {
+  const authError = assertAdmin(request);
   if (authError) return authError;
 
   try {
     await connectToDatabase();
     const { parentId } = params;
+    const includeDeleted =
+      new URL(request.url).searchParams.get('includeDeleted') === 'true';
 
     const parent = await Product.findById(parentId).lean();
     if (!parent) {
       return NextResponse.json({ error: 'Parent product not found' }, { status: 404 });
     }
 
-    const children = await Product.find({ parentProductId: parent._id })
-      .sort({ createdAt: 1 })
-      .lean();
+    const childQuery = { parentProductId: parent._id };
+    if (!includeDeleted) {
+      childQuery.deletedAt = null;
+    }
+
+    const children = await Product.find(childQuery).sort({ createdAt: 1 }).lean();
 
     return NextResponse.json({ success: true, parent, children });
   } catch (error) {
@@ -105,6 +112,20 @@ export async function POST(request, { params }) {
     }
 
     const variationAttributes = sanitizeVariationAttributes(body.variationAttributes);
+    const barcode = normalizeBarcode(body.barcode);
+    if (barcode) {
+      const barcodeCheck = await assertVariantBarcodesUnique(
+        [{ barcode, _childProductId: null }],
+        { parentProductId: parent._id }
+      );
+      if (!barcodeCheck.ok) {
+        return NextResponse.json(
+          { error: barcodeCheck.message, conflicts: barcodeCheck.conflicts },
+          { status: 400 }
+        );
+      }
+    }
+
     const title = deriveChildTitle(parent.title, variationAttributes);
     const slugBase = Product.buildChildSlugBase(parent, variationAttributes);
     const slug = await generateUniqueSlug(slugBase);
@@ -125,7 +146,7 @@ export async function POST(request, { params }) {
       businessTypeSlugs: Array.isArray(parent.businessTypeSlugs) ? parent.businessTypeSlugs : [],
       // Per-child commerce fields (deltas).
       sku: String(body.sku || '').trim(),
-      barcode: String(body.barcode || '').trim(),
+      barcode,
       hsnCode: String(body.hsnCode || '').trim(),
       gstPercent: Number(body.gstPercent || 0),
       mrp: Number(body.mrp || 0),
@@ -141,6 +162,8 @@ export async function POST(request, { params }) {
 
     child.searchBlob = Product.buildSearchBlob(parent, child);
     await child.save();
+
+    await syncParentEmbeddedVariantFromChild(parent._id, child);
 
     if (body.isDefault === true) {
       await Product.updateOne({ _id: parent._id }, { $set: { defaultChildProductId: child._id } });

@@ -17,6 +17,10 @@ import Product from '@/lib/models/Product';
 import { generateUniqueSlug } from '@/lib/utils/slug';
 import { revalidateProductSlugs } from '@/lib/utils/revalidate';
 import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
+import { findBarcodeConflictsForChild, normalizeBarcode } from '@/lib/server/products/barcodeValidation';
+import { syncParentEmbeddedVariantFromChild } from '@/lib/server/products/syncParentEmbeddedVariants';
+import { removeEmbeddedVariantFromParent } from '@/lib/server/products/removeEmbeddedVariant';
+import { archiveSlugOnSoftDelete } from '@/lib/server/products/slugArchive';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +75,24 @@ export async function PATCH(request, { params }) {
 
     const updates = pickAllowed(body);
 
+    if (Object.prototype.hasOwnProperty.call(body, 'barcode')) {
+      const nextBarcode = normalizeBarcode(body.barcode);
+      if (nextBarcode) {
+        const conflicts = await findBarcodeConflictsForChild(child, nextBarcode);
+        if (conflicts.length > 0) {
+          const hit = conflicts[0];
+          return NextResponse.json(
+            {
+              error: `Barcode "${nextBarcode}" is already used by "${hit.title}".`,
+              conflicts,
+            },
+            { status: 400 }
+          );
+        }
+      }
+      updates.barcode = nextBarcode;
+    }
+
     // Variation attributes can be updated; this triggers a slug regen using the new attrs.
     let regenSlug = false;
     if (body.variationAttributes && typeof body.variationAttributes === 'object') {
@@ -109,6 +131,10 @@ export async function PATCH(request, { params }) {
     child.searchBlob = Product.buildSearchBlob(parent, child);
 
     await child.save();
+
+    if (child.parentProductId) {
+      await syncParentEmbeddedVariantFromChild(child.parentProductId, child);
+    }
 
     if (body.isDefault === true && parent) {
       await Product.updateOne({ _id: parent._id }, { $set: { defaultChildProductId: child._id } });
@@ -152,12 +178,20 @@ export async function DELETE(_request, { params }) {
         { status: 400 }
       );
     }
-    if (child.deletedAt) {
-      return NextResponse.json({ error: 'Variant is already deleted' }, { status: 400 });
+    const alreadyDeleted = Boolean(child.deletedAt);
+
+    if (!alreadyDeleted) {
+      child.deletedAt = new Date();
+      await archiveSlugOnSoftDelete(child);
+      await child.save();
     }
 
-    child.deletedAt = new Date();
-    await child.save();
+    if (child.parentProductId) {
+      await removeEmbeddedVariantFromParent(child.parentProductId, {
+        legacyParentVariantId: child.legacyParentVariantId,
+        barcode: child.barcode,
+      });
+    }
 
     const parent = await Product.findById(child.parentProductId).select('slug defaultChildProductId').lean();
 
@@ -168,7 +202,11 @@ export async function DELETE(_request, { params }) {
 
     revalidateProductSlugs([parent?.slug, child.slug]);
 
-    return NextResponse.json({ success: true, message: 'Variant moved to trash' });
+    return NextResponse.json({
+      success: true,
+      message: alreadyDeleted ? 'Variant was already in trash' : 'Variant moved to trash',
+      alreadyDeleted,
+    });
   } catch (error) {
     console.error('Error deleting child:', error);
     return NextResponse.json(

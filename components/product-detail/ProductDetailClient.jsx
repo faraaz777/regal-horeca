@@ -152,6 +152,18 @@ function normalizeProductForPDP(input) {
   return { ...input, variants: synthesized };
 }
 
+function normalizeVariantAttr(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+/** Variants that match the selected colour (or all when no colour selected). */
+function filterVariantsByColor(variants, selectedColor) {
+  const list = Array.isArray(variants) ? variants : [];
+  const colorName = normalizeVariantAttr(selectedColor?.colorName);
+  if (!colorName) return list;
+  return list.filter((v) => normalizeVariantAttr(v?.color) === colorName);
+}
+
 /** Pick the swatch index for the current PDP URL (child slug wins over legacy query params). */
 function findVariantIndexForProductPage(variants, { slug, variantIdFromUrl, skuFromUrl }) {
   const list = Array.isArray(variants) ? variants : [];
@@ -458,15 +470,36 @@ export default function ProductDetailClient({ initialProduct = null }) {
     }
   }, [product?.variants, slug, router]);
 
+  const hasGeneratedVariants = Array.isArray(product?.variants) && product.variants.length > 0;
+
+  const colorVariantsForPicker = useMemo(() => {
+    const palette = Array.isArray(product?.colorVariants) ? product.colorVariants : [];
+    if (!hasGeneratedVariants) return palette;
+    const colorsInStock = new Set(
+      (product.variants || [])
+        .map((v) => normalizeVariantAttr(v?.color))
+        .filter(Boolean)
+    );
+    if (colorsInStock.size === 0) return palette;
+    return palette.filter((cv) => colorsInStock.has(normalizeVariantAttr(cv?.colorName)));
+  }, [product?.colorVariants, product?.variants, hasGeneratedVariants]);
+
+  const variantsForSelectedColor = useMemo(
+    () => filterVariantsByColor(product?.variants, selectedColor),
+    [product?.variants, selectedColor]
+  );
+
   // Default colour swatch when not driven by a variant deep-link (?variantId= / ?sku=)
   useEffect(() => {
     if (!product?.colorVariants?.length || selectedColor != null) return;
-    const hasGenVariants = Array.isArray(product.variants) && product.variants.length > 0;
-    const deepLinkVariant = hasGenVariants && (!!variantIdFromUrl || !!skuFromUrl);
+    const deepLinkVariant = hasGeneratedVariants && (!!variantIdFromUrl || !!skuFromUrl);
     if (deepLinkVariant) return;
-    const defaultVariant = product.colorVariants.find(v => v.isDefault) || product.colorVariants[0];
+    const palette = colorVariantsForPicker.length > 0
+      ? colorVariantsForPicker
+      : product.colorVariants;
+    const defaultVariant = palette.find((v) => v.isDefault) || palette[0];
     setSelectedColor(defaultVariant);
-  }, [product?.colorVariants, product?.variants, selectedColor, variantIdFromUrl, skuFromUrl]);
+  }, [product?.colorVariants, colorVariantsForPicker, hasGeneratedVariants, selectedColor, variantIdFromUrl, skuFromUrl]);
 
   // Fetch related products
   useEffect(() => {
@@ -534,7 +567,6 @@ export default function ProductDetailClient({ initialProduct = null }) {
     setFrequentlyOrderedProducts([]);
   }, [product]);
 
-  const hasGeneratedVariants = Array.isArray(product?.variants) && product.variants.length > 0;
   const activeVariant = hasGeneratedVariants
     ? (product.variants[selectedVariantIndex] || product.variants[0] || null)
     : null;
@@ -564,24 +596,6 @@ export default function ProductDetailClient({ initialProduct = null }) {
       setSelectedColor(matchedColor);
     }
   }, [hasGeneratedVariants, product?.variants, selectedVariantIndex, product?.colorVariants, selectedColor?.colorName]);
-
-  useEffect(() => {
-    if (!hasGeneratedVariants || !selectedColor) return;
-    const variants = product?.variants || [];
-    // Parent/child variants navigate by URL; do not override index from color alone.
-    if (variants.some((v) => v?._childSlug)) return;
-    const selectedColorName = String(selectedColor.colorName || '').trim().toLowerCase();
-    if (!selectedColorName) return;
-    const active = variants[selectedVariantIndex] || null;
-    const activeColor = String(active?.color || '').trim().toLowerCase();
-    if (active && activeColor === selectedColorName) return;
-    const nextIndex = variants.findIndex(
-      (variant) => String(variant?.color || '').trim().toLowerCase() === selectedColorName
-    );
-    if (nextIndex >= 0) {
-      setSelectedVariantIndex(nextIndex);
-    }
-  }, [hasGeneratedVariants, selectedColor, product?.variants, selectedVariantIndex]);
 
   const priceBySize = useMemo(() => {
     if (hasGeneratedVariants) return [];
@@ -758,14 +772,28 @@ export default function ProductDetailClient({ initialProduct = null }) {
       return;
     }
     setSelectedColor(variant);
-    if (hasGeneratedVariants) {
-      const targetColor = String(variant?.colorName || '').trim().toLowerCase();
-      const nextIndex = (product?.variants || []).findIndex(
-        (row) => String(row?.color || '').trim().toLowerCase() === targetColor
-      );
-      if (nextIndex >= 0) {
-        setSelectedVariantIndex(nextIndex);
-      }
+    if (!hasGeneratedVariants) return;
+
+    const variants = product?.variants || [];
+    const targetColor = normalizeVariantAttr(variant?.colorName);
+    const matching = filterVariantsByColor(variants, variant);
+    if (matching.length === 0) return;
+
+    const currentSize = normalizeVariantAttr(activeVariant?.size);
+    let target =
+      currentSize &&
+      matching.find((row) => normalizeVariantAttr(row?.size) === currentSize);
+    if (!target) target = matching[0];
+
+    const childSlug = String(target?._childSlug || '').trim();
+    if (childSlug && childSlug !== String(slug || '').trim()) {
+      router.push(`/products/${childSlug}`, { scroll: false });
+      return;
+    }
+
+    const nextIndex = variants.findIndex((row) => row === target);
+    if (nextIndex >= 0) {
+      setSelectedVariantIndex(nextIndex);
     }
   };
 
@@ -1411,9 +1439,9 @@ export default function ProductDetailClient({ initialProduct = null }) {
                   <p className="text-sm font-bold text-rich-black  t mb-2 min-h-[1.25rem] flex items-center">
                     Colour: <span className="font-normal normal-case text-black/60 ml-0.5">{selectedColor ? selectedColor.colorName : '—'}</span>
                   </p>
-                  {product.colorVariants && product.colorVariants.length > 0 ? (
+                  {colorVariantsForPicker.length > 0 ? (
                     <div className="flex flex-wrap gap-2 items-center min-h-[2.5rem]">
-                      {product.colorVariants.map((variant, index) => (
+                      {colorVariantsForPicker.map((variant, index) => (
                         <button
                           key={index}
                           onClick={() => handleColorSelect(variant)}
@@ -1477,19 +1505,14 @@ export default function ProductDetailClient({ initialProduct = null }) {
               {hasGeneratedVariants && (
                 <div className="mb-2 sm:mb-4">
                   <label className="block text-sm font-bold text-rich-black  mb-2">
-                    Variants
+                    {variantsForSelectedColor.some((v) => String(v?.size || '').trim())
+                      ? 'Size'
+                      : 'Variants'}
                   </label>
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                    {(product?.variants || [])
-                      .map((variant, idx) => ({ variant, idx }))
-                      .filter(({ variant }) => {
-                        if (variant?._childSlug) return true;
-                        if (!selectedColor) return true;
-                        const selectedColorName = String(selectedColor?.colorName || '').trim().toLowerCase();
-                        if (!selectedColorName) return true;
-                        return String(variant?.color || '').trim().toLowerCase() === selectedColorName;
-                      })
-                      .map(({ variant, idx }) => {
+                    {(selectedColor ? variantsForSelectedColor : product?.variants || [])
+                      .map((variant) => {
+                      const idx = (product?.variants || []).indexOf(variant);
                       const label =
                         String(variant?.size || '').trim() ||
                         String(variant?.color || '').trim() ||
@@ -1534,6 +1557,11 @@ export default function ProductDetailClient({ initialProduct = null }) {
                       );
                     })}
                   </div>
+                  {selectedColor && variantsForSelectedColor.length === 0 ? (
+                    <p className="mt-2 text-xs text-black/60">
+                      No sizes available for {selectedColor.colorName}. Choose another colour.
+                    </p>
+                  ) : null}
                 </div>
               )}
 

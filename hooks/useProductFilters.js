@@ -20,8 +20,9 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 const PREDEFINED_COLORS = [
-  'Blue', 'Green', 'Red', 'Yellow', 'Purple', 'Orange', 
-  'Pink', 'Brown', 'Gray', 'Black', 'White', 'Silver'
+  'Blue', 'Green', 'Red', 'Yellow', 'Purple', 'Orange',
+  'Pink', 'Brown', 'Gray', 'Black', 'White', 'Silver',
+  'Transparent', 'Multicolour', 'Gold', 'Rose Gold', 'Beige',
 ];
 
 // Debounce utility

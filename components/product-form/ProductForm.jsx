@@ -556,6 +556,12 @@ export default function ProductForm({
     price: 0,
     priceBySize: [],
     originalPrice: null,
+    unit: '',
+    gstPercent: 0,
+    mrp: 0,
+    sellingPrice: 0,
+    discountPercent: 0,
+    marginPrice: 0,
     businessTypeSlugs: [],
     heroImage: '',
     gallery: [],
@@ -620,11 +626,22 @@ export default function ProductForm({
   const [variantRows, setVariantRows] = useState([]);
   const [selectedVariantRowIndex, setSelectedVariantRowIndex] = useState(null);
   const [showVariantsOnly, setShowVariantsOnly] = useState(() => initialView === 'variants');
+  /** null = not chosen yet (new product); true/false = variant vs standalone workflow. */
+  const [hasVariantsChoice, setHasVariantsChoice] = useState(null);
   const [recentlyDeletedVariantRow, setRecentlyDeletedVariantRow] = useState(null);
   /** Child product ids loaded with this parent — used to soft-delete rows removed from the table. */
   const initialChildIdsRef = useRef([]);
   const isCreatingMultipleVariants = (variantRows || []).length > 0;
   const selectedVariantFieldCount = Object.values(variantFieldSelection).filter(Boolean).length;
+  const isExistingProductRecord = Boolean(product?._id || product?.id);
+
+  /** Child variant rows are edited as a single SKU; only parents/standalones host the variant matrix. */
+  const isChildProduct = useMemo(() => product?.productType === 'child', [product?.productType]);
+
+  const variantWorkflowEnabled = !isChildProduct && hasVariantsChoice === true;
+  const showStandaloneCommerceFields = !isChildProduct && hasVariantsChoice === false;
+  const awaitingVariantChoice = !isChildProduct && !isExistingProductRecord && hasVariantsChoice === null;
+
   const [bulkVariantInputs, setBulkVariantInputs] = useState({
     name: '',
     unit: '',
@@ -639,9 +656,6 @@ export default function ProductForm({
     /** '' = skip on Apply | 'yes' = all in catalog | 'no' = all off */
     showInCatalog: '',
   });
-
-  /** Child variant rows are edited as a single SKU; only parents/standalones host the variant matrix. */
-  const isChildProduct = useMemo(() => product?.productType === 'child', [product?.productType]);
 
   /** Sellable colour for this child row (parent Variants → Colour column), not marketing swatches. */
   const childAssignedColorName = useMemo(() => {
@@ -666,6 +680,25 @@ export default function ProductForm({
       (c) => c.name.toLowerCase() === childAssignedColorName.toLowerCase()
     );
   }, [childAssignedColorName]);
+
+  useEffect(() => {
+    if (isChildProduct) return;
+    const productId = product?._id || product?.id;
+    if (productId) {
+      const isParent = product?.productType === 'parent';
+      const hasChildren = Array.isArray(product?.children) && product.children.length > 0;
+      const hasEmbeddedVariants = Array.isArray(product?.variants) && product.variants.length > 0;
+      setHasVariantsChoice(isParent || hasChildren || hasEmbeddedVariants);
+      return;
+    }
+    if (product) {
+      const isParent = product?.productType === 'parent';
+      const hasEmbeddedVariants = Array.isArray(product?.variants) && product.variants.length > 0;
+      setHasVariantsChoice(isParent || hasEmbeddedVariants);
+      return;
+    }
+    setHasVariantsChoice(null);
+  }, [isChildProduct, product]);
 
   useEffect(() => {
     if (typeof onVariantsOnlyChange === 'function') {
@@ -1198,6 +1231,43 @@ export default function ProductForm({
     };
   };
 
+  const getStandalonePricingErrors = () => getVariantPricingErrors(formData);
+
+  const handleStandalonePricingChange = (field, value) => {
+    setFormData((prev) => {
+      const normalizedValue = ['mrp', 'sellingPrice', 'marginPrice'].includes(field)
+        ? sanitizeNumberInput(value)
+        : value;
+      const next = { ...prev, [field]: normalizedValue };
+
+      if (field === 'mrp' || field === 'sellingPrice') {
+        const mrpValue = Number(next.mrp || 0);
+        const sellingValue = Number(next.sellingPrice || 0);
+        if (Number.isFinite(mrpValue) && mrpValue > 0 && Number.isFinite(sellingValue)) {
+          const rawDiscount = ((mrpValue - sellingValue) / mrpValue) * 100;
+          next.discountPercent = Number(Math.max(0, rawDiscount).toFixed(2));
+        } else {
+          next.discountPercent = 0;
+        }
+        next.price = Number(next.sellingPrice || 0);
+      }
+
+      return next;
+    });
+  };
+
+  const handleChooseProductVariantMode = (usesVariants) => {
+    setHasVariantsChoice(usesVariants);
+    setError('');
+    if (usesVariants) {
+      setShowVariantsOnly(true);
+    } else {
+      setShowVariantsOnly(false);
+      setVariantRows([]);
+      setShowAddVariantsPanel(false);
+    }
+  };
+
   const handleAddSingleVariantRow = () => {
     setVariantRows((prev) => [...prev, createEmptyVariantRow()]);
     setError('');
@@ -1653,6 +1723,12 @@ export default function ProductForm({
         manufacturer: product.manufacturer || '',
         barcode: product.barcode || '',
         hsnCode: product.hsnCode || '',
+        unit: String(product?.variationAttributes?.unit || '').trim(),
+        gstPercent: Number(product?.gstPercent || 0),
+        mrp: Number(product?.mrp || 0),
+        sellingPrice: Number(product?.sellingPrice ?? product?.price ?? 0),
+        discountPercent: Number(product?.discountPercent || 0),
+        marginPrice: Number(product?.marginPrice || 0),
         usageAndCare: product.usageAndCare || '',
         whyBuyFrom: product.whyBuyFrom || '',
         sizeChartUrl: product.sizeChartUrl || '',
@@ -3066,6 +3142,12 @@ export default function ProductForm({
       return;
     }
 
+    if (variantWorkflowEnabled && normalizedVariants.length === 0) {
+      setError('Add at least one variant in the Variants section, or switch to a single product (No variants).');
+      toast.error('Add at least one variant row before saving.');
+      return;
+    }
+
     const parentOrSelfId = product?._id || product?.id || null;
 
     if (normalizedVariants.length > 0) {
@@ -3124,6 +3206,21 @@ export default function ProductForm({
           message = `Variant #${firstInvalidIndex + 1}: Margin Price cannot exceed Selling Price.`;
         } else if (rowErrors.discountPercent) {
           message = `Variant #${firstInvalidIndex + 1}: Discount must be less than 100%.`;
+        }
+        setError(message);
+        toast.error(message);
+        return;
+      }
+    } else if (showStandaloneCommerceFields) {
+      const rowErrors = getStandalonePricingErrors();
+      if (rowErrors.sellingPrice || rowErrors.marginPrice || rowErrors.discountPercent) {
+        let message = 'Invalid pricing on the product form.';
+        if (rowErrors.sellingPrice) {
+          message = 'Selling Price cannot exceed MRP.';
+        } else if (rowErrors.marginPrice) {
+          message = 'Margin Price cannot exceed Selling Price.';
+        } else if (rowErrors.discountPercent) {
+          message = 'Discount must be less than 100%.';
         }
         setError(message);
         toast.error(message);
@@ -3216,7 +3313,16 @@ export default function ProductForm({
         ? Math.min(...normalizedVariants.map((row) => Number(row.price || 0)))
         : normalizedPriceBySize.length > 0
           ? Math.min(...normalizedPriceBySize.map(r => r.price))
-          : Number(formData.price || 0);
+          : Number(formData.sellingPrice || formData.price || 0);
+
+    const standaloneVariationAttributes = showStandaloneCommerceFields
+      ? {
+          ...(formData.variationAttributes && typeof formData.variationAttributes === 'object'
+            ? formData.variationAttributes
+            : {}),
+          unit: String(formData.unit || '').trim(),
+        }
+      : formData.variationAttributes;
 
     // Strip the row-only book-keeping fields before sending to the API. We forward
     // them out-of-band as `_variantRows` so the consumer (add page / admin edit)
@@ -3231,6 +3337,12 @@ export default function ProductForm({
 
     const finalProduct = {
       ...formData,
+      gstPercent: Number(formData.gstPercent || 0),
+      mrp: Number(formData.mrp || 0),
+      sellingPrice: Number(formData.sellingPrice || 0),
+      discountPercent: Number(formData.discountPercent || 0),
+      marginPrice: Number(formData.marginPrice || 0),
+      variationAttributes: standaloneVariationAttributes,
       variants: variantsForLegacyEmbed,
       _variantRows: variantRowsForChildren,
       _initialChildIds: [...initialChildIdsRef.current],
@@ -3253,8 +3365,11 @@ export default function ProductForm({
       finalProduct.variationTheme = Object.entries(variantFieldSelection || {})
         .filter(([, on]) => on)
         .map(([k]) => k);
+    } else if (showStandaloneCommerceFields) {
+      finalProduct.productType = 'standalone';
     }
 
+    delete finalProduct.unit;
     delete finalProduct.tagsInput;
 
     if (isChildProduct) {
@@ -3286,6 +3401,33 @@ export default function ProductForm({
         </div>
       )}
       <form id="product-form" onSubmit={handleSubmit} className={`flex-grow ${showVariantsOnly ? 'w-full' : ''}`}>
+        {awaitingVariantChoice && (
+          <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-5 sm:p-6">
+            <p className="text-base font-semibold text-gray-900 mb-1">Does this product have variants?</p>
+            <p className="text-sm text-gray-600 mb-4">
+              Choose <strong>Yes</strong> if you sell multiple SKUs (size, colour, etc.). Choose <strong>No</strong> for a single product with one SKU and pricing on this form.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => handleChooseProductVariantMode(true)}
+                className="px-5 py-2.5 text-sm font-semibold rounded-md bg-primary text-white hover:bg-primary-700 transition-colors"
+              >
+                Yes — has variants
+              </button>
+              <button
+                type="button"
+                onClick={() => handleChooseProductVariantMode(false)}
+                className="px-5 py-2.5 text-sm font-semibold rounded-md bg-white text-gray-800 border border-gray-300 hover:bg-gray-100 transition-colors"
+              >
+                No — single product
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!awaitingVariantChoice && (
+        <>
         <div className="mb-5 flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -3296,7 +3438,7 @@ export default function ProductForm({
           >
             Full Product Form
           </button>
-          {!isChildProduct && (
+          {variantWorkflowEnabled && (
             <button
               type="button"
               onClick={() => setShowVariantsOnly(true)}
@@ -3337,7 +3479,7 @@ export default function ProductForm({
           </div>
         )}
 
-        {!isChildProduct && showVariantsOnly && (
+        {!isChildProduct && variantWorkflowEnabled && showVariantsOnly && (
         <div className="w-full min-h-screen">
         <FormSection title="Variants">
           <div className="mb-4">
@@ -3850,38 +3992,51 @@ export default function ProductForm({
                   )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                {showStandaloneCommerceFields && (
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-gray-700">Unit</label>
+                    <input
+                      name="unit"
+                      value={formData.unit || ''}
+                      onChange={handleChange}
+                      placeholder="kg, pc, set"
+                      list="variantUnitOptions"
+                      className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+                    />
+                  </div>
+                )}
+                <div className={showStandaloneCommerceFields ? '' : 'md:col-span-2'}>
                   <label className="block text-sm font-medium mb-2 text-gray-700">SKU *</label>
                   <input 
                     name="sku" 
                     value={formData.sku || ''} 
                     onChange={handleChange} 
-                    disabled={isCreatingMultipleVariants || isChildProduct}
+                    disabled={variantWorkflowEnabled || isChildProduct}
                     className={`w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors ${LOCKED_CHILD_FIELD_CLASS}`}
                     placeholder={
                       isChildProduct
                         ? 'Managed in parent Variants section'
-                        : isCreatingMultipleVariants
+                        : variantWorkflowEnabled
                           ? 'SKU is managed per variant row'
                           : 'Enter SKU'
                     }
                   />
                 </div>
-                {!isCreatingMultipleVariants && (
+                {showStandaloneCommerceFields && (
                   <div>
                     <label className="block text-sm font-medium mb-2 text-gray-700">Barcode</label>
                     <input
                       name="barcode"
                       value={formData.barcode || ''}
                       onChange={handleChange}
-                      disabled={isChildProduct}
-                      className={`w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors ${LOCKED_CHILD_FIELD_CLASS}`}
-                      placeholder={isChildProduct ? 'Managed in parent Variants section' : 'Enter Barcode'}
+                      className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+                      placeholder="Enter Barcode"
                     />
                   </div>
                 )}
               </div>
-              {!isCreatingMultipleVariants && (
+              {showStandaloneCommerceFields && (
+                <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-2 text-gray-700">HSN Code</label>
@@ -3889,12 +4044,76 @@ export default function ProductForm({
                       name="hsnCode"
                       value={formData.hsnCode || ''}
                       onChange={handleChange}
-                      disabled={isChildProduct}
-                      className={`w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors ${LOCKED_CHILD_FIELD_CLASS}`}
-                      placeholder={isChildProduct ? 'Managed in parent Variants section' : 'Enter HSN Code'}
+                      className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+                      placeholder="Enter HSN Code"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-gray-700">GST%</label>
+                    <input
+                      type="number"
+                      name="gstPercent"
+                      min="0"
+                      value={formData.gstPercent ?? ''}
+                      onChange={handleChange}
+                      className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+                      placeholder="0"
                     />
                   </div>
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-gray-700">MRP</label>
+                    <input
+                      type="text"
+                      value={formatIndianNumberInput(formData.mrp ?? '')}
+                      onChange={(e) => handleStandalonePricingChange('mrp', e.target.value)}
+                      className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+                      placeholder="Enter MRP"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-gray-700">Selling Price</label>
+                    <input
+                      type="text"
+                      value={formatIndianNumberInput(formData.sellingPrice ?? '')}
+                      onChange={(e) => handleStandalonePricingChange('sellingPrice', e.target.value)}
+                      className={`w-full mt-1 p-3 border rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors ${
+                        getStandalonePricingErrors().sellingPrice ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                      }`}
+                      placeholder="Enter selling price"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-gray-700">Max Discount %</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="99.99"
+                      value={formData.discountPercent ?? ''}
+                      onChange={(e) => handleStandalonePricingChange('discountPercent', e.target.value)}
+                      className={`w-full mt-1 p-3 border rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors ${
+                        getStandalonePricingErrors().discountPercent ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                      }`}
+                      placeholder="Auto from MRP / selling"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-gray-700">Margin Price</label>
+                    <input
+                      type="text"
+                      value={formatIndianNumberInput(formData.marginPrice ?? '')}
+                      onChange={(e) => handleStandalonePricingChange('marginPrice', e.target.value)}
+                      className={`w-full mt-1 p-3 border rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors ${
+                        getStandalonePricingErrors().marginPrice ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                      }`}
+                      placeholder="Enter margin price"
+                    />
+                  </div>
+                </div>
+                </>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -3936,17 +4155,17 @@ export default function ProductForm({
                   <button
                     type="button"
                     onClick={addPriceBySizeRow}
-                    disabled={isCreatingMultipleVariants || isChildProduct}
+                    disabled={variantWorkflowEnabled || isChildProduct}
                     className="text-xs font-semibold text-primary hover:underline disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed"
                   >
                     + Add row
                   </button>
                 </div>
-                {(isCreatingMultipleVariants || isChildProduct) && (
+                {(variantWorkflowEnabled || isChildProduct) && (
                   <p className="mb-2 text-xs text-amber-700">
                     {isChildProduct
                       ? 'Price by Size is managed on the parent product (or per variant row), not on child products.'
-                      : 'Price by Size is locked because variants are enabled. Existing values are preserved.'}
+                      : 'Price by Size is locked while variants are enabled. Use the Variants section for per-SKU pricing.'}
                   </p>
                 )}
 
@@ -3967,14 +4186,14 @@ export default function ProductForm({
                           placeholder="Price "
                           value={row.price ?? ''}
                           onChange={(e) => handlePriceBySizeChange(index, 'price', e.target.value)}
-                          disabled={isCreatingMultipleVariants || isChildProduct}
+                          disabled={variantWorkflowEnabled || isChildProduct}
                           className={`md:col-span-4 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary ${LOCKED_CHILD_FIELD_CLASS}`}
                         />
                         <input
                           placeholder="Size (e.g., 5)"
                           value={row.size ?? ''}
                           onChange={(e) => handlePriceBySizeChange(index, 'size', e.target.value)}
-                          disabled={isCreatingMultipleVariants || isChildProduct}
+                          disabled={variantWorkflowEnabled || isChildProduct}
                           className={`md:col-span-4 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary ${LOCKED_CHILD_FIELD_CLASS}`}
                         />
                         <input
@@ -3982,13 +4201,13 @@ export default function ProductForm({
                           value={row.unit ?? ''}
                           onChange={(e) => handlePriceBySizeChange(index, 'unit', e.target.value)}
                           list="priceBySizeUnitOptions"
-                          disabled={isCreatingMultipleVariants || isChildProduct}
+                          disabled={variantWorkflowEnabled || isChildProduct}
                           className={`md:col-span-3 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary ${LOCKED_CHILD_FIELD_CLASS}`}
                         />
                         <button
                           type="button"
                           onClick={() => removePriceBySizeRow(index)}
-                          disabled={isCreatingMultipleVariants || isChildProduct}
+                          disabled={variantWorkflowEnabled || isChildProduct}
                           className="md:col-span-1 text-red-500 hover:text-red-700 justify-self-center disabled:text-gray-400 disabled:cursor-not-allowed"
                           title="Remove row"
                         >
@@ -5683,6 +5902,9 @@ export default function ProductForm({
         </div>
         )}
 
+        </>
+        )}
+
         {isUploading && (
           <div className="text-blue-600 font-medium text-center mt-6">Uploading files, please wait...</div>
         )}
@@ -5698,11 +5920,22 @@ export default function ProductForm({
           <button 
             type="submit" 
             className="w-full sm:w-auto px-6 py-2.5 sm:py-2 bg-primary text-white rounded-md font-semibold hover:bg-primary-700 text-base" 
-            disabled={isUploading}
+            disabled={isUploading || awaitingVariantChoice}
           >
             {isUploading ? 'Uploading...' : 'Save Product'}
           </button>
         </div>
+        <datalist id="variantUnitOptions">
+          <option value="kg" />
+          <option value="g" />
+          <option value="gm" />
+          <option value="pcs" />
+          <option value="pc" />
+          <option value="set" />
+          <option value="pack" />
+          <option value="box" />
+          <option value="pair" />
+        </datalist>
       </form>
     </div>
   );

@@ -35,6 +35,7 @@ export default function AdminAddProductPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isVariantsOnlyView, setIsVariantsOnlyView] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [duplicateProduct, setDuplicateProduct] = useState(null);
   const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(true);
@@ -166,7 +167,7 @@ export default function AdminAddProductPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto w-full">
+    <div className={`mx-auto w-full ${isVariantsOnlyView ? 'max-w-[96vw] 2xl:max-w-[1800px]' : 'max-w-4xl'}`}>
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 text-sm sm:text-base">
           {error}
@@ -187,6 +188,7 @@ export default function AdminAddProductPage() {
         onSave={handleSave}
         onCancel={handleCancel}
         onCategoryChange={setSelectedCategoryId}
+        onVariantsOnlyChange={setIsVariantsOnlyView}
       />
     </div>
   );

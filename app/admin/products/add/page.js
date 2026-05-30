@@ -115,6 +115,7 @@ export default function AdminAddProductPage() {
       if (variantRows.length > 0 && parentId) {
         const result = await saveProductChildren({
           parentId,
+          parent: { title: productData.title },
           variantRows,
           variationTheme,
         });

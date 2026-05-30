@@ -19,11 +19,17 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
-const PREDEFINED_COLORS = [
-  'Blue', 'Green', 'Red', 'Yellow', 'Purple', 'Orange',
-  'Pink', 'Brown', 'Gray', 'Black', 'White', 'Silver',
-  'Transparent', 'Multicolour', 'Gold', 'Rose Gold', 'Beige',
-];
+import { canonicalizeCatalogColorName } from '@/lib/shared/catalogColors';
+
+function collectProductColorNames(product) {
+  const names = [
+    ...(product?.colorVariants || []).map((cv) => cv?.colorName),
+    product?.variationAttributes?.color,
+  ];
+  return names
+    .map((name) => canonicalizeCatalogColorName(name))
+    .filter(Boolean);
+}
 
 // Debounce utility
 function useDebounce(value, delay) {
@@ -212,11 +218,10 @@ export function useProductFilters(products, categories) {
 
     // Color filter
     if (selectedColors.length > 0) {
-      filtered = filtered.filter(p => {
-        const productColors = p.colorVariants
-          ?.map(cv => cv.colorName)
-          .filter(colorName => PREDEFINED_COLORS.includes(colorName)) || [];
-        return productColors.some(c => selectedColors.includes(c));
+      const wanted = selectedColors.map((c) => canonicalizeCatalogColorName(c) || c);
+      filtered = filtered.filter((p) => {
+        const productColors = collectProductColorNames(p);
+        return productColors.some((c) => wanted.includes(c));
       });
     }
 

@@ -21,10 +21,12 @@ import { findBarcodeConflictsForChild, normalizeBarcode } from '@/lib/server/pro
 import { syncParentEmbeddedVariantFromChild } from '@/lib/server/products/syncParentEmbeddedVariants';
 import { removeEmbeddedVariantFromParent } from '@/lib/server/products/removeEmbeddedVariant';
 import { archiveSlugOnSoftDelete } from '@/lib/server/products/slugArchive';
+import {
+  buildChildPayloadFromVariantRow,
+  sanitizeChildVariationAttributes,
+} from '@/lib/shared/childVariantPayload';
 
 export const dynamic = 'force-dynamic';
-
-const VARIATION_KEYS = ['size', 'color', 'weight', 'unitCount'];
 
 const ALLOWED_FIELDS = [
   'sku',
@@ -73,56 +75,83 @@ export async function PATCH(request, { params }) {
       );
     }
 
-    const updates = pickAllowed(body);
+    let parent = await Product.findById(child.parentProductId).lean();
 
-    if (Object.prototype.hasOwnProperty.call(body, 'barcode')) {
-      const nextBarcode = normalizeBarcode(body.barcode);
-      if (nextBarcode) {
-        const conflicts = await findBarcodeConflictsForChild(child, nextBarcode);
-        if (conflicts.length > 0) {
-          const hit = conflicts[0];
-          return NextResponse.json(
-            {
-              error: `Barcode "${nextBarcode}" is already used by "${hit.title}".`,
-              conflicts,
-            },
-            { status: 400 }
-          );
-        }
+    const built = buildChildPayloadFromVariantRow(
+      {
+        name: body.title || body.name || child.title,
+        size: body.variationAttributes?.size ?? child.variationAttributes?.size,
+        color: body.variationAttributes?.color ?? child.variationAttributes?.color,
+        weight: body.variationAttributes?.weight ?? child.variationAttributes?.weight,
+        unitCount: body.variationAttributes?.unitCount ?? child.variationAttributes?.unitCount,
+        unit: body.variationAttributes?.unit ?? body.unit ?? child.variationAttributes?.unit,
+        sku: Object.prototype.hasOwnProperty.call(body, 'sku') ? body.sku : child.sku,
+        barcode: Object.prototype.hasOwnProperty.call(body, 'barcode') ? body.barcode : child.barcode,
+        hsnCode: Object.prototype.hasOwnProperty.call(body, 'hsnCode') ? body.hsnCode : child.hsnCode,
+        gstPercent: Object.prototype.hasOwnProperty.call(body, 'gstPercent') ? body.gstPercent : child.gstPercent,
+        mrp: Object.prototype.hasOwnProperty.call(body, 'mrp') ? body.mrp : child.mrp,
+        sellingPrice: Object.prototype.hasOwnProperty.call(body, 'sellingPrice')
+          ? body.sellingPrice
+          : child.sellingPrice,
+        discountPercent: Object.prototype.hasOwnProperty.call(body, 'discountPercent')
+          ? body.discountPercent
+          : child.discountPercent,
+        marginPrice: Object.prototype.hasOwnProperty.call(body, 'marginPrice')
+          ? body.marginPrice
+          : child.marginPrice,
+        price: Object.prototype.hasOwnProperty.call(body, 'price') ? body.price : child.price,
+        images: Array.isArray(body.images) ? body.images : child.gallery,
+        showInCatalog: Object.prototype.hasOwnProperty.call(body, 'showInCatalog')
+          ? body.showInCatalog
+          : child.showInCatalog,
+        isDefault: body.isDefault,
+        _legacyParentVariantId: child.legacyParentVariantId,
+      },
+      { parent, variationTheme: parent?.variationTheme }
+    );
+
+    if (built.barcode) {
+      const conflicts = await findBarcodeConflictsForChild(child, built.barcode);
+      if (conflicts.length > 0) {
+        const hit = conflicts[0];
+        return NextResponse.json(
+          {
+            error: `Barcode "${built.barcode}" is already used by "${hit.title}".`,
+            conflicts,
+          },
+          { status: 400 }
+        );
       }
-      updates.barcode = nextBarcode;
     }
 
-    // Variation attributes can be updated; this triggers a slug regen using the new attrs.
     let regenSlug = false;
-    if (body.variationAttributes && typeof body.variationAttributes === 'object') {
-      const sanitized = {};
-      VARIATION_KEYS.forEach((k) => {
-        sanitized[k] = String(body.variationAttributes?.[k] ?? '').trim();
-      });
-      const changed = VARIATION_KEYS.some((k) => sanitized[k] !== (child.variationAttributes?.[k] || ''));
-      if (changed) {
-        child.variationAttributes = sanitized;
-        regenSlug = true;
-      }
+    const prevAttrs = sanitizeChildVariationAttributes(child.variationAttributes || {});
+    const nextAttrs = built.variationAttributes;
+    const attrsChanged = Object.keys(nextAttrs).some((k) => nextAttrs[k] !== prevAttrs[k]);
+    if (attrsChanged) {
+      child.variationAttributes = nextAttrs;
+      regenSlug = true;
     }
 
+    child.title = built.title;
+    child.sku = built.sku;
+    child.barcode = built.barcode;
+    child.hsnCode = built.hsnCode;
+    child.gstPercent = built.gstPercent;
+    child.mrp = built.mrp;
+    child.sellingPrice = built.sellingPrice;
+    child.discountPercent = built.discountPercent;
+    child.marginPrice = built.marginPrice;
+    child.price = built.price;
+    child.gallery = built.images;
+    child.heroImage = built.heroImage || child.gallery?.[0] || '';
+
+    const updates = pickAllowed(body);
     Object.assign(child, updates);
 
-    if (Array.isArray(body.images)) {
-      child.gallery = body.images.filter(Boolean);
-      if (!child.heroImage) {
-        child.heroImage = child.gallery[0] || '';
-      }
-    }
-
-    let parent = null;
-    if (regenSlug) {
-      parent = await Product.findById(child.parentProductId).lean();
-      if (parent) {
-        const slugBase = Product.buildChildSlugBase(parent, child.variationAttributes);
-        child.slug = await generateUniqueSlug(slugBase, child._id);
-      }
+    if (regenSlug && parent) {
+      const slugBase = Product.buildChildSlugBase(parent, child.variationAttributes);
+      child.slug = await generateUniqueSlug(slugBase, child._id);
     }
 
     if (!parent) {

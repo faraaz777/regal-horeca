@@ -19,6 +19,7 @@ import { normalizeProductPayloadForUpdate, normalizeFiltersField } from '@/lib/s
 import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
 import { findBarcodeConflicts, normalizeBarcode } from '@/lib/server/products/barcodeValidation';
 import { syncParentEmbeddedVariantFromChild } from '@/lib/server/products/syncParentEmbeddedVariants';
+import { stripChildVariantOwnedFields } from '@/lib/shared/childVariantPayload';
 import mongoose from 'mongoose';
 
 /**
@@ -187,8 +188,7 @@ export async function PUT(request, { params }) {
 
     const resolvedProductType = product.productType || 'standalone';
     if (resolvedProductType === 'child') {
-      delete updateData.variants;
-      delete updateData.variationTheme;
+      stripChildVariantOwnedFields(updateData);
       if (updateData.productType === 'parent') delete updateData.productType;
     }
 

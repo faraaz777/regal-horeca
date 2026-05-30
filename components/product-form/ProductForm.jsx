@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Product Form Component
  * 
  * Comprehensive product creation/editing form with:
@@ -24,6 +24,10 @@ import {
   findDuplicateBarcodesInRows,
   validateVariantBarcodesAgainstCatalog,
 } from '@/lib/utils/validateVariantBarcodes';
+import { stripChildVariantOwnedFields } from '@/lib/shared/childVariantPayload';
+
+const LOCKED_CHILD_FIELD_CLASS =
+  'disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed';
 
 function getTextLength(str) {
   if (!str || typeof str !== 'string') return 0;
@@ -654,7 +658,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
           variantId: '',
           name: child.title,
           size: attrs.size || '',
-          unit: '',
+          unit: attrs.unit || '',
           color: attrs.color || '',
           unitCount: attrs.unitCount || '',
           weight: attrs.weight || '',
@@ -747,10 +751,6 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     setFormData((prev) => ({ ...prev, priceBySize: next }));
   };
 
-  const selectedColorNames = (formData.colorVariants || [])
-    .map((variant) => String(variant?.colorName || '').trim())
-    .filter(Boolean);
-
   const handleVariantFieldToggle = (field) => {
     setVariantFieldSelection((prev) => {
       if (prev[field]) {
@@ -803,27 +803,6 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     }));
   };
 
-  const removeColorFromVariantBuilder = (colorName) => {
-    const key = String(colorName || '').trim().toLowerCase();
-    if (!key) return;
-    setFormData((prev) => ({
-      ...prev,
-      colorVariants: (prev.colorVariants || []).filter(
-        (variant) => String(variant?.colorName || '').trim().toLowerCase() !== key
-      ),
-    }));
-  };
-
-  const openProductFormColorSection = () => {
-    setShowVariantsOnly(false);
-    setError('');
-    requestAnimationFrame(() => {
-      document
-        .getElementById('product-form-color-variants')
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  };
-
   const renderVariantOptionValueChips = (field) => {
     const values = parseOptionValues(variantBuilderInputs[field]);
     if (values.length === 0) {
@@ -852,38 +831,28 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     );
   };
 
-  const renderColorVariantBuilderChips = () => {
-    if (selectedColorNames.length === 0) {
-      return null;
-    }
-    return (
-      <ul className="flex flex-wrap gap-1.5 mt-2 list-none">
-        {selectedColorNames.map((name) => (
-          <li
-            key={`builder-color-${name}`}
-            className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 text-xs font-medium text-blue-900 bg-blue-50 border border-blue-200 rounded-full"
-          >
-            <span>{name}</span>
-            <button
-              type="button"
-              onClick={() => removeColorFromVariantBuilder(name)}
-              className="inline-flex h-5 w-5 items-center justify-center rounded-full text-blue-700 hover:bg-red-50 hover:text-red-600"
-              title={`Remove ${name}`}
-              aria-label={`Remove color ${name}`}
-            >
-              ×
-            </button>
-          </li>
-        ))}
-      </ul>
-    );
-  };
-
   const parseOptionValues = (raw) =>
     String(raw || '')
       .split(',')
       .map((value) => value.trim())
       .filter(Boolean);
+
+  /** Colors defined in the variant builder + existing rows (not the marketing Color Variants block). */
+  const variantMatrixColorOptions = useMemo(() => {
+    const seen = new Set();
+    const out = [];
+    const add = (name) => {
+      const label = String(name || '').trim();
+      if (!label) return;
+      const key = label.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(label);
+    };
+    parseOptionValues(variantBuilderInputs.color).forEach(add);
+    (variantRows || []).forEach((row) => add(row?.color));
+    return out;
+  }, [variantBuilderInputs.color, variantRows]);
 
   const getVariantCombinationKey = (combo) =>
     [combo.size || '', combo.color || '', combo.weight || '', combo.unitCount || '']
@@ -928,9 +897,9 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     }
 
     if (variantFieldSelection.color) {
-      const values = selectedColorNames;
+      const values = parseOptionValues(variantBuilderInputs.color);
       if (values.length === 0) {
-        setError('Add at least one color in the Color Variants section (use the link below).');
+        setError('Please enter at least one Color value in the variant builder (type a color and click Add).');
         return;
       }
       dimensions.push({ key: 'color', values });
@@ -2963,13 +2932,6 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     e.preventDefault();
     setError('');
 
-    const colorImagesByName = new Map(
-      (formData.colorVariants || []).map((variant) => [
-        String(variant?.colorName || '').trim().toLowerCase(),
-        Array.isArray(variant?.images) ? variant.images.filter(Boolean) : [],
-      ])
-    );
-
     const rowsForVariantSubmit = isChildProduct ? [] : (variantRows || []);
     const normalizedVariants = rowsForVariantSubmit
       .filter((row) => row && typeof row === 'object')
@@ -2978,9 +2940,6 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         images: (() => {
           const explicitImages = Array.isArray(row.images) ? row.images.filter(Boolean) : [];
           if (explicitImages.length > 0) return explicitImages;
-          const colorKey = String(row.color || '').trim().toLowerCase();
-          const matchedColorImages = colorKey ? (colorImagesByName.get(colorKey) || []) : [];
-          if (matchedColorImages.length > 0) return matchedColorImages;
           return formData.heroImage ? [formData.heroImage] : [];
         })(),
         name: String(row.name || formData.title || '').trim(),
@@ -3058,19 +3017,6 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         const catalogBarcodeMsg = await validateVariantBarcodesAgainstCatalog(
           [{ barcode: standaloneBarcode, _childProductId: parentOrSelfId }],
           { parentProductId: parentOrSelfId }
-        );
-        if (catalogBarcodeMsg) {
-          setError(catalogBarcodeMsg);
-          toast.error(catalogBarcodeMsg);
-          return;
-        }
-      }
-    } else {
-      const childBarcode = String(formData.barcode || '').trim();
-      if (childBarcode) {
-        const catalogBarcodeMsg = await validateVariantBarcodesAgainstCatalog(
-          [{ barcode: childBarcode, _childProductId: parentOrSelfId }],
-          { parentProductId: product?.parentProductId || null }
         );
         if (catalogBarcodeMsg) {
           setError(catalogBarcodeMsg);
@@ -3239,6 +3185,12 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
 
     delete finalProduct.tagsInput;
 
+    if (isChildProduct) {
+      stripChildVariantOwnedFields(finalProduct);
+      delete finalProduct._variantRows;
+      delete finalProduct._initialChildIds;
+    }
+
     // Ensure categoryId is included if it exists (even if empty string, API will handle it)
     // categoryId should be set when a "type" level category is selected
     if (finalProduct.categoryId === '' || finalProduct.categoryId === null || finalProduct.categoryId === undefined) {
@@ -3288,8 +3240,8 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
         {isChildProduct && !showVariantsOnly && (
           <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <p>
-              This row is a <strong>variant (child) product</strong>. You cannot add a variant matrix here edit variants on the{' '}
-              <strong>parent</strong> product.
+              This row is a <strong>variant (child) product</strong>. SKU, barcode, HSN, pricing, images, size, colour, and title are managed only in the{' '}
+              <strong>parent → Variants section</strong>. Use this form for shared content (descriptions, specs, categories, etc.).
             </p>
             {product?.parentProductId && (
               <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -3352,38 +3304,31 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Color values</label>
                     <p className="text-xs text-gray-500 mb-2">
-                      Colors come from the{' '}
-                      <button
-                        type="button"
-                        onClick={openProductFormColorSection}
-                        className="font-semibold text-primary underline hover:text-primary-700"
-                      >
-                        Color Variants
-                      </button>{' '}
-                      section of the product form.
+                      Add sellable colours here (e.g. Red, Gold). These are saved on each variant row and child product — separate from marketing Color Variants below.
                     </p>
-                    {selectedColorNames.length > 0 ? (
-                      <>
-                        <p className="text-xs text-blue-700 mb-1">Selected colors — click × to remove:</p>
-                        {renderColorVariantBuilderChips()}
-                        <button
-                          type="button"
-                          onClick={openProductFormColorSection}
-                          className="mt-2 text-xs font-semibold text-primary underline hover:text-primary-700"
-                        >
-                          Add or edit more colors
-                        </button>
-                      </>
-                    ) : (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Type one color and click Add"
+                        value={variantDraftValue.color}
+                        onChange={(e) => setVariantDraftValue((prev) => ({ ...prev, color: e.target.value }))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addVariantOptionValue('color');
+                          }
+                        }}
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                      />
                       <button
                         type="button"
-                        onClick={openProductFormColorSection}
-                        className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-primary border border-primary/40 rounded-md bg-primary/5 hover:bg-primary/10"
+                        onClick={() => addVariantOptionValue('color')}
+                        className="px-2 py-1.5 text-xs font-semibold bg-green-600 text-white rounded-md hover:bg-green-700"
                       >
-                        <PlusIcon className="w-3.5 h-3.5" />
-                        Add colors in Color Variants section
+                        Add
                       </button>
-                    )}
+                    </div>
+                    {renderVariantOptionValueChips('color')}
                   </div>
                 )}
                 {variantFieldSelection.weight && (
@@ -3576,57 +3521,15 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     </td>
                     {variantFieldSelection.color && (
                       <td className="w-[160px] min-w-[160px] px-3 py-7 align-top">
-                        {selectedColorNames.length > 0 ? (
-                          <div className="space-y-1.5">
-                            <select
-                              value={(() => {
-                                const raw = String(row.color || '').trim();
-                                if (!raw) return '';
-                                const match = selectedColorNames.find(
-                                  (n) => n.toLowerCase() === raw.toLowerCase()
-                                );
-                                return match || '__other__';
-                              })()}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                if (v === '') handleVariantRowChange(index, 'color', '');
-                                else if (v === '__other__') handleVariantRowChange(index, 'color', row.color || '');
-                                else handleVariantRowChange(index, 'color', v);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full p-2 border border-gray-300 rounded-md text-sm"
-                            >
-                              <option value="">Match Color Variant</option>
-                              {selectedColorNames.map((name) => (
-                                <option key={name} value={name}>
-                                  {name}
-                                </option>
-                              ))}
-                              <option value="__other__">Other (custom)</option>
-                            </select>
-                            {(() => {
-                              const raw = String(row.color || '').trim();
-                              const inList = selectedColorNames.some((n) => n.toLowerCase() === raw.toLowerCase());
-                              return !inList;
-                            })() && (
-                              <input
-                                type="text"
-                                value={row.color || ''}
-                                onChange={(e) => handleVariantRowChange(index, 'color', e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                                placeholder="Custom color name"
-                                className="w-full p-2 border border-gray-300 rounded-md text-xs"
-                              />
-                            )}
-                          </div>
-                        ) : (
-                          <input
-                            type="text"
-                            value={row.color || ''}
-                            onChange={(e) => handleVariantRowChange(index, 'color', e.target.value)}
-                            className="w-full p-2.5 border border-gray-300 rounded-md"
-                          />
-                        )}
+                        <input
+                          type="text"
+                          value={row.color || ''}
+                          onChange={(e) => handleVariantRowChange(index, 'color', e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          list="variantMatrixColorOptions"
+                          placeholder="e.g. Red, Gold"
+                          className="w-full p-2.5 border border-gray-300 rounded-md"
+                        />
                       </td>
                     )}
                     {variantFieldSelection.unitCount && <td className="w-[130px] min-w-[130px] px-3 py-2"><input type="text" value={row.unitCount || ''} onChange={(e) => handleVariantRowChange(index, 'unitCount', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>}
@@ -3680,7 +3583,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                             )}
                           </div>
                         ) : (
-                          <p className="text-[11px] text-gray-500">Will use color images or hero image fallback.</p>
+                          <p className="text-[11px] text-gray-500">Uses this row&apos;s images, or parent hero if empty.</p>
                         )}
                       </div>
                     </td>
@@ -3731,6 +3634,11 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
               <option value="box" />
               <option value="pair" />
             </datalist>
+            <datalist id="variantMatrixColorOptions">
+              {variantMatrixColorOptions.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
           </div>
         </FormSection>
         </div>
@@ -3748,9 +3656,10 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   name="title" 
                   value={formData.title} 
                   onChange={handleChange} 
-                  className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors" 
-                  placeholder="Enter product title"
-                  required
+                  disabled={isChildProduct}
+                  className={`w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors ${LOCKED_CHILD_FIELD_CLASS}`}
+                  placeholder={isChildProduct ? 'Edit name in parent Variants section' : 'Enter product title'}
+                  required={!isChildProduct}
                 />
               </div>
               <div>
@@ -3861,9 +3770,15 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     name="sku" 
                     value={formData.sku || ''} 
                     onChange={handleChange} 
-                    disabled={isCreatingMultipleVariants}
-                    className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed" 
-                    placeholder={isCreatingMultipleVariants ? 'SKU is managed per variant row' : 'Enter SKU'}
+                    disabled={isCreatingMultipleVariants || isChildProduct}
+                    className={`w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors ${LOCKED_CHILD_FIELD_CLASS}`}
+                    placeholder={
+                      isChildProduct
+                        ? 'Managed in parent Variants section'
+                        : isCreatingMultipleVariants
+                          ? 'SKU is managed per variant row'
+                          : 'Enter SKU'
+                    }
                   />
                 </div>
                 {!isCreatingMultipleVariants && (
@@ -3873,8 +3788,9 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                       name="barcode"
                       value={formData.barcode || ''}
                       onChange={handleChange}
-                      className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
-                      placeholder="Enter Barcode"
+                      disabled={isChildProduct}
+                      className={`w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors ${LOCKED_CHILD_FIELD_CLASS}`}
+                      placeholder={isChildProduct ? 'Managed in parent Variants section' : 'Enter Barcode'}
                     />
                   </div>
                 )}
@@ -3887,8 +3803,9 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                       name="hsnCode"
                       value={formData.hsnCode || ''}
                       onChange={handleChange}
-                      className="w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
-                      placeholder="Enter HSN Code"
+                      disabled={isChildProduct}
+                      className={`w-full mt-1 p-3 border border-gray-300 rounded-lg shadow-sm text-base focus:ring-2 focus:ring-primary focus:border-primary transition-colors ${LOCKED_CHILD_FIELD_CLASS}`}
+                      placeholder={isChildProduct ? 'Managed in parent Variants section' : 'Enter HSN Code'}
                     />
                   </div>
                 </div>
@@ -3933,15 +3850,17 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   <button
                     type="button"
                     onClick={addPriceBySizeRow}
-                    disabled={isCreatingMultipleVariants}
+                    disabled={isCreatingMultipleVariants || isChildProduct}
                     className="text-xs font-semibold text-primary hover:underline disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed"
                   >
                     + Add row
                   </button>
                 </div>
-                {isCreatingMultipleVariants && (
+                {(isCreatingMultipleVariants || isChildProduct) && (
                   <p className="mb-2 text-xs text-amber-700">
-                    Price by Size is locked because variants are enabled. Existing values are preserved.
+                    {isChildProduct
+                      ? 'Price by Size is managed on the parent product (or per variant row), not on child products.'
+                      : 'Price by Size is locked because variants are enabled. Existing values are preserved.'}
                   </p>
                 )}
 
@@ -3962,28 +3881,28 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                           placeholder="Price "
                           value={row.price ?? ''}
                           onChange={(e) => handlePriceBySizeChange(index, 'price', e.target.value)}
-                          disabled={isCreatingMultipleVariants}
-                          className="md:col-span-4 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                          disabled={isCreatingMultipleVariants || isChildProduct}
+                          className={`md:col-span-4 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary ${LOCKED_CHILD_FIELD_CLASS}`}
                         />
                         <input
                           placeholder="Size (e.g., 5)"
                           value={row.size ?? ''}
                           onChange={(e) => handlePriceBySizeChange(index, 'size', e.target.value)}
-                          disabled={isCreatingMultipleVariants}
-                          className="md:col-span-4 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                          disabled={isCreatingMultipleVariants || isChildProduct}
+                          className={`md:col-span-4 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary ${LOCKED_CHILD_FIELD_CLASS}`}
                         />
                         <input
                           placeholder="Unit (e.g., kg / pcs)"
                           value={row.unit ?? ''}
                           onChange={(e) => handlePriceBySizeChange(index, 'unit', e.target.value)}
                           list="priceBySizeUnitOptions"
-                          disabled={isCreatingMultipleVariants}
-                          className="md:col-span-3 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                          disabled={isCreatingMultipleVariants || isChildProduct}
+                          className={`md:col-span-3 p-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-primary ${LOCKED_CHILD_FIELD_CLASS}`}
                         />
                         <button
                           type="button"
                           onClick={() => removePriceBySizeRow(index)}
-                          disabled={isCreatingMultipleVariants}
+                          disabled={isCreatingMultipleVariants || isChildProduct}
                           className="md:col-span-1 text-red-500 hover:text-red-700 justify-self-center disabled:text-gray-400 disabled:cursor-not-allowed"
                           title="Remove row"
                         >
@@ -4773,8 +4692,20 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
 
             <div id="product-form-color-variants" className="scroll-mt-4">
             <FormSection title="Color Variants">
+              {isChildProduct ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <p>
+                    Colour for this variant is set in the <strong>parent product → Variants section</strong> (Colour column).
+                    Marketing colour swatches and per-colour gallery images are edited on the parent only.
+                  </p>
+                </div>
+              ) : (
+              <>
               <div className="space-y-5">
-                <p className="text-sm text-gray-600 mb-4">Select the available colors for the product.</p>
+                <p className="text-sm text-gray-600 mb-4">
+                  Optional marketing swatches and gallery images per colour for the storefront.{' '}
+                  <strong className="text-gray-800">Sellable variant colours</strong> (what is saved on each SKU) are set in the Variants section above — not here.
+                </p>
                 
                 {/* Predefined Colors */}
                 <div>
@@ -4864,8 +4795,8 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                 </div>
               </div>
 
-          {/* Color Picker Modal */}
-          {showColorPicker && (
+              {/* Color Picker Modal */}
+              {showColorPicker && (
             <div 
               className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
               onClick={(e) => {
@@ -4942,7 +4873,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                 </div>
               </div>
             </div>
-          )}
+              )}
               {formData.colorVariants && formData.colorVariants.length > 0 && (
                 <div className="space-y-4 pt-5 border-t border-gray-200 mt-5">
                   <div className="flex items-center justify-between">
@@ -5025,7 +4956,9 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   ))}
                 </div>
               )}
-        </FormSection>
+              </>
+              )}
+            </FormSection>
             </div>
         
         <FormSection title="Specifications">

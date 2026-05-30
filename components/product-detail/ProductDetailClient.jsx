@@ -45,6 +45,10 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
+import {
+  canonicalizeCatalogColorName,
+  getCatalogColorHex,
+} from '@/lib/shared/catalogColors';
 import ProductCard from '@/components/ProductCard';
 import ProductGallery from '@/components/ProductGallery';
 import FaqAccordion from '@/components/FaqAccordion';
@@ -129,7 +133,7 @@ function normalizeProductForPDP(input) {
       variantId: '',
       name: child.title,
       size: attrs.size || '',
-      unit: '',
+      unit: attrs.unit || '',
       color: attrs.color || '',
       unitCount: attrs.unitCount || '',
       weight: attrs.weight || '',
@@ -481,7 +485,29 @@ export default function ProductDetailClient({ initialProduct = null }) {
         .filter(Boolean)
     );
     if (colorsInStock.size === 0) return palette;
-    return palette.filter((cv) => colorsInStock.has(normalizeVariantAttr(cv?.colorName)));
+
+    const matched = palette.filter((cv) =>
+      colorsInStock.has(normalizeVariantAttr(cv?.colorName))
+    );
+    const matchedKeys = new Set(matched.map((cv) => normalizeVariantAttr(cv?.colorName)));
+
+    const extras = [...colorsInStock]
+      .filter((key) => !matchedKeys.has(key))
+      .map((key) => {
+        const canonical = canonicalizeCatalogColorName(key) || key;
+        const fromPalette = palette.find(
+          (cv) => normalizeVariantAttr(cv?.colorName) === normalizeVariantAttr(canonical)
+        );
+        if (fromPalette) return fromPalette;
+        return {
+          colorName: canonical,
+          colorHex: getCatalogColorHex(canonical),
+          images: [],
+          isDefault: false,
+        };
+      });
+
+    return [...matched, ...extras];
   }, [product?.colorVariants, product?.variants, hasGeneratedVariants]);
 
   const variantsForSelectedColor = useMemo(

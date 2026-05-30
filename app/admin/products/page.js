@@ -642,6 +642,7 @@ export default function AdminProductsPage() {
 
       const result = await saveProductChildren({
         parentId: productId,
+        parent: { title: productData.title || editingProduct?.title },
         variantRows,
         variationTheme,
         initialChildIds,

@@ -5,25 +5,7 @@ import { useRouter } from 'next/navigation';
 import { PlusIcon, MinusIcon, XIcon, ChevronLeftIcon } from '@/components/Icons';
 import '@/components/new/SidebarFilter.css';
 
-const COLOR_HEX_MAP = {
-  blue: '#3B82F6',
-  green: '#10B981',
-  red: '#EF4444',
-  yellow: '#F59E0B',
-  purple: '#8B5CF6',
-  orange: '#F97316',
-  pink: '#EC4899',
-  brown: '#92400E',
-  gray: '#6B7280',
-  grey: '#6B7280',
-  black: '#121212',
-  white: '#FAFAF9',
-  silver: '#9CA3AF',
-};
-
-function getColorHex(colorName) {
-  return COLOR_HEX_MAP[colorName?.toLowerCase()] || '#CCCCCC';
-}
+import { getCatalogColorSwatchStyle } from '@/lib/shared/catalogColors';
 
 function FilterSection({ title, id, children, count, isOpen, onToggle }) {
   const hasItems = count !== undefined ? count > 0 : true;
@@ -215,7 +197,7 @@ export default function CatalogFilterSidebar({
                   className={`color-swatch-btn ${isSelected ? 'active' : ''} ${isDisabled ? 'opacity-20 cursor-not-allowed' : ''}`}
                   title={`${color}${count > 0 ? ` (${count})` : ''}`}
                 >
-                  <div className="color-swatch-circle" style={{ backgroundColor: getColorHex(color) }} />
+                  <div className="color-swatch-circle" style={getCatalogColorSwatchStyle(color)} />
                   <span className="color-swatch-label">{color}</span>
                 </button>
               );

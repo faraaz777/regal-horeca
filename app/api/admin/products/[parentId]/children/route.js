@@ -19,27 +19,13 @@ import { revalidateProductSlugs } from '@/lib/utils/revalidate';
 import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
 import { assertVariantBarcodesUnique, normalizeBarcode } from '@/lib/server/products/barcodeValidation';
 import { syncParentEmbeddedVariantFromChild } from '@/lib/server/products/syncParentEmbeddedVariants';
+import {
+  buildChildPayloadFromVariantRow,
+  deriveChildTitle,
+  sanitizeChildVariationAttributes,
+} from '@/lib/shared/childVariantPayload';
 
 export const dynamic = 'force-dynamic';
-
-const VARIATION_KEYS = ['size', 'color', 'weight', 'unitCount'];
-
-function sanitizeVariationAttributes(input) {
-  const out = {};
-  VARIATION_KEYS.forEach((k) => {
-    out[k] = String(input?.[k] ?? '').trim();
-  });
-  return out;
-}
-
-function deriveChildTitle(parentTitle, attrs) {
-  const tail = VARIATION_KEYS
-    .map((k) => attrs[k])
-    .filter(Boolean)
-    .join(' / ');
-  if (!tail) return parentTitle;
-  return `${parentTitle} - ${tail}`;
-}
 
 export async function GET(request, { params }) {
   const authError = assertAdmin(request);
@@ -101,7 +87,9 @@ export async function POST(request, { params }) {
         parent.variationTheme = body.variationTheme.filter(Boolean);
       } else if (parent.variationTheme.length === 0) {
         // Infer from the variation attributes of this first child.
-        const inferred = VARIATION_KEYS.filter((k) => String(body?.variationAttributes?.[k] ?? '').trim());
+        const inferred = ['size', 'color', 'weight', 'unitCount'].filter((k) =>
+          String(body?.variationAttributes?.[k] ?? '').trim()
+        );
         parent.variationTheme = inferred;
       }
       await parent.save();
@@ -111,8 +99,33 @@ export async function POST(request, { params }) {
       await parent.save();
     }
 
-    const variationAttributes = sanitizeVariationAttributes(body.variationAttributes);
-    const barcode = normalizeBarcode(body.barcode);
+    const built = buildChildPayloadFromVariantRow(
+      {
+        name: body.title || body.name,
+        size: body.variationAttributes?.size,
+        color: body.variationAttributes?.color,
+        weight: body.variationAttributes?.weight,
+        unitCount: body.variationAttributes?.unitCount,
+        unit: body.variationAttributes?.unit ?? body.unit,
+        sku: body.sku,
+        barcode: body.barcode,
+        hsnCode: body.hsnCode,
+        gstPercent: body.gstPercent,
+        mrp: body.mrp,
+        sellingPrice: body.sellingPrice,
+        discountPercent: body.discountPercent,
+        marginPrice: body.marginPrice,
+        price: body.price,
+        images: body.images,
+        showInCatalog: body.showInCatalog,
+        isDefault: body.isDefault,
+        _legacyParentVariantId: body.legacyParentVariantId,
+      },
+      { parent, variationTheme: parent.variationTheme }
+    );
+
+    const variationAttributes = built.variationAttributes;
+    const barcode = built.barcode;
     if (barcode) {
       const barcodeCheck = await assertVariantBarcodesUnique(
         [{ barcode, _childProductId: null }],
@@ -126,7 +139,7 @@ export async function POST(request, { params }) {
       }
     }
 
-    const title = deriveChildTitle(parent.title, variationAttributes);
+    const title = built.title;
     const slugBase = Product.buildChildSlugBase(parent, variationAttributes);
     const slug = await generateUniqueSlug(slugBase);
 
@@ -137,27 +150,25 @@ export async function POST(request, { params }) {
       parentProductId: parent._id,
       variationTheme: parent.variationTheme,
       variationAttributes,
-      visibleOnClient: body.visibleOnClient !== false,
-      showInCatalog: body.showInCatalog === true,
-      // Mirrored query-critical fields.
+      visibleOnClient: built.visibleOnClient !== false,
+      showInCatalog: built.showInCatalog === true,
       categoryId: parent.categoryId || null,
       categoryIds: Array.isArray(parent.categoryIds) ? parent.categoryIds : [],
       brand: parent.brand || '',
       businessTypeSlugs: Array.isArray(parent.businessTypeSlugs) ? parent.businessTypeSlugs : [],
-      // Per-child commerce fields (deltas).
-      sku: String(body.sku || '').trim(),
+      sku: built.sku,
       barcode,
-      hsnCode: String(body.hsnCode || '').trim(),
-      gstPercent: Number(body.gstPercent || 0),
-      mrp: Number(body.mrp || 0),
-      sellingPrice: Number(body.sellingPrice || 0),
-      discountPercent: Number(body.discountPercent || 0),
-      marginPrice: Number(body.marginPrice || 0),
-      price: Number(body.price ?? body.sellingPrice ?? 0),
-      heroImage: body.heroImage || (Array.isArray(body.images) ? body.images.find(Boolean) : '') || '',
-      gallery: Array.isArray(body.images) ? body.images.filter(Boolean) : [],
+      hsnCode: built.hsnCode,
+      gstPercent: built.gstPercent,
+      mrp: built.mrp,
+      sellingPrice: built.sellingPrice,
+      discountPercent: built.discountPercent,
+      marginPrice: built.marginPrice,
+      price: built.price,
+      heroImage: built.heroImage,
+      gallery: built.images,
       status: body.status || parent.status || 'In Stock',
-      legacyParentVariantId: String(body.legacyParentVariantId || '').trim(),
+      legacyParentVariantId: built.legacyParentVariantId,
     });
 
     child.searchBlob = Product.buildSearchBlob(parent, child);

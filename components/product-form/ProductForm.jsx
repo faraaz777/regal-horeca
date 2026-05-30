@@ -100,6 +100,28 @@ function getPredefinedColorSwatchClassName(color) {
   return '';
 }
 
+function resolveColorDisplay(name, colorVariants = []) {
+  const trimmed = String(name || '').trim();
+  if (!trimmed) return null;
+  const lower = trimmed.toLowerCase();
+  const predefined = AVAILABLE_COLORS.find((c) => c.name.toLowerCase() === lower);
+  if (predefined) {
+    return {
+      colorName: predefined.name,
+      colorHex: predefined.hex,
+      swatch: predefined.swatch,
+    };
+  }
+  const fromVariants = (colorVariants || []).find(
+    (v) => String(v?.colorName || '').trim().toLowerCase() === lower
+  );
+  return {
+    colorName: trimmed,
+    colorHex: fromVariants?.colorHex || '#CCCCCC',
+    swatch: undefined,
+  };
+}
+
 /**
  * Uploads a file to Cloudflare R2 via the API.
  * - Images are compressed on frontend before upload.
@@ -504,7 +526,16 @@ const FormSection = ({ title, children }) => (
   </div>
 );
 
-export default function ProductForm({ product, allProducts, onSave, onCancel, onCategoryChange, onVariantsOnlyChange, onOpenParent }) {
+export default function ProductForm({
+  product,
+  allProducts,
+  onSave,
+  onCancel,
+  onCategoryChange,
+  onVariantsOnlyChange,
+  onOpenParent,
+  initialView = 'full',
+}) {
   const { categories, brands, businessTypes } = useAppContext();
   
   const [formData, setFormData] = useState({
@@ -588,7 +619,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
   });
   const [variantRows, setVariantRows] = useState([]);
   const [selectedVariantRowIndex, setSelectedVariantRowIndex] = useState(null);
-  const [showVariantsOnly, setShowVariantsOnly] = useState(false);
+  const [showVariantsOnly, setShowVariantsOnly] = useState(() => initialView === 'variants');
   const [recentlyDeletedVariantRow, setRecentlyDeletedVariantRow] = useState(null);
   /** Child product ids loaded with this parent — used to soft-delete rows removed from the table. */
   const initialChildIdsRef = useRef([]);
@@ -611,6 +642,30 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
 
   /** Child variant rows are edited as a single SKU; only parents/standalones host the variant matrix. */
   const isChildProduct = useMemo(() => product?.productType === 'child', [product?.productType]);
+
+  /** Sellable colour for this child row (parent Variants → Colour column), not marketing swatches. */
+  const childAssignedColorName = useMemo(() => {
+    if (!isChildProduct) return '';
+    return String(
+      product?.variationAttributes?.color ?? formData?.variationAttributes?.color ?? ''
+    ).trim();
+  }, [
+    isChildProduct,
+    product?.variationAttributes?.color,
+    formData?.variationAttributes?.color,
+  ]);
+
+  const childAssignedColorDisplay = useMemo(
+    () => resolveColorDisplay(childAssignedColorName, formData.colorVariants),
+    [childAssignedColorName, formData.colorVariants]
+  );
+
+  const childAssignedColorIsPredefined = useMemo(() => {
+    if (!childAssignedColorName) return false;
+    return AVAILABLE_COLORS.some(
+      (c) => c.name.toLowerCase() === childAssignedColorName.toLowerCase()
+    );
+  }, [childAssignedColorName]);
 
   useEffect(() => {
     if (typeof onVariantsOnlyChange === 'function') {
@@ -639,6 +694,12 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       setShowAddVariantsPanel(false);
       setVariantFieldSelection({ size: false, color: false, weight: false, unitCount: false });
       return;
+    }
+
+    if (initialView === 'variants') {
+      setShowVariantsOnly(true);
+    } else {
+      setShowVariantsOnly(false);
     }
 
     // New parent/child variants take precedence over legacy embedded variants.
@@ -731,7 +792,7 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       unitCount: normalized.some((row) => row.unitCount),
       weight: normalized.some((row) => row.weight),
     });
-  }, [product]);
+  }, [product, initialView]);
 
   // Price-by-size helpers
   const addPriceBySizeRow = () => {
@@ -837,8 +898,17 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       .map((value) => value.trim())
       .filter(Boolean);
 
-  /** Colors defined in the variant builder + existing rows (not the marketing Color Variants block). */
-  const variantMatrixColorOptions = useMemo(() => {
+  /** Colour names from Full Product Form → Color Variants (source of truth for variant matrix). */
+  const fullFormColorNames = useMemo(
+    () =>
+      (formData.colorVariants || [])
+        .map((v) => String(v?.colorName || '').trim())
+        .filter(Boolean),
+    [formData.colorVariants]
+  );
+
+  /** All 17 predefined colours + any legacy row value not in the catalog list. */
+  const variantTableColorOptions = useMemo(() => {
     const seen = new Set();
     const out = [];
     const add = (name) => {
@@ -849,10 +919,10 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
       seen.add(key);
       out.push(label);
     };
-    parseOptionValues(variantBuilderInputs.color).forEach(add);
+    AVAILABLE_COLORS.forEach((c) => add(c.name));
     (variantRows || []).forEach((row) => add(row?.color));
     return out;
-  }, [variantBuilderInputs.color, variantRows]);
+  }, [variantRows]);
 
   const getVariantCombinationKey = (combo) =>
     [combo.size || '', combo.color || '', combo.weight || '', combo.unitCount || '']
@@ -897,9 +967,11 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
     }
 
     if (variantFieldSelection.color) {
-      const values = parseOptionValues(variantBuilderInputs.color);
+      const values = fullFormColorNames;
       if (values.length === 0) {
-        setError('Please enter at least one Color value in the variant builder (type a color and click Add).');
+        setError(
+          'Add colours in the Full Product Form (Color Variants section) before generating colour variants.'
+        );
         return;
       }
       dimensions.push({ key: 'color', values });
@@ -3281,10 +3353,32 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
           {showAddVariantsPanel && (
             <div className="mb-4 p-4 border border-gray-200 rounded-md bg-gray-50">
               <p className="text-sm font-semibold text-gray-800 mb-3">Choose variant fields</p>
-              <p className="text-xs text-gray-500 mb-3">Select any 2 fields only.</p>
+              <p className="text-xs text-gray-500 mb-2">Select any 2 fields only.</p>
+              <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <p>
+                  <strong>Color</strong> uses colours from the Full Product Form →{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowVariantsOnly(false);
+                      setShowAddVariantsPanel(false);
+                      requestAnimationFrame(() => {
+                        document.getElementById('product-form-color-variants')?.scrollIntoView({
+                          behavior: 'smooth',
+                          block: 'start',
+                        });
+                      });
+                    }}
+                    className="font-semibold text-amber-950 underline hover:text-amber-800"
+                  >
+                    Color Variants
+                  </button>
+                  . Add or change colours there, then return here to generate variants.
+                </p>
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                 <label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={variantFieldSelection.size} disabled={!variantFieldSelection.size && selectedVariantFieldCount >= 2} onChange={() => handleVariantFieldToggle('size')} className="h-4 w-4 rounded text-primary focus:ring-primary disabled:cursor-not-allowed" />Size</label>
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={variantFieldSelection.color} disabled={!variantFieldSelection.color && selectedVariantFieldCount >= 2} onChange={() => handleVariantFieldToggle('color')} className="h-4 w-4 rounded text-primary focus:ring-primary disabled:cursor-not-allowed" />Color</label>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700" title="Colours come from Full Product Form → Color Variants"><input type="checkbox" checked={variantFieldSelection.color} disabled={!variantFieldSelection.color && selectedVariantFieldCount >= 2} onChange={() => handleVariantFieldToggle('color')} className="h-4 w-4 rounded text-primary focus:ring-primary disabled:cursor-not-allowed" />Color</label>
                 <label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={variantFieldSelection.weight} disabled={!variantFieldSelection.weight && selectedVariantFieldCount >= 2} onChange={() => handleVariantFieldToggle('weight')} className="h-4 w-4 rounded text-primary focus:ring-primary disabled:cursor-not-allowed" />Weight</label>
                 <label className="inline-flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={variantFieldSelection.unitCount} disabled={!variantFieldSelection.unitCount && selectedVariantFieldCount >= 2} onChange={() => handleVariantFieldToggle('unitCount')} className="h-4 w-4 rounded text-primary focus:ring-primary disabled:cursor-not-allowed" />Unit Count</label>
               </div>
@@ -3304,31 +3398,24 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Color values</label>
                     <p className="text-xs text-gray-500 mb-2">
-                      Add sellable colours here (e.g. Red, Gold). These are saved on each variant row and child product — separate from marketing Color Variants below.
+                      Pulled from Color Variants on the Full Product Form.
                     </p>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        placeholder="Type one color and click Add"
-                        value={variantDraftValue.color}
-                        onChange={(e) => setVariantDraftValue((prev) => ({ ...prev, color: e.target.value }))}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            addVariantOptionValue('color');
-                          }
-                        }}
-                        className="w-full p-2 border border-gray-300 rounded-md"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => addVariantOptionValue('color')}
-                        className="px-2 py-1.5 text-xs font-semibold bg-green-600 text-white rounded-md hover:bg-green-700"
-                      >
-                        Add
-                      </button>
-                    </div>
-                    {renderVariantOptionValueChips('color')}
+                    {fullFormColorNames.length > 0 ? (
+                      <ul className="flex flex-wrap gap-1.5 mt-1 list-none">
+                        {fullFormColorNames.map((name) => (
+                          <li
+                            key={`full-form-color-${name}`}
+                            className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-gray-800 bg-white border border-gray-300 rounded-full"
+                          >
+                            {name}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs text-gray-500 mt-1">
+                        No colours in Color Variants yet. Add colours there, then generate variants.
+                      </p>
+                    )}
                   </div>
                 )}
                 {variantFieldSelection.weight && (
@@ -3521,15 +3608,19 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
                     </td>
                     {variantFieldSelection.color && (
                       <td className="w-[160px] min-w-[160px] px-3 py-7 align-top">
-                        <input
-                          type="text"
+                        <select
                           value={row.color || ''}
                           onChange={(e) => handleVariantRowChange(index, 'color', e.target.value)}
                           onClick={(e) => e.stopPropagation()}
-                          list="variantMatrixColorOptions"
-                          placeholder="e.g. Red, Gold"
-                          className="w-full p-2.5 border border-gray-300 rounded-md"
-                        />
+                          className="w-full p-2.5 border border-gray-300 rounded-md bg-white"
+                        >
+                          <option value="">Select colour</option>
+                          {variantTableColorOptions.map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                     )}
                     {variantFieldSelection.unitCount && <td className="w-[130px] min-w-[130px] px-3 py-2"><input type="text" value={row.unitCount || ''} onChange={(e) => handleVariantRowChange(index, 'unitCount', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>}
@@ -3633,11 +3724,6 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
               <option value="pack" />
               <option value="box" />
               <option value="pair" />
-            </datalist>
-            <datalist id="variantMatrixColorOptions">
-              {variantMatrixColorOptions.map((name) => (
-                <option key={name} value={name} />
-              ))}
             </datalist>
           </div>
         </FormSection>
@@ -4693,11 +4779,117 @@ export default function ProductForm({ product, allProducts, onSave, onCancel, on
             <div id="product-form-color-variants" className="scroll-mt-4">
             <FormSection title="Color Variants">
               {isChildProduct ? (
-                <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  <p>
-                    Colour for this variant is set in the <strong>parent product → Variants section</strong> (Colour column).
-                    Marketing colour swatches and per-colour gallery images are edited on the parent only.
-                  </p>
+                <div className="space-y-5">
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <p>
+                      This variant&apos;s sellable colour is set in the{' '}
+                      <strong>parent product → Variants section</strong> (Colour column). Selection here is
+                      read-only. Marketing swatches and per-colour gallery images are edited on the parent only.
+                    </p>
+                    {typeof onOpenParent === 'function' && product?.parentProductId && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenParent(String(product.parentProductId))}
+                        className="mt-2 text-xs font-semibold text-primary underline hover:text-primary-700"
+                      >
+                        Open parent → Variants section
+                      </button>
+                    )}
+                  </div>
+
+                  {childAssignedColorDisplay ? (
+                    <div className="rounded-lg border-2 border-primary/40 bg-primary/5 p-4">
+                      <p className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">
+                        This variant&apos;s colour
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <span
+                          style={
+                            childAssignedColorDisplay.swatch
+                              ? undefined
+                              : { backgroundColor: childAssignedColorDisplay.colorHex }
+                          }
+                          className={`w-10 h-10 rounded-full border-2 border-gray-300 shadow-sm flex-shrink-0 ${getPredefinedColorSwatchClassName(childAssignedColorDisplay)} ${
+                            childAssignedColorDisplay.swatch === 'transparent' ? 'border-dashed' : ''
+                          }`}
+                        />
+                        <p className="text-base font-semibold text-gray-900">
+                          {childAssignedColorDisplay.colorName}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-600">
+                      No colour assigned yet. Set it in the parent <strong>Variants</strong> section (Colour column).
+                    </p>
+                  )}
+
+                  <div>
+                    <p className="text-xs font-medium text-gray-700 mb-3 uppercase tracking-wide">
+                      Predefined Colors
+                    </p>
+                    <p className="text-xs text-gray-500 mb-3">View only — edit on the parent product.</p>
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-2 sm:gap-3">
+                      {AVAILABLE_COLORS.map((color) => {
+                        const isSelected =
+                          childAssignedColorName &&
+                          color.name.toLowerCase() === childAssignedColorName.toLowerCase();
+                        return (
+                          <div
+                            key={color.name}
+                            title={color.name}
+                            className={`flex items-start gap-2 p-2.5 rounded-lg border-2 min-w-0 ${
+                              isSelected
+                                ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/30'
+                                : 'border-gray-200 bg-gray-50 opacity-60'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={Boolean(isSelected)}
+                              disabled
+                              readOnly
+                              tabIndex={-1}
+                              className="mt-0.5 rounded h-4 w-4 flex-shrink-0 text-primary border-gray-300 cursor-not-allowed"
+                              aria-label={`${color.name}${isSelected ? ' (this variant)' : ''}`}
+                            />
+                            <span
+                              style={
+                                color.swatch ? undefined : { backgroundColor: color.hex }
+                              }
+                              className={`w-6 h-6 rounded-full border-2 border-gray-300 shadow-sm flex-shrink-0 ${getPredefinedColorSwatchClassName(color)} ${
+                                color.swatch === 'transparent' ? 'border-dashed' : ''
+                              }`}
+                            />
+                            <span
+                              className={`min-w-0 flex-1 text-sm font-medium leading-snug break-words ${
+                                isSelected ? 'text-gray-900' : 'text-gray-500'
+                              }`}
+                            >
+                              {color.name}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {childAssignedColorName && !childAssignedColorIsPredefined && childAssignedColorDisplay && (
+                    <div className="pt-4 border-t border-gray-200">
+                      <p className="text-xs font-medium text-gray-700 mb-3 uppercase tracking-wide">
+                        Custom Color
+                      </p>
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border border-gray-200 max-w-md">
+                        <span
+                          style={{ backgroundColor: childAssignedColorDisplay.colorHex }}
+                          className="w-8 h-8 rounded-full border-2 border-gray-300 shadow-sm flex-shrink-0"
+                        />
+                        <span className="text-sm font-medium text-gray-900">
+                          {childAssignedColorDisplay.colorName}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
               <>

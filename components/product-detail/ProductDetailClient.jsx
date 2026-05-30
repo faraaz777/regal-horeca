@@ -168,6 +168,17 @@ function filterVariantsByColor(variants, selectedColor) {
   return list.filter((v) => normalizeVariantAttr(v?.color) === colorName);
 }
 
+/** True when variant rows differ by size, weight, or unit count (not colour alone). */
+function variantsHaveSecondaryDimension(variants) {
+  const list = Array.isArray(variants) ? variants : [];
+  return list.some(
+    (v) =>
+      String(v?.size || '').trim() ||
+      String(v?.weight || '').trim() ||
+      String(v?.unitCount || '').trim()
+  );
+}
+
 /** Pick the swatch index for the current PDP URL (child slug wins over legacy query params). */
 function findVariantIndexForProductPage(variants, { slug, variantIdFromUrl, skuFromUrl }) {
   const list = Array.isArray(variants) ? variants : [];
@@ -513,6 +524,11 @@ export default function ProductDetailClient({ initialProduct = null }) {
   const variantsForSelectedColor = useMemo(
     () => filterVariantsByColor(product?.variants, selectedColor),
     [product?.variants, selectedColor]
+  );
+
+  const showVariantChipSelector = useMemo(
+    () => hasGeneratedVariants && variantsHaveSecondaryDimension(product?.variants),
+    [hasGeneratedVariants, product?.variants]
   );
 
   // Default colour swatch when not driven by a variant deep-link (?variantId= / ?sku=)
@@ -1527,13 +1543,15 @@ export default function ProductDetailClient({ initialProduct = null }) {
                 )}
               </div>
 
-              {/* Variant selector from admin variants table */}
-              {hasGeneratedVariants && (
+              {/* Size / weight / unit-count chips — hidden when variants differ by colour only */}
+              {showVariantChipSelector && (
                 <div className="mb-2 sm:mb-4">
                   <label className="block text-sm font-bold text-rich-black  mb-2">
                     {variantsForSelectedColor.some((v) => String(v?.size || '').trim())
                       ? 'Size'
-                      : 'Variants'}
+                      : variantsForSelectedColor.some((v) => String(v?.weight || '').trim())
+                        ? 'Weight'
+                        : 'Unit count'}
                   </label>
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                     {(selectedColor ? variantsForSelectedColor : product?.variants || [])
@@ -1541,9 +1559,10 @@ export default function ProductDetailClient({ initialProduct = null }) {
                       const idx = (product?.variants || []).indexOf(variant);
                       const label =
                         String(variant?.size || '').trim() ||
-                        String(variant?.color || '').trim() ||
+                        String(variant?.weight || '').trim() ||
+                        String(variant?.unitCount || '').trim() ||
                         String(variant?.sku || '').trim() ||
-                        `Variant ${idx + 1}`;
+                        `Option ${idx + 1}`;
                       const childSlug = String(variant?._childSlug || '').trim();
                       const active = childSlug
                         ? childSlug === String(slug || '').trim()

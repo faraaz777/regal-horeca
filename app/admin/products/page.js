@@ -102,6 +102,8 @@ export default function AdminProductsPage() {
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isVariantsOnlyView, setIsVariantsOnlyView] = useState(false);
+  /** 'variants' when opening parent from a child (Variants section); otherwise 'full'. */
+  const [editFormInitialView, setEditFormInitialView] = useState('full');
   const [editingProduct, setEditingProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -316,7 +318,8 @@ export default function AdminProductsPage() {
     router.push('/admin/products/add');
   };
     
-  const handleEditProduct = async (product) => {
+  const handleEditProduct = async (product, options = {}) => {
+    const variantsOnly = Boolean(options.variantsOnly);
     const productId = product._id || product.id;
     if (!productId) {
       showToast.error('Product ID not found');
@@ -355,7 +358,8 @@ export default function AdminProductsPage() {
         }
 
         setEditingProduct(editingPayload);
-        setIsVariantsOnlyView(false);
+        setEditFormInitialView(variantsOnly ? 'variants' : 'full');
+        setIsVariantsOnlyView(variantsOnly);
         setIsEditModalOpen(true);
       } else {
         showToast.error(data.error || 'Failed to load product details');
@@ -449,6 +453,7 @@ export default function AdminProductsPage() {
       ) {
         setIsEditModalOpen(false);
         setIsVariantsOnlyView(false);
+        setEditFormInitialView('full');
         setEditingProduct(null);
       }
 
@@ -665,6 +670,7 @@ export default function AdminProductsPage() {
       );
       setIsEditModalOpen(false);
       setIsVariantsOnlyView(false);
+      setEditFormInitialView('full');
       setEditingProduct(null);
       mutate();
     } catch (error) {
@@ -1718,14 +1724,19 @@ export default function AdminProductsPage() {
               <ProductForm 
                 product={editingProduct} 
                 allProducts={allProductsForForm}
+                initialView={editFormInitialView}
                 onSave={handleSaveEditedProduct}
                 onVariantsOnlyChange={setIsVariantsOnlyView}
                 onOpenParent={(parentId) => {
                   if (!parentId) return;
-                  void handleEditProduct({ _id: parentId, productType: 'parent' });
+                  void handleEditProduct(
+                    { _id: parentId, productType: 'parent' },
+                    { variantsOnly: true }
+                  );
                 }}
                 onCancel={() => {
                   setIsVariantsOnlyView(false);
+                  setEditFormInitialView('full');
                   setIsEditModalOpen(false);
                   setEditingProduct(null);
                 }} 

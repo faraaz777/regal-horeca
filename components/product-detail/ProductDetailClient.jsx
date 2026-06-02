@@ -666,6 +666,8 @@ export default function ProductDetailClient({ initialProduct = null }) {
   }, [priceBySize, selectedSizeKey]);
 
   const displayPrice = activeVariant?.price ?? selectedTier?.price ?? product?.price;
+  const displayMrp = activeVariant?.mrp ?? product?.mrp ?? null;
+  const hasDisplayMrp = Number(displayMrp) > 0;
   const variantUnitTrimmed = hasGeneratedVariants
     ? String(activeVariant?.unit || '').trim()
     : '';
@@ -1406,12 +1408,20 @@ export default function ProductDetailClient({ initialProduct = null }) {
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 mb-1 sm:mb-2">
                 <div>
                   <p className="text-[10px] sm:text-xs uppercase tracking-wide  text-black/50 mb-1">
-                    Starting from
+                    Best price
                   </p>
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                     <span className="text-xl sm:text-2xl font-bold text-accent">
                       {isPriceOnRequest ? 'Price on request' : `${formatPrice(displayPrice)}${displayUnitSuffix}`}
                     </span>
+                    {hasDisplayMrp ? (
+                      <span className="text-xs sm:text-sm text-black/60">
+                        MRP:{' '}
+                        <span className="line-through">
+                          {`${formatPrice(Number(displayMrp))}${displayUnitSuffix}`}
+                        </span>
+                      </span>
+                    ) : null}
                   </div>
                   {/* {product.summary && ( 
                     <p className="text-sm text-[#5F748D] mt-1.5">
@@ -1457,7 +1467,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
 
               {/* Short description (Summary) - 3 lines with More/Less */}
               {summaryText && (
-                <div className="mt-2 sm:mt-5 mb-2 sm:mb-4">
+                <div className=" mb-2 sm:mb-4">
                   <div className="text-sm sm:text-base text-[#5F748D] leading-relaxed">
                     <p className={`${isSummaryExpanded ? '' : 'line-clamp-3'} whitespace-pre-line`}>
                       {summaryText}

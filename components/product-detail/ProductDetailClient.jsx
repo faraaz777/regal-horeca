@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -810,6 +810,18 @@ export default function ProductDetailClient({ initialProduct = null }) {
     openCartDrawer();
   };
 
+  /** Switch child variant URL without growing browser history (one back leaves PDP). */
+  const navigateToVariant = useCallback(
+    (childSlug) => {
+      const trimmed = String(childSlug || '').trim();
+      const current = String(slug || '').trim();
+      if (!trimmed || trimmed === current) return false;
+      router.replace(`/products/${trimmed}`, { scroll: false });
+      return true;
+    },
+    [router, slug]
+  );
+
   const handleColorSelect = (variant) => {
     if (selectedColor?.colorName === variant.colorName) {
       setSelectedColor(null);
@@ -830,10 +842,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
     if (!target) target = matching[0];
 
     const childSlug = String(target?._childSlug || '').trim();
-    if (childSlug && childSlug !== String(slug || '').trim()) {
-      router.push(`/products/${childSlug}`, { scroll: false });
-      return;
-    }
+    if (navigateToVariant(childSlug)) return;
 
     const nextIndex = variants.findIndex((row) => row === target);
     if (nextIndex >= 0) {
@@ -1590,6 +1599,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
                           <Link
                             key={`${variant?.sku || 'variant'}-${idx}`}
                             href={`/products/${childSlug}`}
+                            replace
                             prefetch
                             scroll={false}
                             className={chipClass}

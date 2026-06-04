@@ -1465,6 +1465,7 @@ export default function ProductDetailClient({ initialProduct = null }) {
                     </>
                   )}
                   {product?.faqs?.length > 0 && (
+                    
                     <>
                       {(product?.blogUrl || testimonials.length > 0) ? <span className="text-[#D7DCE1]">|</span> : null}
                       <a href="#product-faq" className="hover:underline">

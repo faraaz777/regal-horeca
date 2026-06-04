@@ -208,6 +208,19 @@ export default function ProductDetailClient({ initialProduct = null }) {
   const { slug } = params;
   const variantIdFromUrl = searchParams?.get('variantId')?.trim() || '';
   const skuFromUrl = searchParams?.get('sku')?.trim() || '';
+
+  /** Switch child variant URL without growing browser history (one back leaves PDP). */
+  const navigateToVariant = useCallback(
+    (childSlug) => {
+      const trimmed = String(childSlug || '').trim();
+      const current = String(slug || '').trim();
+      if (!trimmed || trimmed === current) return false;
+      router.replace(`/products/${trimmed}`, { scroll: false });
+      return true;
+    },
+    [router, slug]
+  );
+
   const { isInWishlist, addToWishlist, removeFromWishlist, categories, addToCart, removeFromCart, isInCart } = useAppContext();
   const [product, setProduct] = useState(() => normalizeProductForPDP(initialProduct));
   const [loading, setLoading] = useState(!initialProduct);
@@ -809,18 +822,6 @@ export default function ProductDetailClient({ initialProduct = null }) {
     toast.success('Added to quote');
     openCartDrawer();
   };
-
-  /** Switch child variant URL without growing browser history (one back leaves PDP). */
-  const navigateToVariant = useCallback(
-    (childSlug) => {
-      const trimmed = String(childSlug || '').trim();
-      const current = String(slug || '').trim();
-      if (!trimmed || trimmed === current) return false;
-      router.replace(`/products/${trimmed}`, { scroll: false });
-      return true;
-    },
-    [router, slug]
-  );
 
   const handleColorSelect = (variant) => {
     if (selectedColor?.colorName === variant.colorName) {

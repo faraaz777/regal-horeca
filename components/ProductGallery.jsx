@@ -49,6 +49,7 @@ export default function ProductGallery({
               alt={`${title} view ${selectedIndex + 1}`}
               fill
               priority
+              unoptimized
               sizes="(max-width: 768px) 100vw, 50vw"
               className="object-contain object-center p-6 sm:p-8 md:p-10 transition-transform duration-700 group-hover:scale-105"
             />
@@ -180,6 +181,7 @@ export default function ProductGallery({
                 src={img}
                 alt={`Thumbnail ${idx + 1}`}
                 fill
+                unoptimized
                 className={`object-contain p-2 transition-transform duration-500 ${selectedIndex === idx ? 'scale-90' : 'group-hover:scale-110'}`}
               />
 

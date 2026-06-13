@@ -68,6 +68,7 @@ function ProductCard({ product }) {
           width={350}
           height={350}
           alt={product.title}
+          unoptimized
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
         />
 

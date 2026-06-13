@@ -370,6 +370,7 @@ export default function SearchBar({ className = "", placeholder = "What are you 
                                 src={productImage}
                                 alt={productName}
                                 fill
+                                unoptimized
                                 className="object-cover transition-transform duration-500 group-hover:scale-110"
                                 onError={() => handleImageError(productId)}
                               />

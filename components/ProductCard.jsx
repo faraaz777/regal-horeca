@@ -228,6 +228,7 @@ export default function ProductCard({ product, onAdd, hidePrice = false, transpa
           src={productImage}
           alt={productName}
           fill
+          unoptimized
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw"
           className="object-contain select-none pointer-events-none"
           draggable={false}

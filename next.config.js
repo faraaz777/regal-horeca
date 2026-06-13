@@ -9,6 +9,8 @@ const nextConfig = {
   
   // Image optimization configuration
   images: {
+    // Load images directly from R2 (bypasses Vercel /_next/image quota & failures)
+    unoptimized: true,
     // Allow images from Cloudflare R2 and other external sources
     remotePatterns: [
       {

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import User from '@/lib/server/models/User';
 import { verifyPassword } from '@/lib/server/auth/password';
-import { signAccessToken } from '@/lib/server/auth/jwt';
+import { signAccessToken, ACCESS_MAX_AGE_SECONDS } from '@/lib/server/auth/jwt';
 import {
   generateRefreshToken,
   storeRefreshToken,
@@ -64,7 +64,7 @@ export async function POST(request) {
       },
     });
 
-    res.cookies.set(ACCESS_COOKIE, accessToken, getCookieOptions(60 * 15, '/'));
+    res.cookies.set(ACCESS_COOKIE, accessToken, getCookieOptions(ACCESS_MAX_AGE_SECONDS, '/'));
     res.cookies.set(REFRESH_COOKIE, refreshToken, getCookieOptions(60 * 60 * 24 * 30, '/api/auth'));
 
     return res;

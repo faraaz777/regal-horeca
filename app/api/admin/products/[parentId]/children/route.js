@@ -28,7 +28,7 @@ import {
 export const dynamic = 'force-dynamic';
 
 export async function GET(request, { params }) {
-  const authError = assertAdmin(request);
+  const authError = await assertAdmin(request);
   if (authError) return authError;
 
   try {
@@ -60,7 +60,7 @@ export async function GET(request, { params }) {
 }
 
 export async function POST(request, { params }) {
-  const authError = assertAdmin(request);
+  const authError = await assertAdmin(request);
   if (authError) return authError;
 
   try {

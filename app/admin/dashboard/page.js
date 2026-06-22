@@ -13,17 +13,9 @@ import useSWR from 'swr';
 import { useAppContext } from '@/context/AppContext';
 import { PlusIcon } from '@/components/Icons';
 
-// Optimized stats fetcher - only gets counts, not full data
-const fetcher = async (url) => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('regal_admin_token') : null;
-  const response = await fetch(url, {
-    ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
-  });
-  if (!response.ok) {
-    throw new Error('Failed to fetch');
-  }
-  return response.json();
-};
+import { adminJson } from '@/lib/client/adminFetch';
+
+const fetcher = async (url) => adminJson(url);
 
 export default function AdminDashboardPage() {
   // Single unified API call instead of 5-6 separate calls

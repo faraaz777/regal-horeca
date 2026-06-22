@@ -56,7 +56,7 @@ function pickAllowed(body) {
 }
 
 export async function PATCH(request, { params }) {
-  const authError = assertAdmin(request);
+  const authError = await assertAdmin(request);
   if (authError) return authError;
 
   try {
@@ -190,7 +190,7 @@ export async function PATCH(request, { params }) {
 }
 
 export async function DELETE(_request, { params }) {
-  const authError = assertAdmin(_request);
+  const authError = await assertAdmin(_request);
   if (authError) return authError;
 
   try {

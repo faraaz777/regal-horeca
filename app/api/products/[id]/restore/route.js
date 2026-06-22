@@ -11,7 +11,7 @@ import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
 import { restoreCanonicalSlugOnUndelete } from '@/lib/server/products/slugArchive';
 
 export async function POST(_request, { params }) {
-  const authError = assertAdmin(_request);
+  const authError = await assertAdmin(_request);
   if (authError) return authError;
 
   try {

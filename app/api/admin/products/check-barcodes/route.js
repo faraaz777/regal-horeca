@@ -12,7 +12,7 @@ import { findBarcodeConflicts, normalizeBarcode } from '@/lib/server/products/ba
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
-  const authError = assertAdmin(request);
+  const authError = await assertAdmin(request);
   if (authError) return authError;
 
   try {

@@ -166,7 +166,7 @@ export async function GET(request, { params }) {
  * - Duplicate slugs auto-increment (e.g., "red-mug-1")
  */
 export async function PUT(request, { params }) {
-  const authError = assertAdmin(request);
+  const authError = await assertAdmin(request);
   if (authError) return authError;
 
   try {
@@ -314,7 +314,7 @@ export async function PUT(request, { params }) {
  * - Deleting a 'child' or 'standalone' deletes only that row.
  */
 export async function DELETE(request, { params }) {
-  const authError = assertAdmin(request);
+  const authError = await assertAdmin(request);
   if (authError) return authError;
 
   try {

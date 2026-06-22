@@ -1,73 +1,64 @@
 /**
  * Enquiry Messages API Route
- * 
- * POST /api/enquiries/[id]/messages - Add a communication log entry
  */
 
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import EnquiryMessage from '@/lib/models/EnquiryMessage';
 import Enquiry from '@/lib/models/Enquiry';
+import { requireAuth } from '@/lib/server/auth/requireAuth';
+import { canAccessEnquiry } from '@/lib/server/enquiries/enquiryAccess';
 
-/**
- * POST /api/enquiries/[id]/messages
- * Add a communication log entry (note, WhatsApp message, etc.)
- */
 export async function POST(request, { params }) {
+  const auth = await requireAuth(request, { permission: 'enquiries:write' });
+  if (auth.error) return auth.error;
+
   try {
     await connectToDatabase();
 
     const { id } = params;
     const body = await request.json();
 
-    const {
-      sender = 'admin',
-      channel = 'internal-note',
-      message,
-      createdBy = '',
-    } = body;
+    const { sender = 'admin', channel = 'internal-note', message } = body;
 
-    // Validate required fields
     if (!message || !message.trim()) {
-      return NextResponse.json(
-        { error: 'Message is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
-    // Verify enquiry exists
-    const enquiry = await Enquiry.findById(id);
+    const enquiry = await Enquiry.findById(id).lean();
     if (!enquiry) {
-      return NextResponse.json(
-        { error: 'Enquiry not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Enquiry not found' }, { status: 404 });
     }
 
-    // Create message
+    if (!(await canAccessEnquiry(auth.session, enquiry))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const enquiryMessage = new EnquiryMessage({
       enquiryId: id,
       sender,
       channel,
       message: message.trim(),
-      createdBy,
+      createdBy: auth.session.name || auth.session.email,
+      createdByUserId: auth.session.userId,
+      createdByName: auth.session.name || auth.session.email,
     });
 
     await enquiryMessage.save();
 
-    return NextResponse.json({
-      success: true,
-      message: enquiryMessage,
-    }, { status: 201 });
+    return NextResponse.json(
+      {
+        success: true,
+        message: enquiryMessage,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error('Error creating enquiry message:', error);
-    
+
     if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
-      return NextResponse.json(
-        { error: 'Validation error', details: errors },
-        { status: 400 }
-      );
+      const errors = Object.values(error.errors).map((err) => err.message);
+      return NextResponse.json({ error: 'Validation error', details: errors }, { status: 400 });
     }
 
     return NextResponse.json(
@@ -76,4 +67,3 @@ export async function POST(request, { params }) {
     );
   }
 }
-

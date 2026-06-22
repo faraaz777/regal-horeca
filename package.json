@@ -10,7 +10,8 @@
     "migrate:variants": "node scripts/migrateVariantsToChildren.mjs",
     "migrate:variants:dry": "node scripts/migrateVariantsToChildren.mjs --dry-run",
     "migrate:product-filters": "node scripts/migrateProductFilters.mjs",
-    "migrate:product-filters:dry": "node scripts/migrateProductFilters.mjs --dry-run"
+    "migrate:product-filters:dry": "node scripts/migrateProductFilters.mjs --dry-run",
+    "seed:super-admin": "node scripts/seed-super-admin.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.540.0",
@@ -30,6 +31,7 @@
     "dompurify": "^3.3.1",
     "exceljs": "^4.4.0",
     "framer-motion": "^12.23.26",
+    "jose": "^6.2.3",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.556.0",
     "mongoose": "^8.3.0",

@@ -10,6 +10,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Brand from '@/lib/models/Brand';
+import { requireAuth } from '@/lib/server/auth/requireAuth';
 
 // Force dynamic rendering to prevent caching issues in production
 export const dynamic = 'force-dynamic';
@@ -94,6 +95,9 @@ export async function GET(request) {
  * Body: Brand object
  */
 export async function POST(request) {
+  const auth = await requireAuth(request, { permission: 'brands:write' });
+  if (auth.error) return auth.error;
+
   try {
     await connectToDatabase();
 

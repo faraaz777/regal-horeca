@@ -12,6 +12,7 @@ import { connectToDatabase } from '@/lib/db/connect';
 import Category from '@/lib/models/Category';
 import { clearCategoryCache } from '@/lib/utils/categoryCache';
 import { revalidateHomepage, revalidateCategories } from '@/lib/utils/revalidate';
+import { requireAuth } from '@/lib/server/auth/requireAuth';
 
 // Allow caching with revalidation - categories change less frequently
 // Revalidate every hour (3600 seconds)
@@ -94,6 +95,9 @@ export async function GET(request) {
  * Body: Category object
  */
 export async function POST(request) {
+  const auth = await requireAuth(request, { permission: 'categories:write' });
+  if (auth.error) return auth.error;
+
   try {
     await connectToDatabase();
 

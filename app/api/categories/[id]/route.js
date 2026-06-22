@@ -13,6 +13,7 @@ import { connectToDatabase } from '@/lib/db/connect';
 import Category from '@/lib/models/Category';
 import { clearCategoryCache } from '@/lib/utils/categoryCache';
 import { revalidateHomepage, revalidateCategories } from '@/lib/utils/revalidate';
+import { requireAuth } from '@/lib/server/auth/requireAuth';
 
 /**
  * GET /api/categories/[id]
@@ -52,6 +53,9 @@ export async function GET(request, { params }) {
  * Updates a category
  */
 export async function PUT(request, { params }) {
+  const auth = await requireAuth(request, { permission: 'categories:write' });
+  if (auth.error) return auth.error;
+
   try {
     await connectToDatabase();
 
@@ -132,6 +136,9 @@ export async function PUT(request, { params }) {
  * Deletes a category
  */
 export async function DELETE(request, { params }) {
+  const auth = await requireAuth(request, { permission: 'categories:write' });
+  if (auth.error) return auth.error;
+
   try {
     await connectToDatabase();
 

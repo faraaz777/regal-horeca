@@ -13,17 +13,11 @@ import useSWR from 'swr';
 import toast from 'react-hot-toast';
 import { SearchIcon, FilterIcon, EyeIcon, PhoneIcon, MailIcon, WhatsAppIcon, ClockIcon, ChevronDownIcon, TrashIcon } from '@/components/Icons';
 import { getWhatsAppCustomerLink } from '@/lib/utils/whatsapp';
+import { adminJson } from '@/lib/client/adminFetch';
+
+const fetcher = async (url) => adminJson(url);
 
 const ITEMS_PER_PAGE = 20;
-
-// SWR fetcher
-const fetcher = async (url) => {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error('Failed to fetch');
-  }
-  return response.json();
-};
 
 // Status badge component
 const StatusBadge = ({ status }) => {
@@ -120,13 +114,9 @@ export default function AdminEnquiriesPage() {
     }
     
     try {
-      const response = await fetch(`/api/enquiries/${enquiryId}`, {
+      await adminJson(`/api/enquiries/${enquiryId}`, {
         method: 'DELETE',
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to delete enquiry');
-      }
       
       toast.success('Enquiry deleted successfully');
       mutate(); // Refresh the list

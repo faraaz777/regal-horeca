@@ -15,11 +15,15 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { buildAIPrompt } from '@/lib/utils/aiPromptBuilder';
+import { requireAuth } from '@/lib/server/auth/requireAuth';
 
 /**
  * POST /api/ai/generate-description
  */
 export async function POST(request) {
+  const auth = await requireAuth(request, { permission: 'ai:write' });
+  if (auth.error) return auth.error;
+
   try {
     // Check API key
     const apiKey = process.env.AI_API_KEY;

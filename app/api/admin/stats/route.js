@@ -19,7 +19,7 @@ const ADMIN_TOTAL_PRODUCTS_MATCH = {
 };
 
 export async function GET(request) {
-  const authError = assertAdmin(request);
+  const authError = await assertAdmin(request);
   if (authError) return authError;
 
   try {

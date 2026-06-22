@@ -11,6 +11,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Brand from '@/lib/models/Brand';
+import { requireAuth } from '@/lib/server/auth/requireAuth';
 
 /**
  * GET /api/brands/[id]
@@ -50,6 +51,9 @@ export async function GET(request, { params }) {
  * Updates a brand
  */
 export async function PUT(request, { params }) {
+  const auth = await requireAuth(request, { permission: 'brands:write' });
+  if (auth.error) return auth.error;
+
   try {
     await connectToDatabase();
 
@@ -106,6 +110,9 @@ export async function PUT(request, { params }) {
  * Deletes a brand
  */
 export async function DELETE(request, { params }) {
+  const auth = await requireAuth(request, { permission: 'brands:write' });
+  if (auth.error) return auth.error;
+
   try {
     await connectToDatabase();
 

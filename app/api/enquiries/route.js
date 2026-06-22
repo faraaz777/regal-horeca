@@ -13,6 +13,9 @@ import Enquiry from '@/lib/models/Enquiry';
 import Customer from '@/lib/models/Customer';
 import EnquiryItem from '@/lib/models/EnquiryItem';
 import { normalizePhone } from '@/lib/utils/phone';
+import { requireAuth } from '@/lib/server/auth/requireAuth';
+import { buildEnquiryListQuery } from '@/lib/server/enquiries/enquiryAccess';
+import mongoose from 'mongoose';
 
 /**
  * POST /api/enquiries
@@ -172,6 +175,9 @@ export async function POST(request) {
  * - skip: Skip results for pagination
  */
 export async function GET(request) {
+  const auth = await requireAuth(request, { permission: 'enquiries:read' });
+  if (auth.error) return auth.error;
+
   try {
     await connectToDatabase();
 
@@ -179,27 +185,29 @@ export async function GET(request) {
     const status = searchParams.get('status');
     const priority = searchParams.get('priority');
     const assignedTo = searchParams.get('assignedTo');
+    const assignedToUserId = searchParams.get('assignedToUserId');
     const category = searchParams.get('category');
     const search = searchParams.get('search');
     const limit = parseInt(searchParams.get('limit') || '50');
     const skip = parseInt(searchParams.get('skip') || '0');
 
-    // Build query
-    const query = {};
+    const query = buildEnquiryListQuery(auth.session, {});
     if (status) {
       query.status = status;
     }
     if (priority) {
       query.priority = priority;
     }
-    if (assignedTo) {
+    if (assignedToUserId && mongoose.Types.ObjectId.isValid(assignedToUserId)) {
+      query.assignedToUserId = new mongoose.Types.ObjectId(assignedToUserId);
+    } else if (assignedTo) {
       query.assignedTo = assignedTo;
     }
     if (category) {
       query.categories = { $in: [category] };
     }
     if (search) {
-      query.$or = [
+      const searchOr = [
         { name: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } },
         { phone: { $regex: search, $options: 'i' } },
@@ -207,11 +215,18 @@ export async function GET(request) {
         { company: { $regex: search, $options: 'i' } },
         { enquiryId: { $regex: search, $options: 'i' } },
       ];
+      if (query.$or) {
+        query.$and = [{ $or: query.$or }, { $or: searchOr }];
+        delete query.$or;
+      } else {
+        query.$or = searchOr;
+      }
     }
 
     // Get enquiries with customer population
     const enquiries = await Enquiry.find(query)
       .populate('customerId', 'name companyName email phone tags')
+      .populate('assignedToUserId', 'name email role')
       .sort({ createdAt: -1 })
       .limit(limit)
       .skip(skip)
@@ -244,7 +259,7 @@ export async function GET(request) {
       statusCounts: statusCountsMap,
     }, {
       headers: {
-        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+        'Cache-Control': 'private, no-store',
       },
     });
   } catch (error) {

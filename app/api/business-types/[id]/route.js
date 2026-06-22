@@ -11,6 +11,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import BusinessType from '@/lib/models/BusinessType';
+import { requireAuth } from '@/lib/server/auth/requireAuth';
 
 /**
  * GET /api/business-types/[id]
@@ -48,6 +49,9 @@ export async function GET(request, { params }) {
  * Updates a business type
  */
 export async function PUT(request, { params }) {
+  const auth = await requireAuth(request, { permission: 'business-types:write' });
+  if (auth.error) return auth.error;
+
   try {
     await connectToDatabase();
 
@@ -102,6 +106,9 @@ export async function PUT(request, { params }) {
  * Deletes a business type
  */
 export async function DELETE(request, { params }) {
+  const auth = await requireAuth(request, { permission: 'business-types:write' });
+  if (auth.error) return auth.error;
+
   try {
     await connectToDatabase();
 

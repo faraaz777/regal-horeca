@@ -46,26 +46,9 @@ function StorefrontInCatalogBadge({ slug, size = 'md' }) {
   );
 }
 
-// SWR fetcher — attaches admin JWT when present
-const fetcher = async (url) => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('regal_admin_token') : null;
-  const response = await fetch(url, {
-    ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
-  });
-  if (!response.ok) {
-    const error = new Error('Failed to fetch');
-    error.info = await response.json();
-    error.status = response.status;
-    throw error;
-  }
-  return response.json();
-};
+import { adminJson, adminFetch } from '@/lib/client/adminFetch';
 
-function adminAuthHeaderObj() {
-  if (typeof window === 'undefined') return {};
-  const token = localStorage.getItem('regal_admin_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+const fetcher = async (url) => adminJson(url);
 
 // Error Display Component with Retry
 const ErrorDisplay = ({ error, onRetry }) => {
@@ -273,15 +256,10 @@ export default function AdminProductsPage() {
         { revalidate: false }
       );
 
-      const res = await fetch(`/api/admin/products/children/${childId}`, {
+      await adminJson(`/api/admin/products/children/${childId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...adminAuthHeaderObj() },
         body: JSON.stringify({ showInCatalog: nextListed }),
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || 'Failed to update catalog visibility');
-      }
       mutate();
     } catch (err) {
       showToast.error(err?.message || 'Failed to update catalog visibility');
@@ -342,11 +320,8 @@ export default function AdminProductsPage() {
         // so the variant table can render. Refetch via the admin children endpoint.
         if (product.productType === 'parent') {
           try {
-            const childrenRes = await fetch(`/api/admin/products/${productId}/children`, {
-              headers: { ...adminAuthHeaderObj() },
-            });
-            const childrenData = await childrenRes.json().catch(() => ({}));
-            if (childrenRes.ok && childrenData?.success) {
+            const childrenData = await adminJson(`/api/admin/products/${productId}/children`);
+            if (childrenData?.success) {
               editingPayload = {
                 ...childrenData.parent,
                 children: childrenData.children,
@@ -474,12 +449,10 @@ export default function AdminProductsPage() {
     const toastId = showToast.loading('Restoring product...');
     setLoading(true);
     try {
-      const res = await fetch(`/api/products/${productId}/restore`, {
+      const body = await adminJson(`/api/products/${productId}/restore`, {
         method: 'POST',
-        headers: { ...adminAuthHeaderObj() },
       });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
+      if (!body.success) {
         showToast.error(body.error || 'Failed to restore product');
         return;
       }

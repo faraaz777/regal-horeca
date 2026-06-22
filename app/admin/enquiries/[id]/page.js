@@ -24,15 +24,9 @@ import {
   TrashIcon
 } from '@/components/Icons';
 import { getWhatsAppCustomerLink } from '@/lib/utils/whatsapp';
+import { adminJson, adminFetch } from '@/lib/client/adminFetch';
 
-// SWR fetcher
-const fetcher = async (url) => {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error('Failed to fetch');
-  }
-  return response.json();
-};
+const fetcher = async (url) => adminJson(url);
 
 // Status badge component
 const StatusBadge = ({ status }) => {
@@ -53,6 +47,22 @@ const StatusBadge = ({ status }) => {
   );
 };
 
+function formatActivityDescription(activity) {
+  const { action, before, after } = activity;
+
+  if (action === 'assigned') {
+    const from = before?.assignedToName || 'Unassigned';
+    const to = after?.assignedToName || 'Unassigned';
+    return `Assignment changed: ${from} → ${to}`;
+  }
+
+  if (action === 'status_changed') {
+    return `Status: ${before?.status || '—'} → ${after?.status || '—'}`;
+  }
+
+  return action.replace(/[._]/g, ' ');
+}
+
 export default function EnquiryDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -60,7 +70,7 @@ export default function EnquiryDetailPage() {
 
   const [status, setStatus] = useState('');
   const [priority, setPriority] = useState('');
-  const [assignedTo, setAssignedTo] = useState('');
+  const [assignedToUserId, setAssignedToUserId] = useState('');
   const [notes, setNotes] = useState('');
   const [phone, setPhone] = useState('');
   const [userType, setUserType] = useState('');
@@ -75,18 +85,32 @@ export default function EnquiryDetailPage() {
   const [isRelatedEnquiriesOpen, setIsRelatedEnquiriesOpen] = useState(true); // Default open
   const [showAllRelated, setShowAllRelated] = useState(false); // For "View All" button
 
-  // Fetch enquiry details
+  const { data: assigneesData } = useSWR('/api/users/assignees', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60000,
+  });
+  const assignees = assigneesData?.users || [];
+
+  const { data: meData } = useSWR('/api/auth/me', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60000,
+  });
+  const currentUser = meData?.user;
+  const canDeleteEnquiry = currentUser?.role === 'super_admin';
+
   const { data, error, isLoading, mutate } = useSWR(
     enquiryId ? `/api/enquiries/${enquiryId}` : null,
     fetcher,
     {
-      revalidateOnFocus: true,
+      revalidateOnFocus: false,
+      dedupingInterval: 5000,
     }
   );
 
   const enquiry = data?.enquiry;
   const enquiryItems = enquiry?.items || [];
   const messages = enquiry?.messages || [];
+  const activities = enquiry?.activities || [];
   const customer = enquiry?.customerId || {};
   const relatedEnquiries = enquiry?.relatedEnquiries || [];
 
@@ -95,7 +119,13 @@ export default function EnquiryDetailPage() {
     if (enquiry) {
       setStatus(enquiry.status || 'new');
       setPriority(enquiry.priority || 'normal');
-      setAssignedTo(enquiry.assignedTo || '');
+      setAssignedToUserId(
+        enquiry.assignedToUserId?._id
+          ? String(enquiry.assignedToUserId._id)
+          : enquiry.assignedToUserId
+            ? String(enquiry.assignedToUserId)
+            : ''
+      );
       setNotes(enquiry.notes || '');
       setPhone(enquiry.phone || '');
       setUserType(enquiry.userType || 'unknown');
@@ -105,24 +135,17 @@ export default function EnquiryDetailPage() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/enquiries/${enquiryId}`, {
+      await adminJson(`/api/enquiries/${enquiryId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           status,
           priority,
-          assignedTo,
+          assignedToUserId: assignedToUserId || null,
           notes,
           phone,
           userType,
         }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to update enquiry');
-      }
 
       toast.success('Enquiry updated successfully');
       setIsEditingPhone(false);
@@ -144,22 +167,14 @@ export default function EnquiryDetailPage() {
 
     setIsAddingNote(true);
     try {
-      const response = await fetch(`/api/enquiries/${enquiryId}/messages`, {
+      await adminJson(`/api/enquiries/${enquiryId}/messages`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           sender: 'admin',
           channel: 'internal-note',
           message: newNote,
-          createdBy: assignedTo || 'Admin',
         }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to add note');
-      }
 
       toast.success('Note added successfully');
       setNewNote('');
@@ -210,7 +225,7 @@ export default function EnquiryDetailPage() {
     if (!enquiryId) return;
     setIsExporting(true);
     try {
-      const response = await fetch(
+      const response = await adminFetch(
         `/api/admin/enquiries/${enquiryId}/export?gst=${encodeURIComponent(gstPercent || 0)}`,
         { method: 'GET' }
       );
@@ -719,6 +734,42 @@ export default function EnquiryDetailPage() {
               </div>
             </div>
           </div>
+
+          {activities.length > 0 && (
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <ClockIcon className="w-5 h-5" />
+                Activity Timeline
+              </h2>
+              <div className="space-y-3">
+                {activities.map((activity) => (
+                  <div
+                    key={activity._id}
+                    className="flex gap-3 pb-3 border-b border-gray-100 last:border-0 last:pb-0"
+                  >
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                        <UserIcon className="w-4 h-4 text-indigo-600" />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <span className="font-medium text-gray-900">
+                          {activity.userName || 'System'}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {formatDate(activity.createdAt)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700">
+                        {formatActivityDescription(activity)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}
@@ -755,13 +806,18 @@ export default function EnquiryDetailPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Assigned To</label>
-                <input
-                  type="text"
-                  value={assignedTo}
-                  onChange={(e) => setAssignedTo(e.target.value)}
-                  placeholder="Admin name/email"
+                <select
+                  value={assignedToUserId}
+                  onChange={(e) => setAssignedToUserId(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                />
+                >
+                  <option value="">Unassigned</option>
+                  {assignees.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name} ({user.role.replace('_', ' ')})
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
@@ -781,7 +837,8 @@ export default function EnquiryDetailPage() {
                 {isSaving ? 'Saving...' : 'Save Changes'}
               </button>
               
-              {/* Delete Button */}
+              {/* Delete Button — super_admin only */}
+              {canDeleteEnquiry && (
               <button
                 onClick={async () => {
                   if (!confirm('Are you sure you want to delete this enquiry? This action cannot be undone.')) {
@@ -789,13 +846,9 @@ export default function EnquiryDetailPage() {
                   }
                   
                   try {
-                    const response = await fetch(`/api/enquiries/${enquiryId}`, {
+                    await adminJson(`/api/enquiries/${enquiryId}`, {
                       method: 'DELETE',
                     });
-                    
-                    if (!response.ok) {
-                      throw new Error('Failed to delete enquiry');
-                    }
                     
                     toast.success('Enquiry deleted successfully');
                     router.push('/admin/enquiries');
@@ -809,6 +862,7 @@ export default function EnquiryDetailPage() {
                 <TrashIcon className="w-4 h-4" />
                 Delete Enquiry
               </button>
+              )}
             </div>
           </div>
 

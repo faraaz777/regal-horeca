@@ -22,6 +22,7 @@ import { PlusIcon, EditIcon, TrashIcon, ChevronRightIcon, ChevronDownIcon } from
 import { showToast } from '@/lib/utils/toast';
 import { apiClient, ApiError } from '@/lib/utils/apiClient';
 import { buildCategoryTree } from '@/lib/utils/categoryUtils';
+import { adminFetch } from '@/lib/client/adminFetch';
 
 export default function AdminCategoriesPage() {
   const { upsertCategory, removeCategory } = useAppContext();
@@ -527,11 +528,9 @@ async function uploadToR2(file, folder = 'categories') {
     formData.append('file', fileToUpload, file.name);
     
     // Upload to server
-    const token = typeof window !== 'undefined' ? localStorage.getItem('regal_admin_token') : null;
-    const response = await fetch(`/api/upload?folder=${folder}`, {
+    const response = await adminFetch(`/api/upload?folder=${folder}`, {
       method: 'POST',
       body: formData,
-      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
     });
     
     const data = await response.json();

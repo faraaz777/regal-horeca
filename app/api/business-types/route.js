@@ -10,6 +10,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import BusinessType from '@/lib/models/BusinessType';
+import { requireAuth } from '@/lib/server/auth/requireAuth';
 
 /**
  * GET /api/business-types
@@ -40,6 +41,9 @@ export async function GET(request) {
  * Body: BusinessType object
  */
 export async function POST(request) {
+  const auth = await requireAuth(request, { permission: 'business-types:write' });
+  if (auth.error) return auth.error;
+
   try {
     await connectToDatabase();
 

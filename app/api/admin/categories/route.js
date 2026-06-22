@@ -2,7 +2,7 @@
  * Admin Categories API Route
  *
  * Uncached categories for admin UI (Add Product, Manage Categories).
- * Same response shape as GET /api/categories. Access gated by frontend (admin layout).
+ * Same response shape as GET /api/categories. Requires admin session cookie.
  *
  * GET /api/admin/categories?tree=true - Tree (no-store)
  * GET /api/admin/categories - Flat list (no-store)
@@ -11,6 +11,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Category from '@/lib/models/Category';
+import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -22,6 +23,9 @@ const NO_STORE_HEADERS = {
 };
 
 export async function GET(request) {
+  const authError = await assertAdmin(request);
+  if (authError) return authError;
+
   try {
     await connectToDatabase();
 

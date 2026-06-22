@@ -3,6 +3,7 @@ import ExcelJS from 'exceljs';
 import { connectToDatabase } from '@/lib/db/connect';
 import Enquiry from '@/lib/models/Enquiry';
 import EnquiryItem from '@/lib/models/EnquiryItem';
+import { requireAuth } from '@/lib/server/auth/requireAuth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -46,6 +47,9 @@ function setAllBorders(cell) {
 }
 
 export async function GET(request, { params }) {
+  const auth = await requireAuth(request, { permission: 'enquiries:read' });
+  if (auth.error) return auth.error;
+
   try {
     await connectToDatabase();
 

@@ -112,7 +112,7 @@ export async function GET(request) {
  * Body: Product object
  */
 export async function POST(request) {
-  const authError = assertAdmin(request);
+  const authError = await assertAdmin(request);
   if (authError) return authError;
 
   try {

@@ -1,8 +1,5 @@
 /**
  * Single Enquiry API Route
- * 
- * GET /api/enquiries/[id] - Get single enquiry details
- * PUT /api/enquiries/[id] - Update enquiry (status, priority, notes, etc.)
  */
 
 import { NextResponse } from 'next/server';
@@ -10,88 +7,90 @@ import { connectToDatabase } from '@/lib/db/connect';
 import Enquiry from '@/lib/models/Enquiry';
 import EnquiryItem from '@/lib/models/EnquiryItem';
 import EnquiryMessage from '@/lib/models/EnquiryMessage';
+import EnquiryActivity from '@/lib/server/models/EnquiryActivity';
 import { normalizePhone } from '@/lib/utils/phone';
+import { requireAuth } from '@/lib/server/auth/requireAuth';
+import {
+  canAccessEnquiry,
+  applyEnquiryUpdate,
+} from '@/lib/server/enquiries/enquiryAccess';
 
-/**
- * GET /api/enquiries/[id]
- * Get single enquiry with all related data
- */
 export async function GET(request, { params }) {
+  const auth = await requireAuth(request, { permission: 'enquiries:read' });
+  if (auth.error) return auth.error;
+
   try {
     await connectToDatabase();
 
     const { id } = params;
 
-    // Get enquiry with customer details - handle populate failure gracefully
     let enquiry;
     try {
       enquiry = await Enquiry.findById(id)
         .populate('customerId')
+        .populate('assignedToUserId', 'name email role')
         .lean();
-    } catch (populateError) {
-      // If populate fails, try without populate
+    } catch {
       enquiry = await Enquiry.findById(id).lean();
     }
 
     if (!enquiry) {
-      return NextResponse.json(
-        { error: 'Enquiry not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Enquiry not found' }, { status: 404 });
     }
 
-    // Get enquiry items (cart products) - handle populate failure gracefully
+    if (!(await canAccessEnquiry(auth.session, enquiry))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     let enquiryItems = [];
     try {
       enquiryItems = await EnquiryItem.find({ enquiryId: id })
         .populate('productId', 'title heroImage slug price')
         .lean();
-    } catch (populateError) {
-      // If populate fails, try without populate
+    } catch {
       enquiryItems = await EnquiryItem.find({ enquiryId: id }).lean();
     }
 
-    // Get communication log
     const messages = await EnquiryMessage.find({ enquiryId: id })
       .sort({ createdAt: -1 })
       .lean();
 
-    // Get customer's total enquiries count
+    const activities = await EnquiryActivity.find({ enquiryId: id })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+
     let customerEnquiriesCount = 0;
     if (enquiry.customerId) {
       const customerIdValue = enquiry.customerId?._id || enquiry.customerId;
       if (customerIdValue) {
         customerEnquiriesCount = await Enquiry.countDocuments({
-          customerId: customerIdValue
+          customerId: customerIdValue,
         });
       }
     }
 
-    // Get related enquiries - by customerId (primary) or phone (fallback for legacy data)
     const relatedEnquiriesQuery = {
-      _id: { $ne: enquiry._id }, // Exclude current enquiry
+      _id: { $ne: enquiry._id },
     };
 
-    // Build query: prioritize customerId, fallback to phone matching
     if (enquiry.customerId) {
       const customerIdValue = enquiry.customerId?._id || enquiry.customerId;
       if (customerIdValue) {
         relatedEnquiriesQuery.customerId = customerIdValue;
       }
     } else if (enquiry.phone) {
-      // Fallback: find by normalized phone for legacy enquiries without customerId
       const normalizedPhone = normalizePhone(enquiry.phone);
-      // Only add phone query if normalization returned a valid value
       if (normalizedPhone && normalizedPhone.length > 0) {
         relatedEnquiriesQuery.phone = normalizedPhone;
       }
     }
 
-    // Only query if we have a valid condition
     let relatedEnquiries = [];
     if (relatedEnquiriesQuery.customerId || relatedEnquiriesQuery.phone) {
       relatedEnquiries = await Enquiry.find(relatedEnquiriesQuery)
-        .select('enquiryId source type status createdAt phone name')
+        .select('enquiryId source type status createdAt phone name assignedToName assignedToUserId')
+        .populate('assignedToUserId', 'name')
         .sort({ createdAt: -1 })
         .limit(20)
         .lean();
@@ -102,9 +101,10 @@ export async function GET(request, { params }) {
       enquiry: {
         ...enquiry,
         items: enquiryItems,
-        messages: messages,
+        messages,
+        activities,
         customerEnquiriesCount,
-        relatedEnquiries, // NEW: All related enquiries from same customer
+        relatedEnquiries,
       },
     });
   } catch (error) {
@@ -116,64 +116,42 @@ export async function GET(request, { params }) {
   }
 }
 
-/**
- * PUT /api/enquiries/[id]
- * Update enquiry (status, priority, assignedTo, notes, etc.)
- */
 export async function PUT(request, { params }) {
+  const auth = await requireAuth(request, { permission: 'enquiries:write' });
+  if (auth.error) return auth.error;
+
   try {
     await connectToDatabase();
-
     const { id } = params;
     const body = await request.json();
 
-    const {
-      status,
-      priority,
-      assignedTo,
-      notes,
-      phone,
-      userType,
-    } = body;
+    const result = await applyEnquiryUpdate({
+      enquiryId: id,
+      session: auth.session,
+      body,
+      request,
+    });
 
-    // Build update object
-    const updateData = {};
-    if (status !== undefined) updateData.status = status;
-    if (priority !== undefined) updateData.priority = priority;
-    if (assignedTo !== undefined) updateData.assignedTo = assignedTo;
-    if (notes !== undefined) updateData.notes = notes;
-    if (phone !== undefined) updateData.phone = phone;
-    if (userType !== undefined) updateData.userType = userType;
-
-    // Update enquiry
-    const enquiry = await Enquiry.findByIdAndUpdate(
-      id,
-      { $set: updateData },
-      { new: true, runValidators: true }
-    )
-      .populate('customerId')
-      .lean();
-
-    if (!enquiry) {
-      return NextResponse.json(
-        { error: 'Enquiry not found' },
-        { status: 404 }
-      );
+    if (result.error === 'not_found') {
+      return NextResponse.json({ error: 'Enquiry not found' }, { status: 404 });
+    }
+    if (result.error === 'forbidden' || result.error === 'forbidden_assign') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    if (result.error === 'invalid_assignee') {
+      return NextResponse.json({ error: result.message || 'Invalid assignee' }, { status: 400 });
     }
 
     return NextResponse.json({
       success: true,
-      enquiry,
+      enquiry: result.enquiry,
     });
   } catch (error) {
     console.error('Error updating enquiry:', error);
-    
+
     if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
-      return NextResponse.json(
-        { error: 'Validation error', details: errors },
-        { status: 400 }
-      );
+      const errors = Object.values(error.errors).map((err) => err.message);
+      return NextResponse.json({ error: 'Validation error', details: errors }, { status: 400 });
     }
 
     return NextResponse.json(
@@ -183,30 +161,23 @@ export async function PUT(request, { params }) {
   }
 }
 
-/**
- * DELETE /api/enquiries/[id]
- * Delete an enquiry and all related data
- */
 export async function DELETE(request, { params }) {
+  const auth = await requireAuth(request, { roles: ['super_admin'] });
+  if (auth.error) return auth.error;
+
   try {
     await connectToDatabase();
 
     const { id } = params;
 
-    // Delete enquiry items first (foreign key constraint)
     await EnquiryItem.deleteMany({ enquiryId: id });
-    
-    // Delete enquiry messages
     await EnquiryMessage.deleteMany({ enquiryId: id });
-    
-    // Delete the enquiry itself
+    await EnquiryActivity.deleteMany({ enquiryId: id });
+
     const enquiry = await Enquiry.findByIdAndDelete(id);
 
     if (!enquiry) {
-      return NextResponse.json(
-        { error: 'Enquiry not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Enquiry not found' }, { status: 404 });
     }
 
     return NextResponse.json({
@@ -221,4 +192,3 @@ export async function DELETE(request, { params }) {
     );
   }
 }
-

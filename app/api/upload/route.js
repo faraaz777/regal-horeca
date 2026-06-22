@@ -6,7 +6,7 @@
  * 
  * POST /api/upload
  * Body: FormData with 'file' field
- * Headers: Authorization: Bearer <token>
+ * Auth: admin session cookie (httpOnly)
  */
 
 import { NextResponse } from 'next/server';
@@ -15,7 +15,7 @@ import { optimizeImage } from '@/lib/utils/imageOptimizer';
 import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
 
 export async function POST(request) {
-  const authError = assertAdmin(request);
+  const authError = await assertAdmin(request);
   if (authError) return authError;
 
   try {

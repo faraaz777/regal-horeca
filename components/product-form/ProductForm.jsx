@@ -25,6 +25,7 @@ import {
   validateVariantBarcodesAgainstCatalog,
 } from '@/lib/utils/validateVariantBarcodes';
 import { stripChildVariantOwnedFields } from '@/lib/shared/childVariantPayload';
+import { adminFetch } from '@/lib/client/adminFetch';
 
 const LOCKED_CHILD_FIELD_CLASS =
   'disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed';
@@ -187,13 +188,9 @@ async function uploadToR2(file, options = {}) {
     const formData = new FormData();
     formData.append('file', fileToUpload, file.name);
     
-    // Upload to server (admin Bearer token required in production)
-    const token =
-      typeof window !== 'undefined' ? localStorage.getItem('regal_admin_token') : null;
-    const response = await fetch(`/api/upload?folder=${encodeURIComponent(folder)}`, {
+    const response = await adminFetch(`/api/upload?folder=${encodeURIComponent(folder)}`, {
       method: 'POST',
       body: formData,
-      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
     });
     
     const data = await response.json();
@@ -1328,13 +1325,9 @@ export default function ProductForm({
     let variantWasAlreadyInTrash = false;
 
     if (childId) {
-      const token =
-        typeof window !== 'undefined' ? localStorage.getItem('regal_admin_token') : null;
-      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
       try {
-        const res = await fetch(`/api/admin/products/children/${childId}`, {
+        const res = await adminFetch(`/api/admin/products/children/${childId}`, {
           method: 'DELETE',
-          headers: authHeaders,
         });
         const body = await res.json().catch(() => ({}));
         variantWasAlreadyInTrash =

@@ -33,7 +33,7 @@ function loadEnvLocal() {
 
 loadEnvLocal();
 
-const USER_ROLES = ['super_admin', 'data_entry', 'sales', 'inventory_manager', 'viewer'];
+const USER_ROLES = ['super_admin', 'product_manager', 'inventory_supervisor', 'data_entry', 'sales', 'inventory_manager', 'viewer'];
 
 const UserSchema = new mongoose.Schema(
   {

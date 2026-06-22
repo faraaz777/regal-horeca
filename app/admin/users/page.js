@@ -8,6 +8,8 @@ import { adminJson } from '@/lib/client/adminFetch';
 
 const ROLE_LABELS = {
   super_admin: 'Super Admin',
+  product_manager: 'Product Manager',
+  inventory_supervisor: 'Inventory Supervisor',
   data_entry: 'Data Entry',
   sales: 'Sales',
   inventory_manager: 'Inventory Manager',

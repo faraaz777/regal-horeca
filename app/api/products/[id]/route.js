@@ -16,7 +16,7 @@ import { archiveSlugOnSoftDelete } from '@/lib/server/products/slugArchive';
 import { revalidateHomepage, revalidatePath, revalidateProducts, revalidateProductSlugs } from '@/lib/utils/revalidate';
 import { resolveProduct, getSiblingChildren } from '@/lib/server/products/resolveProduct';
 import { normalizeProductPayloadForUpdate, normalizeFiltersField } from '@/lib/server/products/normalizeProductInput';
-import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
+import { assertProductWrite } from '@/lib/server/auth/adminApiGuard';
 import { findBarcodeConflicts, normalizeBarcode } from '@/lib/server/products/barcodeValidation';
 import { syncParentEmbeddedVariantFromChild } from '@/lib/server/products/syncParentEmbeddedVariants';
 import { stripChildVariantOwnedFields } from '@/lib/shared/childVariantPayload';
@@ -166,7 +166,7 @@ export async function GET(request, { params }) {
  * - Duplicate slugs auto-increment (e.g., "red-mug-1")
  */
 export async function PUT(request, { params }) {
-  const authError = await assertAdmin(request);
+  const authError = await assertProductWrite(request);
   if (authError) return authError;
 
   try {
@@ -314,7 +314,7 @@ export async function PUT(request, { params }) {
  * - Deleting a 'child' or 'standalone' deletes only that row.
  */
 export async function DELETE(request, { params }) {
-  const authError = await assertAdmin(request);
+  const authError = await assertProductWrite(request);
   if (authError) return authError;
 
   try {

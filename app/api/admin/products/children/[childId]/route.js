@@ -16,7 +16,7 @@ import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
 import { generateUniqueSlug } from '@/lib/utils/slug';
 import { revalidateProductSlugs } from '@/lib/utils/revalidate';
-import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
+import { assertAdmin, assertProductWrite } from '@/lib/server/auth/adminApiGuard';
 import { findBarcodeConflictsForChild, normalizeBarcode } from '@/lib/server/products/barcodeValidation';
 import { syncParentEmbeddedVariantFromChild } from '@/lib/server/products/syncParentEmbeddedVariants';
 import { removeEmbeddedVariantFromParent } from '@/lib/server/products/removeEmbeddedVariant';
@@ -56,7 +56,7 @@ function pickAllowed(body) {
 }
 
 export async function PATCH(request, { params }) {
-  const authError = await assertAdmin(request);
+  const authError = await assertProductWrite(request);
   if (authError) return authError;
 
   try {
@@ -190,7 +190,7 @@ export async function PATCH(request, { params }) {
 }
 
 export async function DELETE(_request, { params }) {
-  const authError = await assertAdmin(_request);
+  const authError = await assertProductWrite(_request);
   if (authError) return authError;
 
   try {

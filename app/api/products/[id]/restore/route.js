@@ -7,11 +7,11 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
 import { revalidateProductSlugs } from '@/lib/utils/revalidate';
-import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
+import { assertProductWrite } from '@/lib/server/auth/adminApiGuard';
 import { restoreCanonicalSlugOnUndelete } from '@/lib/server/products/slugArchive';
 
 export async function POST(_request, { params }) {
-  const authError = await assertAdmin(_request);
+  const authError = await assertProductWrite(_request);
   if (authError) return authError;
 
   try {

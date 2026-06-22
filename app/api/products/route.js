@@ -14,7 +14,7 @@ import { generateUniqueSlug } from '@/lib/utils/slug';
 import { revalidateHomepage, revalidatePath, revalidateProducts } from '@/lib/utils/revalidate';
 import { queryProducts } from '@/lib/server/products/queryProducts';
 import { normalizeProductPayloadForCreate } from '@/lib/server/products/normalizeProductInput';
-import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
+import { assertProductWrite } from '@/lib/server/auth/adminApiGuard';
 
 // Allow caching with revalidation for better performance
 // Revalidate every 5 minutes (300 seconds)
@@ -112,7 +112,7 @@ export async function GET(request) {
  * Body: Product object
  */
 export async function POST(request) {
-  const authError = await assertAdmin(request);
+  const authError = await assertProductWrite(request);
   if (authError) return authError;
 
   try {

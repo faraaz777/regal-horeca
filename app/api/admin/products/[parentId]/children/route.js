@@ -16,7 +16,7 @@ import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
 import { generateUniqueSlug } from '@/lib/utils/slug';
 import { revalidateProductSlugs } from '@/lib/utils/revalidate';
-import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
+import { assertAdmin, assertProductWrite } from '@/lib/server/auth/adminApiGuard';
 import { assertVariantBarcodesUnique, normalizeBarcode } from '@/lib/server/products/barcodeValidation';
 import { syncParentEmbeddedVariantFromChild } from '@/lib/server/products/syncParentEmbeddedVariants';
 import {
@@ -60,7 +60,7 @@ export async function GET(request, { params }) {
 }
 
 export async function POST(request, { params }) {
-  const authError = await assertAdmin(request);
+  const authError = await assertProductWrite(request);
   if (authError) return authError;
 
   try {

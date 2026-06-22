@@ -12,10 +12,10 @@
 import { NextResponse } from 'next/server';
 import { uploadToR2 } from '@/lib/utils/r2Upload';
 import { optimizeImage } from '@/lib/utils/imageOptimizer';
-import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
+import { assertProductWrite } from '@/lib/server/auth/adminApiGuard';
 
 export async function POST(request) {
-  const authError = await assertAdmin(request);
+  const authError = await assertProductWrite(request);
   if (authError) return authError;
 
   try {

@@ -6,13 +6,13 @@
 
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
-import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
+import { assertProductWrite } from '@/lib/server/auth/adminApiGuard';
 import { findBarcodeConflicts, normalizeBarcode } from '@/lib/server/products/barcodeValidation';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
-  const authError = await assertAdmin(request);
+  const authError = await assertProductWrite(request);
   if (authError) return authError;
 
   try {

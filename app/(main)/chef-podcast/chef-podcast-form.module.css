@@ -177,27 +177,40 @@
   padding: 0 40px 80px;
 }
 
+/**
+ * One continuous cream paper sheet — sections share the same surface
+ * with only thin dividers between them, no black gaps.
+ */
+.formPaper {
+  background: #f2f0eb;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.45);
+}
+
 .section {
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  gap: 0 56px;
-  padding: 60px 0;
-  border-bottom: 1px solid var(--cp-rule);
+  padding: 36px 44px 40px;
+  border-bottom: 1px solid rgba(192, 0, 24, 0.14);
 }
 
 .sectionLast {
   border-bottom: none;
+  padding-bottom: 44px;
 }
 
-.sectionLabel {
-  padding-top: 8px;
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  margin-bottom: 32px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid rgba(192, 0, 24, 0.14);
 }
 
 .sectionNumRow {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 0;
+  flex-shrink: 0;
 }
 
 .sectionDot {
@@ -218,16 +231,13 @@
   font-family: var(--font-fraunces), 'Fraunces', serif;
   font-size: 24px;
   font-weight: 800;
-  color: var(--cp-cream);
+  color: #141414;
   line-height: 1.35;
+  margin: 0;
 }
 
-.sectionLine {
-  width: 1px;
-  background: var(--cp-wire);
-  margin-top: 20px;
-  height: 100px;
-  margin-left: 2px;
+.sectionBody {
+  color: #141414;
 }
 
 .grid2 {
@@ -258,9 +268,10 @@
   font-size: 14px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--cp-label);
+  color: #5c5650;
   font-weight: 600;
   pointer-events: none;
+  z-index: 1;
   transition: top 0.2s ease, font-size 0.2s ease, color 0.2s ease;
 }
 
@@ -282,8 +293,9 @@
   bottom: 15px;
   width: 14px;
   height: 14px;
-  color: rgba(192, 0, 24, 0.48);
+  color: rgba(192, 0, 24, 0.55);
   pointer-events: none;
+  z-index: 2;
   transition: color 0.2s ease;
 }
 
@@ -299,15 +311,19 @@
 .fieldInput {
   background: transparent;
   border: none;
-  border-bottom: 1px solid var(--cp-wire);
+  border-bottom: 1px solid rgba(192, 0, 24, 0.32);
   width: 100%;
   padding: 12px 0;
-  color: var(--cp-cream);
+  color: #141414;
   font-size: 16px;
   font-weight: 500;
   font-family: inherit;
   letter-spacing: 0.02em;
   outline: none;
+}
+
+.field:focus-within .fieldInput {
+  border-bottom-color: transparent;
 }
 
 .fieldInput::placeholder {
@@ -335,7 +351,7 @@
 .fieldSelect {
   background: transparent;
   border: none;
-  border-bottom: 1px solid var(--cp-wire);
+  border-bottom: 1px solid rgba(192, 0, 24, 0.32);
   width: 100%;
   padding: 12px 28px 12px 0;
   font-size: 16px;
@@ -347,8 +363,12 @@
   cursor: pointer;
 }
 
+.field:focus-within .fieldSelect {
+  border-bottom-color: transparent;
+}
+
 .fieldSelectFilled {
-  color: var(--cp-cream);
+  color: #141414;
 }
 
 .fieldSelectEmpty {
@@ -367,7 +387,7 @@
   transform: translateY(-50%);
   width: 13px;
   height: 13px;
-  color: var(--cp-label);
+  color: rgba(192, 0, 24, 0.55);
   pointer-events: none;
 }
 
@@ -375,7 +395,7 @@
   font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--cp-label);
+  color: #5c5650;
   font-weight: 600;
   margin-bottom: 12px;
   display: block;
@@ -391,11 +411,12 @@
 }
 
 .textarea {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(192, 0, 24, 0.28);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(192, 0, 24, 0.32);
   width: 100%;
-  padding: 16px 18px;
-  color: var(--cp-cream);
+  padding: 12px 0 16px;
+  color: #141414;
   font-size: 16px;
   font-weight: 500;
   font-family: inherit;
@@ -404,12 +425,11 @@
   outline: none;
   resize: vertical;
   border-radius: 0;
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color 0.2s;
 }
 
 .textareaFocus {
-  background: rgba(192, 0, 24, 0.04);
-  border-color: rgba(192, 0, 24, 0.45);
+  border-bottom-color: transparent;
 }
 
 .textareaFocusBar {
@@ -433,7 +453,7 @@
   margin-top: 2px;
   width: 22px;
   height: 22px;
-  border: 1.5px solid var(--cp-wire);
+  border: 1.5px solid rgba(192, 0, 24, 0.35);
   background: transparent;
   display: flex;
   align-items: center;
@@ -456,7 +476,7 @@
 }
 
 .consentText {
-  color: var(--cp-label);
+  color: #3d3835;
   font-size: 14px;
   line-height: 1.85;
   max-width: 560px;
@@ -595,8 +615,8 @@
 
 .page input:-webkit-autofill,
 .page input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0 1000px var(--cp-bg) inset;
-  -webkit-text-fill-color: var(--cp-cream);
+  -webkit-box-shadow: 0 0 0 1000px #f2f0eb inset;
+  -webkit-text-fill-color: #141414;
   transition: background-color 5000s;
 }
 
@@ -631,17 +651,18 @@
   }
 
   .section {
-    grid-template-columns: 1fr;
-    gap: 0;
-    padding: 48px 0;
+    padding: 28px 22px 32px;
   }
 
-  .sectionLabel {
+  .sectionLast {
+    padding-bottom: 32px;
+  }
+
+  .sectionHead {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
     margin-bottom: 24px;
-  }
-
-  .sectionLine {
-    display: none;
   }
 
   .grid2 {

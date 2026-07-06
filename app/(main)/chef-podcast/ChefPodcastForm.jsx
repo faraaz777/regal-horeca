@@ -88,15 +88,14 @@ const recordingAvailabilityOptions = [
 function Section({ num, label, children, last = false }) {
   return (
     <section className={`${styles.section} ${last ? styles.sectionLast : ''}`}>
-      <div className={styles.sectionLabel}>
+      <header className={styles.sectionHead}>
         <div className={styles.sectionNumRow}>
           <div className={styles.sectionDot} />
           <span className={styles.sectionNum}>{num}</span>
         </div>
         <h2 className={styles.sectionTitle}>{label}</h2>
-        <div className={styles.sectionLine} />
-      </div>
-      <div>{children}</div>
+      </header>
+      <div className={styles.sectionBody}>{children}</div>
     </section>
   );
 }
@@ -323,13 +322,13 @@ export default function ChefPodcastForm() {
                 <Globe2 size={12} strokeWidth={1.5} aria-hidden />
                 regalhoreca.com
               </a>
-              <a href="mailto:info@regalhoreca.com" className={styles.contactItem}>
+              <a href="mailto:regalhoreca@gmail.com" className={styles.contactItem}>
                 <Mail size={12} strokeWidth={1.5} aria-hidden />
-                info@regalhoreca.com
+                regalhoreca@gmail.com
               </a>
-              <a href="tel:+919966181000" className={styles.contactItem}>
+              <a href="tel:+917893960311" className={styles.contactItem}>
                 <Phone size={12} strokeWidth={1.5} aria-hidden />
-                +91 99661 81000
+                +91 78939 60311
               </a>
             </div>
           </div>
@@ -337,6 +336,7 @@ export default function ChefPodcastForm() {
       </header>
 
       <form onSubmit={handleSubmit} className={styles.formBody}>
+        <div className={styles.formPaper}>
         <Section num="01" label="Personal Details">
           <Grid2>
             <UnderlineInput
@@ -507,6 +507,7 @@ export default function ChefPodcastForm() {
             </p>
           </label>
         </Section>
+        </div>
 
         {errorMessage ? <div className={styles.error}>{errorMessage}</div> : null}
 

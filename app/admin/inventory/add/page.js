@@ -2,20 +2,32 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
 import { Search, ArrowLeft, Package, Loader2 } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
+import { useDebounce } from '@/hooks/useDebounce';
 import { canWriteInventory, canWriteProducts } from '@/lib/shared/permissions';
 import {
   STOCK_UNITS,
   PRODUCT_STATUSES,
+  DEAD_STOCK_PERIODS,
+  DEAD_STOCK_PERIOD_LABELS,
   STATUS_BUCKETS,
-  OPENING_REASONS,
-  OPENING_REASON_LABELS,
+  STATUS_BUCKET_LABELS,
 } from '@/lib/shared/inventoryConstants';
 
 const fetcher = (url) => adminJson(url);
+
+function locationStockSuffix(loc) {
+  const itemCount = loc.itemCount ?? 0;
+  const totalQty = loc.totalQty ?? 0;
+  if (itemCount > 0 || totalQty > 0) {
+    return ` · ${itemCount} item${itemCount === 1 ? '' : 's'} (${totalQty} units)`;
+  }
+  return ' · empty';
+}
 
 const EMPTY_MASTER = {
   name: '',
@@ -39,13 +51,14 @@ const EMPTY_MASTER = {
 
 const EMPTY_OPENING = {
   minStock: '',
-  reorderQty: '',
-  deadStockDays: '',
+  maxStock: '',
+  deadStockPeriod: 'month',
+  deadStockQty: '',
   locationId: '',
   openingQty: '',
   openingStatusBucket: 'sellable',
+  markAsDeadStock: false,
   openingReason: 'opening_stock',
-  openingRatePaise: '',
   remark: '',
 };
 
@@ -69,13 +82,15 @@ function Field({ label, required, children, hint }) {
 }
 
 export default function AddToInventoryPage() {
+  const router = useRouter();
   const { data: meData } = useSWR('/api/auth/me', fetcher);
   const role = meData?.user?.role;
   const canEditMaster = canWriteProducts(role);
   const canRecordStock = canWriteInventory(role);
 
   const [searchQ, setSearchQ] = useState('');
-  const [debouncedQ, setDebouncedQ] = useState('');
+  const debouncedQ = useDebounce(searchQ.trim(), 300);
+  const isSearchPending = searchQ.trim() !== debouncedQ;
   const [selected, setSelected] = useState(null);
   const [mode, setMode] = useState('search');
   const [master, setMaster] = useState(EMPTY_MASTER);
@@ -83,23 +98,78 @@ export default function AddToInventoryPage() {
   const [submitting, setSubmitting] = useState(false);
   const [validationErrors, setValidationErrors] = useState([]);
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(searchQ.trim()), 300);
-    return () => clearTimeout(t);
-  }, [searchQ]);
+  const searchUrl = debouncedQ
+    ? `/api/admin/inventory/search?q=${encodeURIComponent(debouncedQ)}&limit=100`
+    : null;
+  const { data: searchData, isLoading: searchLoading, isValidating: searchValidating } = useSWR(
+    searchUrl,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 5000,
+      keepPreviousData: true,
+    }
+  );
 
-  const searchUrl = debouncedQ.length >= 2 ? `/api/admin/inventory/search?q=${encodeURIComponent(debouncedQ)}` : null;
-  const { data: searchData, isLoading: searchLoading } = useSWR(searchUrl, fetcher);
+  const showSearchLoading = Boolean(debouncedQ) && (searchLoading || searchValidating || isSearchPending);
 
-  const { data: metaData } = useSWR(
-    '/api/admin/inventory/locations?vendors=true',
-    fetcher
+  const { data: metaData, mutate: mutateLocations } = useSWR(
+    '/api/admin/inventory/locations?vendors=true&selectable=true',
+    fetcher,
+    { revalidateOnFocus: true, revalidateOnMount: true }
   );
   const { data: deptData } = useSWR('/api/categories?level=department', fetcher);
 
   const departments = deptData?.categories || [];
   const locations = metaData?.locations || [];
   const vendors = metaData?.vendors || [];
+
+  const locationItemsUrl = opening.locationId
+    ? `/api/admin/inventory/locations/${opening.locationId}/items`
+    : null;
+  const { data: locationItemsData, isLoading: locationItemsLoading } = useSWR(
+    locationItemsUrl,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
+  const locationItems = locationItemsData?.items || [];
+
+  const displayLocations = useMemo(() => {
+    if (!opening.locationId || !locationItemsData?.items?.length) {
+      return locations;
+    }
+
+    const selectedId = String(opening.locationId);
+    const productIds = new Set(locationItemsData.items.map((i) => String(i.productId)));
+    const totalQty = locationItemsData.items.reduce((sum, i) => sum + i.qty, 0);
+    const itemCount = productIds.size;
+
+    return locations.map((loc) =>
+      String(loc._id) === selectedId ? { ...loc, itemCount, totalQty } : loc
+    );
+  }, [locations, opening.locationId, locationItemsData]);
+
+  useEffect(() => {
+    if (!opening.locationId || !locationItemsData?.items || !metaData?.locations) return;
+
+    const selectedId = String(opening.locationId);
+    const productIds = new Set(locationItemsData.items.map((i) => String(i.productId)));
+    const totalQty = locationItemsData.items.reduce((sum, i) => sum + i.qty, 0);
+    const itemCount = productIds.size;
+
+    const current = metaData.locations.find((loc) => String(loc._id) === selectedId);
+    if (current?.itemCount === itemCount && current?.totalQty === totalQty) return;
+
+    mutateLocations(
+      {
+        ...metaData,
+        locations: metaData.locations.map((loc) =>
+          String(loc._id) === selectedId ? { ...loc, itemCount, totalQty } : loc
+        ),
+      },
+      { revalidate: false }
+    );
+  }, [opening.locationId, locationItemsData, metaData, mutateLocations]);
 
   const categoryUrl = master.departmentId
     ? `/api/categories?parent=${master.departmentId}`
@@ -116,23 +186,32 @@ export default function AddToInventoryPage() {
   const gateRequiredFields = useMemo(
     () => [
       'minStock',
-      'reorderQty',
-      'deadStockDays',
+      'maxStock',
+      'deadStockPeriod',
+      'deadStockQty',
       'locationId',
       'openingQty',
-      'openingReason',
-      ...(opening.openingReason === 'purchase' ? ['openingRatePaise'] : []),
     ],
-    [opening.openingReason]
+    []
   );
 
-  const selectExisting = useCallback((product) => {
-    setSelected(product);
-    setMode('existing');
-    setMaster(EMPTY_MASTER);
-    setOpening(EMPTY_OPENING);
-    setValidationErrors([]);
-  }, []);
+  const selectExisting = useCallback(
+    (product) => {
+      if (product.hasStock) {
+        const q = encodeURIComponent(product.title || product.sku || '');
+        router.push(
+          `/admin/inventory?productId=${product._id}&q=${q}&movement=1`
+        );
+        return;
+      }
+      setSelected(product);
+      setMode('existing');
+      setMaster(EMPTY_MASTER);
+      setOpening(EMPTY_OPENING);
+      setValidationErrors([]);
+    },
+    [router]
+  );
 
   const startCreate = useCallback(() => {
     setSelected(null);
@@ -144,6 +223,26 @@ export default function AddToInventoryPage() {
 
   const updateMaster = (key, value) => setMaster((p) => ({ ...p, [key]: value }));
   const updateOpening = (key, value) => setOpening((p) => ({ ...p, [key]: value }));
+
+  const toggleMarkAsDeadStock = (checked) => {
+    setOpening((p) => ({
+      ...p,
+      markAsDeadStock: checked,
+      openingStatusBucket: checked
+        ? 'dead_stock'
+        : p.openingStatusBucket === 'dead_stock'
+          ? 'sellable'
+          : p.openingStatusBucket,
+    }));
+  };
+
+  const updateOpeningStatus = (bucket) => {
+    setOpening((p) => ({
+      ...p,
+      openingStatusBucket: bucket,
+      markAsDeadStock: bucket === 'dead_stock',
+    }));
+  };
 
   const validateClient = useCallback(() => {
     const errors = [];
@@ -165,11 +264,7 @@ export default function AddToInventoryPage() {
     }
     if (showAdditionalOpening && canRecordStock) {
       if (!opening.locationId) errors.push('Location is required');
-      if (!opening.openingQty) errors.push('Opening quantity is required');
-      if (!opening.openingReason) errors.push('Opening reason is required');
-      if (opening.openingReason === 'purchase' && !opening.openingRatePaise) {
-        errors.push('Opening rate is required for Purchase');
-      }
+      if (!opening.openingQty) errors.push('Opening stock is required');
     }
     return errors;
   }, [mode, master, opening, gateRequiredFields, showFullOpeningGate, showAdditionalOpening, canEditMaster, canRecordStock]);
@@ -206,12 +301,14 @@ export default function AddToInventoryPage() {
             opening: {
               ...opening,
               minStock: Number(opening.minStock),
-              reorderQty: Number(opening.reorderQty),
-              deadStockDays: Number(opening.deadStockDays),
+              maxStock: Number(opening.maxStock),
+              deadStockPeriod: opening.deadStockPeriod,
+              deadStockQty: Number(opening.deadStockQty),
               openingQty: Number(opening.openingQty),
-              openingRatePaise: opening.openingRatePaise
-                ? Number(opening.openingRatePaise)
-                : null,
+              openingStatusBucket: opening.openingStatusBucket,
+              markAsDeadStock: opening.markAsDeadStock,
+              openingReason: 'opening_stock',
+              openingRatePaise: null,
             },
           }),
         });
@@ -227,10 +324,9 @@ export default function AddToInventoryPage() {
               locationId: opening.locationId,
               openingQty: Number(opening.openingQty),
               openingStatusBucket: opening.openingStatusBucket,
-              openingReason: opening.openingReason,
-              openingRatePaise: opening.openingRatePaise
-                ? Number(opening.openingRatePaise)
-                : null,
+              markAsDeadStock: opening.markAsDeadStock,
+              openingReason: 'opening_stock',
+              openingRatePaise: null,
               remark: opening.remark,
             }
           : {
@@ -238,12 +334,14 @@ export default function AddToInventoryPage() {
               opening: {
                 ...opening,
                 minStock: Number(opening.minStock),
-                reorderQty: Number(opening.reorderQty),
-                deadStockDays: Number(opening.deadStockDays),
-                openingQty: Number(opening.openingQty),
-                openingRatePaise: opening.openingRatePaise
-                  ? Number(opening.openingRatePaise)
-                  : null,
+                maxStock: Number(opening.maxStock),
+                deadStockPeriod: opening.deadStockPeriod,
+                deadStockQty: Number(opening.deadStockQty),
+              openingQty: Number(opening.openingQty),
+              openingStatusBucket: opening.openingStatusBucket,
+              markAsDeadStock: opening.markAsDeadStock,
+              openingReason: 'opening_stock',
+                openingRatePaise: null,
               },
             };
 
@@ -304,16 +402,19 @@ export default function AddToInventoryPage() {
             type="text"
             value={searchQ}
             onChange={(e) => setSearchQ(e.target.value)}
-            placeholder="Search by name, SKU, barcode, or brand…"
+            placeholder="Name, SKU, barcode, HSN, brand, tags…"
             className="w-full pl-10 pr-4 py-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
             autoFocus
           />
         </div>
 
-        {debouncedQ.length >= 2 && (
+        {debouncedQ && (
           <div className="mt-3 border border-gray-100 rounded-lg divide-y max-h-64 overflow-y-auto">
-            {searchLoading ? (
-              <div className="p-4 text-sm text-gray-500 text-center">Searching…</div>
+            {showSearchLoading && results.length === 0 ? (
+              <div className="p-4 text-sm text-gray-500 text-center flex items-center justify-center gap-2">
+                <Loader2 className="animate-spin text-emerald-600" size={16} />
+                Searching…
+              </div>
             ) : results.length === 0 ? (
               <div className="p-4 text-sm text-gray-500 text-center">
                 No matches — create a new product below
@@ -324,14 +425,38 @@ export default function AddToInventoryPage() {
                   key={p._id}
                   type="button"
                   onClick={() => selectExisting(p)}
-                  className={`w-full text-left px-4 py-3 hover:bg-emerald-50 transition-colors ${
+                  className={`w-full text-left px-4 py-3 hover:bg-emerald-50 transition-colors flex items-center gap-3 ${
                     selected?._id === p._id ? 'bg-emerald-50 ring-1 ring-emerald-200' : ''
                   }`}
                 >
-                  <div className="font-medium text-gray-900">{p.title}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    SKU {p.sku} · {p.brand}
-                    {p.hasStock ? ' · Has stock' : ' · No stock yet'}
+                  <div className="h-12 w-12 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-200">
+                    {p.heroImage ? (
+                      <img
+                        src={p.heroImage}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-300">
+                        <Package size={20} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-gray-900">{p.title}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      {[
+                        p.sku && `SKU ${p.sku}`,
+                        p.barcode && `Barcode ${p.barcode}`,
+                        p.hsnCode && `HSN ${p.hsnCode}`,
+                        p.brand,
+                        p.categoryName,
+                        p.hasStock ? 'Has stock' : 'No stock yet',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </div>
                   </div>
                 </button>
               ))
@@ -571,7 +696,7 @@ export default function AddToInventoryPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {showFullOpeningGate && (
                   <>
-                    <Field label="Min stock (reorder level)" required>
+                    <Field label="Min stock" required>
                       <input
                         type="number"
                         min="0"
@@ -580,24 +705,39 @@ export default function AddToInventoryPage() {
                         onChange={(e) => updateOpening('minStock', e.target.value)}
                       />
                     </Field>
-                    <Field label="Reorder qty" required>
+                    <Field label="Max stock" required>
                       <input
                         type="number"
                         min="0"
                         className="w-full px-3 py-2 text-sm border rounded-lg"
-                        value={opening.reorderQty}
-                        onChange={(e) => updateOpening('reorderQty', e.target.value)}
+                        value={opening.maxStock}
+                        onChange={(e) => updateOpening('maxStock', e.target.value)}
                       />
                     </Field>
-                    <Field label="Dead stock days" required>
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-full px-3 py-2 text-sm border rounded-lg"
-                        value={opening.deadStockDays}
-                        onChange={(e) => updateOpening('deadStockDays', e.target.value)}
-                      />
-                    </Field>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Dead stock rule" required>
+                        <select
+                          className="w-full px-3 py-2 text-sm border rounded-lg"
+                          value={opening.deadStockPeriod}
+                          onChange={(e) => updateOpening('deadStockPeriod', e.target.value)}
+                        >
+                          {DEAD_STOCK_PERIODS.map((period) => (
+                            <option key={period} value={period}>
+                              {DEAD_STOCK_PERIOD_LABELS[period]}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="Qty to sell in period" required>
+                        <input
+                          type="number"
+                          min="1"
+                          className="w-full px-3 py-2 text-sm border rounded-lg"
+                          value={opening.deadStockQty}
+                          onChange={(e) => updateOpening('deadStockQty', e.target.value)}
+                        />
+                      </Field>
+                    </div>
                   </>
                 )}
 
@@ -608,15 +748,77 @@ export default function AddToInventoryPage() {
                     onChange={(e) => updateOpening('locationId', e.target.value)}
                   >
                     <option value="">Select location…</option>
-                    {locations.map((loc) => (
+                    {displayLocations.map((loc) => (
                       <option key={loc._id} value={loc._id}>
                         {loc.path}
-                        {loc.level ? ` (${loc.level})` : ''}
+                        {locationStockSuffix(loc)}
                       </option>
                     ))}
                   </select>
                 </Field>
-                <Field label="Opening qty" required>
+
+                {opening.locationId && (
+                  <div className="sm:col-span-2 rounded-lg border border-gray-200 bg-gray-50/80 overflow-hidden">
+                    <div className="px-3 py-2 border-b border-gray-200 bg-white flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-gray-700">
+                        Stock at this location
+                      </p>
+                      {locationItemsData?.location?.displayPath && (
+                        <p className="text-[10px] text-gray-500 font-mono truncate">
+                          {locationItemsData.location.displayPath}
+                        </p>
+                      )}
+                    </div>
+                    {locationItemsLoading ? (
+                      <p className="text-sm text-gray-500 px-3 py-4 flex items-center gap-2">
+                        <Loader2 size={14} className="animate-spin" />
+                        Loading items…
+                      </p>
+                    ) : locationItems.length === 0 ? (
+                      <p className="text-sm text-gray-500 px-3 py-4">No stock at this location yet.</p>
+                    ) : (
+                      <div className="max-h-48 overflow-y-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200 bg-white">
+                              <th className="px-3 py-2">Name</th>
+                              <th className="px-3 py-2">SKU</th>
+                              <th className="px-3 py-2">Qty</th>
+                              <th className="px-3 py-2">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {locationItems.map((item) => (
+                              <tr key={item._id} className="bg-white/60">
+                                <td className="px-3 py-2 font-medium text-gray-900">{item.title}</td>
+                                <td className="px-3 py-2 font-mono text-xs text-gray-600">
+                                  {item.sku || '—'}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <span className="font-semibold">{item.qty}</span>
+                                  <span className="text-gray-400 text-xs ml-1">{item.stockUnit}</span>
+                                </td>
+                                <td className="px-3 py-2">
+                                  <span
+                                    className={`inline-block px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
+                                      item.statusBucket === 'sellable'
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : 'bg-amber-100 text-amber-800'
+                                    }`}
+                                  >
+                                    {item.statusLabel}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <Field label="Opening stock" required>
                   <input
                     type="number"
                     min="1"
@@ -624,44 +826,34 @@ export default function AddToInventoryPage() {
                     value={opening.openingQty}
                     onChange={(e) => updateOpening('openingQty', e.target.value)}
                   />
+                  <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={opening.markAsDeadStock}
+                      onChange={(e) => toggleMarkAsDeadStock(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span className="text-xs text-gray-600">Mark as dead stock</span>
+                  </label>
+                  {opening.markAsDeadStock && (
+                    <p className="text-[10px] text-amber-700 mt-1">
+                      Flags that sales are below the dead-stock target.
+                    </p>
+                  )}
                 </Field>
-                <Field label="Status bucket">
+                <Field label="Status" required>
                   <select
                     className="w-full px-3 py-2 text-sm border rounded-lg"
                     value={opening.openingStatusBucket}
-                    onChange={(e) => updateOpening('openingStatusBucket', e.target.value)}
+                    onChange={(e) => updateOpeningStatus(e.target.value)}
                   >
-                    {STATUS_BUCKETS.map((b) => (
-                      <option key={b} value={b}>
-                        {b.replace('_', ' ')}
+                    {STATUS_BUCKETS.map((bucket) => (
+                      <option key={bucket} value={bucket}>
+                        {STATUS_BUCKET_LABELS[bucket]}
                       </option>
                     ))}
                   </select>
                 </Field>
-                <Field label="Reason" required>
-                  <select
-                    className="w-full px-3 py-2 text-sm border rounded-lg"
-                    value={opening.openingReason}
-                    onChange={(e) => updateOpening('openingReason', e.target.value)}
-                  >
-                    {OPENING_REASONS.map((r) => (
-                      <option key={r} value={r}>
-                        {OPENING_REASON_LABELS[r]}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                {opening.openingReason === 'purchase' && (
-                  <Field label="Opening rate (paise)" required>
-                    <input
-                      type="number"
-                      min="1"
-                      className="w-full px-3 py-2 text-sm border rounded-lg"
-                      value={opening.openingRatePaise}
-                      onChange={(e) => updateOpening('openingRatePaise', e.target.value)}
-                    />
-                  </Field>
-                )}
                 <div className="sm:col-span-2">
                   <Field label="Remark">
                     <textarea

@@ -48,6 +48,7 @@ export async function POST(request) {
 
     await writeAuditLog({
       userId: user._id,
+      actorRole: user.role,
       action: 'auth.login',
       entityType: 'User',
       entityId: user._id,

@@ -7,6 +7,16 @@ import { inventorySearchSchema, formatZodError } from '@/lib/server/inventory/sc
 import { productHasLedgerEntries } from '@/lib/server/inventory/stockLedgerService';
 import InventoryRule from '@/lib/models/InventoryRule';
 
+function resolveSearchHeroImage(product) {
+  if (product.heroImage?.trim()) return product.heroImage.trim();
+  const galleryImage = Array.isArray(product.gallery) ? product.gallery.find(Boolean) : '';
+  if (galleryImage) return galleryImage;
+  const parent = product.parentProductId;
+  if (parent?.heroImage?.trim()) return parent.heroImage.trim();
+  const parentGalleryImage = Array.isArray(parent?.gallery) ? parent.gallery.find(Boolean) : '';
+  return parentGalleryImage || '';
+}
+
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
@@ -36,10 +46,12 @@ export async function GET(request) {
           title: p.title,
           sku: p.sku,
           barcode: p.barcode,
+          hsnCode: p.hsnCode,
           brand: p.brand,
           colour: p.colour,
           stockUnit: p.stockUnit,
           productStatus: p.productStatus,
+          heroImage: resolveSearchHeroImage(p),
           categoryName: p.categoryId?.name || '',
           departmentName: p.departmentId?.name || '',
           hasStock,

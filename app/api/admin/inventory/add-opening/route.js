@@ -39,14 +39,17 @@ export async function POST(request) {
     const opening = hasLedger
       ? {
           minStock: 0,
+          maxStock: 0,
           reorderQty: 0,
-          deadStockDays: 0,
+          deadStockPeriod: 'month',
+          deadStockQty: 1,
           locationId: parsed.data.locationId,
           openingQty: parsed.data.openingQty,
           openingStatusBucket: parsed.data.openingStatusBucket,
           openingReason: parsed.data.openingReason,
           openingRatePaise: parsed.data.openingRatePaise,
           remark: parsed.data.remark,
+          markAsDeadStock: parsed.data.markAsDeadStock,
         }
       : parsed.data.opening;
 

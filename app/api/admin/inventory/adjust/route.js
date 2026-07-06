@@ -24,6 +24,8 @@ export async function POST(request) {
       locationId: locationId || null,
       note: note || '',
       userId: auth.session.userId,
+      actorRole: auth.session.role,
+      request,
     });
 
     return NextResponse.json({ success: true, stock: summary });

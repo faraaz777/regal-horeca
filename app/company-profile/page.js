@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { connectToDatabase } from '@/lib/db/connect';
 import CompanyProfile from '@/lib/models/CompanyProfile';
+import CompanyProfileViewer from './CompanyProfileViewer';
 
 async function getActiveProfile() {
   try {
@@ -36,14 +37,13 @@ export default async function CompanyProfilePage() {
   }
 
   const pdfSrc = `/api/attachment/proxy?src=${encodeURIComponent(profile.fileUrl)}`;
+  const downloadSrc = `/api/attachment/proxy?download=1&src=${encodeURIComponent(profile.fileUrl)}`;
 
   return (
-    <main className="h-screen w-full">
-      <iframe
-        src={pdfSrc}
-        className="h-full w-full border-0"
-        title={profile.originalFileName || 'Company Profile'}
-      />
-    </main>
+    <CompanyProfileViewer
+      pdfSrc={pdfSrc}
+      downloadSrc={downloadSrc}
+      title={profile.originalFileName || 'Company Profile'}
+    />
   );
 }

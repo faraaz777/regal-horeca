@@ -6,8 +6,30 @@
  * submissions are posted into the existing Google Form backend.
  */
 
+import { Bodoni_Moda, Fraunces, Outfit } from 'next/font/google';
 import { SITE_CONFIG } from '@/lib/constants/seo';
 import ChefPodcastForm from './ChefPodcastForm';
+
+const bodoni = Bodoni_Moda({
+  subsets: ['latin'],
+  variable: '--font-bodoni',
+  display: 'swap',
+  weight: ['700', '800', '900'],
+});
+
+const fraunces = Fraunces({
+  subsets: ['latin'],
+  variable: '--font-fraunces',
+  display: 'swap',
+  style: ['normal', 'italic'],
+  weight: ['700', '800', '900'],
+});
+
+const outfit = Outfit({
+  subsets: ['latin'],
+  variable: '--font-outfit',
+  display: 'swap',
+});
 
 export const metadata = {
   title: 'Chef Podcast Registration | REGAL HoReCa',
@@ -23,5 +45,9 @@ export const metadata = {
 };
 
 export default function ChefPodcastPage() {
-  return <ChefPodcastForm />;
+  return (
+    <div className={`${bodoni.variable} ${fraunces.variable} ${outfit.variable}`}>
+      <ChefPodcastForm />
+    </div>
+  );
 }

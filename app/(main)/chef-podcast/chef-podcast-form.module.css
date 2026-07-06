@@ -1,0 +1,661 @@
+.page {
+  --cp-bg: #000000;
+  --cp-red: #c00018;
+  --cp-cream: #f2f0eb;
+  --cp-muted: #a39b93;
+  --cp-label: #ddd6cf;
+  --cp-rule: rgba(255, 255, 255, 0.12);
+  --cp-wire: rgba(192, 0, 24, 0.42);
+  background: var(--cp-bg);
+  min-height: 100vh;
+  color: var(--cp-cream);
+  font-family: var(--font-outfit), 'Outfit', sans-serif;
+}
+
+.page ::selection {
+  background: var(--cp-red);
+  color: #fff;
+}
+
+.masthead {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--cp-rule);
+}
+
+.mastheadBg {
+  position: absolute;
+  right: -2%;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-fraunces), 'Fraunces', serif;
+  font-size: clamp(180px, 30vw, 340px);
+  font-weight: 900;
+  color: rgba(192, 0, 24, 0.045);
+  line-height: 1;
+  user-select: none;
+  pointer-events: none;
+  letter-spacing: -0.05em;
+}
+
+.mastheadInner {
+  position: relative;
+  z-index: 1;
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 52px 40px 44px;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 40px;
+}
+
+.brandMark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--cp-label);
+  font-size: 10px;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+}
+
+.brandDot {
+  width: 8px;
+  height: 8px;
+  background: var(--cp-red);
+  border-radius: 50%;
+}
+
+.podcastMark {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--cp-label);
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0 0 36px;
+  padding: 0;
+}
+
+.titleLine {
+  display: block;
+  font-size: clamp(72px, 12.5vw, 136px);
+  line-height: 0.76;
+  letter-spacing: -0.045em;
+  color: var(--cp-cream);
+  text-transform: uppercase;
+}
+
+/**
+ * Didone contrast for upright masthead lines.
+ * Bodoni gives thin horizontals with thick vertical stems,
+ * matching the reference artwork for CHEF / REGISTER.
+ */
+.titleSerif {
+  font-family: var(--font-bodoni), 'Bodoni Moda', 'Didot', 'Bodoni MT', serif;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.titlePodcast {
+  font-family: var(--font-fraunces), 'Fraunces', serif;
+  color: var(--cp-red);
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variation-settings: 'SOFT' 0, 'WONK' 0, 'opsz' 144;
+}
+
+.titleEm {
+  color: var(--cp-red);
+  font-style: italic;
+  font-weight: 700;
+}
+
+.subRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+  padding-top: 32px;
+  border-top: 1px solid var(--cp-rule);
+}
+
+.subText {
+  color: var(--cp-label);
+  font-size: 14px;
+  line-height: 1.8;
+  max-width: 380px;
+}
+
+.contactBar {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.contactItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--cp-label);
+  font-size: 11px;
+  padding: 6px 16px;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.contactItem svg {
+  color: rgba(192, 0, 24, 0.72);
+  flex-shrink: 0;
+  transition: color 0.2s;
+}
+
+.contactItem:hover {
+  color: var(--cp-cream);
+}
+
+.contactItem:hover svg {
+  color: var(--cp-red);
+}
+
+.contactItem + .contactItem {
+  border-left: 1px solid var(--cp-rule);
+}
+
+.formBody {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 0 40px 80px;
+}
+
+.section {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 0 56px;
+  padding: 60px 0;
+  border-bottom: 1px solid var(--cp-rule);
+}
+
+.sectionLast {
+  border-bottom: none;
+}
+
+.sectionLabel {
+  padding-top: 8px;
+}
+
+.sectionNumRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sectionDot {
+  width: 7px;
+  height: 7px;
+  background: var(--cp-red);
+  flex-shrink: 0;
+}
+
+.sectionNum {
+  font-family: var(--font-fraunces), 'Fraunces', serif;
+  font-size: 18px;
+  color: var(--cp-red);
+  letter-spacing: 0.2em;
+}
+
+.sectionTitle {
+  font-family: var(--font-fraunces), 'Fraunces', serif;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--cp-cream);
+  line-height: 1.35;
+}
+
+.sectionLine {
+  width: 1px;
+  background: var(--cp-wire);
+  margin-top: 20px;
+  height: 100px;
+  margin-left: 2px;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 40px 48px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 44px;
+}
+
+.fullWidth {
+  grid-column: 1 / -1;
+}
+
+.field {
+  position: relative;
+  padding-top: 20px;
+}
+
+.fieldLabel {
+  position: absolute;
+  left: 0;
+  top: 14px;
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cp-label);
+  font-weight: 600;
+  pointer-events: none;
+  transition: top 0.2s ease, font-size 0.2s ease, color 0.2s ease;
+}
+
+.fieldFilled .fieldLabel,
+.field:focus-within .fieldLabel {
+  top: -4px;
+  font-size: 11px;
+  color: var(--cp-red);
+  letter-spacing: 0.18em;
+}
+
+/**
+ * Field icons sit on the input baseline as quiet red marks.
+ * They brighten on focus without competing with labels or underlines.
+ */
+.fieldIcon {
+  position: absolute;
+  left: 0;
+  bottom: 15px;
+  width: 14px;
+  height: 14px;
+  color: rgba(192, 0, 24, 0.48);
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+
+.fieldHasIcon:focus-within .fieldIcon {
+  color: var(--cp-red);
+}
+
+.fieldHasIcon .fieldInput,
+.fieldHasIcon .fieldSelect {
+  padding-left: 24px;
+}
+
+.fieldInput {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--cp-wire);
+  width: 100%;
+  padding: 12px 0;
+  color: var(--cp-cream);
+  font-size: 16px;
+  font-weight: 500;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+  outline: none;
+}
+
+.fieldInput::placeholder {
+  color: transparent;
+}
+
+.fieldUnderline {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  background: var(--cp-red);
+  width: 0;
+  transition: width 0.3s ease;
+}
+
+.field:focus-within .fieldUnderline {
+  width: 100%;
+}
+
+.selectWrap {
+  position: relative;
+}
+
+.fieldSelect {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--cp-wire);
+  width: 100%;
+  padding: 12px 28px 12px 0;
+  font-size: 16px;
+  font-weight: 500;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.fieldSelectFilled {
+  color: var(--cp-cream);
+}
+
+.fieldSelectEmpty {
+  color: transparent;
+}
+
+.fieldSelect option {
+  background: #111;
+  color: var(--cp-cream);
+}
+
+.selectChevron {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 13px;
+  height: 13px;
+  color: var(--cp-label);
+  pointer-events: none;
+}
+
+.textareaLabel {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cp-label);
+  font-weight: 600;
+  margin-bottom: 12px;
+  display: block;
+  transition: color 0.2s;
+}
+
+.textareaLabelFocus {
+  color: var(--cp-red);
+}
+
+.textareaWrap {
+  position: relative;
+}
+
+.textarea {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(192, 0, 24, 0.28);
+  width: 100%;
+  padding: 16px 18px;
+  color: var(--cp-cream);
+  font-size: 16px;
+  font-weight: 500;
+  font-family: inherit;
+  line-height: 1.8;
+  letter-spacing: 0.02em;
+  outline: none;
+  resize: vertical;
+  border-radius: 0;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.textareaFocus {
+  background: rgba(192, 0, 24, 0.04);
+  border-color: rgba(192, 0, 24, 0.45);
+}
+
+.textareaFocusBar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--cp-red);
+  width: 100%;
+}
+
+.consentLabel {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  cursor: pointer;
+}
+
+.consentBox {
+  flex-shrink: 0;
+  margin-top: 2px;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--cp-wire);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s;
+  position: relative;
+}
+
+.consentBoxChecked {
+  border-color: var(--cp-red);
+  background: var(--cp-red);
+}
+
+.consentInput {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  cursor: pointer;
+  margin: 0;
+}
+
+.consentText {
+  color: var(--cp-label);
+  font-size: 14px;
+  line-height: 1.85;
+  max-width: 560px;
+}
+
+.required {
+  color: var(--cp-red);
+}
+
+.submitRow {
+  padding-top: 52px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.submitBtn {
+  background: var(--cp-red);
+  color: #fff;
+  border: none;
+  padding: 20px 48px;
+  font-size: 11px;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  border-radius: 0;
+}
+
+.submitBtn:hover:not(:disabled) {
+  background: #9e0015;
+}
+
+.submitBtn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.submitBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.submitHint {
+  color: var(--cp-muted);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+.error {
+  margin-top: 24px;
+  border: 1px solid rgba(192, 0, 24, 0.35);
+  background: rgba(192, 0, 24, 0.08);
+  padding: 14px 18px;
+  font-size: 13px;
+  color: #f5d0d4;
+}
+
+.success {
+  min-height: 70vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.successInner {
+  max-width: 400px;
+}
+
+.successIcon {
+  width: 44px;
+  height: 44px;
+  color: var(--cp-red);
+  margin: 0 auto 20px;
+}
+
+.successLine {
+  width: 1px;
+  height: 56px;
+  background: var(--cp-red);
+  margin: 0 auto 36px;
+}
+
+.successLineBottom {
+  margin: 36px auto 0;
+}
+
+.successKicker {
+  color: var(--cp-red);
+  font-size: 9px;
+  letter-spacing: 0.55em;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+
+.successTitle {
+  font-family: var(--font-fraunces), 'Fraunces', serif;
+  font-size: clamp(48px, 12vw, 72px);
+  color: var(--cp-cream);
+  font-weight: 900;
+  line-height: 0.88;
+  letter-spacing: -0.03em;
+  margin-bottom: 28px;
+}
+
+.successText {
+  color: var(--cp-muted);
+  font-size: 13px;
+  line-height: 1.85;
+}
+
+.successBtn {
+  margin-top: 28px;
+  background: transparent;
+  border: 1px solid var(--cp-wire);
+  color: var(--cp-cream);
+  padding: 14px 24px;
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.successBtn:hover {
+  border-color: var(--cp-red);
+  color: var(--cp-red);
+}
+
+.page input:-webkit-autofill,
+.page input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--cp-bg) inset;
+  -webkit-text-fill-color: var(--cp-cream);
+  transition: background-color 5000s;
+}
+
+@media (max-width: 768px) {
+  .mastheadInner {
+    padding: 40px 20px 36px;
+  }
+
+  .titleLine {
+    font-size: clamp(56px, 15vw, 88px);
+    line-height: 0.8;
+  }
+
+  .subRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 24px;
+  }
+
+  .contactBar {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .contactItem {
+    padding: 0;
+    border-left: none !important;
+  }
+
+  .formBody {
+    padding: 0 20px 60px;
+  }
+
+  .section {
+    grid-template-columns: 1fr;
+    gap: 0;
+    padding: 48px 0;
+  }
+
+  .sectionLabel {
+    margin-bottom: 24px;
+  }
+
+  .sectionLine {
+    display: none;
+  }
+
+  .grid2 {
+    grid-template-columns: 1fr;
+  }
+
+  .submitRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .submitBtn {
+    width: 100%;
+    justify-content: center;
+  }
+}

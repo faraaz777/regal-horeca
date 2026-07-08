@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import { requireAuth } from '@/lib/server/auth/requireAuth';
-import { hasPermission } from '@/lib/shared/permissions';
 import { searchInventoryProducts } from '@/lib/server/inventory/addToInventoryService';
 import { inventorySearchSchema, formatZodError } from '@/lib/server/inventory/schemas';
-import { productHasLedgerEntries } from '@/lib/server/inventory/stockLedgerService';
+import {
+  getStockTotalsMapForProducts,
+} from '@/lib/server/inventory/stockLedgerService';
+import StockLedger from '@/lib/models/StockLedger';
+import { deriveStockStatus } from '@/lib/server/inventory/inventoryService';
 import InventoryRule from '@/lib/models/InventoryRule';
 
 function resolveSearchHeroImage(product) {
@@ -36,29 +39,54 @@ export async function GET(request) {
     }
 
     const products = await searchInventoryProducts(parsed.data.q, parsed.data.limit);
+    const productIds = products.map((p) => p._id);
 
-    const enriched = await Promise.all(
-      products.map(async (p) => {
-        const hasStock = await productHasLedgerEntries(p._id);
-        const rule = await InventoryRule.findOne({ productId: p._id }).lean();
-        return {
-          _id: p._id,
-          title: p.title,
-          sku: p.sku,
-          barcode: p.barcode,
-          hsnCode: p.hsnCode,
-          brand: p.brand,
-          colour: p.colour,
-          stockUnit: p.stockUnit,
-          productStatus: p.productStatus,
-          heroImage: resolveSearchHeroImage(p),
-          categoryName: p.categoryId?.name || '',
-          departmentName: p.departmentId?.name || '',
-          hasStock,
-          hasInventoryRule: Boolean(rule),
-        };
-      })
-    );
+    const [stockMap, rules, ledgerProductIds] = await Promise.all([
+      getStockTotalsMapForProducts(productIds),
+      InventoryRule.find({ productId: { $in: productIds } })
+        .select('productId minStock')
+        .lean(),
+      StockLedger.distinct('productId', { productId: { $in: productIds } }),
+    ]);
+
+    const ledgerSet = new Set(ledgerProductIds.map(String));
+    const ruleByProduct = new Map(rules.map((r) => [String(r.productId), r]));
+
+    const enriched = products.map((p) => {
+      const pid = String(p._id);
+      const totals = stockMap.get(pid) || { sellableQty: 0, holdQty: 0, scrapQty: 0, totalQty: 0 };
+      const hasLedger = ledgerSet.has(pid);
+      const inInventory = hasLedger || totals.totalQty > 0;
+      const rule = ruleByProduct.get(pid);
+      const threshold = rule?.minStock ?? 10;
+
+      return {
+        _id: p._id,
+        title: p.title,
+        sku: p.sku,
+        barcode: p.barcode,
+        hsnCode: p.hsnCode,
+        brand: p.brand,
+        colour: p.colour,
+        stockUnit: p.stockUnit || 'Pcs',
+        productStatus: p.productStatus,
+        heroImage: resolveSearchHeroImage(p),
+        categoryName: p.categoryId?.name || '',
+        departmentName: p.departmentId?.name || '',
+        hasStock: inInventory,
+        hasInventoryRule: Boolean(rule),
+        sellableQty: totals.sellableQty,
+        holdQty: totals.holdQty,
+        scrapQty: totals.scrapQty,
+        totalQty: totals.totalQty,
+        stockStatus: deriveStockStatus(totals.sellableQty, threshold),
+      };
+    });
+
+    enriched.sort((a, b) => {
+      if (a.hasStock === b.hasStock) return a.title.localeCompare(b.title);
+      return a.hasStock ? -1 : 1;
+    });
 
     return NextResponse.json({ results: enriched });
   } catch (error) {

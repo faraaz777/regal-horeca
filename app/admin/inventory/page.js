@@ -43,12 +43,6 @@ function StockStatusBadges({ item }) {
       label: 'Hold',
       style: STOCK_BUCKET_STYLES.hold,
     },
-    {
-      key: 'scrap',
-      qty: item.scrapQty ?? 0,
-      label: 'Scrapped',
-      style: STOCK_BUCKET_STYLES.scrap,
-    },
   ].filter((b) => b.qty > 0);
 
   if (buckets.length === 0) {
@@ -66,6 +60,52 @@ function StockStatusBadges({ item }) {
         </span>
       ))}
     </div>
+  );
+}
+
+function StockLocationsCell({ item }) {
+  const locations = item.stockLocations || [];
+  const unit = item.stockUnit || 'Pcs';
+
+  if (!locations.length) {
+    return <span className="text-xs text-gray-400">—</span>;
+  }
+
+  return (
+    <ul className="space-y-1.5">
+      {locations.map((loc) => (
+        <li key={loc.locationId || loc.locationPath} className="text-xs leading-snug">
+          <p
+            className="font-mono text-gray-700 truncate"
+            title={loc.locationPathFull || loc.locationPath}
+          >
+            {loc.locationPath}
+          </p>
+          <div className="flex flex-wrap gap-1 mt-0.5">
+            {loc.sellableQty > 0 && (
+              <span className="inline-flex px-1.5 py-px rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                {loc.sellableQty} Sellable
+              </span>
+            )}
+            {loc.holdQty > 0 && (
+              <span className="inline-flex px-1.5 py-px rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800">
+                {loc.holdQty} Hold
+              </span>
+            )}
+            {loc.scrapQty > 0 && (
+              <span className="inline-flex px-1.5 py-px rounded-full text-[10px] font-semibold bg-red-100 text-red-800">
+                {loc.scrapQty} Scrapped
+              </span>
+            )}
+            {loc.sellableQty <= 0 && loc.holdQty <= 0 && loc.scrapQty <= 0 && (
+              <span className="text-[10px] text-gray-500">
+                {loc.totalQty} {unit}
+              </span>
+            )}
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -232,28 +272,29 @@ export default function AdminInventoryPage() {
         )}
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                <th className="px-4 py-3 min-w-[240px]">Name</th>
-                <th className="px-4 py-3">SKU</th>
-                <th className="px-4 py-3 min-w-[140px]">Sellable</th>
-                <th className="px-4 py-3 min-w-[100px]">Stock status</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="px-4 py-3 w-[26%]">Name</th>
+                <th className="px-4 py-3 w-[9%]">SKU</th>
+                <th className="px-4 py-3 w-[11%]">Sellable</th>
+                <th className="px-4 py-3 w-[12%]">Stock status</th>
+                <th className="px-4 py-3 w-[8%]">Status</th>
+                <th className="px-4 py-3 w-[22%]">Location & qty</th>
+                <th className="px-4 py-3 w-[12%] text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {showLoading && items.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
                     <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600" />
                     <p className="mt-2">Loading inventory…</p>
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
                     <Package className="mx-auto text-gray-300 mb-2" size={32} />
                     No products found
                   </td>
@@ -271,8 +312,8 @@ export default function AdminInventoryPage() {
                         : ''
                     }`}
                   >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
+                    <td className="px-4 py-3 align-middle">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div className="relative h-14 w-14 flex-shrink-0">
                           {item.heroImage ? (
                             <Image
@@ -290,8 +331,8 @@ export default function AdminInventoryPage() {
                             <div className="w-14 h-14 rounded-md bg-gray-100 border border-dashed border-gray-300" />
                           )}
                         </div>
-                        <div>
-                          <div className="font-medium text-gray-900">{item.title}</div>
+                        <div className="min-w-0">
+                          <div className="font-medium text-gray-900 truncate">{item.title}</div>
                           <div className="text-xs text-gray-500 mt-0.5">
                             {item.brand}
                             {item.categoryName ? ` · ${item.categoryName}` : ''}
@@ -299,8 +340,10 @@ export default function AdminInventoryPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-600">{item.sku || '—'}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 align-middle font-mono text-xs text-gray-600 truncate">
+                      {item.sku || '—'}
+                    </td>
+                    <td className="px-4 py-3 align-middle">
                       <div className="inline-flex items-center gap-1">
                         {canAdjust && (
                           <button
@@ -330,19 +373,22 @@ export default function AdminInventoryPage() {
                         <span className="text-xs text-gray-400 ml-1">{item.stockUnit}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-3 align-middle">
                       <StockStatusBadges item={item} />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 align-middle">
                       <span
-                        className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${
+                        className={`inline-flex px-1.5 py-px rounded-full text-[10px] font-semibold leading-tight capitalize ${
                           STATUS_STYLES[item.stockStatus] || STATUS_STYLES.out
                         }`}
                       >
                         {STATUS_LABELS[item.stockStatus]}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 align-top">
+                      <StockLocationsCell item={item} />
+                    </td>
+                    <td className="px-4 py-3 align-middle">
                       <div className="flex items-center justify-end gap-1">
                         {canAdjust && (
                           <button

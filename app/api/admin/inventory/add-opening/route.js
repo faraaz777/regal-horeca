@@ -43,8 +43,16 @@ export async function POST(request) {
           reorderQty: 0,
           deadStockPeriod: 'month',
           deadStockQty: 1,
-          locationId: parsed.data.locationId,
-          openingQty: parsed.data.openingQty,
+          locationEntries: parsed.data.locationEntries?.length
+            ? parsed.data.locationEntries
+            : parsed.data.locationIds?.length
+              ? parsed.data.locationIds.map((locationId) => ({
+                  locationId,
+                  qty: parsed.data.openingQty,
+                }))
+              : parsed.data.locationId
+                ? [{ locationId: parsed.data.locationId, qty: parsed.data.openingQty }]
+                : [],
           openingStatusBucket: parsed.data.openingStatusBucket,
           openingReason: parsed.data.openingReason,
           openingRatePaise: parsed.data.openingRatePaise,

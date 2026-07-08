@@ -37,7 +37,7 @@ export async function POST(request) {
     const location = await createLocation({
       code: body.code,
       name: body.name,
-      level: body.level || 'shelf',
+      level: body.level || 'branch',
       parentLocationId: body.parentLocationId || null,
     });
     return NextResponse.json({ success: true, location }, { status: 201 });

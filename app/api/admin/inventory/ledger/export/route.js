@@ -70,7 +70,7 @@ export async function GET(request) {
           reason: row.reasonLabel || '',
           remark: row.remark || '',
           ref: row.ref || '',
-          location: row.locationId?.path || '',
+          location: row.locationDisplayPath || row.locationId?.path || '',
           user: row.performedBy?.name || row.performedBy?.email || '',
           qty: row.qty ?? '',
         });

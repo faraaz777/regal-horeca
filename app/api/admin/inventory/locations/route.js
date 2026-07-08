@@ -5,10 +5,7 @@ import {
   listAllLocations,
   createLocation,
 } from '@/lib/server/inventory/locationCrudService';
-import {
-  listActiveVendors,
-  listSelectableLocations,
-} from '@/lib/server/inventory/addToInventoryService';
+import { listActiveVendors } from '@/lib/server/inventory/addToInventoryService';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,12 +17,8 @@ export async function GET(request) {
     await connectToDatabase();
     const { searchParams } = new URL(request.url);
     const includeVendors = searchParams.get('vendors') === 'true';
-    const selectableOnly = searchParams.get('selectable') === 'true';
 
-    const locations = selectableOnly
-      ? await listSelectableLocations()
-      : await listAllLocations();
-    const payload = { locations };
+    const payload = { locations: await listAllLocations() };
 
     if (includeVendors) {
       payload.vendors = await listActiveVendors();

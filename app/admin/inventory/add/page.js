@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
@@ -17,16 +17,71 @@ import {
   STATUS_BUCKETS,
   STATUS_BUCKET_LABELS,
 } from '@/lib/shared/inventoryConstants';
+import MultiLocationSelector from '@/components/admin/inventory/MultiLocationSelector';
 
 const fetcher = (url) => adminJson(url);
 
-function locationStockSuffix(loc) {
-  const itemCount = loc.itemCount ?? 0;
-  const totalQty = loc.totalQty ?? 0;
-  if (itemCount > 0 || totalQty > 0) {
-    return ` · ${itemCount} item${itemCount === 1 ? '' : 's'} (${totalQty} units)`;
+const SEARCH_STATUS_STYLES = {
+  in_stock: 'bg-emerald-100 text-emerald-800',
+  low: 'bg-amber-100 text-amber-800',
+  out: 'bg-red-100 text-red-800',
+};
+
+const SEARCH_BUCKET_STYLES = {
+  hold: 'bg-amber-100 text-amber-800',
+  scrap: 'bg-red-100 text-red-800',
+};
+
+function SearchStockBadges({ product }) {
+  const buckets = [
+    {
+      key: 'sellable',
+      qty: product.sellableQty ?? 0,
+      label: 'Sellable',
+      style: SEARCH_STATUS_STYLES[product.stockStatus] || SEARCH_STATUS_STYLES.out,
+    },
+    {
+      key: 'hold',
+      qty: product.holdQty ?? 0,
+      label: 'Hold',
+      style: SEARCH_BUCKET_STYLES.hold,
+    },
+    {
+      key: 'scrap',
+      qty: product.scrapQty ?? 0,
+      label: 'Scrapped',
+      style: SEARCH_BUCKET_STYLES.scrap,
+    },
+  ].filter((b) => b.qty > 0);
+
+  if (!product.hasStock) {
+    return (
+      <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600">
+        Not in inventory
+      </span>
+    );
   }
-  return ' · empty';
+
+  if (buckets.length === 0) {
+    return (
+      <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-100 text-sky-800">
+        In inventory · 0 units
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1 mt-1">
+      {buckets.map((b) => (
+        <span
+          key={b.key}
+          className={`inline-flex px-1.5 py-px rounded-full text-[10px] font-semibold ${b.style}`}
+        >
+          {b.qty} {b.label}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 const EMPTY_MASTER = {
@@ -54,8 +109,7 @@ const EMPTY_OPENING = {
   maxStock: '',
   deadStockPeriod: 'month',
   deadStockQty: '',
-  locationId: '',
-  openingQty: '',
+  selectedLocations: [],
   openingStatusBucket: 'sellable',
   markAsDeadStock: false,
   openingReason: 'opening_stock',
@@ -113,19 +167,19 @@ export default function AddToInventoryPage() {
 
   const showSearchLoading = Boolean(debouncedQ) && (searchLoading || searchValidating || isSearchPending);
 
-  const { data: metaData, mutate: mutateLocations } = useSWR(
-    '/api/admin/inventory/locations?vendors=true&selectable=true',
+  const { data: metaData } = useSWR(
+    '/api/admin/inventory/locations?vendors=true',
     fetcher,
     { revalidateOnFocus: true, revalidateOnMount: true }
   );
   const { data: deptData } = useSWR('/api/categories?level=department', fetcher);
 
   const departments = deptData?.categories || [];
-  const locations = metaData?.locations || [];
   const vendors = metaData?.vendors || [];
 
-  const locationItemsUrl = opening.locationId
-    ? `/api/admin/inventory/locations/${opening.locationId}/items`
+  const previewLocationId = opening.selectedLocations[0]?.locationId || null;
+  const locationItemsUrl = previewLocationId
+    ? `/api/admin/inventory/locations/${previewLocationId}/items`
     : null;
   const { data: locationItemsData, isLoading: locationItemsLoading } = useSWR(
     locationItemsUrl,
@@ -134,42 +188,9 @@ export default function AddToInventoryPage() {
   );
   const locationItems = locationItemsData?.items || [];
 
-  const displayLocations = useMemo(() => {
-    if (!opening.locationId || !locationItemsData?.items?.length) {
-      return locations;
-    }
-
-    const selectedId = String(opening.locationId);
-    const productIds = new Set(locationItemsData.items.map((i) => String(i.productId)));
-    const totalQty = locationItemsData.items.reduce((sum, i) => sum + i.qty, 0);
-    const itemCount = productIds.size;
-
-    return locations.map((loc) =>
-      String(loc._id) === selectedId ? { ...loc, itemCount, totalQty } : loc
-    );
-  }, [locations, opening.locationId, locationItemsData]);
-
-  useEffect(() => {
-    if (!opening.locationId || !locationItemsData?.items || !metaData?.locations) return;
-
-    const selectedId = String(opening.locationId);
-    const productIds = new Set(locationItemsData.items.map((i) => String(i.productId)));
-    const totalQty = locationItemsData.items.reduce((sum, i) => sum + i.qty, 0);
-    const itemCount = productIds.size;
-
-    const current = metaData.locations.find((loc) => String(loc._id) === selectedId);
-    if (current?.itemCount === itemCount && current?.totalQty === totalQty) return;
-
-    mutateLocations(
-      {
-        ...metaData,
-        locations: metaData.locations.map((loc) =>
-          String(loc._id) === selectedId ? { ...loc, itemCount, totalQty } : loc
-        ),
-      },
-      { revalidate: false }
-    );
-  }, [opening.locationId, locationItemsData, metaData, mutateLocations]);
+  const handleLocationsChange = useCallback((locations) => {
+    setOpening((p) => ({ ...p, selectedLocations: locations }));
+  }, []);
 
   const categoryUrl = master.departmentId
     ? `/api/categories?parent=${master.departmentId}`
@@ -189,8 +210,7 @@ export default function AddToInventoryPage() {
       'maxStock',
       'deadStockPeriod',
       'deadStockQty',
-      'locationId',
-      'openingQty',
+      'selectedLocations',
     ],
     []
   );
@@ -257,17 +277,57 @@ export default function AddToInventoryPage() {
     }
     if (showFullOpeningGate && canRecordStock) {
       for (const key of gateRequiredFields) {
+        if (key === 'selectedLocations') {
+          if (!opening.selectedLocations?.length) {
+            errors.push('Add at least one location (branch, floor, and rack)');
+          } else {
+            const invalidQty = opening.selectedLocations.some(
+              (loc) => !loc.qty || Number(loc.qty) < 1
+            );
+            if (invalidQty) {
+              errors.push('Enter a valid opening quantity for each location');
+            }
+          }
+          continue;
+        }
         if (opening[key] === '' || opening[key] == null) {
           errors.push(`${key} is required for first inventory intake`);
         }
       }
     }
     if (showAdditionalOpening && canRecordStock) {
-      if (!opening.locationId) errors.push('Location is required');
-      if (!opening.openingQty) errors.push('Opening stock is required');
+      if (!opening.selectedLocations?.length) {
+        errors.push('Add at least one location (branch, floor, and rack)');
+      } else {
+        const invalidQty = opening.selectedLocations.some(
+          (loc) => !loc.qty || Number(loc.qty) < 1
+        );
+        if (invalidQty) {
+          errors.push('Enter a valid opening quantity for each location');
+        }
+      }
     }
     return errors;
   }, [mode, master, opening, gateRequiredFields, showFullOpeningGate, showAdditionalOpening, canEditMaster, canRecordStock]);
+
+  const buildOpeningPayload = useCallback(() => {
+    const locationEntries = (opening.selectedLocations || []).map((loc) => ({
+      locationId: loc.locationId,
+      qty: Number(loc.qty),
+    }));
+    return {
+      minStock: Number(opening.minStock),
+      maxStock: Number(opening.maxStock),
+      deadStockPeriod: opening.deadStockPeriod,
+      deadStockQty: Number(opening.deadStockQty),
+      locationEntries,
+      openingStatusBucket: opening.openingStatusBucket,
+      markAsDeadStock: opening.markAsDeadStock,
+      openingReason: 'opening_stock',
+      openingRatePaise: null,
+      remark: opening.remark,
+    };
+  }, [opening]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -286,6 +346,7 @@ export default function AddToInventoryPage() {
           toast.error('You need both product and inventory permissions');
           return;
         }
+        const openingPayload = buildOpeningPayload();
         await adminJson('/api/admin/inventory/create-with-opening', {
           method: 'POST',
           body: JSON.stringify({
@@ -298,58 +359,45 @@ export default function AddToInventoryPage() {
               maxDiscountPercent: Number(master.maxDiscountPercent),
               vendorId: master.vendorId || null,
             },
-            opening: {
-              ...opening,
-              minStock: Number(opening.minStock),
-              maxStock: Number(opening.maxStock),
-              deadStockPeriod: opening.deadStockPeriod,
-              deadStockQty: Number(opening.deadStockQty),
-              openingQty: Number(opening.openingQty),
-              openingStatusBucket: opening.openingStatusBucket,
-              markAsDeadStock: opening.markAsDeadStock,
-              openingReason: 'opening_stock',
-              openingRatePaise: null,
-            },
+            opening: openingPayload,
           }),
         });
-        toast.success('Product created with opening stock');
+        toast.success(
+          openingPayload.locationEntries.length > 1
+            ? `Product created with opening stock at ${openingPayload.locationEntries.length} locations`
+            : 'Product created with opening stock'
+        );
       } else if (selected) {
         if (!canRecordStock) {
           toast.error('Inventory permission required');
           return;
         }
+        const openingPayload = buildOpeningPayload();
         const body = selected.hasStock
           ? {
               productId: selected._id,
-              locationId: opening.locationId,
-              openingQty: Number(opening.openingQty),
-              openingStatusBucket: opening.openingStatusBucket,
-              markAsDeadStock: opening.markAsDeadStock,
-              openingReason: 'opening_stock',
+              locationEntries: openingPayload.locationEntries,
+              openingStatusBucket: openingPayload.openingStatusBucket,
+              markAsDeadStock: openingPayload.markAsDeadStock,
+              openingReason: openingPayload.openingReason,
               openingRatePaise: null,
-              remark: opening.remark,
+              remark: openingPayload.remark,
             }
           : {
               productId: selected._id,
-              opening: {
-                ...opening,
-                minStock: Number(opening.minStock),
-                maxStock: Number(opening.maxStock),
-                deadStockPeriod: opening.deadStockPeriod,
-                deadStockQty: Number(opening.deadStockQty),
-              openingQty: Number(opening.openingQty),
-              openingStatusBucket: opening.openingStatusBucket,
-              markAsDeadStock: opening.markAsDeadStock,
-              openingReason: 'opening_stock',
-                openingRatePaise: null,
-              },
+              opening: openingPayload,
             };
 
         await adminJson('/api/admin/inventory/add-opening', {
           method: 'POST',
           body: JSON.stringify(body),
         });
-        toast.success('Opening stock recorded');
+        const totalQty = openingPayload.locationEntries.reduce((sum, e) => sum + e.qty, 0);
+        toast.success(
+          openingPayload.locationEntries.length > 1
+            ? `Opening stock recorded at ${openingPayload.locationEntries.length} locations (${totalQty} units total)`
+            : 'Opening stock recorded'
+        );
       }
 
       window.location.href = '/admin/inventory';
@@ -420,46 +468,67 @@ export default function AddToInventoryPage() {
                 No matches — create a new product below
               </div>
             ) : (
-              results.map((p) => (
-                <button
-                  key={p._id}
-                  type="button"
-                  onClick={() => selectExisting(p)}
-                  className={`w-full text-left px-4 py-3 hover:bg-emerald-50 transition-colors flex items-center gap-3 ${
-                    selected?._id === p._id ? 'bg-emerald-50 ring-1 ring-emerald-200' : ''
-                  }`}
-                >
-                  <div className="h-12 w-12 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-200">
-                    {p.heroImage ? (
-                      <img
-                        src={p.heroImage}
-                        alt=""
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-300">
-                        <Package size={20} />
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-gray-900">{p.title}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {[
-                        p.sku && `SKU ${p.sku}`,
-                        p.barcode && `Barcode ${p.barcode}`,
-                        p.hsnCode && `HSN ${p.hsnCode}`,
-                        p.brand,
-                        p.categoryName,
-                        p.hasStock ? 'Has stock' : 'No stock yet',
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
+              results.map((p) => {
+                const inInventory = Boolean(p.hasStock);
+                const isSelected = selected?._id === p._id;
+                return (
+                  <button
+                    key={p._id}
+                    type="button"
+                    onClick={() => selectExisting(p)}
+                    className={`w-full text-left px-4 py-3 transition-colors flex items-center gap-3 border-l-4 ${
+                      isSelected
+                        ? inInventory
+                          ? 'bg-sky-50 ring-1 ring-sky-200 border-sky-500'
+                          : 'bg-emerald-50 ring-1 ring-emerald-200 border-emerald-500'
+                        : inInventory
+                          ? 'hover:bg-sky-50/80 border-sky-400 bg-sky-50/40'
+                          : 'hover:bg-emerald-50 border-transparent'
+                    }`}
+                  >
+                    <div className="h-12 w-12 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-200">
+                      {p.heroImage ? (
+                        <img
+                          src={p.heroImage}
+                          alt=""
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-300">
+                          <Package size={20} />
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </button>
-              ))
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="font-medium text-gray-900 truncate">{p.title}</div>
+                        {inInventory && (
+                          <span className="shrink-0 inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-sky-600 text-white">
+                            In inventory
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {[
+                          p.sku && `SKU ${p.sku}`,
+                          p.barcode && `Barcode ${p.barcode}`,
+                          p.brand,
+                          p.categoryName,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </div>
+                      <SearchStockBadges product={p} />
+                      {inInventory && (
+                        <p className="text-[10px] text-sky-700 mt-1">
+                          Click to add stock at another location or adjust
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })
             )}
           </div>
         )}
@@ -694,74 +763,21 @@ export default function AddToInventoryPage() {
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {showFullOpeningGate && (
-                  <>
-                    <Field label="Min stock" required>
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-full px-3 py-2 text-sm border rounded-lg"
-                        value={opening.minStock}
-                        onChange={(e) => updateOpening('minStock', e.target.value)}
-                      />
-                    </Field>
-                    <Field label="Max stock" required>
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-full px-3 py-2 text-sm border rounded-lg"
-                        value={opening.maxStock}
-                        onChange={(e) => updateOpening('maxStock', e.target.value)}
-                      />
-                    </Field>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Dead stock rule" required>
-                        <select
-                          className="w-full px-3 py-2 text-sm border rounded-lg"
-                          value={opening.deadStockPeriod}
-                          onChange={(e) => updateOpening('deadStockPeriod', e.target.value)}
-                        >
-                          {DEAD_STOCK_PERIODS.map((period) => (
-                            <option key={period} value={period}>
-                              {DEAD_STOCK_PERIOD_LABELS[period]}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                      <Field label="Qty to sell in period" required>
-                        <input
-                          type="number"
-                          min="1"
-                          className="w-full px-3 py-2 text-sm border rounded-lg"
-                          value={opening.deadStockQty}
-                          onChange={(e) => updateOpening('deadStockQty', e.target.value)}
-                        />
-                      </Field>
-                    </div>
-                  </>
-                )}
+                <div className="sm:col-span-2">
+                  <Field label="Locations & opening qty (Branch › Floor › Rack)" required>
+                    <MultiLocationSelector
+                      value={opening.selectedLocations}
+                      onChange={handleLocationsChange}
+                      required
+                    />
+                  </Field>
+                </div>
 
-                <Field label="Location" required>
-                  <select
-                    className="w-full px-3 py-2 text-sm border rounded-lg"
-                    value={opening.locationId}
-                    onChange={(e) => updateOpening('locationId', e.target.value)}
-                  >
-                    <option value="">Select location…</option>
-                    {displayLocations.map((loc) => (
-                      <option key={loc._id} value={loc._id}>
-                        {loc.path}
-                        {locationStockSuffix(loc)}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                {opening.locationId && (
+                {previewLocationId && (
                   <div className="sm:col-span-2 rounded-lg border border-gray-200 bg-gray-50/80 overflow-hidden">
                     <div className="px-3 py-2 border-b border-gray-200 bg-white flex items-center justify-between gap-2">
                       <p className="text-xs font-semibold text-gray-700">
-                        Stock at this location
+                        Stock at first selected location
                       </p>
                       {locationItemsData?.location?.displayPath && (
                         <p className="text-[10px] text-gray-500 font-mono truncate">
@@ -818,14 +834,65 @@ export default function AddToInventoryPage() {
                   </div>
                 )}
 
-                <Field label="Opening stock" required>
-                  <input
-                    type="number"
-                    min="1"
+                {showFullOpeningGate && (
+                  <>
+                    <Field label="Min stock" required>
+                      <input
+                        type="number"
+                        min="0"
+                        className="w-full px-3 py-2 text-sm border rounded-lg"
+                        value={opening.minStock}
+                        onChange={(e) => updateOpening('minStock', e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Max stock" required>
+                      <input
+                        type="number"
+                        min="0"
+                        className="w-full px-3 py-2 text-sm border rounded-lg"
+                        value={opening.maxStock}
+                        onChange={(e) => updateOpening('maxStock', e.target.value)}
+                      />
+                    </Field>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Dead stock rule" required>
+                        <select
+                          className="w-full px-3 py-2 text-sm border rounded-lg"
+                          value={opening.deadStockPeriod}
+                          onChange={(e) => updateOpening('deadStockPeriod', e.target.value)}
+                        >
+                          {DEAD_STOCK_PERIODS.map((period) => (
+                            <option key={period} value={period}>
+                              {DEAD_STOCK_PERIOD_LABELS[period]}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="Qty to sell in period" required>
+                        <input
+                          type="number"
+                          min="1"
+                          className="w-full px-3 py-2 text-sm border rounded-lg"
+                          value={opening.deadStockQty}
+                          onChange={(e) => updateOpening('deadStockQty', e.target.value)}
+                        />
+                      </Field>
+                    </div>
+                  </>
+                )}
+
+                <Field label="Status" required>
+                  <select
                     className="w-full px-3 py-2 text-sm border rounded-lg"
-                    value={opening.openingQty}
-                    onChange={(e) => updateOpening('openingQty', e.target.value)}
-                  />
+                    value={opening.openingStatusBucket}
+                    onChange={(e) => updateOpeningStatus(e.target.value)}
+                  >
+                    {STATUS_BUCKETS.map((bucket) => (
+                      <option key={bucket} value={bucket}>
+                        {STATUS_BUCKET_LABELS[bucket]}
+                      </option>
+                    ))}
+                  </select>
                   <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -840,19 +907,6 @@ export default function AddToInventoryPage() {
                       Flags that sales are below the dead-stock target.
                     </p>
                   )}
-                </Field>
-                <Field label="Status" required>
-                  <select
-                    className="w-full px-3 py-2 text-sm border rounded-lg"
-                    value={opening.openingStatusBucket}
-                    onChange={(e) => updateOpeningStatus(e.target.value)}
-                  >
-                    {STATUS_BUCKETS.map((bucket) => (
-                      <option key={bucket} value={bucket}>
-                        {STATUS_BUCKET_LABELS[bucket]}
-                      </option>
-                    ))}
-                  </select>
                 </Field>
                 <div className="sm:col-span-2">
                   <Field label="Remark">

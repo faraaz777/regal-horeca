@@ -8,6 +8,7 @@ import { Download, Loader2, Search, X, ChevronLeft, ChevronRight } from 'lucide-
 import { adminFetch, adminJson } from '@/lib/client/adminFetch';
 import { canReadStockLedger } from '@/lib/shared/permissions';
 import { LEDGER_FILTER_TYPES, LEDGER_FILTER_TYPE_LABELS } from '@/lib/shared/inventoryConstants';
+import LocationSelector from '@/components/admin/inventory/LocationSelector';
 
 const fetcher = (url) => adminJson(url);
 
@@ -72,6 +73,12 @@ export default function StockMovementsPage() {
   const [page, setPage] = useState(1);
   const [drawerProductId, setDrawerProductId] = useState(initialProductId);
   const [exporting, setExporting] = useState(false);
+  const [locationFilter, setLocationFilter] = useState({
+    branchId: null,
+    floorId: null,
+    rackId: null,
+    locationId: null,
+  });
 
   const ledgerUrl = useMemo(() => {
     if (!canView) return null;
@@ -81,8 +88,9 @@ export default function StockMovementsPage() {
     if (dateFrom) params.set('dateFrom', dateFrom);
     if (dateTo) params.set('dateTo', dateTo);
     if (drawerProductId) params.set('productId', drawerProductId);
+    if (locationFilter.locationId) params.set('locationId', locationFilter.locationId);
     return `/api/admin/inventory/ledger?${params}`;
-  }, [canView, page, typeFilter, search, dateFrom, dateTo, drawerProductId]);
+  }, [canView, page, typeFilter, search, dateFrom, dateTo, drawerProductId, locationFilter.locationId]);
 
   const { data, error, isLoading, isValidating } = useSWR(ledgerUrl, fetcher, {
     revalidateOnFocus: false,
@@ -100,9 +108,10 @@ export default function StockMovementsPage() {
       if (dateFrom) params.set('dateFrom', dateFrom);
       if (dateTo) params.set('dateTo', dateTo);
       if (drawerProductId) params.set('productId', drawerProductId);
+      if (locationFilter.locationId) params.set('locationId', locationFilter.locationId);
       return `/api/admin/inventory/ledger/export?${params}`;
     },
-    [typeFilter, search, dateFrom, dateTo, drawerProductId]
+    [typeFilter, search, dateFrom, dateTo, drawerProductId, locationFilter.locationId]
   );
 
   const handleExport = async (format) => {
@@ -225,6 +234,27 @@ export default function StockMovementsPage() {
           />
         </div>
 
+        <div className="border-t border-gray-100 pt-4">
+          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Filter by location
+          </p>
+          <LocationSelector
+            mode="filter"
+            selectedBranchId={locationFilter.branchId}
+            selectedFloorId={locationFilter.floorId}
+            selectedRackId={locationFilter.rackId}
+            onChange={(selection) => {
+              setLocationFilter({
+                branchId: selection.branchId,
+                floorId: selection.floorId,
+                rackId: selection.rackId,
+                locationId: selection.locationId,
+              });
+              setPage(1);
+            }}
+          />
+        </div>
+
         {drawerProductId && (
           <div className="flex items-center gap-2 text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
             <span>Filtered to product ledger</span>
@@ -259,6 +289,7 @@ export default function StockMovementsPage() {
                 <th className="px-4 py-3">Change</th>
                 <th className="px-4 py-3">Reason</th>
                 <th className="px-4 py-3">Remark / Ref</th>
+                <th className="px-4 py-3">Location</th>
                 <th className="px-4 py-3">User</th>
                 <th className="px-4 py-3">When</th>
               </tr>
@@ -266,14 +297,14 @@ export default function StockMovementsPage() {
             <tbody className="divide-y divide-gray-100">
               {(isLoading || isValidating) && items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
                     <Loader2 className="inline animate-spin text-emerald-600" size={24} />
                     <p className="mt-2">Loading movements…</p>
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
                     No movements found
                   </td>
                 </tr>
@@ -318,6 +349,11 @@ export default function StockMovementsPage() {
                       {row.ref && (
                         <div className="text-xs text-gray-400 font-mono mt-0.5">{row.ref}</div>
                       )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 text-xs max-w-[160px]">
+                      <span className="truncate block" title={row.locationDisplayPath}>
+                        {row.locationDisplayPath || '—'}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-gray-600">
                       {row.performedBy?.name || row.performedBy?.email || '—'}

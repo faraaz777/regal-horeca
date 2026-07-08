@@ -16,12 +16,21 @@ import {
 } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
 import { canWriteInventory } from '@/lib/shared/permissions';
-import { LOCATION_LEVELS, LOCATION_PATH_SEP } from '@/lib/shared/inventoryConstants';
+import {
+  ACTIVE_LOCATION_LEVELS,
+  ACTIVE_LOCATION_CHILD,
+  ACTIVE_LOCATION_PARENT,
+  LEGACY_LOCATION_LEVELS,
+  LOCATION_PATH_SEP,
+} from '@/lib/shared/inventoryConstants';
 
 const fetcher = (url) => adminJson(url);
 
-const LEVEL_LABELS = ['Branch', 'Floor', 'Section', 'Zone', 'Rack', 'Shelf'];
-const LEVEL_INDEX = Object.fromEntries(LOCATION_LEVELS.map((l, i) => [l, i]));
+const ACTIVE_LEVEL_LABELS = {
+  branch: 'Branch',
+  floor: 'Floor',
+  rack: 'Rack',
+};
 
 const EMPTY_FORM = {
   code: '',
@@ -35,6 +44,7 @@ function TreeNode({ node, depth, selectedId, expanded, onSelect, onToggle }) {
   const isSelected = selectedId === id;
   const hasChildren = node.children?.length > 0;
   const isExpanded = expanded.has(id);
+  const isLegacy = node.isLegacy || LEGACY_LOCATION_LEVELS.includes(node.level);
 
   return (
     <div>
@@ -42,7 +52,11 @@ function TreeNode({ node, depth, selectedId, expanded, onSelect, onToggle }) {
         type="button"
         onClick={() => onSelect(node)}
         className={`w-full flex items-center gap-1.5 py-1.5 pr-2 text-left text-sm rounded-md transition-colors ${
-          isSelected ? 'bg-emerald-100 text-emerald-900 font-medium' : 'hover:bg-gray-50 text-gray-800'
+          isSelected
+            ? 'bg-emerald-100 text-emerald-900 font-medium'
+            : isLegacy
+              ? 'hover:bg-gray-50 text-gray-500'
+              : 'hover:bg-gray-50 text-gray-800'
         }`}
         style={{ paddingLeft: `${depth * 14 + 8}px` }}
       >
@@ -67,7 +81,12 @@ function TreeNode({ node, depth, selectedId, expanded, onSelect, onToggle }) {
         ) : (
           <span className="w-3.5 shrink-0" />
         )}
-        <span className="flex-1 truncate">{node.label}</span>
+        <span className="flex-1 truncate">
+          {node.label}
+          {isLegacy && (
+            <span className="ml-1 text-[10px] font-normal text-gray-400">(legacy)</span>
+          )}
+        </span>
         <span
           className={`shrink-0 min-w-[1.25rem] text-center text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
             node.itemCount > 0 ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-400'
@@ -104,6 +123,9 @@ function LocationModal({ mode, form, setForm, parentOptions, onClose, onSubmit, 
         <h2 className="text-lg font-semibold text-gray-900 mb-4">
           {mode === 'create' ? 'Add location' : 'Edit location'}
         </h2>
+        <p className="text-xs text-gray-500 mb-3">
+          Active model: Branch {LOCATION_PATH_SEP} Floor {LOCATION_PATH_SEP} Rack
+        </p>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -121,9 +143,9 @@ function LocationModal({ mode, form, setForm, parentOptions, onClose, onSubmit, 
               className="w-full px-3 py-2 text-sm border rounded-lg"
               disabled={mode === 'edit'}
             >
-              {LOCATION_LEVELS.map((l) => (
+              {ACTIVE_LOCATION_LEVELS.map((l) => (
                 <option key={l} value={l}>
-                  {l.charAt(0).toUpperCase() + l.slice(1)}
+                  {ACTIVE_LEVEL_LABELS[l]}
                 </option>
               ))}
             </select>
@@ -140,7 +162,7 @@ function LocationModal({ mode, form, setForm, parentOptions, onClose, onSubmit, 
                 <option value="">Select parent…</option>
                 {parentOptions.map((p) => (
                   <option key={p._id} value={p._id}>
-                    {p.path} ({p.level})
+                    {p.path || p.name || p.code} ({ACTIVE_LEVEL_LABELS[p.level] || p.level})
                   </option>
                 ))}
               </select>
@@ -151,7 +173,7 @@ function LocationModal({ mode, form, setForm, parentOptions, onClose, onSubmit, 
             <input
               value={form.code}
               onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))}
-              placeholder="e.g. b1, R12, Shelf 3"
+              placeholder="e.g. Hyderabad Main, Floor 2, R012"
               className="w-full px-3 py-2 text-sm border rounded-lg font-mono"
               required
             />
@@ -161,7 +183,7 @@ function LocationModal({ mode, form, setForm, parentOptions, onClose, onSubmit, 
             <input
               value={form.name}
               onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-              placeholder="e.g. Begum Bazaar HQ, Normal"
+              placeholder="e.g. Hyderabad Main Branch"
               className="w-full px-3 py-2 text-sm border rounded-lg"
             />
           </div>
@@ -219,10 +241,15 @@ export default function InventoryLocationsPage() {
   const tree = treeData?.tree || [];
   const allLocations = allLocsData?.locations || [];
 
+  const selectedIsLegacy =
+    selectedNode &&
+    (selectedNode.isLegacy || LEGACY_LOCATION_LEVELS.includes(selectedNode.level));
+
   const parentOptions = useMemo(() => {
     if (!form.level || form.level === 'branch') return [];
-    const parentLevel = LOCATION_LEVELS[LEVEL_INDEX[form.level] - 1];
-    return allLocations.filter((l) => l.level === parentLevel);
+    const parentLevel = ACTIVE_LOCATION_PARENT[form.level];
+    if (!parentLevel) return [];
+    return allLocations.filter((l) => l.level === parentLevel && !l.isLegacy);
   }, [form.level, allLocations]);
 
   const refresh = useCallback(() => {
@@ -260,9 +287,13 @@ export default function InventoryLocationsPage() {
 
   const openCreate = useCallback((parentNode = null) => {
     if (parentNode) {
-      const childLevel = LOCATION_LEVELS[LEVEL_INDEX[parentNode.level] + 1];
+      if (LEGACY_LOCATION_LEVELS.includes(parentNode.level)) {
+        toast.error('Cannot add children under legacy section/zone/shelf nodes');
+        return;
+      }
+      const childLevel = ACTIVE_LOCATION_CHILD[parentNode.level];
       if (!childLevel) {
-        toast.error('Cannot add children under a shelf');
+        toast.error('Cannot add children under a rack');
         return;
       }
       setForm({
@@ -278,7 +309,7 @@ export default function InventoryLocationsPage() {
   }, []);
 
   const openEdit = useCallback(() => {
-    if (!selectedNode) return;
+    if (!selectedNode || selectedIsLegacy) return;
     adminJson(`/api/admin/inventory/locations/${selectedNode._id}`)
       .then((res) => {
         const loc = res.location;
@@ -291,7 +322,7 @@ export default function InventoryLocationsPage() {
         setModal('edit');
       })
       .catch((err) => toast.error(err.message || 'Failed to load location'));
-  }, [selectedNode]);
+  }, [selectedNode, selectedIsLegacy]);
 
   const handleSave = async () => {
     setSubmitting(true);
@@ -327,7 +358,7 @@ export default function InventoryLocationsPage() {
   };
 
   const handleDelete = async () => {
-    if (!selectedId || !selectedNode) return;
+    if (!selectedId || !selectedNode || selectedIsLegacy) return;
     if (!window.confirm(`Delete "${selectedNode.displayPath || selectedNode.label}"?`)) return;
     setSubmitting(true);
     try {
@@ -362,10 +393,7 @@ export default function InventoryLocationsPage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Locations</h1>
           <p className="text-sm text-gray-500 mt-1 flex items-center gap-1">
             <MapPin size={14} />
-            Manage warehouse hierarchy ·{' '}
-            <code className="text-xs bg-gray-100 px-1 rounded">
-              b1{LOCATION_PATH_SEP}f1{LOCATION_PATH_SEP}R12{LOCATION_PATH_SEP}Shelf 3
-            </code>
+            Branch {LOCATION_PATH_SEP} Floor {LOCATION_PATH_SEP} Rack · legacy nodes are read-only
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -373,7 +401,8 @@ export default function InventoryLocationsPage() {
             <button
               type="button"
               onClick={() => openCreate(selectedNode)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700"
+              disabled={selectedIsLegacy}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
             >
               <Plus size={16} />
               Add location
@@ -397,7 +426,7 @@ export default function InventoryLocationsPage() {
           <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide truncate">
-                {LEVEL_LABELS.join(' › ')}
+                {ACTIVE_LOCATION_LEVELS.map((l) => ACTIVE_LEVEL_LABELS[l]).join(` ${LOCATION_PATH_SEP} `)}
               </p>
               <button
                 type="button"
@@ -438,7 +467,7 @@ export default function InventoryLocationsPage() {
               ))
             )}
           </div>
-          {selectedNode && canManage && (
+          {selectedNode && canManage && !selectedIsLegacy && (
             <div className="px-3 py-3 border-t border-gray-100 flex gap-2">
               <button
                 type="button"
@@ -456,6 +485,11 @@ export default function InventoryLocationsPage() {
                 <Trash2 size={14} /> Delete
               </button>
             </div>
+          )}
+          {selectedIsLegacy && (
+            <p className="px-3 py-2 text-[10px] text-amber-700 border-t border-amber-100 bg-amber-50">
+              Legacy node — view stock only. New stock must use Branch › Floor › Rack.
+            </p>
           )}
         </div>
 
@@ -494,7 +528,7 @@ export default function InventoryLocationsPage() {
                     <th className="px-4 py-2.5">SKU</th>
                     <th className="px-4 py-2.5">Sellable</th>
                     <th className="px-4 py-2.5">Status</th>
-                    <th className="px-4 py-2.5 min-w-[200px]">Full path</th>
+                    <th className="px-4 py-2.5 min-w-[200px]">Location</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">

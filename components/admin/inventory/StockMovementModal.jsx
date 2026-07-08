@@ -5,6 +5,8 @@ import useSWR from 'swr';
 import toast from 'react-hot-toast';
 import { X, Loader2 } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
+import { validateLocationSelectionClient } from '@/lib/client/locationCascadeApi';
+import LocationSelector from '@/components/admin/inventory/LocationSelector';
 import {
   MOVEMENT_STATUS_BUCKETS,
   STATUS_BUCKET_LABELS,
@@ -35,6 +37,12 @@ const EMPTY_FORM = {
   toLocationId: '',
 };
 
+const EMPTY_LOCATION = {
+  branchId: null,
+  floorId: null,
+  rackId: null,
+};
+
 function Field({ label, required, children }) {
   return (
     <div>
@@ -47,9 +55,22 @@ function Field({ label, required, children }) {
   );
 }
 
+function resolveMinusLocationId(selection, minusRows) {
+  if (!selection?.rackId) return '';
+  const row = minusRows.find(
+    (r) =>
+      String(r.rackId) === String(selection.rackId) ||
+      String(r.locationId) === String(selection.rackId)
+  );
+  return row ? String(row.locationId) : String(selection.locationId || selection.rackId);
+}
+
 export default function StockMovementModal({ item, onClose, onSuccess }) {
   const [tab, setTab] = useState('add');
   const [form, setForm] = useState(EMPTY_FORM);
+  const [locationSel, setLocationSel] = useState(EMPTY_LOCATION);
+  const [fromSel, setFromSel] = useState(EMPTY_LOCATION);
+  const [toSel, setToSel] = useState(EMPTY_LOCATION);
   const [submitting, setSubmitting] = useState(false);
 
   const stockUrl = item?._id ? `/api/admin/inventory/${item._id}/stock` : null;
@@ -57,34 +78,24 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
     revalidateOnFocus: false,
   });
 
-  const { data: locationsData } = useSWR(
-    '/api/admin/inventory/locations?selectable=true',
-    fetcher,
-    { revalidateOnFocus: false }
-  );
-
-  const locations = locationsData?.locations || [];
-
-  useEffect(() => {
-    if (!stockData?.locations?.length) return;
-    const primary = stockData.locations.find((r) => r.qty > 0) || stockData.locations[0];
-    const locId = String(primary?.locationId || '');
-    setForm((p) => ({
-      ...p,
-      locationId: p.locationId || locId,
-      fromLocationId: p.fromLocationId || locId,
-    }));
-  }, [stockData]);
-
   const update = (key, value) => setForm((p) => ({ ...p, [key]: value }));
 
   const setMovementTab = (key) => {
     setTab(key);
-    if (key === 'add' && !ADD_MOVEMENT_REASONS.includes(form.reason)) {
-      setForm((p) => ({ ...p, reason: 'opening_stock' }));
-    } else if (key === 'minus' && !MOVEMENT_REASONS.includes(form.reason)) {
-      setForm((p) => ({ ...p, reason: 'manual_adjustment' }));
-    }
+    setLocationSel(EMPTY_LOCATION);
+    setFromSel(EMPTY_LOCATION);
+    setToSel(EMPTY_LOCATION);
+    setForm((p) => ({
+      ...EMPTY_FORM,
+      quantity: p.quantity,
+      remark: p.remark,
+      reason:
+        key === 'add'
+          ? 'opening_stock'
+          : key === 'minus'
+            ? 'manual_adjustment'
+            : p.reason,
+    }));
   };
 
   const stockRows = stockData?.locations || [];
@@ -95,6 +106,22 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
       .filter((r) => r.statusBucket === form.statusBucket && (r.qty || 0) > 0)
       .sort((a, b) => (b.qty || 0) - (a.qty || 0));
   }, [stockRows, form.statusBucket]);
+
+  const sellableLocations = useMemo(() => {
+    return stockRows
+      .filter((r) => r.statusBucket === 'sellable' && (r.qty || 0) > 0)
+      .sort((a, b) => (b.qty || 0) - (a.qty || 0));
+  }, [stockRows]);
+
+  const allowedRackIdsForMinus = useMemo(
+    () => [...new Set(minusLocationsForBucket.map((r) => r.rackId).filter(Boolean))],
+    [minusLocationsForBucket]
+  );
+
+  const allowedRackIdsForTransfer = useMemo(
+    () => [...new Set(sellableLocations.map((r) => r.rackId).filter(Boolean))],
+    [sellableLocations]
+  );
 
   const selectedMinusRow = useMemo(() => {
     if (!form.locationId) return null;
@@ -115,10 +142,13 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
       (r) => String(r.locationId) === String(form.locationId)
     );
     if (!currentValid) {
-      setForm((p) => ({
-        ...p,
-        locationId: String(minusLocationsForBucket[0].locationId),
-      }));
+      const first = minusLocationsForBucket[0];
+      setForm((p) => ({ ...p, locationId: String(first.locationId) }));
+      setLocationSel({
+        branchId: first.branchId || null,
+        floorId: first.floorId || null,
+        rackId: first.rackId || null,
+      });
     }
   }, [tab, form.statusBucket, minusLocationsForBucket, form.locationId]);
 
@@ -132,6 +162,53 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
   const reasonOptions = tab === 'add' ? ADD_MOVEMENT_REASONS : MOVEMENT_REASONS;
   const reasonLabels = tab === 'add' ? ADD_MOVEMENT_REASON_LABELS : MOVEMENT_REASON_LABELS;
 
+  const handleLocationChange = useCallback(
+    (selection) => {
+      setLocationSel({
+        branchId: selection.branchId,
+        floorId: selection.floorId,
+        rackId: selection.rackId,
+      });
+      if (tab === 'minus') {
+        update('locationId', resolveMinusLocationId(selection, minusLocationsForBucket));
+      } else {
+        update('locationId', selection.locationId || '');
+      }
+    },
+    [tab, minusLocationsForBucket]
+  );
+
+  const handleFromLocationChange = useCallback(
+    (selection) => {
+      setFromSel({
+        branchId: selection.branchId,
+        floorId: selection.floorId,
+        rackId: selection.rackId,
+      });
+      update('fromLocationId', resolveMinusLocationId(selection, sellableLocations));
+    },
+    [sellableLocations]
+  );
+
+  const handleToLocationChange = useCallback((selection) => {
+    setToSel({
+      branchId: selection.branchId,
+      floorId: selection.floorId,
+      rackId: selection.rackId,
+    });
+    update('toLocationId', selection.locationId || '');
+  }, []);
+
+  const selectMinusRow = (row) => {
+    const locId = String(row.locationId);
+    update('locationId', locId);
+    setLocationSel({
+      branchId: row.branchId || null,
+      floorId: row.floorId || null,
+      rackId: row.rackId || null,
+    });
+  };
+
   const handlePost = useCallback(async () => {
     const qty = Number(form.quantity);
     if (!qty || qty <= 0) {
@@ -139,15 +216,49 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
       return;
     }
 
+    if (tab === 'add' || tab === 'status_change') {
+      const check = validateLocationSelectionClient({
+        ...locationSel,
+        locationId: form.locationId,
+      });
+      if (!check.valid) {
+        toast.error(check.error);
+        return;
+      }
+    }
+
     if (tab === 'minus') {
       if (!form.locationId) {
-        toast.error('Select the location to remove stock from');
+        toast.error('Select branch, floor, and rack to remove stock from');
         return;
       }
       if (qty > availableAtLocation) {
         toast.error(
           `Cannot remove ${qty} — only ${availableAtLocation} available at this location`
         );
+        return;
+      }
+    }
+
+    if (tab === 'transfer') {
+      const fromCheck = validateLocationSelectionClient({
+        ...fromSel,
+        locationId: form.fromLocationId,
+      });
+      if (!fromCheck.valid) {
+        toast.error('Select source branch, floor, and rack');
+        return;
+      }
+      const toCheck = validateLocationSelectionClient({
+        ...toSel,
+        locationId: form.toLocationId,
+      });
+      if (!toCheck.valid) {
+        toast.error('Select destination branch, floor, and rack');
+        return;
+      }
+      if (String(form.fromLocationId) === String(form.toLocationId)) {
+        toast.error('Source and destination must be different');
         return;
       }
     }
@@ -172,11 +283,6 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
       } else if (tab === 'transfer') {
         body.fromLocationId = form.fromLocationId || null;
         body.toLocationId = form.toLocationId;
-        if (!body.toLocationId) {
-          toast.error('Select destination location');
-          setSubmitting(false);
-          return;
-        }
       }
 
       await adminJson('/api/admin/inventory/movement', {
@@ -193,7 +299,18 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
     } finally {
       setSubmitting(false);
     }
-  }, [form, item._id, tab, mutate, onClose, onSuccess, availableAtLocation]);
+  }, [
+    form,
+    item._id,
+    tab,
+    mutate,
+    onClose,
+    onSuccess,
+    availableAtLocation,
+    locationSel,
+    fromSel,
+    toSel,
+  ]);
 
   if (!item) return null;
 
@@ -351,7 +468,8 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
                 </p>
                 {minusLocationsForBucket.length === 0 ? (
                   <p className="text-xs text-amber-900">
-                    No {STATUS_BUCKET_LABELS[form.statusBucket]?.toLowerCase()} stock at any location.
+                    No {STATUS_BUCKET_LABELS[form.statusBucket]?.toLowerCase()} stock at any
+                    location.
                   </p>
                 ) : (
                   <ul className="space-y-1">
@@ -362,7 +480,7 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
                         <li key={locId}>
                           <button
                             type="button"
-                            onClick={() => update('locationId', locId)}
+                            onClick={() => selectMinusRow(row)}
                             className={`w-full text-left text-xs px-2 py-1.5 rounded-md border transition-colors ${
                               isSelected
                                 ? 'border-amber-300 bg-white text-amber-950 font-medium'
@@ -381,66 +499,45 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
             )}
 
             {(tab === 'add' || tab === 'minus' || tab === 'status_change') && (
-              <Field label={tab === 'minus' ? 'Remove from location' : 'Location'} required={tab === 'minus'}>
-                <select
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
-                  value={form.locationId}
-                  onChange={(e) => update('locationId', e.target.value)}
+              <Field
+                label={tab === 'minus' ? 'Remove from location' : 'Location'}
+                required
+              >
+                <LocationSelector
+                  selectedBranchId={locationSel.branchId}
+                  selectedFloorId={locationSel.floorId}
+                  selectedRackId={locationSel.rackId || form.locationId}
+                  onChange={handleLocationChange}
+                  required
                   disabled={tab === 'minus' && minusLocationsForBucket.length === 0}
-                >
-                  {tab === 'minus' ? (
-                    minusLocationsForBucket.length === 0 ? (
-                      <option value="">No stock available</option>
-                    ) : (
-                      minusLocationsForBucket.map((row) => (
-                        <option key={String(row.locationId)} value={String(row.locationId)}>
-                          {row.locationPath} — {row.qty} available
-                        </option>
-                      ))
-                    )
-                  ) : (
-                    <>
-                      <option value="">Default location</option>
-                      {locations.map((loc) => (
-                        <option key={loc._id} value={loc._id}>
-                          {loc.path}
-                        </option>
-                      ))}
-                    </>
-                  )}
-                </select>
+                  allowedLocationIds={
+                    tab === 'minus' ? allowedRackIdsForMinus : undefined
+                  }
+                />
               </Field>
             )}
 
             {tab === 'transfer' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label="From location">
-                  <select
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
-                    value={form.fromLocationId}
-                    onChange={(e) => update('fromLocationId', e.target.value)}
-                  >
-                    <option value="">Default</option>
-                    {locations.map((loc) => (
-                      <option key={loc._id} value={loc._id}>
-                        {loc.path}
-                      </option>
-                    ))}
-                  </select>
+              <div className="space-y-4">
+                <Field label="From location" required>
+                  <LocationSelector
+                    selectedBranchId={fromSel.branchId}
+                    selectedFloorId={fromSel.floorId}
+                    selectedRackId={fromSel.rackId || form.fromLocationId}
+                    onChange={handleFromLocationChange}
+                    required
+                    disabled={sellableLocations.length === 0}
+                    allowedLocationIds={allowedRackIdsForTransfer}
+                  />
                 </Field>
                 <Field label="To location" required>
-                  <select
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
-                    value={form.toLocationId}
-                    onChange={(e) => update('toLocationId', e.target.value)}
-                  >
-                    <option value="">Select…</option>
-                    {locations.map((loc) => (
-                      <option key={loc._id} value={loc._id}>
-                        {loc.path}
-                      </option>
-                    ))}
-                  </select>
+                  <LocationSelector
+                    selectedBranchId={toSel.branchId}
+                    selectedFloorId={toSel.floorId}
+                    selectedRackId={toSel.rackId || form.toLocationId}
+                    onChange={handleToLocationChange}
+                    required
+                  />
                 </Field>
               </div>
             )}

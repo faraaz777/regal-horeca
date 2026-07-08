@@ -29,7 +29,7 @@ import {
   UserIcon,
   PhoneIcon,
 } from "../Icons";
-import { ClipboardList as LuClipboardList } from "lucide-react";
+import { ClipboardList as LuClipboardList, Mic as LuMic } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { buildCategoryTree } from "@/lib/utils/categoryUtils";
 import SearchBar from "../new/SearchBar";
@@ -476,6 +476,8 @@ function DepartmentsBar({
 
   // More dropdown links
   const moreLinks = [
+    { name: 'Company Profile', href: '/company-profile' },
+    { name: 'Chef Podcast', href: '/chef-podcast' },
     { name: 'Contact', href: '/#contact' },
     { name: "FAQ's", href: '/#faqs' },
     { name: 'Enquiry', href: '/enquiry' },
@@ -1058,6 +1060,26 @@ function MobileMenuOverlay({ isMenuOpen, setIsMenuOpen, navStack, wishlist, cart
               >
                 <InfoIcon className="w-5 h-5 sm:w-6 sm:h-6 text-black/60 flex-shrink-0" />
                 <span>About Us</span>
+              </Link>
+
+              <Link
+                href="/company-profile"
+                onClick={() => setIsMenuOpen(false)}
+                className="flex items-center gap-3 py-3.5 sm:py-4 text-sm sm:text-base font-medium text-black hover:bg-gray-50/50 border-b border-gray-50/50 -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8"
+              >
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-black/60 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Company Profile</span>
+              </Link>
+
+              <Link
+                href="/chef-podcast"
+                onClick={() => setIsMenuOpen(false)}
+                className="flex items-center gap-3 py-3.5 sm:py-4 text-sm sm:text-base font-medium text-black hover:bg-gray-50/50 border-b border-gray-50/50 -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8"
+              >
+                <LuMic className="w-5 h-5 sm:w-6 sm:h-6 text-black/60 flex-shrink-0" />
+                <span>Chef Podcast</span>
               </Link>
             </div>
           )}

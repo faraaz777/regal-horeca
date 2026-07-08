@@ -1,92 +1,82 @@
-/**
- * File Upload API Route
- * 
- * Handles image and PDF uploads to Cloudflare R2.
- * Only authenticated admins can upload files.
- * 
- * POST /api/upload
- * Body: FormData with 'file' field
- * Auth: admin session cookie (httpOnly)
- */
-
 import { NextResponse } from 'next/server';
 import { uploadToR2 } from '@/lib/utils/r2Upload';
 import { optimizeImage } from '@/lib/utils/imageOptimizer';
-import { assertProductWrite } from '@/lib/server/auth/adminApiGuard';
+import { requireAuth } from '@/lib/server/auth/requireAuth';
+import { hasPermission } from '@/lib/shared/permissions';
+import { SALES_COLLECTION_THUMBNAIL_FOLDER } from '@/lib/shared/salesConstants';
+
+const VALID_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+const VALID_DOCUMENT_TYPES = ['application/pdf'];
+
+async function assertUploadAccess(request, folder) {
+  const auth = await requireAuth(request);
+  if (auth.error) return { error: auth.error };
+
+  const { session } = auth;
+  if (hasPermission(session.role, 'products:write')) {
+    return { session, imagesOnly: false };
+  }
+
+  if (
+    folder === SALES_COLLECTION_THUMBNAIL_FOLDER &&
+    hasPermission(session.role, 'sales:collections:write')
+  ) {
+    return { session, imagesOnly: true };
+  }
+
+  return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+}
 
 export async function POST(request) {
-  const authError = await assertProductWrite(request);
-  if (authError) return authError;
+  const url = new URL(request.url);
+  const folder = url.searchParams.get('folder') || 'products';
+
+  const access = await assertUploadAccess(request, folder);
+  if (access.error) return access.error;
 
   try {
-    // Parse form data
     const formData = await request.formData();
     const file = formData.get('file');
 
     if (!file) {
-      return NextResponse.json(
-        { error: 'No file provided' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // Validate file type (images + PDF)
-    const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-    const validDocumentTypes = ['application/pdf'];
-    const validTypes = [...validImageTypes, ...validDocumentTypes];
+    const validTypes = access.imagesOnly
+      ? VALID_IMAGE_TYPES
+      : [...VALID_IMAGE_TYPES, ...VALID_DOCUMENT_TYPES];
+
     if (!validTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: 'Invalid file type. Only images and PDF files are allowed.' },
+        { error: access.imagesOnly ? 'Only images are allowed.' : 'Invalid file type.' },
         { status: 400 }
       );
     }
 
-    // Validate file size (max 10MB)
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
-      return NextResponse.json(
-        { error: 'File size exceeds 10MB limit' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'File size exceeds 10MB limit' }, { status: 400 });
     }
 
-    // Get folder from query parameter (default: 'products')
-    const url = new URL(request.url);
-    const folder = url.searchParams.get('folder') || 'products';
-
-    // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Skip optimization if file is 1.5MB or less (preserve original quality)
-    const SKIP_OPTIMIZATION_SIZE = 1.5 * 1024 * 1024; // 1.5MB
+    const SKIP_OPTIMIZATION_SIZE = 1.5 * 1024 * 1024;
     let optimizedBuffer = buffer;
-    
-    const isImage = validImageTypes.includes(file.type);
-    if (isImage && file.size > SKIP_OPTIMIZATION_SIZE) {
-      // Optimize image before upload (550KB limit) only if larger than 1.5MB
+
+    if (VALID_IMAGE_TYPES.includes(file.type) && file.size > SKIP_OPTIMIZATION_SIZE) {
       optimizedBuffer = await optimizeImage(buffer);
     }
 
-    // Upload file to R2
     const publicUrl = await uploadToR2(optimizedBuffer, file.name, folder);
 
-    return NextResponse.json({
-      success: true,
-      url: publicUrl,
-    });
+    return NextResponse.json({ success: true, url: publicUrl });
   } catch (error) {
     console.error('Upload error:', error);
-    // Return the actual error message so the client can display it
     const errorMessage = error.message || 'Failed to upload file';
     return NextResponse.json(
-      { 
-        success: false,
-        error: errorMessage,
-        details: error.message || String(error)
-      },
+      { success: false, error: errorMessage, details: error.message || String(error) },
       { status: 500 }
     );
   }
 }
-

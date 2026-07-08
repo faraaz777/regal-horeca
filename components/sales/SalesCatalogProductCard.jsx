@@ -1,10 +1,14 @@
 'use client';
 
+import { useState } from 'react';
 import { formatPaise, stockStatusClass } from '@/lib/shared/formatMoney';
 import {
   parseProductTitleParts,
   parseSkuForDisplay,
 } from '@/lib/shared/formatProductDisplay';
+import { InfoIcon } from '@/components/Icons';
+import SalesProductDetailModal from '@/components/sales/SalesProductDetailModal';
+import SalesSaveToCollectionMenu from '@/components/sales/SalesSaveToCollectionMenu';
 
 function stockStatusLabel(status) {
   if (status === 'in_stock') return 'In stock';
@@ -23,7 +27,10 @@ function MetaRow({ label, value, mono = false }) {
 }
 
 export default function SalesCatalogProductCard({ product, canAdd, onAdd }) {
+  const [detailOpen, setDetailOpen] = useState(false);
+
   const {
+    id,
     title,
     sku,
     barcode,
@@ -48,8 +55,22 @@ export default function SalesCatalogProductCard({ product, canAdd, onAdd }) {
   const showBarcode = barcode && barcode !== skuCode;
 
   return (
-    <article className="bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col h-full">
-      <div className="flex gap-3 p-3 flex-1">
+    <>
+      <article className="bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col h-full relative">
+        <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
+          <SalesSaveToCollectionMenu productId={id} productTitle={title} />
+          <button
+            type="button"
+            onClick={() => setDetailOpen(true)}
+            className="p-1 rounded-full bg-white/90 border border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-white shadow-sm"
+            title="View product details"
+            aria-label="View product details"
+          >
+            <InfoIcon className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex gap-3 p-3 flex-1">
         <div className="shrink-0 w-20 h-20 rounded-md border border-gray-100 bg-gray-50 overflow-hidden">
           {heroImage ? (
             <img src={heroImage} alt="" className="w-full h-full object-cover" />
@@ -60,7 +81,7 @@ export default function SalesCatalogProductCard({ product, canAdd, onAdd }) {
           )}
         </div>
 
-        <div className="min-w-0 flex-1 flex flex-col gap-1">
+        <div className="min-w-0 flex-1 flex flex-col gap-1 pr-6">
           <h3 className="font-medium text-gray-900 text-sm leading-snug line-clamp-2">{headline}</h3>
 
           {(categoryName || displayBrand) && (
@@ -132,5 +153,16 @@ export default function SalesCatalogProductCard({ product, canAdd, onAdd }) {
         </button>
       </div>
     </article>
+
+      {detailOpen && (
+        <SalesProductDetailModal
+          productId={id}
+          preview={product}
+          onClose={() => setDetailOpen(false)}
+          canAdd={canAdd}
+          onAdd={onAdd}
+        />
+      )}
+    </>
   );
 }

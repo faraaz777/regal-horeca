@@ -18,10 +18,15 @@ const EMPTY_SELECTION = {
   displayPath: '',
 };
 
-function CascadeField({ label, required, loading, emptyMessage, children }) {
+function CascadeField({ label, required, loading, emptyMessage, labelClassName, children }) {
   return (
     <div>
-      <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
+      <label
+        className={
+          labelClassName ||
+          'block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1'
+        }
+      >
         {label}
         {required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
@@ -44,6 +49,13 @@ function CascadeField({ label, required, loading, emptyMessage, children }) {
 const selectClass =
   'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 disabled:bg-gray-50 disabled:text-gray-400';
 
+function rackLabel(rack) {
+  if (!rack) return '';
+  const name = rack.name?.trim();
+  if (name) return name;
+  return rack.code?.trim() || 'Rack';
+}
+
 /**
  * @param {import('@/lib/shared/locationTypes').LocationSelectorProps} props
  */
@@ -58,6 +70,7 @@ export default function LocationSelector({
   layout = 'vertical',
   allowedLocationIds,
   className = '',
+  labelClassName = '',
 }) {
   const [branchId, setBranchId] = useState(selectedBranchId || '');
   const [floorId, setFloorId] = useState(selectedFloorId || '');
@@ -172,7 +185,7 @@ export default function LocationSelector({
   const selectedDisplay = useMemo(() => {
     if (!rackId) return '';
     const rack = racks.find((r) => String(r._id) === String(rackId));
-    return rack?.displayPath || '';
+    return rackLabel(rack);
   }, [rackId, racks]);
 
   const isHorizontal = layout === 'horizontal';
@@ -187,6 +200,7 @@ export default function LocationSelector({
         required={required && !showOptional}
         loading={branchesLoading}
         emptyMessage={!branchesLoading && branches.length === 0 ? 'No branches configured' : null}
+        labelClassName={labelClassName || undefined}
       >
         <select
           className={selectClass}
@@ -209,6 +223,7 @@ export default function LocationSelector({
           required={required && !showOptional}
           loading={branchId ? floorsLoading : false}
           emptyMessage={branchId ? floorEmpty : null}
+          labelClassName={labelClassName || undefined}
         >
           <select
             className={selectClass}
@@ -232,6 +247,7 @@ export default function LocationSelector({
           required={required && !showOptional}
           loading={floorId ? racksLoading : false}
           emptyMessage={floorId ? rackEmpty : null}
+          labelClassName={labelClassName || undefined}
         >
           <select
             className={selectClass}
@@ -242,7 +258,7 @@ export default function LocationSelector({
             <option value="">{showOptional ? 'All racks' : 'Select rack…'}</option>
             {racks.map((r) => (
               <option key={r._id} value={r._id}>
-                {r.displayPath || r.name || r.code}
+                {rackLabel(r)}
               </option>
             ))}
           </select>

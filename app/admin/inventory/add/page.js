@@ -5,19 +5,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
-import { Search, ArrowLeft, Package, Loader2 } from 'lucide-react';
+import { Search, ArrowLeft, Package, Loader2, Box, CheckCircle2 } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
 import { useDebounce } from '@/hooks/useDebounce';
 import { canWriteInventory, canWriteProducts } from '@/lib/shared/permissions';
 import {
   STOCK_UNITS,
   PRODUCT_STATUSES,
-  DEAD_STOCK_PERIODS,
-  DEAD_STOCK_PERIOD_LABELS,
-  STATUS_BUCKETS,
-  STATUS_BUCKET_LABELS,
 } from '@/lib/shared/inventoryConstants';
-import MultiLocationSelector from '@/components/admin/inventory/MultiLocationSelector';
+import AllocateStockToRacksModal from '@/components/admin/inventory/AllocateStockToRacksModal';
 
 const fetcher = (url) => adminJson(url);
 
@@ -105,6 +101,7 @@ const EMPTY_MASTER = {
 };
 
 const EMPTY_OPENING = {
+  openingQty: '',
   minStock: '',
   maxStock: '',
   deadStockPeriod: 'month',
@@ -115,6 +112,11 @@ const EMPTY_OPENING = {
   openingReason: 'opening_stock',
   remark: '',
 };
+
+function parsePositiveInt(value) {
+  const n = parseInt(value, 10);
+  return Number.isNaN(n) ? 0 : n;
+}
 
 function rupeesToPaiseInput(rupees) {
   const n = parseFloat(rupees);
@@ -151,6 +153,7 @@ export default function AddToInventoryPage() {
   const [opening, setOpening] = useState(EMPTY_OPENING);
   const [submitting, setSubmitting] = useState(false);
   const [validationErrors, setValidationErrors] = useState([]);
+  const [allocationModalOpen, setAllocationModalOpen] = useState(false);
 
   const searchUrl = debouncedQ
     ? `/api/admin/inventory/search?q=${encodeURIComponent(debouncedQ)}&limit=100`
@@ -177,19 +180,8 @@ export default function AddToInventoryPage() {
   const departments = deptData?.categories || [];
   const vendors = metaData?.vendors || [];
 
-  const previewLocationId = opening.selectedLocations[0]?.locationId || null;
-  const locationItemsUrl = previewLocationId
-    ? `/api/admin/inventory/locations/${previewLocationId}/items`
-    : null;
-  const { data: locationItemsData, isLoading: locationItemsLoading } = useSWR(
-    locationItemsUrl,
-    fetcher,
-    { revalidateOnFocus: false }
-  );
-  const locationItems = locationItemsData?.items || [];
-
-  const handleLocationsChange = useCallback((locations) => {
-    setOpening((p) => ({ ...p, selectedLocations: locations }));
+  const handleAllocationSave = useCallback((allocationData) => {
+    setOpening(allocationData);
   }, []);
 
   const categoryUrl = master.departmentId
@@ -203,6 +195,15 @@ export default function AddToInventoryPage() {
   const showCreateForm = mode === 'create' || (mode === 'existing' && selected && !selected.hasStock);
   const showAdditionalOpening = mode === 'existing' && selected?.hasStock;
   const showFullOpeningGate = showCreateForm;
+
+  const openingQtyNum = parsePositiveInt(opening.openingQty);
+  const allocatedTotal = useMemo(
+    () =>
+      (opening.selectedLocations || []).reduce((sum, loc) => sum + (Number(loc.qty) || 0), 0),
+    [opening.selectedLocations]
+  );
+  const remainingToAllocate = openingQtyNum - allocatedTotal;
+  const isFullyAllocated = openingQtyNum > 0 && remainingToAllocate === 0;
 
   const gateRequiredFields = useMemo(
     () => [
@@ -229,8 +230,11 @@ export default function AddToInventoryPage() {
       setMaster(EMPTY_MASTER);
       setOpening(EMPTY_OPENING);
       setValidationErrors([]);
+      if (canRecordStock) {
+        setAllocationModalOpen(true);
+      }
     },
-    [router]
+    [router, canRecordStock]
   );
 
   const startCreate = useCallback(() => {
@@ -242,27 +246,6 @@ export default function AddToInventoryPage() {
   }, []);
 
   const updateMaster = (key, value) => setMaster((p) => ({ ...p, [key]: value }));
-  const updateOpening = (key, value) => setOpening((p) => ({ ...p, [key]: value }));
-
-  const toggleMarkAsDeadStock = (checked) => {
-    setOpening((p) => ({
-      ...p,
-      markAsDeadStock: checked,
-      openingStatusBucket: checked
-        ? 'dead_stock'
-        : p.openingStatusBucket === 'dead_stock'
-          ? 'sellable'
-          : p.openingStatusBucket,
-    }));
-  };
-
-  const updateOpeningStatus = (bucket) => {
-    setOpening((p) => ({
-      ...p,
-      openingStatusBucket: bucket,
-      markAsDeadStock: bucket === 'dead_stock',
-    }));
-  };
 
   const validateClient = useCallback(() => {
     const errors = [];
@@ -276,16 +259,24 @@ export default function AddToInventoryPage() {
       if (!master.hsnCode.trim()) errors.push('HSN code is required');
     }
     if (showFullOpeningGate && canRecordStock) {
+      if (!opening.openingQty || openingQtyNum < 1) {
+        errors.push('Opening quantity must be at least 1');
+      }
       for (const key of gateRequiredFields) {
         if (key === 'selectedLocations') {
           if (!opening.selectedLocations?.length) {
-            errors.push('Add at least one location (branch, floor, and rack)');
+            errors.push('Allocate stock to at least one rack');
           } else {
             const invalidQty = opening.selectedLocations.some(
               (loc) => !loc.qty || Number(loc.qty) < 1
             );
             if (invalidQty) {
-              errors.push('Enter a valid opening quantity for each location');
+              errors.push('Enter a valid quantity for each rack');
+            }
+            if (openingQtyNum > 0 && allocatedTotal !== openingQtyNum) {
+              errors.push(
+                `Allocated total (${allocatedTotal}) must equal opening quantity (${openingQtyNum})`
+              );
             }
           }
           continue;
@@ -296,19 +287,27 @@ export default function AddToInventoryPage() {
       }
     }
     if (showAdditionalOpening && canRecordStock) {
+      if (!opening.openingQty || openingQtyNum < 1) {
+        errors.push('Opening quantity must be at least 1');
+      }
       if (!opening.selectedLocations?.length) {
-        errors.push('Add at least one location (branch, floor, and rack)');
+        errors.push('Allocate stock to at least one rack');
       } else {
         const invalidQty = opening.selectedLocations.some(
           (loc) => !loc.qty || Number(loc.qty) < 1
         );
         if (invalidQty) {
-          errors.push('Enter a valid opening quantity for each location');
+          errors.push('Enter a valid quantity for each rack');
+        }
+        if (openingQtyNum > 0 && allocatedTotal !== openingQtyNum) {
+          errors.push(
+            `Allocated total (${allocatedTotal}) must equal opening quantity (${openingQtyNum})`
+          );
         }
       }
     }
     return errors;
-  }, [mode, master, opening, gateRequiredFields, showFullOpeningGate, showAdditionalOpening, canEditMaster, canRecordStock]);
+  }, [mode, master, opening, openingQtyNum, allocatedTotal, gateRequiredFields, showFullOpeningGate, showAdditionalOpening, canEditMaster, canRecordStock]);
 
   const buildOpeningPayload = useCallback(() => {
     const locationEntries = (opening.selectedLocations || []).map((loc) => ({
@@ -316,6 +315,7 @@ export default function AddToInventoryPage() {
       qty: Number(loc.qty),
     }));
     return {
+      openingQty: Number(opening.openingQty),
       minStock: Number(opening.minStock),
       maxStock: Number(opening.maxStock),
       deadStockPeriod: opening.deadStockPeriod,
@@ -331,6 +331,11 @@ export default function AddToInventoryPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (canRecordStock && (showFullOpeningGate || showAdditionalOpening) && !isFullyAllocated) {
+      setAllocationModalOpen(true);
+      toast.error('Allocate all opening stock to racks before saving');
+      return;
+    }
     const clientErrors = validateClient();
     if (clientErrors.length > 0) {
       setValidationErrors(clientErrors);
@@ -376,6 +381,7 @@ export default function AddToInventoryPage() {
         const body = selected.hasStock
           ? {
               productId: selected._id,
+              openingQty: openingPayload.openingQty,
               locationEntries: openingPayload.locationEntries,
               openingStatusBucket: openingPayload.openingStatusBucket,
               markAsDeadStock: openingPayload.markAsDeadStock,
@@ -568,8 +574,20 @@ export default function AddToInventoryPage() {
                 <p className="text-xs text-emerald-600 mt-1">
                   {selected.hasStock
                     ? 'Add stock at an additional location'
-                    : 'First inventory intake — complete the gate below'}
+                    : isFullyAllocated
+                      ? `${openingQtyNum} units allocated across ${opening.selectedLocations?.length || 0} rack${(opening.selectedLocations?.length || 0) === 1 ? '' : 's'} — ready to save`
+                      : 'First inventory intake — allocate stock to racks in the popup'}
                 </p>
+                {!selected.hasStock && canRecordStock && (
+                  <button
+                    type="button"
+                    onClick={() => setAllocationModalOpen(true)}
+                    className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:text-accent/80"
+                  >
+                    <Box size={13} />
+                    {isFullyAllocated ? 'Edit allocation' : 'Open allocation'}
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -752,175 +770,45 @@ export default function AddToInventoryPage() {
             </section>
           )}
 
-          {canRecordStock && (showFullOpeningGate || showAdditionalOpening) && (
-            <section className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900">
-                {showAdditionalOpening ? 'Additional stock intake' : 'First inventory gate'}
-              </h2>
-              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                Required before stock is recorded. Opening stock is written to the append-only ledger;
-                summary qty is derived automatically.
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2">
-                  <Field label="Locations & opening qty (Branch › Floor › Rack)" required>
-                    <MultiLocationSelector
-                      value={opening.selectedLocations}
-                      onChange={handleLocationsChange}
-                      required
-                    />
-                  </Field>
-                </div>
-
-                {previewLocationId && (
-                  <div className="sm:col-span-2 rounded-lg border border-gray-200 bg-gray-50/80 overflow-hidden">
-                    <div className="px-3 py-2 border-b border-gray-200 bg-white flex items-center justify-between gap-2">
-                      <p className="text-xs font-semibold text-gray-700">
-                        Stock at first selected location
-                      </p>
-                      {locationItemsData?.location?.displayPath && (
-                        <p className="text-[10px] text-gray-500 font-mono truncate">
-                          {locationItemsData.location.displayPath}
-                        </p>
-                      )}
-                    </div>
-                    {locationItemsLoading ? (
-                      <p className="text-sm text-gray-500 px-3 py-4 flex items-center gap-2">
-                        <Loader2 size={14} className="animate-spin" />
-                        Loading items…
-                      </p>
-                    ) : locationItems.length === 0 ? (
-                      <p className="text-sm text-gray-500 px-3 py-4">No stock at this location yet.</p>
-                    ) : (
-                      <div className="max-h-48 overflow-y-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="text-left text-[10px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200 bg-white">
-                              <th className="px-3 py-2">Name</th>
-                              <th className="px-3 py-2">SKU</th>
-                              <th className="px-3 py-2">Qty</th>
-                              <th className="px-3 py-2">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {locationItems.map((item) => (
-                              <tr key={item._id} className="bg-white/60">
-                                <td className="px-3 py-2 font-medium text-gray-900">{item.title}</td>
-                                <td className="px-3 py-2 font-mono text-xs text-gray-600">
-                                  {item.sku || '—'}
-                                </td>
-                                <td className="px-3 py-2">
-                                  <span className="font-semibold">{item.qty}</span>
-                                  <span className="text-gray-400 text-xs ml-1">{item.stockUnit}</span>
-                                </td>
-                                <td className="px-3 py-2">
-                                  <span
-                                    className={`inline-block px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
-                                      item.statusBucket === 'sellable'
-                                        ? 'bg-emerald-100 text-emerald-800'
-                                        : 'bg-amber-100 text-amber-800'
-                                    }`}
-                                  >
-                                    {item.statusLabel}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
+          {canRecordStock && mode === 'create' && showFullOpeningGate && (
+            <div
+              className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border px-4 py-3 ${
+                isFullyAllocated
+                  ? 'border-emerald-200 bg-emerald-50/50'
+                  : 'border-gray-200 bg-gray-50/80'
+              }`}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                {isFullyAllocated ? (
+                  <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                ) : (
+                  <Box size={18} className="text-accent shrink-0" />
                 )}
-
-                {showFullOpeningGate && (
-                  <>
-                    <Field label="Min stock" required>
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-full px-3 py-2 text-sm border rounded-lg"
-                        value={opening.minStock}
-                        onChange={(e) => updateOpening('minStock', e.target.value)}
-                      />
-                    </Field>
-                    <Field label="Max stock" required>
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-full px-3 py-2 text-sm border rounded-lg"
-                        value={opening.maxStock}
-                        onChange={(e) => updateOpening('maxStock', e.target.value)}
-                      />
-                    </Field>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Dead stock rule" required>
-                        <select
-                          className="w-full px-3 py-2 text-sm border rounded-lg"
-                          value={opening.deadStockPeriod}
-                          onChange={(e) => updateOpening('deadStockPeriod', e.target.value)}
-                        >
-                          {DEAD_STOCK_PERIODS.map((period) => (
-                            <option key={period} value={period}>
-                              {DEAD_STOCK_PERIOD_LABELS[period]}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                      <Field label="Qty to sell in period" required>
-                        <input
-                          type="number"
-                          min="1"
-                          className="w-full px-3 py-2 text-sm border rounded-lg"
-                          value={opening.deadStockQty}
-                          onChange={(e) => updateOpening('deadStockQty', e.target.value)}
-                        />
-                      </Field>
-                    </div>
-                  </>
-                )}
-
-                <Field label="Status" required>
-                  <select
-                    className="w-full px-3 py-2 text-sm border rounded-lg"
-                    value={opening.openingStatusBucket}
-                    onChange={(e) => updateOpeningStatus(e.target.value)}
-                  >
-                    {STATUS_BUCKETS.map((bucket) => (
-                      <option key={bucket} value={bucket}>
-                        {STATUS_BUCKET_LABELS[bucket]}
-                      </option>
-                    ))}
-                  </select>
-                  <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={opening.markAsDeadStock}
-                      onChange={(e) => toggleMarkAsDeadStock(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <span className="text-xs text-gray-600">Mark as dead stock</span>
-                  </label>
-                  {opening.markAsDeadStock && (
-                    <p className="text-[10px] text-amber-700 mt-1">
-                      Flags that sales are below the dead-stock target.
-                    </p>
-                  )}
-                </Field>
-                <div className="sm:col-span-2">
-                  <Field label="Remark">
-                    <textarea
-                      className="w-full px-3 py-2 text-sm border rounded-lg"
-                      rows={2}
-                      value={opening.remark}
-                      onChange={(e) => updateOpening('remark', e.target.value)}
-                    />
-                  </Field>
-                </div>
+                <p className="text-sm text-gray-700">
+                  {isFullyAllocated
+                    ? `${openingQtyNum} ${master.unit || 'units'} allocated across ${opening.selectedLocations?.length || 0} rack${(opening.selectedLocations?.length || 0) === 1 ? '' : 's'}`
+                    : 'Allocate opening stock to racks before saving'}
+                </p>
               </div>
-            </section>
+              <button
+                type="button"
+                onClick={() => setAllocationModalOpen(true)}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold text-accent border border-accent/30 rounded-lg hover:bg-accent/5 shrink-0"
+              >
+                <Box size={14} />
+                {isFullyAllocated ? 'Edit allocation' : 'Allocate stock to racks'}
+              </button>
+            </div>
           )}
+
+          <AllocateStockToRacksModal
+            isOpen={allocationModalOpen}
+            onClose={() => setAllocationModalOpen(false)}
+            value={opening}
+            onSave={handleAllocationSave}
+            showInventoryRules={showFullOpeningGate}
+            stockUnit={selected?.stockUnit || master.unit || 'units'}
+          />
 
           <div className="flex justify-end gap-3">
             <Link
@@ -931,7 +819,7 @@ export default function AddToInventoryPage() {
             </Link>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || (canRecordStock && (showFullOpeningGate || showAdditionalOpening) && !isFullyAllocated)}
               className="px-6 py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 inline-flex items-center gap-2"
             >
               {submitting && <Loader2 size={16} className="animate-spin" />}

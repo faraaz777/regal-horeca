@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
@@ -9,6 +9,7 @@ import { adminFetch, adminJson } from '@/lib/client/adminFetch';
 import { canReadStockLedger } from '@/lib/shared/permissions';
 import { LEDGER_FILTER_TYPES, LEDGER_FILTER_TYPE_LABELS } from '@/lib/shared/inventoryConstants';
 import LocationSelector from '@/components/admin/inventory/LocationSelector';
+import { resolveCascadeLocation } from '@/lib/client/locationCascadeApi';
 
 const fetcher = (url) => adminJson(url);
 
@@ -61,6 +62,7 @@ async function downloadExport(url) {
 export default function StockMovementsPage() {
   const searchParams = useSearchParams();
   const initialProductId = searchParams.get('productId') || '';
+  const initialLocationId = searchParams.get('locationId') || '';
 
   const { data: meData } = useSWR('/api/auth/me', fetcher, { revalidateOnFocus: false });
   const role = meData?.user?.role;
@@ -77,8 +79,31 @@ export default function StockMovementsPage() {
     branchId: null,
     floorId: null,
     rackId: null,
-    locationId: null,
+    locationId: initialLocationId || null,
   });
+
+  useEffect(() => {
+    if (!initialLocationId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await resolveCascadeLocation(initialLocationId);
+        const selection = data.selection || data;
+        if (cancelled) return;
+        setLocationFilter({
+          branchId: selection.branchId,
+          floorId: selection.floorId,
+          rackId: selection.rackId,
+          locationId: selection.locationId,
+        });
+      } catch {
+        /* ignore invalid deep link */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialLocationId]);
 
   const ledgerUrl = useMemo(() => {
     if (!canView) return null;

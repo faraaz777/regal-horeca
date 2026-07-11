@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Pencil } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
 import { validateLocationSelectionClient } from '@/lib/client/locationCascadeApi';
 import LocationSelector from '@/components/admin/inventory/LocationSelector';
@@ -14,7 +14,10 @@ import {
   MOVEMENT_REASON_LABELS,
   ADD_MOVEMENT_REASONS,
   ADD_MOVEMENT_REASON_LABELS,
+  DEAD_STOCK_PERIOD_LABELS,
+  DEAD_STOCK_PERIODS,
 } from '@/lib/shared/inventoryConstants';
+import { canEditInventoryRules } from '@/lib/shared/permissions';
 
 const fetcher = (url) => adminJson(url);
 
@@ -23,7 +26,10 @@ const TAB_LABELS = {
   minus: 'Minus',
   status_change: 'Status change',
   transfer: 'Transfer',
+  rules: 'Rules',
 };
+
+const MOVEMENT_TABS = ['add', 'minus', 'status_change', 'transfer'];
 
 const EMPTY_FORM = {
   quantity: '1',
@@ -55,6 +61,288 @@ function Field({ label, required, children }) {
   );
 }
 
+function RuleRow({ label, value, highlight }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-2.5 border-b border-gray-100 last:border-0">
+      <span className="text-xs font-semibold text-gray-700 shrink-0">{label}</span>
+      <span
+        className={`text-sm text-right ${
+          highlight ? 'font-semibold text-emerald-800' : 'font-medium text-gray-900'
+        }`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+const inputClass =
+  'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500';
+
+function buildRulesFormFromRule(rule) {
+  if (!rule) return null;
+  return {
+    minStock: String(rule.minStock ?? ''),
+    maxStock: String(rule.maxStock ?? ''),
+    reorderQty: String(rule.reorderQty ?? '0'),
+    deadStockPeriod: rule.deadStockPeriod || 'month',
+    deadStockQty: String(rule.deadStockQty ?? ''),
+    deadStockMarked: Boolean(rule.deadStockMarked),
+    gateRemark: rule.gateRemark || '',
+  };
+}
+
+function RulesReadView({ rule, stockUnit, showPermissionNote = false }) {
+  const unit = stockUnit || 'units';
+  const periodLabel = DEAD_STOCK_PERIOD_LABELS[rule.deadStockPeriod] || rule.deadStockPeriod;
+  const statusLabel = rule.openingStatusBucket
+    ? STATUS_BUCKET_LABELS[rule.openingStatusBucket] || rule.openingStatusBucket
+    : '—';
+  const setAtLabel = rule.setAt
+    ? new Date(rule.setAt).toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      })
+    : '—';
+  const updatedAtLabel = rule.updatedAt
+    ? new Date(rule.updatedAt).toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      })
+    : '—';
+
+  return (
+    <>
+      <div className="rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-1">
+        <RuleRow label="Min stock" value={`${rule.minStock} ${unit}`} />
+        <RuleRow label="Max stock" value={`${rule.maxStock} ${unit}`} />
+        <RuleRow label="Reorder qty" value={`${rule.reorderQty ?? 0} ${unit}`} />
+        <RuleRow label="Dead stock rule" value={periodLabel} />
+        <RuleRow label="Qty to sell in period" value={`${rule.deadStockQty} ${unit}`} />
+        <RuleRow label="Opening status" value={statusLabel} />
+        <RuleRow
+          label="Mark as dead stock"
+          value={rule.deadStockMarked ? 'Yes' : 'No'}
+          highlight={rule.deadStockMarked}
+        />
+        <RuleRow label="Set at intake" value={setAtLabel} />
+        <RuleRow label="Last updated" value={updatedAtLabel} />
+      </div>
+      {rule.gateRemark && (
+        <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
+            Intake remark
+          </p>
+          <p className="text-sm text-gray-800">{rule.gateRemark}</p>
+        </div>
+      )}
+      {showPermissionNote && (
+        <p className="text-[11px] text-gray-500">
+          Only Super Admin and Inventory Manager can edit these rules.
+        </p>
+      )}
+    </>
+  );
+}
+
+function RulesPanel({
+  rule,
+  stockUnit,
+  isLoading,
+  canEdit,
+  isEditing,
+  onStartEdit,
+  rulesForm,
+  onRulesChange,
+}) {
+  if (isLoading) {
+    return (
+      <p className="text-sm text-gray-500 flex items-center gap-2 py-6 justify-center">
+        <Loader2 size={14} className="animate-spin" />
+        Loading inventory rules…
+      </p>
+    );
+  }
+
+  if (!rule) {
+    return (
+      <div className="rounded-lg border border-amber-100 bg-amber-50/60 px-4 py-5 text-center">
+        <p className="text-sm font-medium text-amber-900">No inventory rules on file</p>
+        <p className="text-xs text-amber-800 mt-1">
+          Rules are set during the first inventory gate when opening stock is recorded.
+        </p>
+      </div>
+    );
+  }
+
+  const unit = stockUnit || 'units';
+  const statusLabel = rule.openingStatusBucket
+    ? STATUS_BUCKET_LABELS[rule.openingStatusBucket] || rule.openingStatusBucket
+    : '—';
+  const setAtLabel = rule.setAt
+    ? new Date(rule.setAt).toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      })
+    : '—';
+  const updatedAtLabel = rule.updatedAt
+    ? new Date(rule.updatedAt).toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      })
+    : '—';
+
+  if (!canEdit || !isEditing) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+            Inventory gate rules
+          </p>
+          {canEdit && !isEditing && (
+            <button
+              type="button"
+              onClick={onStartEdit}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 border border-emerald-200 rounded-lg bg-emerald-50 hover:bg-emerald-100 transition-colors"
+            >
+              <Pencil size={13} />
+              Edit
+            </button>
+          )}
+        </div>
+        <RulesReadView rule={rule} stockUnit={stockUnit} showPermissionNote={!canEdit} />
+      </div>
+    );
+  }
+
+  const update = (key, value) => {
+    onRulesChange((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const toggleDeadStock = (checked) => {
+    onRulesChange((prev) => ({ ...prev, deadStockMarked: checked }));
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+        Inventory gate rules
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="Min stock" required>
+          <div className="relative">
+            <input
+              type="number"
+              min="0"
+              className={`${inputClass} pr-14`}
+              value={rulesForm?.minStock ?? ''}
+              onChange={(e) => update('minStock', e.target.value)}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+              {unit}
+            </span>
+          </div>
+        </Field>
+        <Field label="Max stock" required>
+          <div className="relative">
+            <input
+              type="number"
+              min="0"
+              className={`${inputClass} pr-14`}
+              value={rulesForm?.maxStock ?? ''}
+              onChange={(e) => update('maxStock', e.target.value)}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+              {unit}
+            </span>
+          </div>
+        </Field>
+        <Field label="Reorder qty">
+          <div className="relative">
+            <input
+              type="number"
+              min="0"
+              className={`${inputClass} pr-14`}
+              value={rulesForm?.reorderQty ?? '0'}
+              onChange={(e) => update('reorderQty', e.target.value)}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+              {unit}
+            </span>
+          </div>
+        </Field>
+        <Field label="Dead stock rule" required>
+          <select
+            className={inputClass}
+            value={rulesForm?.deadStockPeriod ?? 'month'}
+            onChange={(e) => update('deadStockPeriod', e.target.value)}
+          >
+            {DEAD_STOCK_PERIODS.map((period) => (
+              <option key={period} value={period}>
+                {DEAD_STOCK_PERIOD_LABELS[period]}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Qty to sell in period" required>
+          <div className="relative">
+            <input
+              type="number"
+              min="1"
+              className={`${inputClass} pr-14`}
+              value={rulesForm?.deadStockQty ?? ''}
+              onChange={(e) => update('deadStockQty', e.target.value)}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+              {unit}
+            </span>
+          </div>
+        </Field>
+        <Field label="Opening status">
+          <input
+            type="text"
+            className={`${inputClass} bg-gray-50 text-gray-600`}
+            value={statusLabel}
+            readOnly
+            title="Opening status is fixed from the original intake ledger entry"
+          />
+        </Field>
+      </div>
+
+      <label className="flex items-start gap-2.5 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={Boolean(rulesForm?.deadStockMarked)}
+          onChange={(e) => toggleDeadStock(e.target.checked)}
+          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+        />
+        <span>
+          <span className="text-sm font-medium text-gray-800">Mark as dead stock</span>
+          <span className="block text-[11px] text-gray-500 mt-0.5">
+            Flags that sales are below the dead-stock target for this product.
+          </span>
+        </span>
+      </label>
+
+      <Field label="Intake remark">
+        <textarea
+          className={`${inputClass} resize-none`}
+          rows={2}
+          value={rulesForm?.gateRemark ?? ''}
+          onChange={(e) => update('gateRemark', e.target.value)}
+          placeholder="Optional note from original intake"
+        />
+      </Field>
+
+      <p className="text-[11px] text-gray-500">
+        Set at intake: {setAtLabel}
+        {rule.updatedAt && ` · Last updated: ${updatedAtLabel}`}
+      </p>
+    </div>
+  );
+}
+
 function resolveMinusLocationId(selection, minusRows) {
   if (!selection?.rackId) return '';
   const row = minusRows.find(
@@ -72,6 +360,13 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
   const [fromSel, setFromSel] = useState(EMPTY_LOCATION);
   const [toSel, setToSel] = useState(EMPTY_LOCATION);
   const [submitting, setSubmitting] = useState(false);
+  const [rulesForm, setRulesForm] = useState(null);
+  const [savingRules, setSavingRules] = useState(false);
+  const [editingRules, setEditingRules] = useState(false);
+
+  const { data: meData } = useSWR('/api/auth/me', fetcher, { revalidateOnFocus: false });
+  const userRole = meData?.user?.role;
+  const canEditRules = canEditInventoryRules(userRole);
 
   const stockUrl = item?._id ? `/api/admin/inventory/${item._id}/stock` : null;
   const { data: stockData, isLoading, mutate } = useSWR(stockUrl, fetcher, {
@@ -81,6 +376,7 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
   const update = (key, value) => setForm((p) => ({ ...p, [key]: value }));
 
   const setMovementTab = (key) => {
+    setEditingRules(false);
     setTab(key);
     setLocationSel(EMPTY_LOCATION);
     setFromSel(EMPTY_LOCATION);
@@ -99,6 +395,24 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
   };
 
   const stockRows = stockData?.locations || [];
+  const inventoryRule = stockData?.inventoryRule ?? null;
+
+  useEffect(() => {
+    setRulesForm(buildRulesFormFromRule(inventoryRule));
+    if (!inventoryRule) {
+      setEditingRules(false);
+    }
+  }, [inventoryRule]);
+
+  const handleStartRulesEdit = useCallback(() => {
+    setRulesForm(buildRulesFormFromRule(inventoryRule));
+    setEditingRules(true);
+  }, [inventoryRule]);
+
+  const handleCancelRulesEdit = useCallback(() => {
+    setRulesForm(buildRulesFormFromRule(inventoryRule));
+    setEditingRules(false);
+  }, [inventoryRule]);
 
   const minusLocationsForBucket = useMemo(() => {
     if (!stockRows.length) return [];
@@ -209,6 +523,56 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
     });
   };
 
+  const handleSaveRules = useCallback(async () => {
+    if (!item?._id || !rulesForm) return;
+
+    const minStock = Number(rulesForm.minStock);
+    const maxStock = Number(rulesForm.maxStock);
+    const reorderQty = Number(rulesForm.reorderQty) || 0;
+    const deadStockQty = Number(rulesForm.deadStockQty);
+
+    if (Number.isNaN(minStock) || minStock < 0) {
+      toast.error('Enter a valid min stock');
+      return;
+    }
+    if (Number.isNaN(maxStock) || maxStock < 0) {
+      toast.error('Enter a valid max stock');
+      return;
+    }
+    if (maxStock < minStock) {
+      toast.error('Max stock must be greater than or equal to min stock');
+      return;
+    }
+    if (!deadStockQty || deadStockQty < 1) {
+      toast.error('Dead stock quantity must be at least 1');
+      return;
+    }
+
+    setSavingRules(true);
+    try {
+      await adminJson(`/api/admin/inventory/${item._id}/rules`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          minStock,
+          maxStock,
+          reorderQty,
+          deadStockPeriod: rulesForm.deadStockPeriod,
+          deadStockQty,
+          deadStockMarked: Boolean(rulesForm.deadStockMarked),
+          gateRemark: rulesForm.gateRemark?.trim() || '',
+        }),
+      });
+      toast.success('Inventory rules updated');
+      await mutate();
+      setEditingRules(false);
+      onSuccess?.();
+    } catch (err) {
+      toast.error(err.message || 'Failed to update rules');
+    } finally {
+      setSavingRules(false);
+    }
+  }, [item?._id, mutate, onSuccess, rulesForm]);
+
   const handlePost = useCallback(async () => {
     const qty = Number(form.quantity);
     if (!qty || qty <= 0) {
@@ -315,6 +679,8 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
   if (!item) return null;
 
   const summary = stockData || item;
+  const stockUnit = stockData?.product?.stockUnit || item.stockUnit || 'Pcs';
+  const isRulesTab = tab === 'rules';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
@@ -340,7 +706,7 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
 
         <div className="px-5 pt-4">
           <div className="flex flex-wrap gap-2 mb-4">
-            {['add', 'minus', 'status_change', 'transfer'].map((key) => (
+            {MOVEMENT_TABS.map((key) => (
               <button
                 key={key}
                 type="button"
@@ -354,6 +720,20 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
                 {TAB_LABELS[key]}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => {
+                setEditingRules(false);
+                setTab('rules');
+              }}
+              className={`px-3 py-1.5 text-sm font-medium rounded-full border transition-colors ${
+                isRulesTab
+                  ? 'border-emerald-600 text-emerald-700 bg-emerald-50'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {TAB_LABELS.rules}
+            </button>
           </div>
 
           {isLoading ? (
@@ -374,6 +754,19 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
           )}
 
           <div className="space-y-4 pb-4">
+            {isRulesTab ? (
+              <RulesPanel
+                rule={inventoryRule}
+                stockUnit={stockUnit}
+                isLoading={isLoading}
+                canEdit={canEditRules}
+                isEditing={editingRules}
+                onStartEdit={handleStartRulesEdit}
+                rulesForm={rulesForm}
+                onRulesChange={setRulesForm}
+              />
+            ) : (
+              <>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Quantity" required>
                 <input
@@ -551,6 +944,8 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
                 onChange={(e) => update('remark', e.target.value)}
               />
             </Field>
+              </>
+            )}
           </div>
         </div>
 
@@ -560,8 +955,9 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-white"
           >
-            Cancel
+            {isRulesTab ? 'Close' : 'Cancel'}
           </button>
+          {!isRulesTab && (
           <button
             type="button"
             disabled={
@@ -578,6 +974,28 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
             {submitting && <Loader2 size={14} className="animate-spin" />}
             Post movement
           </button>
+          )}
+          {isRulesTab && editingRules && (
+            <button
+              type="button"
+              onClick={handleCancelRulesEdit}
+              disabled={savingRules}
+              className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-white disabled:opacity-50"
+            >
+              Cancel edit
+            </button>
+          )}
+          {isRulesTab && canEditRules && inventoryRule && editingRules && (
+            <button
+              type="button"
+              disabled={savingRules || !rulesForm}
+              onClick={handleSaveRules}
+              className="px-4 py-2 text-sm font-semibold text-white bg-emerald-800 rounded-lg hover:bg-emerald-900 disabled:opacity-50 inline-flex items-center gap-2"
+            >
+              {savingRules && <Loader2 size={14} className="animate-spin" />}
+              Save rules
+            </button>
+          )}
         </div>
       </div>
     </div>

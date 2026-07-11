@@ -3,6 +3,14 @@ module.exports = {
   content: [
     './app/**/*.{js,jsx}',
     './components/**/*.{js,jsx}',
+    './lib/**/*.{js,jsx}',
+  ],
+  safelist: [
+    'bg-slate-200',
+    'bg-sky-200',
+    'bg-sky-400',
+    'bg-blue-500',
+    'bg-indigo-700',
   ],
   theme: {
     extend: {

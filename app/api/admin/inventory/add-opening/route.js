@@ -43,6 +43,7 @@ export async function POST(request) {
           reorderQty: 0,
           deadStockPeriod: 'month',
           deadStockQty: 1,
+          openingQty: parsed.data.openingQty,
           locationEntries: parsed.data.locationEntries?.length
             ? parsed.data.locationEntries
             : parsed.data.locationIds?.length

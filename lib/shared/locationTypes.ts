@@ -62,6 +62,7 @@ export interface LocationSelectorProps {
   layout?: 'vertical' | 'horizontal';
   allowedLocationIds?: string[];
   className?: string;
+  labelClassName?: string;
 }
 
 export interface CascadeBranchesResponse {

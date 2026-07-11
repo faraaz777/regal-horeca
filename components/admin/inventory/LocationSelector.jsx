@@ -9,6 +9,13 @@ import {
   fetchCascadeRacks,
   resolveCascadeLocation,
 } from '@/lib/client/locationCascadeApi';
+import { formatRackDisplayName } from '@/lib/shared/locationDisplay';
+import SearchableSelect from '@/components/admin/inventory/SearchableSelect';
+import {
+  toBranchOptions,
+  toFloorOptions,
+  toRackOptions,
+} from '@/lib/client/locationSelectOptions';
 
 const EMPTY_SELECTION = {
   branchId: null,
@@ -46,15 +53,8 @@ function CascadeField({ label, required, loading, emptyMessage, labelClassName, 
   );
 }
 
-const selectClass =
+const inputClass =
   'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 disabled:bg-gray-50 disabled:text-gray-400';
-
-function rackLabel(rack) {
-  if (!rack) return '';
-  const name = rack.name?.trim();
-  if (name) return name;
-  return rack.code?.trim() || 'Rack';
-}
 
 /**
  * @param {import('@/lib/shared/locationTypes').LocationSelectorProps} props
@@ -164,7 +164,7 @@ export default function LocationSelector({
       floorId: floorId || null,
       rackId: value || null,
       locationId: value || null,
-      displayPath: rack?.displayPath || '',
+      displayPath: formatRackDisplayName(rack),
     });
   };
 
@@ -182,10 +182,24 @@ export default function LocationSelector({
 
   const showOptional = mode === 'filter' && !required;
 
+  const branchOptions = useMemo(() => toBranchOptions(branches), [branches]);
+  const floorOptions = useMemo(() => toFloorOptions(floors), [floors]);
+  const rackOptions = useMemo(() => toRackOptions(racks), [racks]);
+
+  const branchEmptyOption = showOptional
+    ? { value: '', label: 'All branches', searchText: 'all branches' }
+    : null;
+  const floorEmptyOption = showOptional
+    ? { value: '', label: 'All floors', searchText: 'all floors' }
+    : null;
+  const rackEmptyOption = showOptional
+    ? { value: '', label: 'All racks', searchText: 'all racks' }
+    : null;
+
   const selectedDisplay = useMemo(() => {
     if (!rackId) return '';
     const rack = racks.find((r) => String(r._id) === String(rackId));
-    return rackLabel(rack);
+    return formatRackDisplayName(rack);
   }, [rackId, racks]);
 
   const isHorizontal = layout === 'horizontal';
@@ -202,19 +216,15 @@ export default function LocationSelector({
         emptyMessage={!branchesLoading && branches.length === 0 ? 'No branches configured' : null}
         labelClassName={labelClassName || undefined}
       >
-        <select
-          className={selectClass}
+        <SearchableSelect
+          options={branchOptions}
           value={branchId}
           disabled={disabled}
-          onChange={(e) => handleBranchChange(e.target.value)}
-        >
-          <option value="">{showOptional ? 'All branches' : 'Select branch…'}</option>
-          {branches.map((b) => (
-            <option key={b._id} value={b._id}>
-              {b.name || b.code}
-            </option>
-          ))}
-        </select>
+          placeholder={showOptional ? 'Search branches…' : 'Search branch…'}
+          emptyOption={branchEmptyOption}
+          inputClassName={inputClass}
+          onChange={handleBranchChange}
+        />
       </CascadeField>
 
       {(isHorizontal || branchId) && (
@@ -225,19 +235,15 @@ export default function LocationSelector({
           emptyMessage={branchId ? floorEmpty : null}
           labelClassName={labelClassName || undefined}
         >
-          <select
-            className={selectClass}
+          <SearchableSelect
+            options={floorOptions}
             value={floorId}
             disabled={disabled || !branchId || !!floorEmpty}
-            onChange={(e) => handleFloorChange(e.target.value)}
-          >
-            <option value="">{showOptional ? 'All floors' : 'Select floor…'}</option>
-            {floors.map((f) => (
-              <option key={f._id} value={f._id}>
-                {f.name || f.code}
-              </option>
-            ))}
-          </select>
+            placeholder={showOptional ? 'Search floors…' : 'Search floor…'}
+            emptyOption={floorEmptyOption}
+            inputClassName={inputClass}
+            onChange={handleFloorChange}
+          />
         </CascadeField>
       )}
 
@@ -249,19 +255,15 @@ export default function LocationSelector({
           emptyMessage={floorId ? rackEmpty : null}
           labelClassName={labelClassName || undefined}
         >
-          <select
-            className={selectClass}
+          <SearchableSelect
+            options={rackOptions}
             value={rackId}
             disabled={disabled || !floorId || !!rackEmpty}
-            onChange={(e) => handleRackChange(e.target.value)}
-          >
-            <option value="">{showOptional ? 'All racks' : 'Select rack…'}</option>
-            {racks.map((r) => (
-              <option key={r._id} value={r._id}>
-                {rackLabel(r)}
-              </option>
-            ))}
-          </select>
+            placeholder={showOptional ? 'Search racks…' : 'Search rack…'}
+            emptyOption={rackEmptyOption}
+            inputClassName={inputClass}
+            onChange={handleRackChange}
+          />
         </CascadeField>
       )}
 

@@ -10,12 +10,13 @@ import {
   getRackStatusStyle,
   heatmapFillClass,
 } from '@/lib/client/locatorUtils';
+import { formatRackDisplayName } from '@/lib/shared/locationDisplay';
 
 function RackTooltip({ rack }) {
   return (
     <div className="pointer-events-none absolute left-1/2 bottom-full mb-2 -translate-x-1/2 z-50 hidden group-hover:block">
       <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg min-w-[160px] max-w-[240px]">
-        <p className="font-mono font-semibold truncate">{rack.displayPathShort}</p>
+        <p className="font-mono font-semibold truncate">{formatRackDisplayName(rack)}</p>
         <p className="text-gray-300 mt-1">
           {rack.sellableQty > 0 && <span>{rack.sellableQty} Sellable</span>}
           {rack.holdQty > 0 && (

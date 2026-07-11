@@ -128,7 +128,9 @@ export default function AdminInventoryPage() {
 
   const [search, setSearch] = useState(initialSearch);
   const debouncedSearch = useDebounce(search.trim(), 300);
-  const [categoryId, setCategoryId] = useState('');
+  const [brand, setBrand] = useState('');
+  const [stockStatus, setStockStatus] = useState('');
+  const [condition, setCondition] = useState('');
   const [adjustingId, setAdjustingId] = useState(null);
   const [movementItem, setMovementItem] = useState(null);
   const [highlightId, setHighlightId] = useState(focusProductId);
@@ -139,9 +141,11 @@ export default function AdminInventoryPage() {
   const inventoryUrl = useMemo(() => {
     const params = new URLSearchParams({ page: '1', limit: '200' });
     if (debouncedSearch) params.set('search', debouncedSearch);
-    if (categoryId) params.set('categoryId', categoryId);
+    if (brand) params.set('brand', brand);
+    if (stockStatus) params.set('stockStatus', stockStatus);
+    if (condition) params.set('condition', condition);
     return `/api/admin/inventory?${params}`;
-  }, [debouncedSearch, categoryId]);
+  }, [debouncedSearch, brand, stockStatus, condition]);
 
   const { data, error, isLoading, isValidating, mutate } = useSWR(inventoryUrl, fetcher, {
     revalidateOnFocus: false,
@@ -151,11 +155,13 @@ export default function AdminInventoryPage() {
 
   const showLoading = isLoading || isValidating || isSearchPending;
 
-  const { data: categoriesData } = useSWR('/api/categories', fetcher, { revalidateOnFocus: false });
+  const { data: brandsData } = useSWR('/api/admin/inventory/brands', fetcher, {
+    revalidateOnFocus: false,
+  });
 
   const items = data?.items || [];
   const totalCount = data?.pagination?.total ?? items.length;
-  const categories = categoriesData?.categories || categoriesData || [];
+  const brands = brandsData?.brands || [];
 
   const handleAdjust = useCallback(
     async (productId, delta) => {
@@ -228,7 +234,7 @@ export default function AdminInventoryPage() {
 
       <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
         <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
-          <div className="flex flex-col sm:flex-row gap-3 flex-1">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3 flex-1">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input
@@ -240,16 +246,35 @@ export default function AdminInventoryPage() {
               />
             </div>
             <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 min-w-[140px]"
             >
-              <option value="">All categories</option>
-              {(Array.isArray(categories) ? categories : []).map((cat) => (
-                <option key={cat._id || cat.id} value={cat._id || cat.id}>
-                  {cat.name}
+              <option value="">All brands</option>
+              {brands.map((b) => (
+                <option key={b} value={b}>
+                  {b}
                 </option>
               ))}
+            </select>
+            <select
+              value={stockStatus}
+              onChange={(e) => setStockStatus(e.target.value)}
+              className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 min-w-[140px]"
+            >
+              <option value="">All stock levels</option>
+              <option value="in_stock">In stock</option>
+              <option value="low">Low stock</option>
+              <option value="out">Out of stock</option>
+            </select>
+            <select
+              value={condition}
+              onChange={(e) => setCondition(e.target.value)}
+              className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 min-w-[130px]"
+            >
+              <option value="">All conditions</option>
+              <option value="hold">On hold</option>
+              <option value="normal">Available</option>
             </select>
           </div>
           {canAddToInventory && (

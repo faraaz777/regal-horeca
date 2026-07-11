@@ -21,7 +21,7 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
 
-    const result = await updateRackPosition(params.locationId, parsed.data);
+    const result = await updateRackPosition(params.locationId, parsed.data, auth.session, request);
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
     const status = error.message === 'Rack not found' ? 404 : 400;

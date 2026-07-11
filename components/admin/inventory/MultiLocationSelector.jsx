@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LocationSelector from '@/components/admin/inventory/LocationSelector';
+import { formatRackDisplayName } from '@/lib/shared/locationDisplay';
 import { validateLocationSelectionClient } from '@/lib/client/locationCascadeApi';
 
 const EMPTY_DRAFT = {
@@ -199,9 +200,9 @@ export default function MultiLocationSelector({
                   <tr key={loc.locationId} className="bg-white">
                     <td
                       className="px-3 py-2 text-xs text-gray-800 font-mono truncate max-w-[240px]"
-                      title={loc.displayPath}
+                      title={formatRackDisplayName(loc)}
                     >
-                      {loc.displayPath || '—'}
+                      {formatRackDisplayName(loc) || '—'}
                     </td>
                     <td className="px-3 py-2">
                       <input

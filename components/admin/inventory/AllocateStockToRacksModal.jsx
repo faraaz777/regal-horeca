@@ -18,6 +18,7 @@ import {
 import { adminJson } from '@/lib/client/adminFetch';
 import { validateLocationSelectionClient } from '@/lib/client/locationCascadeApi';
 import LocationSelector from '@/components/admin/inventory/LocationSelector';
+import { formatRackDisplayName } from '@/lib/shared/locationDisplay';
 import {
   DEAD_STOCK_PERIODS,
   DEAD_STOCK_PERIOD_LABELS,
@@ -580,9 +581,9 @@ export default function AllocateStockToRacksModal({
                           <td className="px-4 py-3">
                             <p
                               className="text-xs font-mono text-gray-800 truncate max-w-md"
-                              title={loc.displayPath}
+                              title={formatRackDisplayName(loc)}
                             >
-                              {loc.displayPath || '—'}
+                              {formatRackDisplayName(loc) || '—'}
                             </p>
                           </td>
                           <td className="px-4 py-3">
@@ -638,7 +639,7 @@ export default function AllocateStockToRacksModal({
                 </option>
                 {(form.selectedLocations || []).map((loc) => (
                   <option key={loc.locationId} value={loc.locationId}>
-                    {loc.displayPath}
+                    {formatRackDisplayName(loc)}
                   </option>
                 ))}
               </select>
@@ -654,7 +655,7 @@ export default function AllocateStockToRacksModal({
                 ) : locationItems.length === 0 ? (
                   <p className="text-xs text-gray-500 py-2">
                     No existing stock at{' '}
-                    <span className="font-mono">{previewLocation?.displayPath}</span> — this intake
+                    <span className="font-mono">{formatRackDisplayName(previewLocation)}</span> — this intake
                     will be the first.
                   </p>
                 ) : (

@@ -1,5 +1,6 @@
 /**
- * Seed location tree for inventory (code-based paths: b1 › f1 › sec1 › z1 › R12 › Shelf 3).
+ * Seed location tree for inventory (Branch › Floor › Rack).
+ * Each floor gets RACKS_PER_FLOOR racks with capacity MAX_PRODUCTS_PER_RACK.
  * Usage: node scripts/seed-inventory-locations.mjs
  */
 
@@ -10,6 +11,8 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SEP = ' › ';
+const RACKS_PER_FLOOR = 5;
+const MAX_PRODUCTS_PER_RACK = 5;
 
 function loadEnvLocal() {
   const envPath = resolve(__dirname, '../.env.local');
@@ -38,11 +41,24 @@ const LocationSchema = new mongoose.Schema(
     path: String,
     level: String,
     isActive: { type: Boolean, default: true },
+    capacity: { type: Number, default: null },
   },
   { timestamps: true }
 );
 
-/** Matches reference UI: Begum Bazaar HQ → … → R12 → Shelf 3 */
+function racksForFloor() {
+  return Array.from({ length: RACKS_PER_FLOOR }, (_, i) => {
+    const n = i + 1;
+    return {
+      code: `R${n}`,
+      name: `Rack ${n}`,
+      level: 'rack',
+      capacity: MAX_PRODUCTS_PER_RACK,
+    };
+  });
+}
+
+/** Branch → floors → 5 racks each (active inventory model). */
 const TREE = [
   {
     code: 'b1',
@@ -53,38 +69,13 @@ const TREE = [
         code: 'f1',
         name: 'Ground Floor',
         level: 'floor',
-        children: [
-          {
-            code: 'sec1',
-            name: 'Crockery',
-            level: 'section',
-            children: [
-              {
-                code: 'z1',
-                name: 'Zone A',
-                level: 'zone',
-                children: [
-                  {
-                    code: 'R12',
-                    name: 'Normal',
-                    level: 'rack',
-                    children: [
-                      { code: 'Shelf 1', name: '', level: 'shelf' },
-                      { code: 'Shelf 2', name: '', level: 'shelf' },
-                      { code: 'Shelf 3', name: '', level: 'shelf' },
-                    ],
-                  },
-                  {
-                    code: 'R13',
-                    name: 'Display',
-                    level: 'rack',
-                    children: [{ code: 'Shelf 1', name: '', level: 'shelf' }],
-                  },
-                ],
-              },
-            ],
-          },
-        ],
+        children: racksForFloor(),
+      },
+      {
+        code: 'f2',
+        name: 'First Floor',
+        level: 'floor',
+        children: racksForFloor(),
       },
     ],
   },
@@ -107,7 +98,11 @@ async function upsertNode(node, parentId, codePath, Location) {
       path,
       level: node.level,
       isActive: true,
+      ...(node.capacity != null ? { capacity: node.capacity } : {}),
     });
+  } else if (node.level === 'rack' && node.capacity != null && doc.capacity == null) {
+    doc.capacity = node.capacity;
+    await doc.save();
   }
 
   for (const child of node.children || []) {
@@ -129,9 +124,9 @@ async function main() {
     await upsertNode(root, null, [], Location);
   }
 
-  const shelves = await Location.find({ level: 'shelf' }).sort({ path: 1 }).lean();
-  console.log(`Seeded ${shelves.length} shelf location(s):`);
-  shelves.forEach((s) => console.log(' -', s.path));
+  const racks = await Location.find({ level: 'rack', isActive: true }).sort({ path: 1 }).lean();
+  console.log(`Seeded ${racks.length} rack location(s) (${RACKS_PER_FLOOR} per floor):`);
+  racks.forEach((r) => console.log(` - ${r.path} (capacity ${r.capacity ?? '—'})`));
   await mongoose.disconnect();
 }
 

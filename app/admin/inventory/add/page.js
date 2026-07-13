@@ -205,6 +205,29 @@ export default function AddToInventoryPage() {
   const remainingToAllocate = openingQtyNum - allocatedTotal;
   const isFullyAllocated = openingQtyNum > 0 && remainingToAllocate === 0;
 
+  const allocationProduct = useMemo(() => {
+    if (selected) {
+      return {
+        title: selected.title,
+        sku: selected.sku,
+        barcode: selected.barcode,
+        brand: selected.brand,
+        categoryName: selected.categoryName,
+        heroImage: selected.heroImage,
+      };
+    }
+    if (mode === 'create' && master.name.trim()) {
+      return {
+        title: master.name.trim(),
+        sku: master.sku,
+        barcode: master.barcode,
+        brand: master.brand,
+        heroImage: master.heroImage,
+      };
+    }
+    return null;
+  }, [selected, mode, master]);
+
   const gateRequiredFields = useMemo(
     () => [
       'minStock',
@@ -565,8 +588,21 @@ export default function AddToInventoryPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {mode === 'existing' && selected && (
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3">
-              <Package className="text-emerald-600 shrink-0 mt-0.5" size={20} />
-              <div>
+              <div className="relative h-14 w-14 flex-shrink-0 rounded-lg overflow-hidden bg-white border border-emerald-200">
+                {selected.heroImage ? (
+                  <img
+                    src={selected.heroImage}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-emerald-300">
+                    <Package size={22} />
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
                 <p className="font-semibold text-emerald-900">{selected.title}</p>
                 <p className="text-sm text-emerald-700">
                   SKU {selected.sku} · {selected.brand}
@@ -808,6 +844,8 @@ export default function AddToInventoryPage() {
             onSave={handleAllocationSave}
             showInventoryRules={showFullOpeningGate}
             stockUnit={selected?.stockUnit || master.unit || 'units'}
+            product={allocationProduct}
+            productId={selected?._id || null}
           />
 
           <div className="flex justify-end gap-3">

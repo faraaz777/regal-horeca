@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
+import Image from 'next/image';
 import {
   Box,
   RotateCcw,
@@ -12,11 +13,13 @@ import {
   MapPin,
   Info,
   PackageOpen,
+  Package,
   X,
   Loader2,
 } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
 import { validateLocationSelectionClient } from '@/lib/client/locationCascadeApi';
+import { fetchCascadeRacks } from '@/lib/client/locationCascadeApi';
 import LocationSelector from '@/components/admin/inventory/LocationSelector';
 import { formatRackDisplayName } from '@/lib/shared/locationDisplay';
 import {
@@ -24,6 +27,8 @@ import {
   DEAD_STOCK_PERIOD_LABELS,
   STATUS_BUCKETS,
   STATUS_BUCKET_LABELS,
+  MAX_PRODUCTS_PER_RACK,
+  RACKS_PER_FLOOR,
 } from '@/lib/shared/inventoryConstants';
 
 const fetcher = (url) => adminJson(url);
@@ -84,6 +89,63 @@ const inputClass =
 const selectClass =
   'w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent disabled:bg-gray-50 disabled:text-gray-400';
 
+const blurDataURL =
+  'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q==';
+
+function ProductInfoBanner({ product, stockUnit }) {
+  if (!product?.title) return null;
+
+  const meta = [
+    product.sku && `SKU ${product.sku}`,
+    product.barcode && `Barcode ${product.barcode}`,
+    product.brand,
+    product.categoryName,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  return (
+    <section className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 shadow-sm">
+      <p className="text-[11px] font-bold uppercase tracking-widest text-gray-800 mb-3">
+        Product
+      </p>
+      <div className="flex items-start gap-4">
+        <div className="relative h-16 w-16 sm:h-20 sm:w-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
+          {product.heroImage ? (
+            <Image
+              src={product.heroImage}
+              alt={product.title}
+              fill
+              sizes="80px"
+              unoptimized
+              className="object-cover"
+              placeholder="blur"
+              blurDataURL={blurDataURL}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-300">
+              <Package size={28} />
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-lg font-bold text-gray-900 leading-tight truncate">{product.title}</h3>
+          {meta && <p className="text-sm text-gray-500 mt-1">{meta}</p>}
+          {stockUnit && (
+            <p className="text-xs font-medium text-gray-400 mt-1">Stock unit: {stockUnit}</p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function rackAcceptsProduct(rack, productId) {
+  if (!rack?.isFull) return true;
+  if (!productId) return false;
+  return (rack.productIds || []).includes(String(productId));
+}
+
 /**
  * Modal for allocating master-pool opening stock across branch › floor › rack.
  */
@@ -94,6 +156,8 @@ export default function AllocateStockToRacksModal({
   onSave,
   showInventoryRules = true,
   stockUnit = 'units',
+  product = null,
+  productId = null,
 }) {
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [draftQty, setDraftQty] = useState('');
@@ -146,6 +210,13 @@ export default function AllocateStockToRacksModal({
     { revalidateOnFocus: false }
   );
   const locationItems = locationItemsData?.items || [];
+
+  const { data: draftRackData } = useSWR(
+    isOpen && draft.floorId ? ['allocate-racks', draft.floorId] : null,
+    () => fetchCascadeRacks(draft.floorId),
+    { revalidateOnFocus: false }
+  );
+  const draftRacks = draftRackData?.racks || [];
 
   const updateForm = useCallback((key, val) => {
     setForm((p) => ({ ...p, [key]: val }));
@@ -208,6 +279,11 @@ export default function AllocateStockToRacksModal({
       toast.error('This location is already added');
       return;
     }
+    const rack = draftRacks.find((r) => String(r._id) === String(draft.rackId));
+    if (rack && !rackAcceptsProduct(rack, productId)) {
+      toast.error(`Rack is full — maximum ${MAX_PRODUCTS_PER_RACK} products per rack`);
+      return;
+    }
     const next = [...locations, { ...draft, qty }];
     setLocations(next);
     if (!previewLocationId) {
@@ -216,7 +292,7 @@ export default function AllocateStockToRacksModal({
     setDraft(EMPTY_DRAFT);
     setDraftQty('');
     setSelectorKey((k) => k + 1);
-  }, [draft, draftQty, form.selectedLocations, poolReady, previewLocationId, remaining, setLocations]);
+  }, [draft, draftQty, draftRacks, form.selectedLocations, poolReady, previewLocationId, productId, remaining, setLocations]);
 
   const removeLocation = useCallback(
     (locationId) => {
@@ -383,6 +459,8 @@ export default function AllocateStockToRacksModal({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-4">
+          <ProductInfoBanner product={product} stockUnit={stockUnit} />
+
           {/* Stock overview */}
           <section className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 shadow-sm">
             <SectionHeading
@@ -461,7 +539,7 @@ export default function AllocateStockToRacksModal({
             <SectionHeading
               icon={Plus}
               title="Add to rack"
-              subtitle="Pick a branch, floor, rack and quantity to build your allocation list"
+              subtitle={`Pick a branch, floor, rack and quantity — each floor has ${RACKS_PER_FLOOR} racks, each rack holds up to ${MAX_PRODUCTS_PER_RACK} products`}
             />
             <div className={rackSectionDisabled ? 'opacity-50 pointer-events-none' : ''}>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
@@ -659,10 +737,11 @@ export default function AllocateStockToRacksModal({
                     will be the first.
                   </p>
                 ) : (
-                  <div className="max-h-32 overflow-y-auto">
+                  <div className="max-h-40 overflow-y-auto">
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="text-left text-[11px] font-bold text-gray-700 uppercase tracking-wider">
+                          <th className="py-1 pr-2 w-10" />
                           <th className="py-1 pr-2">Name</th>
                           <th className="py-1 pr-2">SKU</th>
                           <th className="py-1">Qty</th>
@@ -671,6 +750,24 @@ export default function AllocateStockToRacksModal({
                       <tbody className="divide-y divide-gray-50">
                         {locationItems.map((item) => (
                           <tr key={item._id}>
+                            <td className="py-1.5 pr-2">
+                              <div className="relative h-8 w-8 rounded overflow-hidden bg-gray-100 border border-gray-200">
+                                {item.heroImage ? (
+                                  <Image
+                                    src={item.heroImage}
+                                    alt=""
+                                    fill
+                                    sizes="32px"
+                                    unoptimized
+                                    className="object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-gray-300">
+                                    <Package size={12} />
+                                  </div>
+                                )}
+                              </div>
+                            </td>
                             <td className="py-1.5 pr-2 font-medium text-gray-800 truncate max-w-[140px]">
                               {item.title}
                             </td>

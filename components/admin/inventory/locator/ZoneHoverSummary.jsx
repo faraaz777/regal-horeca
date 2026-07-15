@@ -2,20 +2,13 @@
 
 import { memo } from 'react';
 
-function ZoneHoverSummary({ zone, summary, zoom }) {
+function ZoneHoverSummary({ zone, summary }) {
   if (!summary) return null;
 
   const s = summary;
-  const scale = Math.min(1.1, Math.max(0.85, 1 / (zoom || 1)));
 
   return (
-    <div
-      className="absolute left-1/2 bottom-full z-50 pointer-events-none mb-2"
-      style={{
-        transform: `translateX(-50%) scale(${scale})`,
-        transformOrigin: 'bottom center',
-      }}
-    >
+    <div className="absolute left-1/2 bottom-full z-50 pointer-events-none mb-2 -translate-x-1/2">
       <div className="bg-gray-900/95 text-white text-xs rounded-lg px-3 py-2.5 shadow-xl min-w-[200px] border border-gray-700">
         <p className="font-bold text-sm mb-1.5">{zone.name || zone.code || 'Zone'}</p>
         <ul className="space-y-0.5 text-gray-200">

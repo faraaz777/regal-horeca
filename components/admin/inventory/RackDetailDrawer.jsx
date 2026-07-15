@@ -11,17 +11,6 @@ import { STATUS_BUCKET_LABELS } from '@/lib/shared/inventoryConstants';
 
 const fetcher = (url) => adminJson(url);
 
-function formatTs(value) {
-  if (!value) return '—';
-  return new Date(value).toLocaleString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 export default function RackDetailDrawer({ rackId, canEdit = false, onClose, onCapacitySaved }) {
   const { data, isLoading, error, mutate } = useSWR(
     rackId ? `/api/admin/inventory/locations/${rackId}/locator-detail` : null,
@@ -31,7 +20,6 @@ export default function RackDetailDrawer({ rackId, canEdit = false, onClose, onC
 
   const rack = data?.rack;
   const items = data?.items || [];
-  const lastMovement = data?.lastMovement;
   const statusStyle = rack ? getRackStatusStyle(rack.stockStatus) : null;
 
   const [capacityInput, setCapacityInput] = useState('');
@@ -79,7 +67,7 @@ export default function RackDetailDrawer({ rackId, canEdit = false, onClose, onC
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-5">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {isLoading && (
             <p className="text-sm text-gray-500 flex items-center gap-2">
               <Loader2 size={16} className="animate-spin" /> Loading…
@@ -90,70 +78,76 @@ export default function RackDetailDrawer({ rackId, canEdit = false, onClose, onC
           {rack && (
             <>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Location</p>
-                <p className="text-sm font-mono text-gray-900 mt-1">{rack.displayPath}</p>
-                <p className="text-xs text-gray-500 font-mono mt-0.5">{rack.displayPathShort}</p>
-                {statusStyle && (
-                  <span
-                    className={`inline-flex mt-2 px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusStyle.fill} ${statusStyle.text}`}
-                  >
-                    {statusStyle.label}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Location</p>
+                    <p className="text-sm font-mono text-gray-900 mt-1 truncate">{rack.displayPath}</p>
+                    <p className="text-xs text-gray-500 font-mono mt-0.5 truncate">{rack.displayPathShort}</p>
+                  </div>
+                  {statusStyle && (
+                    <span
+                      className={`shrink-0 inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusStyle.fill} ${statusStyle.text}`}
+                    >
+                      {statusStyle.label}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs mt-2">
+                  <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold">
+                    {rack.sellableQty} Sellable
                   </span>
-                )}
-              </div>
-
-              <div className="flex flex-wrap gap-2 text-xs">
-                <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold">
-                  {rack.sellableQty} Sellable
-                </span>
-                {rack.holdQty > 0 && (
-                  <span className="px-2 py-1 rounded-full bg-amber-100 text-amber-800 font-semibold">
-                    {rack.holdQty} Hold
-                  </span>
-                )}
-                {rack.scrapQty > 0 && (
-                  <span className="px-2 py-1 rounded-full bg-red-100 text-red-800 font-semibold">
-                    {rack.scrapQty} Scrap
-                  </span>
-                )}
+                  {rack.holdQty > 0 && (
+                    <span className="px-2 py-1 rounded-full bg-amber-100 text-amber-800 font-semibold">
+                      {rack.holdQty} Hold
+                    </span>
+                  )}
+                  {rack.scrapQty > 0 && (
+                    <span className="px-2 py-1 rounded-full bg-red-100 text-red-800 font-semibold">
+                      {rack.scrapQty} Scrap
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2">
-                  Capacity {fillPctLabel && <span className="text-gray-400 normal-case">· {fillPctLabel}</span>}
-                </p>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">
+                    Capacity {fillPctLabel && <span className="text-gray-400 normal-case">· {fillPctLabel}</span>}
+                  </p>
+                  {!canEdit && (
+                    <span className="text-xs text-gray-700">
+                      {rack.capacity != null ? `${rack.totalQty} / ${rack.capacity} units` : 'Not set'}
+                    </span>
+                  )}
+                </div>
                 {rack.capacity != null && (
-                  <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden mb-2">
+                  <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-sky-500"
                       style={{ width: `${Math.min(100, Math.round((rack.fillPct || 0) * 100))}%` }}
                     />
                   </div>
                 )}
-                {canEdit ? (
-                  <div className="flex items-center gap-2">
+                {canEdit && (
+                  <div className="flex items-center gap-2 mt-2">
                     <input
                       type="number"
                       min="0"
                       value={capacityInput}
                       onChange={(e) => setCapacityInput(e.target.value)}
                       placeholder="Max units"
-                      className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                      className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                     />
                     <button
                       type="button"
                       onClick={handleSaveCapacity}
                       disabled={savingCapacity}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
                     >
                       {savingCapacity ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                       Save
                     </button>
                   </div>
-                ) : (
-                  <p className="text-sm text-gray-700">
-                    {rack.capacity != null ? `${rack.totalQty} / ${rack.capacity} units` : 'Not set'}
-                  </p>
                 )}
               </div>
 
@@ -176,26 +170,6 @@ export default function RackDetailDrawer({ rackId, canEdit = false, onClose, onC
                       </li>
                     ))}
                   </ul>
-                )}
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2">
-                  Last movement
-                </p>
-                {lastMovement ? (
-                  <div className="text-sm border border-gray-200 rounded-lg p-3 bg-gray-50">
-                    <p className="font-medium text-gray-900">{lastMovement.productTitle}</p>
-                    <p className="text-xs text-gray-500 font-mono">{lastMovement.productSku}</p>
-                    <p className="text-xs mt-1 text-gray-700">
-                      {lastMovement.qty > 0 ? '+' : ''}
-                      {lastMovement.qty} · {lastMovement.type}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">{formatTs(lastMovement.createdAt)}</p>
-                    <p className="text-xs text-gray-500">By {lastMovement.performedByName}</p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-400">No ledger entries</p>
                 )}
               </div>
 

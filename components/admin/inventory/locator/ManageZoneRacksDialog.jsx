@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
 import { Loader2, Search, X } from 'lucide-react';
@@ -21,6 +21,8 @@ const FILTERS = [
   { id: 'assigned_elsewhere', label: 'Other zones' },
 ];
 
+const UNDO_TOAST_MS = 10000;
+
 export default function ManageZoneRacksDialog({
   open,
   onClose,
@@ -36,6 +38,8 @@ export default function ManageZoneRacksDialog({
   const [statusFilter, setStatusFilter] = useState('all');
   const [selected, setSelected] = useState(new Set());
   const [busy, setBusy] = useState(false);
+  const [removeConfirm, setRemoveConfirm] = useState(null);
+  const undoingRef = useRef(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 250);
@@ -47,6 +51,7 @@ export default function ManageZoneRacksDialog({
       setSearch('');
       setSelected(new Set());
       setStatusFilter('all');
+      setRemoveConfirm(null);
     }
   }, [open]);
 
@@ -83,6 +88,69 @@ export default function ManageZoneRacksDialog({
     });
   };
 
+  const refreshAfterChange = useCallback(async () => {
+    await mutate();
+    onUpdated?.();
+  }, [mutate, onUpdated]);
+
+  const handleUndoRemove = useCallback(
+    async ({ rackIds, zoneId, zoneName, versionAfterRemove, count }) => {
+      if (undoingRef.current) return;
+      undoingRef.current = true;
+      try {
+        await assignRacksToZone(floorId, zoneId, {
+          rackIds,
+          layoutVersion: versionAfterRemove,
+        });
+        toast.success(
+          count === 1
+            ? `Restored rack to ${zoneName}`
+            : `Restored ${count} racks to ${zoneName}`
+        );
+        await refreshAfterChange();
+      } catch (err) {
+        toast.error(err.message || 'Undo failed — reassign the rack from Manage racks');
+      } finally {
+        undoingRef.current = false;
+      }
+    },
+    [floorId, refreshAfterChange]
+  );
+
+  const showRemovedToast = useCallback(
+    ({ rackIds, zoneId, zoneName, versionAfterRemove, count }) => {
+      toast(
+        (t) => (
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-800">
+              {count === 1
+                ? `Removed rack from ${zoneName}`
+                : `Removed ${count} racks from ${zoneName}`}
+            </span>
+            <button
+              type="button"
+              className="shrink-0 text-sm font-bold text-emerald-700 hover:text-emerald-800 underline underline-offset-2"
+              onClick={() => {
+                toast.dismiss(t.id);
+                void handleUndoRemove({
+                  rackIds,
+                  zoneId,
+                  zoneName,
+                  versionAfterRemove,
+                  count,
+                });
+              }}
+            >
+              Undo
+            </button>
+          </div>
+        ),
+        { duration: UNDO_TOAST_MS, position: 'top-center' }
+      );
+    },
+    [handleUndoRemove]
+  );
+
   const handleAssign = async () => {
     const toAssign = selectedItems.filter((i) => i.allocationStatus === 'available');
     if (!toAssign.length) {
@@ -97,8 +165,7 @@ export default function ManageZoneRacksDialog({
       });
       toast.success(`Assigned ${toAssign.length} rack(s)`);
       setSelected(new Set());
-      await mutate();
-      onUpdated?.();
+      await refreshAfterChange();
     } catch (err) {
       toast.error(err.message || 'Assign failed');
     } finally {
@@ -127,8 +194,7 @@ export default function ManageZoneRacksDialog({
       });
       toast.success(`Moved ${item.code} to ${zone.name}`);
       setSelected(new Set());
-      await mutate();
-      onUpdated?.();
+      await refreshAfterChange();
     } catch (err) {
       toast.error(err.message || 'Move failed');
     } finally {
@@ -136,30 +202,41 @@ export default function ManageZoneRacksDialog({
     }
   };
 
-  const handleRemove = async () => {
+  const requestRemove = () => {
     const toRemove = selectedItems.filter((i) => i.allocationStatus === 'assigned_here');
     if (!toRemove.length) {
       toast.error('Select racks assigned to this zone');
       return;
     }
-
     const totalUnits = toRemove.reduce((s, i) => s + (i.totalQty || 0), 0);
-    let msg = `Remove ${toRemove.length} rack(s) from this zone?`;
-    if (totalUnits > 0) {
-      msg = `Selected racks contain ${totalUnits.toLocaleString()} units across products.\n\nRemoving from the visual zone will NOT move or delete stock.\n\nContinue?`;
-    }
-    if (!window.confirm(msg)) return;
+    setRemoveConfirm({ items: toRemove, totalUnits });
+  };
+
+  const confirmRemove = async () => {
+    if (!removeConfirm?.items?.length) return;
+    const toRemove = removeConfirm.items;
+    const rackIds = toRemove.map((i) => i.rackId);
+    const zoneId = zone.id;
+    const zoneName = zone.name;
+    const versionAtRemove = layoutVersion;
 
     setBusy(true);
     try {
-      await removeRacksFromZone(floorId, zone.id, {
-        rackIds: toRemove.map((i) => i.rackId),
-        layoutVersion,
+      await removeRacksFromZone(floorId, zoneId, {
+        rackIds,
+        layoutVersion: versionAtRemove,
       });
-      toast.success(`Removed ${toRemove.length} rack(s) from zone`);
+      setRemoveConfirm(null);
       setSelected(new Set());
-      await mutate();
-      onUpdated?.();
+      await refreshAfterChange();
+      // remove increments layout version once — undo must use that next version
+      showRemovedToast({
+        rackIds,
+        zoneId,
+        zoneName,
+        versionAfterRemove: versionAtRemove + 1,
+        count: rackIds.length,
+      });
     } catch (err) {
       toast.error(err.message || 'Remove failed');
     } finally {
@@ -175,7 +252,7 @@ export default function ManageZoneRacksDialog({
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/45">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden relative">
         <div className="flex items-start justify-between px-4 py-3 border-b border-gray-100 shrink-0">
           <div>
             <h2 className="text-sm font-bold text-gray-900">
@@ -301,11 +378,63 @@ export default function ManageZoneRacksDialog({
             <button
               type="button"
               disabled={busy || !hasHere}
-              onClick={handleRemove}
+              onClick={requestRemove}
               className="px-3 py-1.5 text-xs font-bold rounded-md border border-red-200 text-red-700 disabled:opacity-40"
             >
               Remove from zone
             </button>
+          </div>
+        )}
+
+        {removeConfirm && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 p-4">
+            <div
+              role="alertdialog"
+              aria-labelledby="remove-racks-title"
+              aria-describedby="remove-racks-desc"
+              className="bg-white rounded-xl shadow-xl w-full max-w-sm p-4 space-y-3"
+            >
+              <h3 id="remove-racks-title" className="text-sm font-bold text-gray-900">
+                Remove from zone?
+              </h3>
+              <div id="remove-racks-desc" className="text-xs text-gray-600 space-y-2">
+                <p>
+                  Remove{' '}
+                  <strong>
+                    {removeConfirm.items.length === 1
+                      ? formatRackDisplayName(removeConfirm.items[0])
+                      : `${removeConfirm.items.length} racks`}
+                  </strong>{' '}
+                  from <strong>{zone.name}</strong>?
+                </p>
+                {removeConfirm.totalUnits > 0 && (
+                  <p className="rounded-md bg-amber-50 border border-amber-100 px-2.5 py-2 text-amber-900">
+                    These racks hold {removeConfirm.totalUnits.toLocaleString()} units. Stock is not
+                    moved or deleted — only the zone placement is cleared.
+                  </p>
+                )}
+                <p className="text-gray-500">You can undo this right after removing.</p>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setRemoveConfirm(null)}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={confirmRemove}
+                  className="px-3 py-1.5 text-xs font-bold rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 inline-flex items-center gap-1.5"
+                >
+                  {busy && <Loader2 size={12} className="animate-spin" />}
+                  Yes, remove
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

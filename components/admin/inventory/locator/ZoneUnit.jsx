@@ -15,6 +15,7 @@ function ZoneUnit({
   summary,
   zoom,
   onSelect,
+  onInteractionStart,
   onChange,
   onChangeEnd,
   dimmed,
@@ -23,6 +24,7 @@ function ZoneUnit({
   const latestRef = useRef(zone);
   latestRef.current = zone;
   const dragMoved = useRef(false);
+  const historyPushed = useRef(false);
   const hoverTimer = useRef(null);
   const [hovered, setHovered] = useState(false);
 
@@ -52,6 +54,7 @@ function ZoneUnit({
       if (!canEditZone) return;
       e.stopPropagation();
       dragMoved.current = false;
+      historyPushed.current = false;
 
       const startX = e.clientX;
       const startY = e.clientY;
@@ -60,7 +63,13 @@ function ZoneUnit({
       const onMove = (ev) => {
         const dx = (ev.clientX - startX) / zoom;
         const dy = (ev.clientY - startY) / zoom;
-        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragMoved.current = true;
+        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+          if (!historyPushed.current) {
+            historyPushed.current = true;
+            onInteractionStart?.();
+          }
+          dragMoved.current = true;
+        }
         const next = { ...zone, x: Math.max(0, origin.x + dx), y: Math.max(0, origin.y + dy) };
         latestRef.current = next;
         onChange?.(next);
@@ -75,13 +84,14 @@ function ZoneUnit({
       window.addEventListener('mousemove', onMove);
       window.addEventListener('mouseup', onUp);
     },
-    [canEditZone, onChange, onChangeEnd, zone, zoom]
+    [canEditZone, onChange, onChangeEnd, onInteractionStart, zone, zoom]
   );
 
   const handleResizeMouseDown = useCallback(
     (e) => {
       if (!canEditZone) return;
       e.stopPropagation();
+      historyPushed.current = false;
       const startX = e.clientX;
       const startY = e.clientY;
       const origin = { width: zone.width, height: zone.height };
@@ -89,6 +99,10 @@ function ZoneUnit({
       const onMove = (ev) => {
         const dw = (ev.clientX - startX) / zoom;
         const dh = (ev.clientY - startY) / zoom;
+        if (!historyPushed.current) {
+          historyPushed.current = true;
+          onInteractionStart?.();
+        }
         const next = {
           ...zone,
           width: Math.max(40, origin.width + dw),
@@ -107,7 +121,7 @@ function ZoneUnit({
       window.addEventListener('mousemove', onMove);
       window.addEventListener('mouseup', onUp);
     },
-    [canEditZone, onChange, onChangeEnd, zone, zoom]
+    [canEditZone, onChange, onChangeEnd, onInteractionStart, zone, zoom]
   );
 
   const handleClick = useCallback(
@@ -153,13 +167,14 @@ function ZoneUnit({
       />
 
       {hovered && !suppressHover && !selected && (
-        <ZoneHoverSummary zone={zone} summary={summary || zone.summary} zoom={zoom} />
+        <ZoneHoverSummary zone={zone} summary={summary || zone.summary} />
       )}
 
-      <div
-        className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-white/85 text-[10px] font-semibold text-gray-800 shadow-sm pointer-events-none"
-        style={{ transform: `scale(${Math.min(1.2, Math.max(0.75, 1 / zoom))})`, transformOrigin: 'top left' }}
-      >
+      {/*
+        Label lives inside the canvas zoom transform — do not counter-scale with 1/zoom,
+        or it stays screen-sized and bulges when zoomed out.
+      */}
+      <div className="absolute top-1 left-1 max-w-[calc(100%-8px)] px-1.5 py-0.5 rounded bg-white/85 text-[10px] font-semibold text-gray-800 shadow-sm pointer-events-none whitespace-nowrap overflow-hidden text-ellipsis">
         {label}
       </div>
 

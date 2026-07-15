@@ -427,6 +427,21 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
       .sort((a, b) => (b.qty || 0) - (a.qty || 0));
   }, [stockRows]);
 
+  const existingLocations = useMemo(() => {
+    const byLocation = new Map();
+    for (const row of stockRows) {
+      if (!row.locationId || (row.qty || 0) <= 0) continue;
+      const locationId = String(row.locationId);
+      const current = byLocation.get(locationId);
+      if (current) {
+        current.qty += row.qty || 0;
+      } else {
+        byLocation.set(locationId, { ...row, locationId, qty: row.qty || 0 });
+      }
+    }
+    return [...byLocation.values()].sort((a, b) => (b.qty || 0) - (a.qty || 0));
+  }, [stockRows]);
+
   const allowedRackIdsForMinus = useMemo(
     () => [...new Set(minusLocationsForBucket.map((r) => r.rackId).filter(Boolean))],
     [minusLocationsForBucket]
@@ -444,11 +459,24 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
     );
   }, [minusLocationsForBucket, form.locationId]);
 
+  const selectedTransferFromRow = useMemo(() => {
+    if (!form.fromLocationId) return null;
+    return sellableLocations.find(
+      (r) => String(r.locationId) === String(form.fromLocationId)
+    );
+  }, [sellableLocations, form.fromLocationId]);
+
   const availableAtLocation = selectedMinusRow?.qty ?? 0;
+  const availableAtTransferFrom = selectedTransferFromRow?.qty ?? 0;
   const requestedQty = Number(form.quantity) || 0;
   const minusExceedsStock =
     tab === 'minus' && (availableAtLocation <= 0 || requestedQty > availableAtLocation);
+  const transferExceedsStock =
+    tab === 'transfer' &&
+    (availableAtTransferFrom <= 0 || requestedQty > availableAtTransferFrom);
   const minusMissingLocation = tab === 'minus' && minusLocationsForBucket.length > 0 && !form.locationId;
+  const transferMissingFrom =
+    tab === 'transfer' && sellableLocations.length > 0 && !form.fromLocationId;
 
   useEffect(() => {
     if (tab !== 'minus' || !minusLocationsForBucket.length) return;
@@ -466,12 +494,36 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
     }
   }, [tab, form.statusBucket, minusLocationsForBucket, form.locationId]);
 
+  // Prefill From location from known sellable stock — no manual re-entry needed
+  useEffect(() => {
+    if (tab !== 'transfer' || !sellableLocations.length) return;
+    const currentValid = sellableLocations.some(
+      (r) => String(r.locationId) === String(form.fromLocationId)
+    );
+    if (!currentValid) {
+      const first = sellableLocations[0];
+      setForm((p) => ({ ...p, fromLocationId: String(first.locationId) }));
+      setFromSel({
+        branchId: first.branchId || null,
+        floorId: first.floorId || null,
+        rackId: first.rackId || null,
+      });
+    }
+  }, [tab, sellableLocations, form.fromLocationId]);
+
   useEffect(() => {
     if (tab !== 'minus' || !availableAtLocation) return;
     if (requestedQty > availableAtLocation) {
       setForm((p) => ({ ...p, quantity: String(availableAtLocation) }));
     }
   }, [tab, form.locationId, availableAtLocation, requestedQty]);
+
+  useEffect(() => {
+    if (tab !== 'transfer' || !availableAtTransferFrom) return;
+    if (requestedQty > availableAtTransferFrom) {
+      setForm((p) => ({ ...p, quantity: String(availableAtTransferFrom) }));
+    }
+  }, [tab, form.fromLocationId, availableAtTransferFrom, requestedQty]);
 
   const reasonOptions = tab === 'add' ? ADD_MOVEMENT_REASONS : MOVEMENT_REASONS;
   const reasonLabels = tab === 'add' ? ADD_MOVEMENT_REASON_LABELS : MOVEMENT_REASON_LABELS;
@@ -517,6 +569,26 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
     const locId = String(row.locationId);
     update('locationId', locId);
     setLocationSel({
+      branchId: row.branchId || null,
+      floorId: row.floorId || null,
+      rackId: row.rackId || null,
+    });
+  };
+
+  const selectAddLocation = (row) => {
+    const locId = String(row.locationId);
+    update('locationId', locId);
+    setLocationSel({
+      branchId: row.branchId || null,
+      floorId: row.floorId || null,
+      rackId: row.rackId || null,
+    });
+  };
+
+  const selectTransferFromRow = (row) => {
+    const locId = String(row.locationId);
+    update('fromLocationId', locId);
+    setFromSel({
       branchId: row.branchId || null,
       floorId: row.floorId || null,
       rackId: row.rackId || null,
@@ -772,7 +844,13 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
                 <input
                   type="number"
                   min="1"
-                  max={tab === 'minus' && availableAtLocation > 0 ? availableAtLocation : undefined}
+                  max={
+                    tab === 'minus' && availableAtLocation > 0
+                      ? availableAtLocation
+                      : tab === 'transfer' && availableAtTransferFrom > 0
+                        ? availableAtTransferFrom
+                        : undefined
+                  }
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
                   value={form.quantity}
                   onChange={(e) => update('quantity', e.target.value)}
@@ -786,6 +864,17 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
                     {availableAtLocation > 0
                       ? `Max ${availableAtLocation} at selected location`
                       : 'No stock at selected location'}
+                  </p>
+                )}
+                {tab === 'transfer' && form.fromLocationId && (
+                  <p
+                    className={`text-[11px] mt-1 ${
+                      transferExceedsStock ? 'text-red-600 font-medium' : 'text-gray-500'
+                    }`}
+                  >
+                    {availableAtTransferFrom > 0
+                      ? `Max ${availableAtTransferFrom} at from location`
+                      : 'No sellable stock at from location'}
                   </p>
                 )}
               </Field>
@@ -891,6 +980,41 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
               </div>
             )}
 
+            {tab === 'add' && !isLoading && existingLocations.length > 0 && (
+              <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2.5">
+                <p className="text-[10px] font-semibold text-emerald-800 uppercase tracking-wide mb-1.5">
+                  Add to an existing location
+                </p>
+                <ul className="space-y-1">
+                  {existingLocations.map((row) => {
+                    const locId = String(row.locationId);
+                    const isSelected = form.locationId === locId;
+                    return (
+                      <li key={locId}>
+                        <button
+                          type="button"
+                          onClick={() => selectAddLocation(row)}
+                          className={`w-full flex items-center justify-between gap-3 text-left text-xs px-2 py-1.5 rounded-md border transition-colors ${
+                            isSelected
+                              ? 'border-emerald-300 bg-white text-emerald-950 font-medium'
+                              : 'border-transparent text-emerald-900 hover:bg-white/80'
+                          }`}
+                        >
+                          <span className="truncate">{row.locationPath || '—'}</span>
+                          <span className="font-mono font-semibold shrink-0">
+                            {row.qty} stored
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="text-[10px] text-emerald-700 mt-1.5">
+                  Or choose a different location below.
+                </p>
+              </div>
+            )}
+
             {(tab === 'add' || tab === 'minus' || tab === 'status_change') && (
               <Field
                 label={tab === 'minus' ? 'Remove from location' : 'Location'}
@@ -912,6 +1036,41 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
 
             {tab === 'transfer' && (
               <div className="space-y-4">
+                {!isLoading && (
+                  <div className="rounded-lg border border-sky-100 bg-sky-50/60 px-3 py-2.5">
+                    <p className="text-[10px] font-semibold text-sky-800 uppercase tracking-wide mb-1.5">
+                      Sellable stock at locations
+                    </p>
+                    {sellableLocations.length === 0 ? (
+                      <p className="text-xs text-sky-900">
+                        No sellable stock at any location to transfer from.
+                      </p>
+                    ) : (
+                      <ul className="space-y-1">
+                        {sellableLocations.map((row) => {
+                          const locId = String(row.locationId);
+                          const isSelected = String(form.fromLocationId) === locId;
+                          return (
+                            <li key={locId}>
+                              <button
+                                type="button"
+                                onClick={() => selectTransferFromRow(row)}
+                                className={`w-full text-left text-xs px-2 py-1.5 rounded-md border transition-colors ${
+                                  isSelected
+                                    ? 'border-sky-300 bg-white text-sky-950 font-medium'
+                                    : 'border-transparent text-sky-900 hover:bg-white/80'
+                                }`}
+                              >
+                                <span className="truncate block">{row.locationPath || '—'}</span>
+                                <span className="font-mono font-semibold">{row.qty}</span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                )}
                 <Field label="From location" required>
                   <LocationSelector
                     selectedBranchId={fromSel.branchId}
@@ -966,7 +1125,13 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
                 (minusLocationsForBucket.length === 0 ||
                   minusMissingLocation ||
                   minusExceedsStock ||
-                  requestedQty <= 0))
+                  requestedQty <= 0)) ||
+              (tab === 'transfer' &&
+                (sellableLocations.length === 0 ||
+                  transferMissingFrom ||
+                  transferExceedsStock ||
+                  requestedQty <= 0 ||
+                  !form.toLocationId))
             }
             onClick={handlePost}
             className="px-4 py-2 text-sm font-semibold text-white bg-emerald-800 rounded-lg hover:bg-emerald-900 disabled:opacity-50 inline-flex items-center gap-2"

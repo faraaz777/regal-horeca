@@ -135,6 +135,8 @@ export default function LocatorCanvas({ role }) {
   const dragOffsets = useRef(new Map());
   const historyPast = useRef([]);
   const historyFuture = useRef([]);
+  // Refs alone don't re-render — tick bumps so Undo/Redo enabled state updates
+  const [historyTick, setHistoryTick] = useState(0);
   const autosaveTimer = useRef(null);
 
   const layoutUrl = floorId ? `/api/admin/inventory/locations/${floorId}/layout` : null;
@@ -156,7 +158,14 @@ export default function LocatorCanvas({ role }) {
     });
     if (historyPast.current.length > HISTORY_LIMIT) historyPast.current.shift();
     historyFuture.current = [];
+    setHistoryTick((t) => t + 1);
   }, [localLayout, localRacks, localUnplaced]);
+
+  const clearHistory = useCallback(() => {
+    historyPast.current = [];
+    historyFuture.current = [];
+    setHistoryTick((t) => t + 1);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -216,10 +225,13 @@ export default function LocatorCanvas({ role }) {
       setHighlightIds(new Set());
       setHighlightZoneIds(new Set());
       setSaveStatus('saved');
-      historyPast.current = [];
-      historyFuture.current = [];
     }
   }, [layout]);
+
+  // Only reset undo stack when switching floors — not after every save/mutate
+  useEffect(() => {
+    clearHistory();
+  }, [floorId, clearHistory]);
 
   const fitToCanvas = useCallback(() => {
     const viewport = viewportRef.current;
@@ -403,6 +415,11 @@ export default function LocatorCanvas({ role }) {
     [localLayout, persistLayout]
   );
 
+  // Snapshot before zone drag/resize starts (live onChange already mutates localLayout)
+  const handleZoneInteractionStart = useCallback(() => {
+    pushHistory();
+  }, [pushHistory]);
+
   const handleCreateZoneComplete = useCallback(
     async (rect) => {
       if (rect.width < 20 || rect.height < 20) return;
@@ -567,7 +584,6 @@ export default function LocatorCanvas({ role }) {
       if (!data?.rack || !editMode || activeTool === 'pan' || data.type === 'unplaced') return;
 
       const rackId = data.rack._id;
-      pushHistory();
 
       const idsToMove =
         selectedIds.has(rackId) && selectedIds.size > 1 ? [...selectedIds] : [rackId];
@@ -601,6 +617,7 @@ export default function LocatorCanvas({ role }) {
 
       if (!updates.length) return;
 
+      pushHistory();
       setLocalRacks(nextRacks);
       await persistPositions(updates);
     },
@@ -773,7 +790,7 @@ export default function LocatorCanvas({ role }) {
         ? 'cursor-crosshair'
         : '';
 
-  const handleUndo = () => {
+  const handleUndo = useCallback(() => {
     const prev = historyPast.current.pop();
     if (!prev) return;
     historyFuture.current.push({
@@ -784,10 +801,11 @@ export default function LocatorCanvas({ role }) {
     setLocalRacks(prev.racks);
     setLocalUnplaced(prev.unplaced);
     setLocalLayout(prev.layout);
+    setHistoryTick((t) => t + 1);
     scheduleAutosave();
-  };
+  }, [localLayout, localRacks, localUnplaced, scheduleAutosave]);
 
-  const handleRedo = () => {
+  const handleRedo = useCallback(() => {
     const next = historyFuture.current.pop();
     if (!next) return;
     historyPast.current.push({
@@ -798,8 +816,9 @@ export default function LocatorCanvas({ role }) {
     setLocalRacks(next.racks);
     setLocalUnplaced(next.unplaced);
     setLocalLayout(next.layout);
+    setHistoryTick((t) => t + 1);
     scheduleAutosave();
-  };
+  }, [localLayout, localRacks, localUnplaced, scheduleAutosave]);
 
   const handleUpload = async (file, repositionMode) => {
     const res = await uploadFloorPlanBackground(floorId, file, repositionMode);
@@ -907,6 +926,7 @@ export default function LocatorCanvas({ role }) {
         onFit={fitToCanvas}
         gridEnabled={gridEnabled}
         onToggleGrid={() => {
+          pushHistory();
           const next = {
             ...localLayout,
             canvas: { ...localLayout.canvas, gridEnabled: !gridEnabled },
@@ -926,8 +946,8 @@ export default function LocatorCanvas({ role }) {
           }
         }}
         saveStatus={saveStatus}
-        canUndo={historyPast.current.length > 0}
-        canRedo={historyFuture.current.length > 0}
+        canUndo={historyTick >= 0 && historyPast.current.length > 0}
+        canRedo={historyTick >= 0 && historyFuture.current.length > 0}
         onUndo={handleUndo}
         onRedo={handleRedo}
       />
@@ -1033,6 +1053,7 @@ export default function LocatorCanvas({ role }) {
                   zoom={zoom}
                   suppressHover={isDraggingRack || manageRacksOpen || isPanning}
                   onSelectZone={handleSelectZone}
+                  onZoneInteractionStart={handleZoneInteractionStart}
                   onZoneChange={(z) => applyZoneUpdate(z)}
                   onZoneChangeEnd={handleZoneChangeEnd}
                 />
@@ -1114,7 +1135,8 @@ export default function LocatorCanvas({ role }) {
         zone={drawerZone || selectedZone}
         layoutVersion={localLayout.version ?? layout?.layout?.version ?? 1}
         floorLabel={floorLabel}
-        canEdit={canEdit && editMode}
+        // Rack assign/move/remove is inventory ops — not tied to layout edit mode
+        canEdit={canEdit}
         onUpdated={() => mutate()}
       />
 

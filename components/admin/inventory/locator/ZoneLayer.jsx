@@ -12,6 +12,7 @@ function ZoneLayer({
   highlightZoneIds,
   zoom,
   onSelectZone,
+  onZoneInteractionStart,
   onZoneChange,
   onZoneChangeEnd,
   suppressHover,
@@ -33,6 +34,7 @@ function ZoneLayer({
           dimmed={highlightZoneIds?.size > 0 && !highlightZoneIds.has(zone.id)}
           suppressHover={suppressHover}
           onSelect={onSelectZone}
+          onInteractionStart={onZoneInteractionStart}
           onChange={onZoneChange}
           onChangeEnd={onZoneChangeEnd}
         />

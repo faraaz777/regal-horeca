@@ -19,10 +19,8 @@ const TYPE_BADGE_STYLES = {
   adjustment_minus: 'bg-red-100 text-red-800',
   transfer_out: 'bg-violet-100 text-violet-800',
   transfer_in: 'bg-violet-100 text-violet-800',
-  condition_change: 'bg-amber-100 text-amber-800',
-  reservation_hold: 'bg-orange-100 text-orange-800',
   sale_fulfill: 'bg-sky-100 text-sky-800',
-  status: 'bg-amber-100 text-amber-800',
+  sold: 'bg-sky-100 text-sky-800',
 };
 
 function formatTs(value) {

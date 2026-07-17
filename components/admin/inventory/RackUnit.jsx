@@ -19,16 +19,10 @@ function RackTooltip({ rack }) {
         <p className="font-mono font-semibold truncate">{formatRackDisplayName(rack)}</p>
         <p className="text-gray-300 mt-1">
           {rack.sellableQty > 0 && <span>{rack.sellableQty} Sellable</span>}
-          {rack.holdQty > 0 && (
+          {rack.deadStockQty > 0 && (
             <span>
               {rack.sellableQty > 0 ? ' · ' : ''}
-              {rack.holdQty} Hold
-            </span>
-          )}
-          {rack.scrapQty > 0 && (
-            <span>
-              {rack.sellableQty > 0 || rack.holdQty > 0 ? ' · ' : ''}
-              {rack.scrapQty} Scrap
+              {rack.deadStockQty} Dead stock
             </span>
           )}
           {rack.totalQty === 0 && <span>Empty</span>}

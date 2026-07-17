@@ -54,7 +54,12 @@ export async function GET(request) {
 
     const enriched = products.map((p) => {
       const pid = String(p._id);
-      const totals = stockMap.get(pid) || { sellableQty: 0, holdQty: 0, scrapQty: 0, totalQty: 0 };
+      const totals = stockMap.get(pid) || {
+        sellableQty: 0,
+        deadStockQty: 0,
+        soldQty: 0,
+        totalQty: 0,
+      };
       const hasLedger = ledgerSet.has(pid);
       const inInventory = hasLedger || totals.totalQty > 0;
       const rule = ruleByProduct.get(pid);
@@ -76,8 +81,8 @@ export async function GET(request) {
         hasStock: inInventory,
         hasInventoryRule: Boolean(rule),
         sellableQty: totals.sellableQty,
-        holdQty: totals.holdQty,
-        scrapQty: totals.scrapQty,
+        deadStockQty: totals.deadStockQty,
+        soldQty: totals.soldQty,
         totalQty: totals.totalQty,
         stockStatus: deriveStockStatus(totals.sellableQty, threshold),
       };

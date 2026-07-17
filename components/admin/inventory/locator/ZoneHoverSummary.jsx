@@ -31,11 +31,9 @@ function ZoneHoverSummary({ zone, summary }) {
               {s.rackStatusCounts.empty > 0 && `${s.rackStatusCounts.empty} empty`}
             </li>
           )}
-          {(s.stockStatusQty?.hold > 0 || s.stockStatusQty?.scrap > 0) && (
+          {(s.stockStatusQty?.dead_stock > 0) && (
             <li className="text-[10px] text-gray-400">
-              {s.stockStatusQty.hold > 0 && `${s.stockStatusQty.hold} on hold`}
-              {s.stockStatusQty.hold > 0 && s.stockStatusQty.scrap > 0 && ' · '}
-              {s.stockStatusQty.scrap > 0 && `${s.stockStatusQty.scrap} scrap`}
+              {s.stockStatusQty.dead_stock} dead stock
             </li>
           )}
         </ul>

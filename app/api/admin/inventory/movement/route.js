@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import { requireAuth } from '@/lib/server/auth/requireAuth';
 import { recordStockMovement } from '@/lib/server/inventory/inventoryService';
-import { MOVEMENT_REASONS, ADD_MOVEMENT_REASONS, STATUS_BUCKETS } from '@/lib/shared/inventoryConstants';
+import {
+  MOVEMENT_REASONS,
+  ADD_MOVEMENT_REASONS,
+  MINUS_MOVEMENT_REASONS,
+  INTAKE_STATUS_BUCKETS,
+} from '@/lib/shared/inventoryConstants';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,8 +23,6 @@ export async function POST(request) {
       action,
       quantity,
       statusBucket,
-      fromBucket,
-      toBucket,
       reason,
       remark,
       ref,
@@ -35,29 +38,40 @@ export async function POST(request) {
       );
     }
 
-    if (!['add', 'minus', 'status_change', 'transfer'].includes(action)) {
+    if (!['add', 'minus', 'transfer'].includes(action)) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
     if (reason) {
-      const allowedReasons = action === 'add' ? ADD_MOVEMENT_REASONS : MOVEMENT_REASONS;
+      const allowedReasons =
+        action === 'add'
+          ? ADD_MOVEMENT_REASONS
+          : action === 'minus'
+            ? MINUS_MOVEMENT_REASONS
+            : MOVEMENT_REASONS;
       if (!allowedReasons.includes(reason)) {
         return NextResponse.json({ error: 'Invalid reason' }, { status: 400 });
       }
     }
 
-    if (statusBucket && !STATUS_BUCKETS.includes(statusBucket)) {
-      return NextResponse.json({ error: 'Invalid status bucket' }, { status: 400 });
+    // Add: sellable | dead_stock. Minus/transfer: always sellable.
+    let effectiveBucket = 'sellable';
+    if (action === 'add') {
+      effectiveBucket = statusBucket || 'sellable';
+      if (!INTAKE_STATUS_BUCKETS.includes(effectiveBucket)) {
+        return NextResponse.json(
+          { error: 'Add stock must be sellable or dead_stock' },
+          { status: 400 }
+        );
+      }
     }
 
     const stock = await recordStockMovement({
       productId,
       action,
       quantity: Number(quantity),
-      statusBucket: statusBucket || 'sellable',
-      fromBucket: fromBucket || 'sellable',
-      toBucket: toBucket || 'sellable',
-      reason: reason || 'manual_adjustment',
+      statusBucket: effectiveBucket,
+      reason: reason || (action === 'minus' ? 'sold' : 'manual_adjustment'),
       remark: remark || '',
       ref: ref || '',
       locationId: locationId || null,

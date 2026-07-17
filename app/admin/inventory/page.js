@@ -25,8 +25,7 @@ const STATUS_LABELS = {
 };
 
 const STOCK_BUCKET_STYLES = {
-  hold: 'bg-amber-100 text-amber-800',
-  scrap: 'bg-red-100 text-red-800',
+  dead_stock: 'bg-slate-200 text-slate-800',
 };
 
 function StockStatusBadges({ item }) {
@@ -38,10 +37,10 @@ function StockStatusBadges({ item }) {
       style: STATUS_STYLES[item.stockStatus] || STATUS_STYLES.out,
     },
     {
-      key: 'hold',
-      qty: item.holdQty ?? 0,
-      label: 'Hold',
-      style: STOCK_BUCKET_STYLES.hold,
+      key: 'dead_stock',
+      qty: item.deadStockQty ?? 0,
+      label: 'Dead stock',
+      style: STOCK_BUCKET_STYLES.dead_stock,
     },
   ].filter((b) => b.qty > 0);
 
@@ -87,17 +86,12 @@ function StockLocationsCell({ item }) {
                 {loc.sellableQty} Sellable
               </span>
             )}
-            {loc.holdQty > 0 && (
-              <span className="inline-flex px-1.5 py-px rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800">
-                {loc.holdQty} Hold
+            {loc.deadStockQty > 0 && (
+              <span className="inline-flex px-1.5 py-px rounded-full text-[10px] font-semibold bg-slate-200 text-slate-800">
+                {loc.deadStockQty} Dead stock
               </span>
             )}
-            {loc.scrapQty > 0 && (
-              <span className="inline-flex px-1.5 py-px rounded-full text-[10px] font-semibold bg-red-100 text-red-800">
-                {loc.scrapQty} Scrapped
-              </span>
-            )}
-            {loc.sellableQty <= 0 && loc.holdQty <= 0 && loc.scrapQty <= 0 && (
+            {loc.sellableQty <= 0 && (loc.deadStockQty || 0) <= 0 && (
               <span className="text-[10px] text-gray-500">
                 {loc.totalQty} {unit}
               </span>
@@ -273,19 +267,27 @@ export default function AdminInventoryPage() {
               className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 min-w-[130px]"
             >
               <option value="">All conditions</option>
-              <option value="hold">On hold</option>
-              <option value="normal">Available</option>
+              <option value="NORMAL">Normal</option>
+              <option value="HAS_DEAD_STOCK">Has dead stock</option>
             </select>
           </div>
-          {canAddToInventory && (
+          <div className="flex flex-wrap gap-2">
             <Link
-              href="/admin/inventory/add"
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors"
+              href="/admin/inventory/reports"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
             >
-              <Plus size={18} />
-              Add to inventory
+              Reports
             </Link>
-          )}
+            {canAddToInventory && (
+              <Link
+                href="/admin/inventory/add"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors"
+              >
+                <Plus size={18} />
+                Add to inventory
+              </Link>
+            )}
+          </div>
         </div>
       </div>
 

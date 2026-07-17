@@ -143,7 +143,7 @@ export default function InventoryRequestsPage() {
                 onClick={() => handleReview('fulfill')}
                 className="w-full py-2 bg-black text-white rounded text-sm disabled:opacity-50"
               >
-                Mark fulfilled (deduct hold)
+                Mark fulfilled (record sale)
               </button>
             )}
 

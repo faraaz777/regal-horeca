@@ -112,24 +112,15 @@ export default function ZoneDetailDrawer({
             {statusCounts.empty > 0 && (
               <StatBadge label="empty" value={statusCounts.empty} className="bg-gray-200 text-gray-700" />
             )}
-            {statusCounts.hold > 0 && (
-              <StatBadge label="hold" value={statusCounts.hold} className="bg-orange-100 text-orange-800" />
-            )}
-            {statusCounts.scrap > 0 && (
-              <StatBadge label="scrap" value={statusCounts.scrap} className="bg-red-100 text-red-800" />
-            )}
           </div>
 
-          {(summary?.stockStatusQty?.hold > 0 || summary?.stockStatusQty?.scrap > 0) && (
+          {(summary?.stockStatusQty?.sellable > 0 || summary?.stockStatusQty?.dead_stock > 0) && (
             <div className="text-xs text-gray-600 space-y-1">
               {summary.stockStatusQty.sellable > 0 && (
                 <p>Sellable qty: <strong>{summary.stockStatusQty.sellable.toLocaleString()}</strong></p>
               )}
-              {summary.stockStatusQty.hold > 0 && (
-                <p>Hold qty: <strong>{summary.stockStatusQty.hold.toLocaleString()}</strong></p>
-              )}
-              {summary.stockStatusQty.scrap > 0 && (
-                <p>Scrap qty: <strong>{summary.stockStatusQty.scrap.toLocaleString()}</strong></p>
+              {summary.stockStatusQty.dead_stock > 0 && (
+                <p>Dead stock qty: <strong>{summary.stockStatusQty.dead_stock.toLocaleString()}</strong></p>
               )}
             </div>
           )}

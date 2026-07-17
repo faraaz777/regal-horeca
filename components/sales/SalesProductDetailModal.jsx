@@ -384,8 +384,8 @@ export default function SalesProductDetailModal({
                             <p>
                               {loc.sellableQty} {detail.stockUnit} sellable
                             </p>
-                            {loc.holdQty > 0 && (
-                              <p className="text-amber-700">{loc.holdQty} on hold</p>
+                            {loc.deadStockQty > 0 && (
+                              <p className="text-slate-700">{loc.deadStockQty} dead stock</p>
                             )}
                           </div>
                         </li>

@@ -8,12 +8,13 @@ import { adminJson } from '@/lib/client/adminFetch';
 import { validateLocationSelectionClient } from '@/lib/client/locationCascadeApi';
 import LocationSelector from '@/components/admin/inventory/LocationSelector';
 import {
-  MOVEMENT_STATUS_BUCKETS,
+  INTAKE_STATUS_BUCKETS,
   STATUS_BUCKET_LABELS,
   MOVEMENT_REASONS,
   MOVEMENT_REASON_LABELS,
   ADD_MOVEMENT_REASONS,
   ADD_MOVEMENT_REASON_LABELS,
+  MINUS_MOVEMENT_REASONS,
   DEAD_STOCK_PERIOD_LABELS,
   DEAD_STOCK_PERIODS,
 } from '@/lib/shared/inventoryConstants';
@@ -24,19 +25,16 @@ const fetcher = (url) => adminJson(url);
 const TAB_LABELS = {
   add: 'Add',
   minus: 'Minus',
-  status_change: 'Status change',
   transfer: 'Transfer',
   rules: 'Rules',
 };
 
-const MOVEMENT_TABS = ['add', 'minus', 'status_change', 'transfer'];
+const MOVEMENT_TABS = ['add', 'minus', 'transfer'];
 
 const EMPTY_FORM = {
   quantity: '1',
   reason: 'opening_stock',
   statusBucket: 'sellable',
-  fromBucket: 'sellable',
-  toBucket: 'hold',
   remark: '',
   locationId: '',
   fromLocationId: '',
@@ -389,7 +387,7 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
         key === 'add'
           ? 'opening_stock'
           : key === 'minus'
-            ? 'manual_adjustment'
+            ? 'sold'
             : p.reason,
     }));
   };
@@ -416,10 +414,11 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
 
   const minusLocationsForBucket = useMemo(() => {
     if (!stockRows.length) return [];
+    // Minus / sale always removes from sellable only.
     return stockRows
-      .filter((r) => r.statusBucket === form.statusBucket && (r.qty || 0) > 0)
+      .filter((r) => r.statusBucket === 'sellable' && (r.qty || 0) > 0)
       .sort((a, b) => (b.qty || 0) - (a.qty || 0));
-  }, [stockRows, form.statusBucket]);
+  }, [stockRows]);
 
   const sellableLocations = useMemo(() => {
     return stockRows
@@ -525,7 +524,8 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
     }
   }, [tab, form.fromLocationId, availableAtTransferFrom, requestedQty]);
 
-  const reasonOptions = tab === 'add' ? ADD_MOVEMENT_REASONS : MOVEMENT_REASONS;
+  const reasonOptions =
+    tab === 'add' ? ADD_MOVEMENT_REASONS : tab === 'minus' ? MINUS_MOVEMENT_REASONS : MOVEMENT_REASONS;
   const reasonLabels = tab === 'add' ? ADD_MOVEMENT_REASON_LABELS : MOVEMENT_REASON_LABELS;
 
   const handleLocationChange = useCallback(
@@ -652,7 +652,7 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
       return;
     }
 
-    if (tab === 'add' || tab === 'status_change') {
+    if (tab === 'add') {
       const check = validateLocationSelectionClient({
         ...locationSel,
         locationId: form.locationId,
@@ -710,11 +710,7 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
       };
 
       if (tab === 'add' || tab === 'minus') {
-        body.statusBucket = form.statusBucket;
-        body.locationId = form.locationId || null;
-      } else if (tab === 'status_change') {
-        body.fromBucket = form.fromBucket;
-        body.toBucket = form.toBucket;
+        body.statusBucket = tab === 'minus' ? 'sellable' : form.statusBucket;
         body.locationId = form.locationId || null;
       } else if (tab === 'transfer') {
         body.fromLocationId = form.fromLocationId || null;
@@ -819,8 +815,8 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
                 Stock status
               </p>
               <p className="text-xs text-gray-600">
-                Sellable {summary.sellableQty ?? 0} · Hold {summary.holdQty ?? 0} · Scrapped{' '}
-                {summary.scrapQty ?? 0}
+                Sellable {summary.sellableQty ?? 0} · Dead stock{' '}
+                {summary.deadStockQty ?? 0}
               </p>
             </div>
           )}
@@ -895,46 +891,16 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
                 </Field>
               )}
 
-              {tab === 'status_change' && (
-                <>
-                  <Field label="From status" required>
-                    <select
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
-                      value={form.fromBucket}
-                      onChange={(e) => update('fromBucket', e.target.value)}
-                    >
-                      {MOVEMENT_STATUS_BUCKETS.map((b) => (
-                        <option key={b} value={b}>
-                          {STATUS_BUCKET_LABELS[b]}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="To status" required>
-                    <select
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
-                      value={form.toBucket}
-                      onChange={(e) => update('toBucket', e.target.value)}
-                    >
-                      {MOVEMENT_STATUS_BUCKETS.map((b) => (
-                        <option key={b} value={b}>
-                          {STATUS_BUCKET_LABELS[b]}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                </>
-              )}
             </div>
 
-            {(tab === 'add' || tab === 'minus') && (
-              <Field label="Status bucket" required>
+            {tab === 'add' && (
+              <Field label="Status" required>
                 <select
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
                   value={form.statusBucket}
                   onChange={(e) => update('statusBucket', e.target.value)}
                 >
-                  {MOVEMENT_STATUS_BUCKETS.map((b) => (
+                  {INTAKE_STATUS_BUCKETS.map((b) => (
                     <option key={b} value={b}>
                       {STATUS_BUCKET_LABELS[b]}
                     </option>
@@ -946,12 +912,11 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
             {tab === 'minus' && !isLoading && (
               <div className="rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2.5">
                 <p className="text-[10px] font-semibold text-amber-800 uppercase tracking-wide mb-1.5">
-                  Stock at locations ({STATUS_BUCKET_LABELS[form.statusBucket]})
+                  Sellable stock at locations
                 </p>
                 {minusLocationsForBucket.length === 0 ? (
                   <p className="text-xs text-amber-900">
-                    No {STATUS_BUCKET_LABELS[form.statusBucket]?.toLowerCase()} stock at any
-                    location.
+                    No sellable stock at any location.
                   </p>
                 ) : (
                   <ul className="space-y-1">
@@ -1015,7 +980,7 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
               </div>
             )}
 
-            {(tab === 'add' || tab === 'minus' || tab === 'status_change') && (
+            {(tab === 'add' || tab === 'minus') && (
               <Field
                 label={tab === 'minus' ? 'Remove from location' : 'Location'}
                 required

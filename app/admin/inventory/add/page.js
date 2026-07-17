@@ -24,8 +24,7 @@ const SEARCH_STATUS_STYLES = {
 };
 
 const SEARCH_BUCKET_STYLES = {
-  hold: 'bg-amber-100 text-amber-800',
-  scrap: 'bg-red-100 text-red-800',
+  dead_stock: 'bg-slate-200 text-slate-800',
 };
 
 function SearchStockBadges({ product }) {
@@ -37,16 +36,10 @@ function SearchStockBadges({ product }) {
       style: SEARCH_STATUS_STYLES[product.stockStatus] || SEARCH_STATUS_STYLES.out,
     },
     {
-      key: 'hold',
-      qty: product.holdQty ?? 0,
-      label: 'Hold',
-      style: SEARCH_BUCKET_STYLES.hold,
-    },
-    {
-      key: 'scrap',
-      qty: product.scrapQty ?? 0,
-      label: 'Scrapped',
-      style: SEARCH_BUCKET_STYLES.scrap,
+      key: 'dead_stock',
+      qty: product.deadStockQty ?? 0,
+      label: 'Dead stock',
+      style: SEARCH_BUCKET_STYLES.dead_stock,
     },
   ].filter((b) => b.qty > 0);
 

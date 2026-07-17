@@ -25,7 +25,7 @@ import { formatRackDisplayName } from '@/lib/shared/locationDisplay';
 import {
   DEAD_STOCK_PERIODS,
   DEAD_STOCK_PERIOD_LABELS,
-  STATUS_BUCKETS,
+  INTAKE_STATUS_BUCKETS,
   STATUS_BUCKET_LABELS,
   MAX_PRODUCTS_PER_RACK,
   RACKS_PER_FLOOR,
@@ -861,7 +861,7 @@ export default function AllocateStockToRacksModal({
                   value={form.openingStatusBucket}
                   onChange={(e) => updateOpeningStatus(e.target.value)}
                 >
-                  {STATUS_BUCKETS.filter((b) => b !== 'non_sellable').map((bucket) => (
+                  {INTAKE_STATUS_BUCKETS.map((bucket) => (
                     <option key={bucket} value={bucket}>
                       {STATUS_BUCKET_LABELS[bucket]}
                     </option>

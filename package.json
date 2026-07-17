@@ -11,6 +11,8 @@
     "migrate:variants:dry": "node scripts/migrateVariantsToChildren.mjs --dry-run",
     "migrate:product-filters": "node scripts/migrateProductFilters.mjs",
     "migrate:product-filters:dry": "node scripts/migrateProductFilters.mjs --dry-run",
+    "migrate:inventory-buckets": "node scripts/migrateInventoryStatusBuckets.mjs",
+    "migrate:inventory-buckets:dry": "node scripts/migrateInventoryStatusBuckets.mjs --dry-run",
     "seed:super-admin": "node scripts/seed-super-admin.mjs"
   },
   "dependencies": {

@@ -96,14 +96,9 @@ export default function RackDetailDrawer({ rackId, canEdit = false, onClose, onC
                   <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold">
                     {rack.sellableQty} Sellable
                   </span>
-                  {rack.holdQty > 0 && (
-                    <span className="px-2 py-1 rounded-full bg-amber-100 text-amber-800 font-semibold">
-                      {rack.holdQty} Hold
-                    </span>
-                  )}
-                  {rack.scrapQty > 0 && (
-                    <span className="px-2 py-1 rounded-full bg-red-100 text-red-800 font-semibold">
-                      {rack.scrapQty} Scrap
+                  {rack.deadStockQty > 0 && (
+                    <span className="px-2 py-1 rounded-full bg-slate-200 text-slate-800 font-semibold">
+                      {rack.deadStockQty} Dead stock
                     </span>
                   )}
                 </div>

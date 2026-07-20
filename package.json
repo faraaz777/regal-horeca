@@ -37,6 +37,7 @@
     "framer-motion": "^12.23.26",
     "html-to-image": "^1.11.13",
     "jose": "^6.2.3",
+    "jsbarcode": "^3.12.3",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.556.0",

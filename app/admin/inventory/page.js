@@ -7,10 +7,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
-import { Plus, Minus, Search, Package, Eye, Pencil } from 'lucide-react';
+import { Plus, Minus, Search, Package, Eye, Pencil, MapPin } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
 import { canWriteInventory, canWriteProducts } from '@/lib/shared/permissions';
+import { LOCATION_PATH_SEP } from '@/lib/shared/inventoryConstants';
 import StockMovementModal from '@/components/admin/inventory/StockMovementModal';
+import MiniBarcode from '@/components/admin/inventory/MiniBarcode';
 
 const STATUS_STYLES = {
   in_stock: 'bg-emerald-100 text-emerald-800',
@@ -24,82 +26,126 @@ const STATUS_LABELS = {
   out: 'Out',
 };
 
-const STOCK_BUCKET_STYLES = {
-  dead_stock: 'bg-slate-200 text-slate-800',
-};
+const LOCATION_PREVIEW_COUNT = 2;
 
-function StockStatusBadges({ item }) {
-  const buckets = [
-    {
-      key: 'sellable',
-      qty: item.sellableQty ?? 0,
-      label: 'Sellable',
-      style: STATUS_STYLES[item.stockStatus] || STATUS_STYLES.out,
-    },
-    {
-      key: 'dead_stock',
-      qty: item.deadStockQty ?? 0,
-      label: 'Dead stock',
-      style: STOCK_BUCKET_STYLES.dead_stock,
-    },
-  ].filter((b) => b.qty > 0);
+/**
+ * Rack-first label for the live inventory list.
+ * Path like "b1 › f2 › Rack 12" → primary "Rack 12", context "b1 · f2".
+ */
+function splitLocationDisplay(loc) {
+  const path = String(loc?.locationPath || '').trim();
+  const full = String(loc?.locationPathFull || path).trim();
 
-  if (buckets.length === 0) {
-    return <span className="text-xs text-gray-400">—</span>;
+  if (!path || path === '—') {
+    return {
+      primary: 'No assigned location',
+      context: '',
+      title: full || 'Stock has no valid rack path',
+      unassigned: true,
+    };
   }
 
+  const parts = path.split(LOCATION_PATH_SEP).map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 1) {
+    return { primary: parts[0], context: '', title: full, unassigned: false };
+  }
+
+  const primary = parts[parts.length - 1];
+  const context = parts.slice(0, -1).join(' · ');
+  return { primary, context, title: full, unassigned: false };
+}
+
+function LocationQtyBadges({ loc, unit }) {
   return (
-    <div className="flex flex-col gap-0.5 items-start">
-      {buckets.map((b) => (
-        <span
-          key={b.key}
-          className={`inline-flex px-1.5 py-px rounded-full text-[10px] font-semibold leading-tight ${b.style}`}
-        >
-          {b.qty} {b.label}
+    <div className="flex flex-wrap gap-1 justify-end shrink-0 max-w-[55%]">
+      {loc.sellableQty > 0 && (
+        <span className="inline-flex px-1.5 py-px rounded text-[10px] font-semibold bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-100">
+          {loc.sellableQty} Sellable
         </span>
-      ))}
+      )}
+      {loc.deadStockQty > 0 && (
+        <span className="inline-flex px-1 py-px rounded text-[9px] font-semibold bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-300">
+          {loc.deadStockQty} Dead stock
+        </span>
+      )}
+      {loc.sellableQty <= 0 && (loc.deadStockQty || 0) <= 0 && (
+        <span className="text-[10px] text-gray-500">
+          {loc.totalQty} {unit}
+        </span>
+      )}
     </div>
   );
 }
 
+function LocationRow({ loc, unit }) {
+  const { primary, context, title, unassigned } = splitLocationDisplay(loc);
+
+  return (
+    <li className="flex items-center justify-between gap-3">
+      <div className="flex items-start gap-2 min-w-0">
+        <MapPin
+          size={13}
+          className={`mt-1 shrink-0 ${unassigned ? 'text-amber-500' : 'text-emerald-600'}`}
+          aria-hidden
+        />
+        <div className="min-w-0 space-y-1" title={title}>
+          <p
+            className={`text-xs font-semibold truncate leading-none ${
+              unassigned ? 'text-amber-800' : 'text-gray-900'
+            }`}
+          >
+            {primary}
+          </p>
+          {context ? (
+            <p className="text-[11px] text-gray-600 truncate leading-none tracking-wide">
+              {context}
+            </p>
+          ) : null}
+        </div>
+      </div>
+      <LocationQtyBadges loc={loc} unit={unit} />
+    </li>
+  );
+}
+
 function StockLocationsCell({ item }) {
+  const [expanded, setExpanded] = useState(false);
   const locations = item.stockLocations || [];
   const unit = item.stockUnit || 'Pcs';
 
   if (!locations.length) {
-    return <span className="text-xs text-gray-400">—</span>;
+    return (
+      <div className="flex items-center gap-1.5 text-xs text-gray-400">
+        <MapPin size={12} className="shrink-0 text-gray-300" aria-hidden />
+        <span>No assigned location</span>
+      </div>
+    );
   }
 
+  const hiddenCount = locations.length - LOCATION_PREVIEW_COUNT;
+  const visible = expanded ? locations : locations.slice(0, LOCATION_PREVIEW_COUNT);
+
   return (
-    <ul className="space-y-1.5">
-      {locations.map((loc) => (
-        <li key={loc.locationId || loc.locationPath} className="text-xs leading-snug">
-          <p
-            className="font-mono text-gray-700 truncate"
-            title={loc.locationPathFull || loc.locationPath}
-          >
-            {loc.locationPath}
-          </p>
-          <div className="flex flex-wrap gap-1 mt-0.5">
-            {loc.sellableQty > 0 && (
-              <span className="inline-flex px-1.5 py-px rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800">
-                {loc.sellableQty} Sellable
-              </span>
-            )}
-            {loc.deadStockQty > 0 && (
-              <span className="inline-flex px-1.5 py-px rounded-full text-[10px] font-semibold bg-slate-200 text-slate-800">
-                {loc.deadStockQty} Dead stock
-              </span>
-            )}
-            {loc.sellableQty <= 0 && (loc.deadStockQty || 0) <= 0 && (
-              <span className="text-[10px] text-gray-500">
-                {loc.totalQty} {unit}
-              </span>
-            )}
-          </div>
-        </li>
-      ))}
-    </ul>
+    <div>
+      <ul className="space-y-2">
+        {visible.map((loc) => (
+          <LocationRow
+            key={loc.locationId || loc.locationPath}
+            loc={loc}
+            unit={unit}
+          />
+        ))}
+      </ul>
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1.5 ml-[18px] text-[11px] font-medium text-emerald-700 hover:text-emerald-900"
+        >
+          {expanded ? 'Show less' : `+${hiddenCount} more location${hiddenCount === 1 ? '' : 's'}`}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -302,26 +348,25 @@ export default function AdminInventoryPage() {
           <table className="w-full text-sm table-fixed">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                <th className="px-4 py-3 w-[26%]">Name</th>
-                <th className="px-4 py-3 w-[9%]">SKU</th>
-                <th className="px-4 py-3 w-[11%]">Sellable</th>
-                <th className="px-4 py-3 w-[12%]">Stock status</th>
-                <th className="px-4 py-3 w-[8%]">Status</th>
-                <th className="px-4 py-3 w-[22%]">Location & qty</th>
-                <th className="px-4 py-3 w-[12%] text-right">Actions</th>
+                <th className="px-4 py-3 w-[28%]">Name</th>
+                <th className="px-4 py-3 w-[10%]">SKU</th>
+                <th className="px-4 py-3 w-[12%]">Sellable</th>
+                <th className="px-4 py-3 w-[10%]">Status</th>
+                <th className="px-4 py-3 w-[26%]">Location & qty</th>
+                <th className="px-4 py-3 w-[14%] text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-200">
               {showLoading && items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
                     <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600" />
                     <p className="mt-2">Loading inventory…</p>
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
                     <Package className="mx-auto text-gray-300 mb-2" size={32} />
                     No products found
                   </td>
@@ -367,8 +412,13 @@ export default function AdminInventoryPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 align-middle font-mono text-xs text-gray-600 truncate">
-                      {item.sku || '—'}
+                    <td className="px-4 py-3 align-middle">
+                      <div className="min-w-0">
+                        <div className="font-mono text-xs text-gray-600 truncate">
+                          {item.sku || '—'}
+                        </div>
+                        {item.barcode ? <MiniBarcode value={item.barcode} /> : null}
+                      </div>
                     </td>
                     <td className="px-4 py-3 align-middle">
                       <div className="inline-flex items-center gap-1">
@@ -397,11 +447,7 @@ export default function AdminInventoryPage() {
                             <Plus size={14} />
                           </button>
                         )}
-                        <span className="text-xs text-gray-400 ml-1">{item.stockUnit}</span>
                       </div>
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <StockStatusBadges item={item} />
                     </td>
                     <td className="px-4 py-3 align-middle">
                       <span

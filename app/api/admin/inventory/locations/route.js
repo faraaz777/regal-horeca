@@ -43,9 +43,10 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Level is required' }, { status: 400 });
     }
 
+    // code/name optional — server auto-generates B1/F1/R1 style codes when omitted
     const location = await createLocation({
-      code,
-      name,
+      code: code || '',
+      name: name || '',
       level,
       parentLocationId: parentLocationId || null,
     });

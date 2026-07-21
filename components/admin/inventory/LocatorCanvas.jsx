@@ -1175,9 +1175,7 @@ export default function LocatorCanvas({ role }) {
       {drawerRackId && (
         <RackDetailDrawer
           rackId={drawerRackId}
-          canEdit={canEdit}
           onClose={() => setDrawerRackId(null)}
-          onCapacitySaved={() => mutate()}
         />
       )}
     </div>

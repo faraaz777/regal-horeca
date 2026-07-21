@@ -7,13 +7,30 @@ import {
   updateLocation,
   deleteLocation,
   locationHasStock,
+  isValidLocationId,
 } from '@/lib/server/inventory/locationCrudService';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Locations admin edit only needs code + name.
+ * Structural fields (level, parent, isActive, capacity) must not be changed via this PATCH.
+ */
+function pickLocationEditFields(body) {
+  if (!body || typeof body !== 'object') return {};
+  const patch = {};
+  if (body.code !== undefined) patch.code = body.code;
+  if (body.name !== undefined) patch.name = body.name;
+  return patch;
+}
+
 export async function GET(request, { params }) {
   const auth = await requireAuth(request, { permission: 'inventory:read' });
   if (auth.error) return auth.error;
+
+  if (!isValidLocationId(params.locationId)) {
+    return NextResponse.json({ error: 'Invalid location id' }, { status: 400 });
+  }
 
   try {
     await connectToDatabase();
@@ -29,10 +46,21 @@ export async function PATCH(request, { params }) {
   const auth = await requireAuth(request, { permission: 'inventory:write' });
   if (auth.error) return auth.error;
 
+  if (!isValidLocationId(params.locationId)) {
+    return NextResponse.json({ error: 'Invalid location id' }, { status: 400 });
+  }
+
   try {
     await connectToDatabase();
     const body = await request.json();
-    const location = await updateLocation(params.locationId, body);
+    const patch = pickLocationEditFields(body);
+    if (patch.code === undefined && patch.name === undefined) {
+      return NextResponse.json(
+        { error: 'Provide code and/or name to update' },
+        { status: 400 }
+      );
+    }
+    const location = await updateLocation(params.locationId, patch);
     return NextResponse.json({ success: true, location });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
@@ -42,6 +70,10 @@ export async function PATCH(request, { params }) {
 export async function DELETE(request, { params }) {
   const auth = await requireAuth(request, { permission: 'inventory:write' });
   if (auth.error) return auth.error;
+
+  if (!isValidLocationId(params.locationId)) {
+    return NextResponse.json({ error: 'Invalid location id' }, { status: 400 });
+  }
 
   try {
     await connectToDatabase();

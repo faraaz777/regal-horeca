@@ -1,6 +1,6 @@
 /**
  * Seed location tree for inventory (Branch › Floor › Rack).
- * Each floor gets RACKS_PER_FLOOR racks with capacity MAX_PRODUCTS_PER_RACK.
+ * Floors start empty — add racks from the Locations UI.
  * Usage: node scripts/seed-inventory-locations.mjs
  */
 
@@ -11,8 +11,6 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SEP = ' › ';
-const RACKS_PER_FLOOR = 5;
-const MAX_PRODUCTS_PER_RACK = 5;
 
 function loadEnvLocal() {
   const envPath = resolve(__dirname, '../.env.local');
@@ -47,18 +45,10 @@ const LocationSchema = new mongoose.Schema(
 );
 
 function racksForFloor() {
-  return Array.from({ length: RACKS_PER_FLOOR }, (_, i) => {
-    const n = i + 1;
-    return {
-      code: `R${n}`,
-      name: `Rack ${n}`,
-      level: 'rack',
-      capacity: MAX_PRODUCTS_PER_RACK,
-    };
-  });
+  return [];
 }
 
-/** Branch → floors → 5 racks each (active inventory model). */
+/** Branch → floors (racks added from Locations UI). */
 const TREE = [
   {
     code: 'b1',
@@ -124,9 +114,9 @@ async function main() {
     await upsertNode(root, null, [], Location);
   }
 
-  const racks = await Location.find({ level: 'rack', isActive: true }).sort({ path: 1 }).lean();
-  console.log(`Seeded ${racks.length} rack location(s) (${RACKS_PER_FLOOR} per floor):`);
-  racks.forEach((r) => console.log(` - ${r.path} (capacity ${r.capacity ?? '—'})`));
+  const floors = await Location.find({ level: 'floor', isActive: true }).sort({ path: 1 }).lean();
+  console.log(`Seeded ${floors.length} floor(s); racks: add from Locations UI`);
+  floors.forEach((f) => console.log(` - ${f.path}`));
   await mongoose.disconnect();
 }
 

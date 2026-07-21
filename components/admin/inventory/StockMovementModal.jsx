@@ -17,6 +17,7 @@ import {
   MINUS_MOVEMENT_REASONS,
   DEAD_STOCK_PERIOD_LABELS,
   DEAD_STOCK_PERIODS,
+  LOCATION_PATH_SEP,
 } from '@/lib/shared/inventoryConstants';
 import { canEditInventoryRules } from '@/lib/shared/permissions';
 
@@ -46,6 +47,77 @@ const EMPTY_LOCATION = {
   floorId: null,
   rackId: null,
 };
+
+/** Rack-first label for fast chip taps — e.g. "b1 › f2 › R12" → "R12". */
+function shortLocationLabel(row) {
+  const path = String(row?.locationPath || '').trim();
+  if (!path || path === '—') return 'Unassigned';
+  const parts = path.split(LOCATION_PATH_SEP).map((p) => p.trim()).filter(Boolean);
+  return parts[parts.length - 1] || path;
+}
+
+const CHIP_TONES = {
+  emerald: {
+    selected: 'border-emerald-400 bg-emerald-600 text-white',
+    idle: 'border-emerald-200 bg-white text-emerald-900 hover:border-emerald-300 hover:bg-emerald-50',
+  },
+  amber: {
+    selected: 'border-amber-400 bg-amber-600 text-white',
+    idle: 'border-amber-200 bg-white text-amber-950 hover:border-amber-300 hover:bg-amber-50',
+  },
+  sky: {
+    selected: 'border-sky-400 bg-sky-600 text-white',
+    idle: 'border-sky-200 bg-white text-sky-950 hover:border-sky-300 hover:bg-sky-50',
+  },
+};
+
+/**
+ * One-tap location chips — primary path for daily movements (faster than cascade).
+ */
+function LocationChipRow({ rows, selectedId, onSelect, tone = 'emerald' }) {
+  if (!rows?.length) return null;
+  const styles = CHIP_TONES[tone] || CHIP_TONES.emerald;
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {rows.map((row) => {
+        const locId = String(row.locationId);
+        const isSelected = String(selectedId || '') === locId;
+        return (
+          <button
+            key={locId}
+            type="button"
+            onClick={() => onSelect(row)}
+            title={row.locationPath || locId}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
+              isSelected ? styles.selected : styles.idle
+            }`}
+          >
+            <span className="truncate max-w-[7rem]">{shortLocationLabel(row)}</span>
+            <span className={`font-mono tabular-nums ${isSelected ? 'opacity-90' : 'opacity-70'}`}>
+              {row.qty}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function BrowseLocationsDetails({ label = 'Browse other locations', children, defaultOpen = false }) {
+  return (
+    <details
+      className="group rounded-lg border border-gray-200 bg-gray-50/40"
+      defaultOpen={defaultOpen}
+    >
+      <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 select-none [&::-webkit-details-marker]:hidden flex items-center justify-between gap-2">
+        <span>{label}</span>
+        <span className="text-gray-400 group-open:rotate-180 transition-transform">▾</span>
+      </summary>
+      <div className="px-3 pb-3 pt-1 border-t border-gray-100">{children}</div>
+    </details>
+  );
+}
 
 function Field({ label, required, children }) {
   return (
@@ -351,9 +423,18 @@ function resolveMinusLocationId(selection, minusRows) {
   return row ? String(row.locationId) : String(selection.locationId || selection.rackId);
 }
 
-export default function StockMovementModal({ item, onClose, onSuccess }) {
-  const [tab, setTab] = useState('add');
-  const [form, setForm] = useState(EMPTY_FORM);
+export default function StockMovementModal({
+  item,
+  onClose,
+  onSuccess,
+  initialTab = 'add',
+}) {
+  const startTab = MOVEMENT_TABS.includes(initialTab) ? initialTab : 'add';
+  const [tab, setTab] = useState(startTab);
+  const [form, setForm] = useState(() => ({
+    ...EMPTY_FORM,
+    reason: startTab === 'minus' ? 'sold' : 'opening_stock',
+  }));
   const [locationSel, setLocationSel] = useState(EMPTY_LOCATION);
   const [fromSel, setFromSel] = useState(EMPTY_LOCATION);
   const [toSel, setToSel] = useState(EMPTY_LOCATION);
@@ -839,6 +920,8 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
               <Field label="Quantity" required>
                 <input
                   type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   min="1"
                   max={
                     tab === 'minus' && availableAtLocation > 0
@@ -910,152 +993,118 @@ export default function StockMovementModal({ item, onClose, onSuccess }) {
             )}
 
             {tab === 'minus' && !isLoading && (
-              <div className="rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2.5">
-                <p className="text-[10px] font-semibold text-amber-800 uppercase tracking-wide mb-1.5">
-                  Sellable stock at locations
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold text-amber-800 uppercase tracking-wide">
+                  Tap a location to remove from
                 </p>
                 {minusLocationsForBucket.length === 0 ? (
-                  <p className="text-xs text-amber-900">
+                  <p className="text-xs text-amber-900 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
                     No sellable stock at any location.
                   </p>
                 ) : (
-                  <ul className="space-y-1">
-                    {minusLocationsForBucket.map((row) => {
-                      const locId = String(row.locationId);
-                      const isSelected = form.locationId === locId;
-                      return (
-                        <li key={locId}>
-                          <button
-                            type="button"
-                            onClick={() => selectMinusRow(row)}
-                            className={`w-full text-left text-xs px-2 py-1.5 rounded-md border transition-colors ${
-                              isSelected
-                                ? 'border-amber-300 bg-white text-amber-950 font-medium'
-                                : 'border-transparent text-amber-900 hover:bg-white/80'
-                            }`}
-                          >
-                            <span className="truncate block">{row.locationPath || '—'}</span>
-                            <span className="font-mono font-semibold">{row.qty}</span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <LocationChipRow
+                    rows={minusLocationsForBucket}
+                    selectedId={form.locationId}
+                    onSelect={selectMinusRow}
+                    tone="amber"
+                  />
                 )}
               </div>
             )}
 
             {tab === 'add' && !isLoading && existingLocations.length > 0 && (
-              <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2.5">
-                <p className="text-[10px] font-semibold text-emerald-800 uppercase tracking-wide mb-1.5">
-                  Add to an existing location
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold text-emerald-800 uppercase tracking-wide">
+                  Tap a location you already use
                 </p>
-                <ul className="space-y-1">
-                  {existingLocations.map((row) => {
-                    const locId = String(row.locationId);
-                    const isSelected = form.locationId === locId;
-                    return (
-                      <li key={locId}>
-                        <button
-                          type="button"
-                          onClick={() => selectAddLocation(row)}
-                          className={`w-full flex items-center justify-between gap-3 text-left text-xs px-2 py-1.5 rounded-md border transition-colors ${
-                            isSelected
-                              ? 'border-emerald-300 bg-white text-emerald-950 font-medium'
-                              : 'border-transparent text-emerald-900 hover:bg-white/80'
-                          }`}
-                        >
-                          <span className="truncate">{row.locationPath || '—'}</span>
-                          <span className="font-mono font-semibold shrink-0">
-                            {row.qty} stored
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-                <p className="text-[10px] text-emerald-700 mt-1.5">
-                  Or choose a different location below.
-                </p>
+                <LocationChipRow
+                  rows={existingLocations}
+                  selectedId={form.locationId}
+                  onSelect={selectAddLocation}
+                  tone="emerald"
+                />
               </div>
             )}
 
             {(tab === 'add' || tab === 'minus') && (
-              <Field
-                label={tab === 'minus' ? 'Remove from location' : 'Location'}
-                required
+              <BrowseLocationsDetails
+                label={
+                  tab === 'minus'
+                    ? 'Browse locations'
+                    : existingLocations.length > 0
+                      ? 'Browse other locations'
+                      : 'Choose location'
+                }
+                defaultOpen={
+                  tab === 'add'
+                    ? existingLocations.length === 0
+                    : minusLocationsForBucket.length === 0
+                }
               >
-                <LocationSelector
-                  selectedBranchId={locationSel.branchId}
-                  selectedFloorId={locationSel.floorId}
-                  selectedRackId={locationSel.rackId || form.locationId}
-                  onChange={handleLocationChange}
+                <Field
+                  label={tab === 'minus' ? 'Remove from location' : 'Location'}
                   required
-                  disabled={tab === 'minus' && minusLocationsForBucket.length === 0}
-                  allowedLocationIds={
-                    tab === 'minus' ? allowedRackIdsForMinus : undefined
-                  }
-                />
-              </Field>
+                >
+                  <LocationSelector
+                    selectedBranchId={locationSel.branchId}
+                    selectedFloorId={locationSel.floorId}
+                    selectedRackId={locationSel.rackId || form.locationId}
+                    onChange={handleLocationChange}
+                    required
+                    disabled={tab === 'minus' && minusLocationsForBucket.length === 0}
+                    allowedLocationIds={
+                      tab === 'minus' ? allowedRackIdsForMinus : undefined
+                    }
+                  />
+                </Field>
+              </BrowseLocationsDetails>
             )}
 
             {tab === 'transfer' && (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {!isLoading && (
-                  <div className="rounded-lg border border-sky-100 bg-sky-50/60 px-3 py-2.5">
-                    <p className="text-[10px] font-semibold text-sky-800 uppercase tracking-wide mb-1.5">
-                      Sellable stock at locations
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-semibold text-sky-800 uppercase tracking-wide">
+                      From — tap sellable location
                     </p>
                     {sellableLocations.length === 0 ? (
-                      <p className="text-xs text-sky-900">
+                      <p className="text-xs text-sky-900 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2">
                         No sellable stock at any location to transfer from.
                       </p>
                     ) : (
-                      <ul className="space-y-1">
-                        {sellableLocations.map((row) => {
-                          const locId = String(row.locationId);
-                          const isSelected = String(form.fromLocationId) === locId;
-                          return (
-                            <li key={locId}>
-                              <button
-                                type="button"
-                                onClick={() => selectTransferFromRow(row)}
-                                className={`w-full text-left text-xs px-2 py-1.5 rounded-md border transition-colors ${
-                                  isSelected
-                                    ? 'border-sky-300 bg-white text-sky-950 font-medium'
-                                    : 'border-transparent text-sky-900 hover:bg-white/80'
-                                }`}
-                              >
-                                <span className="truncate block">{row.locationPath || '—'}</span>
-                                <span className="font-mono font-semibold">{row.qty}</span>
-                              </button>
-                            </li>
-                          );
-                        })}
-                      </ul>
+                      <LocationChipRow
+                        rows={sellableLocations}
+                        selectedId={form.fromLocationId}
+                        onSelect={selectTransferFromRow}
+                        tone="sky"
+                      />
                     )}
                   </div>
                 )}
-                <Field label="From location" required>
-                  <LocationSelector
-                    selectedBranchId={fromSel.branchId}
-                    selectedFloorId={fromSel.floorId}
-                    selectedRackId={fromSel.rackId || form.fromLocationId}
-                    onChange={handleFromLocationChange}
-                    required
-                    disabled={sellableLocations.length === 0}
-                    allowedLocationIds={allowedRackIdsForTransfer}
-                  />
-                </Field>
-                <Field label="To location" required>
-                  <LocationSelector
-                    selectedBranchId={toSel.branchId}
-                    selectedFloorId={toSel.floorId}
-                    selectedRackId={toSel.rackId || form.toLocationId}
-                    onChange={handleToLocationChange}
-                    required
-                  />
-                </Field>
+                <BrowseLocationsDetails label="Browse from / to locations" defaultOpen>
+                  <div className="space-y-3">
+                    <Field label="From location" required>
+                      <LocationSelector
+                        selectedBranchId={fromSel.branchId}
+                        selectedFloorId={fromSel.floorId}
+                        selectedRackId={fromSel.rackId || form.fromLocationId}
+                        onChange={handleFromLocationChange}
+                        required
+                        disabled={sellableLocations.length === 0}
+                        allowedLocationIds={allowedRackIdsForTransfer}
+                      />
+                    </Field>
+                    <Field label="To location" required>
+                      <LocationSelector
+                        selectedBranchId={toSel.branchId}
+                        selectedFloorId={toSel.floorId}
+                        selectedRackId={toSel.rackId || form.toLocationId}
+                        onChange={handleToLocationChange}
+                        required
+                      />
+                    </Field>
+                  </div>
+                </BrowseLocationsDetails>
               </div>
             )}
 

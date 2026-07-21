@@ -27,8 +27,6 @@ import {
   DEAD_STOCK_PERIOD_LABELS,
   INTAKE_STATUS_BUCKETS,
   STATUS_BUCKET_LABELS,
-  MAX_PRODUCTS_PER_RACK,
-  RACKS_PER_FLOOR,
 } from '@/lib/shared/inventoryConstants';
 
 const fetcher = (url) => adminJson(url);
@@ -138,12 +136,6 @@ function ProductInfoBanner({ product, stockUnit }) {
       </div>
     </section>
   );
-}
-
-function rackAcceptsProduct(rack, productId) {
-  if (!rack?.isFull) return true;
-  if (!productId) return false;
-  return (rack.productIds || []).includes(String(productId));
 }
 
 /**
@@ -277,11 +269,6 @@ export default function AllocateStockToRacksModal({
     const locations = form.selectedLocations || [];
     if (locations.some((loc) => String(loc.locationId) === String(draft.locationId))) {
       toast.error('This location is already added');
-      return;
-    }
-    const rack = draftRacks.find((r) => String(r._id) === String(draft.rackId));
-    if (rack && !rackAcceptsProduct(rack, productId)) {
-      toast.error(`Rack is full — maximum ${MAX_PRODUCTS_PER_RACK} products per rack`);
       return;
     }
     const next = [...locations, { ...draft, qty }];
@@ -539,7 +526,7 @@ export default function AllocateStockToRacksModal({
             <SectionHeading
               icon={Plus}
               title="Add to rack"
-              subtitle={`Pick a branch, floor, rack and quantity — each floor has ${RACKS_PER_FLOOR} racks, each rack holds up to ${MAX_PRODUCTS_PER_RACK} products`}
+              subtitle="Pick a branch, floor, rack and quantity"
             />
             <div className={rackSectionDisabled ? 'opacity-50 pointer-events-none' : ''}>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">

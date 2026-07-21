@@ -6,7 +6,6 @@ import { useDebounce } from '@/hooks/useDebounce';
 import Link from 'next/link';
 import Image from 'next/image';
 import useSWR from 'swr';
-import toast from 'react-hot-toast';
 import { Plus, Minus, Search, Package, Eye, Pencil, MapPin } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
 import { canWriteInventory, canWriteProducts } from '@/lib/shared/permissions';
@@ -171,8 +170,8 @@ export default function AdminInventoryPage() {
   const [brand, setBrand] = useState('');
   const [stockStatus, setStockStatus] = useState('');
   const [condition, setCondition] = useState('');
-  const [adjustingId, setAdjustingId] = useState(null);
   const [movementItem, setMovementItem] = useState(null);
+  const [movementTab, setMovementTab] = useState('add');
   const [highlightId, setHighlightId] = useState(focusProductId);
   const rowRefs = useRef(new Map());
   const autoOpenedRef = useRef(false);
@@ -203,34 +202,15 @@ export default function AdminInventoryPage() {
   const totalCount = data?.pagination?.total ?? items.length;
   const brands = brandsData?.brands || [];
 
-  const handleAdjust = useCallback(
-    async (productId, delta) => {
-      if (!canAdjust) return;
-      setAdjustingId(productId);
-      try {
-        await adminJson('/api/admin/inventory/adjust', {
-          method: 'POST',
-          body: JSON.stringify({ productId, delta }),
-        });
-        toast.success(delta > 0 ? 'Stock added' : 'Stock reduced');
-        mutate();
-      } catch (err) {
-        toast.error(err.message || 'Adjustment failed');
-      } finally {
-        setAdjustingId(null);
-      }
-    },
-    [canAdjust, mutate]
-  );
-
   const clearFocusParams = useCallback(() => {
     router.replace('/admin/inventory', { scroll: false });
     setHighlightId('');
   }, [router]);
 
   const openMovement = useCallback(
-    (item) => {
+    (item, tab = 'add') => {
       if (!canAdjust) return;
+      setMovementTab(tab === 'minus' ? 'minus' : 'add');
       setMovementItem(item);
       setHighlightId(String(item._id));
     },
@@ -249,6 +229,7 @@ export default function AdminInventoryPage() {
 
     if (openMovementOnLoad && canAdjust) {
       autoOpenedRef.current = true;
+      setMovementTab('add');
       setMovementItem(match);
       router.replace('/admin/inventory', { scroll: false });
     }
@@ -350,7 +331,7 @@ export default function AdminInventoryPage() {
               <tr className="bg-gray-50 border-b border-gray-200 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
                 <th className="px-4 py-3 w-[28%]">Name</th>
                 <th className="px-4 py-3 w-[10%]">SKU</th>
-                <th className="px-4 py-3 w-[12%]">Sellable</th>
+                <th className="px-4 py-3 w-[12%]">Total</th>
                 <th className="px-4 py-3 w-[10%]">Status</th>
                 <th className="px-4 py-3 w-[26%]">Location & qty</th>
                 <th className="px-4 py-3 w-[14%] text-right">Actions</th>
@@ -425,24 +406,27 @@ export default function AdminInventoryPage() {
                         {canAdjust && (
                           <button
                             type="button"
-                            disabled={adjustingId === item._id}
-                            onClick={() => handleAdjust(item._id, -1)}
-                            className="p-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                            onClick={() => openMovement(item, 'minus')}
+                            className="p-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-100"
                             aria-label="Decrease stock"
+                            title="Minus stock"
                           >
                             <Minus size={14} />
                           </button>
                         )}
-                        <span className="min-w-[2.5rem] text-center font-semibold text-gray-900">
-                          {item.sellableQty}
+                        <span
+                          className="min-w-[2.5rem] text-center font-semibold text-gray-900"
+                          title={`Sellable: ${item.sellableQty ?? 0} · Dead stock: ${item.deadStockQty ?? 0}`}
+                        >
+                          {(item.sellableQty ?? 0) + (item.deadStockQty ?? 0)}
                         </span>
                         {canAdjust && (
                           <button
                             type="button"
-                            disabled={adjustingId === item._id}
-                            onClick={() => handleAdjust(item._id, 1)}
-                            className="p-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                            onClick={() => openMovement(item, 'add')}
+                            className="p-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-100"
                             aria-label="Increase stock"
+                            title="Add stock"
                           >
                             <Plus size={14} />
                           </button>
@@ -503,9 +487,12 @@ export default function AdminInventoryPage() {
 
       {movementItem && (
         <StockMovementModal
+          key={`${movementItem._id}-${movementTab}`}
           item={movementItem}
+          initialTab={movementTab}
           onClose={() => {
             setMovementItem(null);
+            setMovementTab('add');
             clearFocusParams();
           }}
           onSuccess={() => mutate()}

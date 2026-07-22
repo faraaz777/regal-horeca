@@ -36,6 +36,11 @@ export interface Rack {
   parentLocationId: string;
   path: string;
   displayPath: string;
+  /** Distinct SKUs with sellable qty on this rack. */
+  productCount?: number;
+  productIds?: string[];
+  /** Sellable units of all products on this rack (allocate “stored stock”). */
+  totalQty?: number;
 }
 
 export interface LocationSelection {

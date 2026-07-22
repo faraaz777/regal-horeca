@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { Loader2, ArrowRight } from 'lucide-react';
 import { fetchCascadeRacks } from '@/lib/client/locationCascadeApi';
+import { cascadeRacksSwrKey } from '@/lib/client/cascadeRacksSwrKey';
 import {
   shortLocationLabel,
   locationRackCode,
@@ -149,14 +150,14 @@ function TransferFloorRacks({
   onSelectRack,
 }) {
   const { data: rackData, isLoading } = useSWR(
-    floorId ? ['cascade-racks-transfer', floorId] : null,
+    cascadeRacksSwrKey('transfer', floorId),
     () => fetchCascadeRacks(floorId),
-    { revalidateOnFocus: false }
+    { revalidateOnFocus: true, dedupingInterval: 15_000, refreshInterval: 25_000, keepPreviousData: true }
   );
 
   const racks = rackData?.racks || [];
 
-  if (isLoading) {
+  if (!rackData && isLoading) {
     return (
       <p className="text-xs text-gray-500 flex items-center gap-1.5 px-1 py-2">
         <Loader2 size={12} className="animate-spin" />

@@ -21,6 +21,7 @@ import LocationQtyList from './movement/LocationQtyList';
 import NewRackAddPanel from './movement/NewRackAddPanel';
 import TransferTicketPanel from './movement/TransferTicketPanel';
 import RulesPanel, { buildRulesFormFromRule } from './movement/RulesPanel';
+import MaxStockWarnDialog from './MaxStockWarnDialog';
 
 const fetcher = (url) => adminJson(url);
 
@@ -63,6 +64,7 @@ export default function StockMovementModal({
   const [rulesForm, setRulesForm] = useState(null);
   const [savingRules, setSavingRules] = useState(false);
   const [editingRules, setEditingRules] = useState(false);
+  const [maxWarnPending, setMaxWarnPending] = useState(null);
 
   const { data: meData } = useSWR('/api/auth/me', fetcher, { revalidateOnFocus: false });
   const userRole = meData?.user?.role;
@@ -340,6 +342,55 @@ export default function StockMovementModal({
     }
   }, [item?._id, mutate, onSuccess, rulesForm]);
 
+  const postAddMovement = useCallback(async () => {
+    const lines = addLocationRows
+      .map((row) => ({
+        locationId: row.locationId,
+        quantity: addQuantities[String(row.locationId)] ?? 0,
+      }))
+      .filter((line) => line.quantity > 0);
+
+    if (lines.length === 0) {
+      toast.error('Enter quantity to add at least one location');
+      return false;
+    }
+
+    if (lines.length > MAX_MOVEMENT_LINES) {
+      toast.error(`At most ${MAX_MOVEMENT_LINES} locations per movement`);
+      return false;
+    }
+
+    if (String(form.remark || '').length > MAX_MOVEMENT_REMARK_LENGTH) {
+      toast.error(`Remark must be ${MAX_MOVEMENT_REMARK_LENGTH} characters or fewer`);
+      return false;
+    }
+
+    setSubmitting(true);
+    try {
+      await adminJson('/api/admin/inventory/movement', {
+        method: 'POST',
+        body: JSON.stringify({
+          productId: item._id,
+          action: 'add',
+          reason: form.reason,
+          remark: form.remark,
+          lines,
+        }),
+      });
+
+      toast.success('Movement posted');
+      await mutate();
+      onSuccess?.();
+      onClose();
+      return true;
+    } catch (err) {
+      toast.error(err.message || 'Failed to post movement');
+      return false;
+    } finally {
+      setSubmitting(false);
+    }
+  }, [addLocationRows, addQuantities, form.reason, form.remark, item._id, mutate, onClose, onSuccess]);
+
   const handlePost = useCallback(async () => {
     if (tab === 'minus') {
       const lines = sellableLocationRows
@@ -417,28 +468,25 @@ export default function StockMovementModal({
         return;
       }
 
-      setSubmitting(true);
-      try {
-        await adminJson('/api/admin/inventory/movement', {
-          method: 'POST',
-          body: JSON.stringify({
-            productId: item._id,
-            action: 'add',
-            reason: form.reason,
-            remark: form.remark,
-            lines,
-          }),
+      /**
+       * Max stock is a soft planning limit — warn before post, never hard-block.
+       */
+      const maxStock = inventoryRule?.maxStock;
+      const onHandQty = stockData?.sellableQty ?? item?.sellableQty ?? 0;
+      if (
+        Number.isFinite(maxStock) &&
+        maxStock >= 0 &&
+        onHandQty + totalAddQty > maxStock
+      ) {
+        setMaxWarnPending({
+          currentQty: onHandQty,
+          afterQty: onHandQty + totalAddQty,
+          maxStock,
         });
-
-        toast.success('Movement posted');
-        await mutate();
-        onSuccess?.();
-        onClose();
-      } catch (err) {
-        toast.error(err.message || 'Failed to post movement');
-      } finally {
-        setSubmitting(false);
+        return;
       }
+
+      await postAddMovement();
       return;
     }
 
@@ -500,6 +548,7 @@ export default function StockMovementModal({
   }, [
     form,
     item._id,
+    item?.sellableQty,
     tab,
     mutate,
     onClose,
@@ -509,6 +558,10 @@ export default function StockMovementModal({
     minusExceedsStock,
     addLocationRows,
     addQuantities,
+    totalAddQty,
+    inventoryRule,
+    stockData,
+    postAddMovement,
     transferQty,
     transferSameLocation,
     transferExceedsStock,
@@ -516,6 +569,11 @@ export default function StockMovementModal({
     fromSel,
     toSel,
   ]);
+
+  const handleMaxWarnContinue = useCallback(async () => {
+    setMaxWarnPending(null);
+    await postAddMovement();
+  }, [postAddMovement]);
 
   if (!item) return null;
 
@@ -849,6 +907,17 @@ export default function StockMovementModal({
           </div>
         </div>
       </div>
+
+      <MaxStockWarnDialog
+        isOpen={Boolean(maxWarnPending)}
+        onCancel={() => setMaxWarnPending(null)}
+        onContinue={handleMaxWarnContinue}
+        currentQty={maxWarnPending?.currentQty ?? 0}
+        afterQty={maxWarnPending?.afterQty ?? 0}
+        maxStock={maxWarnPending?.maxStock ?? 0}
+        stockUnit={stockUnit}
+        continuing={submitting}
+      />
     </div>
   );
 }

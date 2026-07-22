@@ -1,9 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import useSWR from 'swr';
+import useSWR, { preload } from 'swr';
 import { Loader2, ChevronDown, ChevronRight } from 'lucide-react';
-import { fetchCascadeBranches, fetchCascadeFloors } from '@/lib/client/locationCascadeApi';
+import {
+  fetchCascadeBranches,
+  fetchCascadeFloors,
+  fetchCascadeRacks,
+} from '@/lib/client/locationCascadeApi';
+import { cascadeRacksSwrKey } from '@/lib/client/cascadeRacksSwrKey';
 
 /**
  * Branch/floor accent styles — Transfer TO keeps amber selected branch chips
@@ -64,13 +69,13 @@ export default function LocationCascadePicker({
   const { data: branchData, isLoading: branchesLoading } = useSWR(
     enabled ? `cascade-branches-${swrKeyPrefix}` : null,
     fetchCascadeBranches,
-    { revalidateOnFocus: false }
+    { revalidateOnFocus: false, dedupingInterval: 60_000 }
   );
 
   const { data: floorData, isLoading: floorsLoading } = useSWR(
     enabled && branchId ? [`cascade-floors-${swrKeyPrefix}`, branchId] : null,
     () => fetchCascadeFloors(branchId),
-    { revalidateOnFocus: false }
+    { revalidateOnFocus: false, dedupingInterval: 30_000 }
   );
 
   const branches = branchData?.branches || [];
@@ -81,9 +86,48 @@ export default function LocationCascadePicker({
     const nextId = String(id);
     setBranchId(nextId);
     setPickingBranch(false);
+    // Expand nothing yet — floors effect opens first / default floor once loaded
     setExpandedFloors(new Set());
     onBranchChange?.(nextId);
   };
+
+  /**
+   * When a branch is active and floors arrive, expand one floor only
+   * (defaultFloorId or the first floor) so racks load without a wall of cards.
+   */
+  useEffect(() => {
+    if (pickingBranch || !branchId || !floors.length) return;
+    setExpandedFloors((prev) => {
+      if (prev.size > 0) {
+        const stillValid = [...prev].some((id) =>
+          floors.some((f) => String(f._id) === String(id))
+        );
+        if (stillValid) return prev;
+      }
+      if (
+        defaultFloorId &&
+        floors.some((f) => String(f._id) === String(defaultFloorId))
+      ) {
+        return new Set([String(defaultFloorId)]);
+      }
+      return new Set([String(floors[0]._id)]);
+    });
+  }, [pickingBranch, branchId, floors, defaultFloorId]);
+
+  /**
+   * Prefetch racks for every floor in the branch so expanding a floor
+   * hits SWR cache instead of waiting on a cold cascade call.
+   */
+  useEffect(() => {
+    if (pickingBranch || !floors.length) return;
+    for (const floor of floors) {
+      const fid = String(floor._id);
+      const key = cascadeRacksSwrKey(swrKeyPrefix, fid);
+      if (key) {
+        preload(key, () => fetchCascadeRacks(fid));
+      }
+    }
+  }, [pickingBranch, floors, swrKeyPrefix]);
 
   const toggleFloor = (floorId) => {
     setExpandedFloors((prev) => {
@@ -200,7 +244,11 @@ export default function LocationCascadePicker({
                 </div>
                 {isExpanded && (
                   <div className="px-2 pb-2 pt-1 border-t border-gray-100">
-                    {renderFloorRacks?.(floor, { branchId })}
+                    {renderFloorRacks?.(floor, {
+                      branchId,
+                      branchCode: selectedBranch?.code || '',
+                      branchName: selectedBranch?.name || '',
+                    })}
                   </div>
                 )}
               </div>

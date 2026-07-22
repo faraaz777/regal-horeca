@@ -2,14 +2,44 @@
 
 import { useEffect, useState } from 'react';
 
-export default function MovementQtyStepper({ value, max, onChange, accent = 'amber', size = 'md' }) {
+export default function MovementQtyStepper({
+  value,
+  max,
+  onChange,
+  accent = 'amber',
+  size = 'md',
+  fullWidth = false,
+}) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(value));
   const focusRing = accent === 'emerald' ? 'focus:ring-emerald-400' : 'focus:ring-amber-400';
   const hoverBg = accent === 'emerald' ? 'hover:bg-emerald-50' : 'hover:bg-amber-50';
+
+  const sizeMap = {
+    sm: {
+      btn: 'w-6 h-7 text-xs',
+      mid: fullWidth ? 'flex-1 min-w-0 h-7 text-xs' : 'w-7 h-7 text-xs',
+      radius: 'rounded-lg',
+      btnRadius: 'rounded-l-md',
+      btnRadiusR: 'rounded-r-md',
+    },
+    md: {
+      btn: 'w-7 h-8 text-sm',
+      mid: fullWidth ? 'flex-1 min-w-0 h-8 text-sm' : 'w-9 h-8 text-sm',
+      radius: 'rounded-xl',
+      btnRadius: 'rounded-l-[10px]',
+      btnRadiusR: 'rounded-r-[10px]',
+    },
+    lg: {
+      btn: 'w-11 h-11 text-lg',
+      mid: fullWidth ? 'flex-1 min-w-0 h-11 text-base' : 'w-12 h-11 text-base',
+      radius: 'rounded-xl',
+      btnRadius: 'rounded-l-[10px]',
+      btnRadiusR: 'rounded-r-[10px]',
+    },
+  };
+  const s = sizeMap[size] || sizeMap.md;
   const isLg = size === 'lg';
-  const btnW = isLg ? 'w-11 h-11 text-lg' : 'w-7 h-8 text-sm';
-  const midW = isLg ? 'w-12 h-11 text-base' : 'w-9 h-8 text-sm';
 
   useEffect(() => {
     if (!editing) setDraft(String(value));
@@ -32,7 +62,7 @@ export default function MovementQtyStepper({ value, max, onChange, accent = 'amb
 
   return (
     <div
-      className={`inline-flex items-center rounded-xl border-2 border-gray-200 bg-gray-50 shrink-0 ${
+      className={`${fullWidth ? 'flex w-full' : 'inline-flex'} items-center ${s.radius} border-2 border-gray-200 bg-gray-50 shrink-0 ${
         isLg ? 'shadow-sm' : ''
       }`}
     >
@@ -40,7 +70,7 @@ export default function MovementQtyStepper({ value, max, onChange, accent = 'amb
         type="button"
         disabled={value <= 0}
         onClick={() => onChange(Math.max(0, value - 1))}
-        className={`${btnW} font-semibold text-gray-700 disabled:opacity-30 hover:bg-gray-100 rounded-l-[10px]`}
+        className={`${s.btn} font-semibold text-gray-700 disabled:opacity-30 hover:bg-gray-100 ${s.btnRadius}`}
         aria-label="Decrease quantity"
       >
         −
@@ -51,7 +81,7 @@ export default function MovementQtyStepper({ value, max, onChange, accent = 'amb
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
-          className={`${midW} text-center font-mono tabular-nums border-x-2 border-gray-200 bg-white outline-none focus:ring-2 ${focusRing}`}
+          className={`${s.mid} text-center font-mono tabular-nums border-x-2 border-gray-200 bg-white outline-none focus:ring-2 ${focusRing}`}
           value={draft}
           onChange={(e) => setDraft(e.target.value.replace(/\D/g, ''))}
           onBlur={() => {
@@ -77,7 +107,7 @@ export default function MovementQtyStepper({ value, max, onChange, accent = 'amb
             setDraft(String(value));
             setEditing(true);
           }}
-          className={`${midW} font-mono tabular-nums border-x-2 border-gray-200 bg-white ${hoverBg}`}
+          className={`${s.mid} font-mono tabular-nums border-x-2 border-gray-200 bg-white ${hoverBg}`}
           title="Tap to type quantity"
         >
           {value}
@@ -87,7 +117,7 @@ export default function MovementQtyStepper({ value, max, onChange, accent = 'amb
         type="button"
         disabled={!canIncrease}
         onClick={() => onChange(clamp(value + 1))}
-        className={`${btnW} font-semibold text-gray-700 disabled:opacity-30 hover:bg-gray-100 rounded-r-[10px]`}
+        className={`${s.btn} font-semibold text-gray-700 disabled:opacity-30 hover:bg-gray-100 ${s.btnRadiusR}`}
         aria-label="Increase quantity"
       >
         +

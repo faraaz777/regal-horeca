@@ -3,11 +3,8 @@ import { connectToDatabase } from '@/lib/db/connect';
 import { requireAuth } from '@/lib/server/auth/requireAuth';
 import { searchInventoryProducts } from '@/lib/server/inventory/addToInventoryService';
 import { inventorySearchSchema, formatZodError } from '@/lib/server/inventory/schemas';
-import {
-  getStockTotalsMapForProducts,
-} from '@/lib/server/inventory/stockLedgerService';
+import Stock from '@/lib/models/Stock';
 import StockLedger from '@/lib/models/StockLedger';
-import { deriveStockStatus } from '@/lib/server/inventory/inventoryService';
 import InventoryRule from '@/lib/models/InventoryRule';
 
 function resolveSearchHeroImage(product) {
@@ -22,6 +19,13 @@ function resolveSearchHeroImage(product) {
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * GET /api/admin/inventory/search
+ *
+ * Discovery only — product identity + badges.
+ * Does NOT return live quantities (those belong on Stock snapshots / detail views).
+ * Ledger is used only as a presence signal for “already in inventory”.
+ */
 export async function GET(request) {
   const auth = await requireAuth(request, { permission: 'inventory:read' });
   if (auth.error) return auth.error;
@@ -31,7 +35,7 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const parsed = inventorySearchSchema.safeParse({
       q: searchParams.get('q') || '',
-      limit: searchParams.get('limit') || 10,
+      limit: searchParams.get('limit') || 50,
     });
 
     if (!parsed.success) {
@@ -41,28 +45,37 @@ export async function GET(request) {
     const products = await searchInventoryProducts(parsed.data.q, parsed.data.limit);
     const productIds = products.map((p) => p._id);
 
-    const [stockMap, rules, ledgerProductIds] = await Promise.all([
-      getStockTotalsMapForProducts(productIds),
-      InventoryRule.find({ productId: { $in: productIds } })
-        .select('productId minStock deadStockMarked')
-        .lean(),
-      StockLedger.distinct('productId', { productId: { $in: productIds } }),
+    /**
+     * Presence checks only — no qty aggregation.
+     * inInventory = has ledger history OR any positive Stock snapshot row.
+     */
+    const [stockProductIds, ledgerProductIds, rules] = await Promise.all([
+      productIds.length
+        ? Stock.distinct('productId', {
+            productId: { $in: productIds },
+            qty: { $gt: 0 },
+          })
+        : [],
+      productIds.length
+        ? StockLedger.distinct('productId', { productId: { $in: productIds } })
+        : [],
+      productIds.length
+        ? InventoryRule.find({ productId: { $in: productIds } })
+            .select('productId deadStockMarked')
+            .lean()
+        : [],
     ]);
 
-    const ledgerSet = new Set(ledgerProductIds.map(String));
+    const inInventorySet = new Set([
+      ...stockProductIds.map(String),
+      ...ledgerProductIds.map(String),
+    ]);
     const ruleByProduct = new Map(rules.map((r) => [String(r.productId), r]));
 
     const enriched = products.map((p) => {
       const pid = String(p._id);
-      const totals = stockMap.get(pid) || {
-        sellableQty: 0,
-        soldQty: 0,
-        totalQty: 0,
-      };
-      const hasLedger = ledgerSet.has(pid);
-      const inInventory = hasLedger || totals.totalQty > 0;
+      const hasStock = inInventorySet.has(pid);
       const rule = ruleByProduct.get(pid);
-      const threshold = rule?.minStock ?? 10;
       const isDeadStock = Boolean(rule?.deadStockMarked);
 
       return {
@@ -78,15 +91,10 @@ export async function GET(request) {
         heroImage: resolveSearchHeroImage(p),
         categoryName: p.categoryId?.name || '',
         departmentName: p.departmentId?.name || '',
-        hasStock: inInventory,
-        hasInventoryRule: Boolean(rule),
-        sellableQty: totals.sellableQty,
+        hasStock,
         isDeadStock,
         deadStockMarked: isDeadStock,
         condition: isDeadStock ? 'HAS_DEAD_STOCK' : 'NORMAL',
-        soldQty: totals.soldQty,
-        totalQty: totals.totalQty,
-        stockStatus: deriveStockStatus(totals.sellableQty, threshold),
       };
     });
 

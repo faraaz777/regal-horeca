@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
-import { Search, ArrowLeft, Package, Loader2, Box, CheckCircle2 } from 'lucide-react';
+import { Search, ArrowLeft, Package, Loader2 } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
 import { useDebounce } from '@/hooks/useDebounce';
 import { canWriteInventory, canWriteProducts } from '@/lib/shared/permissions';
@@ -13,40 +13,36 @@ import {
   STOCK_UNITS,
   PRODUCT_STATUSES,
 } from '@/lib/shared/inventoryConstants';
-import AllocateStockToRacksModal from '@/components/admin/inventory/AllocateStockToRacksModal';
+import AllocateStockPanel from '@/components/admin/inventory/AllocateStockPanel';
 
 const fetcher = (url) => adminJson(url);
 
 const SEARCH_STATUS_STYLES = {
-  in_stock: 'bg-emerald-100 text-emerald-800',
-  low: 'bg-amber-100 text-amber-800',
-  out: 'bg-red-100 text-red-800',
+  in: 'bg-sky-100 text-sky-800',
+  out: 'bg-gray-100 text-gray-600',
 };
 
+/**
+ * Search is discovery — badges only, never live qty numbers.
+ */
 function SearchStockBadges({ product }) {
-  if (!product.hasStock) {
-    return (
-      <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600">
-        Not in inventory
-      </span>
-    );
-  }
+  const inInventory = Boolean(product.hasStock);
+  const dead = Boolean(product.isDeadStock || product.condition === 'HAS_DEAD_STOCK');
 
-  const onHand = product.sellableQty ?? 0;
   return (
-    <span className="inline-flex flex-wrap items-center gap-1">
+    <span className="inline-flex flex-wrap items-center gap-1 mt-1">
       <span
         className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-          SEARCH_STATUS_STYLES[product.stockStatus] || SEARCH_STATUS_STYLES.out
+          inInventory ? SEARCH_STATUS_STYLES.in : SEARCH_STATUS_STYLES.out
         }`}
       >
-        {onHand} on hand
+        {inInventory ? 'In inventory' : 'Not in inventory'}
       </span>
-      {(product.isDeadStock || product.condition === 'HAS_DEAD_STOCK') && (
+      {dead ? (
         <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-900">
-          ⚠ Dead stock
+          Dead stock
         </span>
-      )}
+      ) : null}
     </span>
   );
 }
@@ -124,12 +120,11 @@ export default function AddToInventoryPage() {
   const [opening, setOpening] = useState(EMPTY_OPENING);
   const [submitting, setSubmitting] = useState(false);
   const [validationErrors, setValidationErrors] = useState([]);
-  const [allocationModalOpen, setAllocationModalOpen] = useState(false);
 
   const searchUrl = debouncedQ
-    ? `/api/admin/inventory/search?q=${encodeURIComponent(debouncedQ)}&limit=100`
+    ? `/api/admin/inventory/search?q=${encodeURIComponent(debouncedQ)}&limit=50`
     : null;
-  const { data: searchData, isLoading: searchLoading, isValidating: searchValidating } = useSWR(
+  const { data: searchData, isLoading: searchLoading } = useSWR(
     searchUrl,
     fetcher,
     {
@@ -139,7 +134,7 @@ export default function AddToInventoryPage() {
     }
   );
 
-  const showSearchLoading = Boolean(debouncedQ) && (searchLoading || searchValidating || isSearchPending);
+  const showSearchLoading = Boolean(debouncedQ) && (searchLoading || isSearchPending);
 
   const { data: metaData } = useSWR(
     '/api/admin/inventory/locations?vendors=true',
@@ -151,10 +146,6 @@ export default function AddToInventoryPage() {
   const departments = deptData?.categories || [];
   const vendors = metaData?.vendors || [];
 
-  const handleAllocationSave = useCallback((allocationData) => {
-    setOpening(allocationData);
-  }, []);
-
   const categoryUrl = master.departmentId
     ? `/api/categories?parent=${master.departmentId}`
     : null;
@@ -163,18 +154,11 @@ export default function AddToInventoryPage() {
 
   const results = searchData?.results || [];
 
+  const isWorking = mode === 'create' || mode === 'existing';
   const showCreateForm = mode === 'create' || (mode === 'existing' && selected && !selected.hasStock);
   const showAdditionalOpening = mode === 'existing' && selected?.hasStock;
   const showFullOpeningGate = showCreateForm;
-
-  const openingQtyNum = parsePositiveInt(opening.openingQty);
-  const allocatedTotal = useMemo(
-    () =>
-      (opening.selectedLocations || []).reduce((sum, loc) => sum + (Number(loc.qty) || 0), 0),
-    [opening.selectedLocations]
-  );
-  const remainingToAllocate = openingQtyNum - allocatedTotal;
-  const isFullyAllocated = openingQtyNum > 0 && remainingToAllocate === 0;
+  const showAllocatePanel = canRecordStock && showFullOpeningGate;
 
   const allocationProduct = useMemo(() => {
     if (selected) {
@@ -224,11 +208,9 @@ export default function AddToInventoryPage() {
       setMaster(EMPTY_MASTER);
       setOpening(EMPTY_OPENING);
       setValidationErrors([]);
-      if (canRecordStock) {
-        setAllocationModalOpen(true);
-      }
+      setSearchQ('');
     },
-    [router, canRecordStock]
+    [router]
   );
 
   const startCreate = useCallback(() => {
@@ -237,179 +219,262 @@ export default function AddToInventoryPage() {
     setMaster(EMPTY_MASTER);
     setOpening(EMPTY_OPENING);
     setValidationErrors([]);
+    setSearchQ('');
+  }, []);
+
+  const changeProduct = useCallback(() => {
+    setSelected(null);
+    setMode('search');
+    setMaster(EMPTY_MASTER);
+    setOpening(EMPTY_OPENING);
+    setValidationErrors([]);
   }, []);
 
   const updateMaster = (key, value) => setMaster((p) => ({ ...p, [key]: value }));
 
-  const validateClient = useCallback(() => {
-    const errors = [];
-    if (mode === 'create' && canEditMaster) {
-      if (!master.name.trim()) errors.push('Product name is required');
-      if (!master.sku.trim()) errors.push('SKU is required');
-      if (!master.barcode.trim()) errors.push('Barcode is required');
-      if (!master.brand.trim()) errors.push('Brand is required');
-      if (!master.departmentId) errors.push('Department is required');
-      if (!master.categoryId) errors.push('Category is required');
-      if (!master.hsnCode.trim()) errors.push('HSN code is required');
-    }
-    if (showFullOpeningGate && canRecordStock) {
-      if (!opening.openingQty || openingQtyNum < 1) {
-        errors.push('Opening quantity must be at least 1');
+  /**
+   * Confirm & Save may pass fresh opening from the panel — avoid stale state.
+   */
+  const resolveOpening = useCallback(
+    (openingOverride) => openingOverride || opening,
+    [opening]
+  );
+
+  const validateClient = useCallback(
+    (openingOverride) => {
+      const effectiveOpening = resolveOpening(openingOverride);
+      const effectiveOpeningQty = parsePositiveInt(effectiveOpening.openingQty);
+      const effectiveAllocated = (effectiveOpening.selectedLocations || []).reduce(
+        (sum, loc) => sum + (Number(loc.qty) || 0),
+        0
+      );
+      const errors = [];
+      if (mode === 'create' && canEditMaster) {
+        if (!master.name.trim()) errors.push('Product name is required');
+        if (!master.sku.trim()) errors.push('SKU is required');
+        if (!master.barcode.trim()) errors.push('Barcode is required');
+        if (!master.brand.trim()) errors.push('Brand is required');
+        if (!master.departmentId) errors.push('Department is required');
+        if (!master.categoryId) errors.push('Category is required');
+        if (!master.hsnCode.trim()) errors.push('HSN code is required');
       }
-      for (const key of gateRequiredFields) {
-        if (key === 'selectedLocations') {
-          if (!opening.selectedLocations?.length) {
-            errors.push('Allocate stock to at least one rack');
-          } else {
-            const invalidQty = opening.selectedLocations.some(
-              (loc) => !loc.qty || Number(loc.qty) < 1
-            );
-            if (invalidQty) {
-              errors.push('Enter a valid quantity for each rack');
-            }
-            if (openingQtyNum > 0 && allocatedTotal !== openingQtyNum) {
-              errors.push(
-                `Allocated total (${allocatedTotal}) must equal opening quantity (${openingQtyNum})`
+      if (showFullOpeningGate && canRecordStock) {
+        if (!effectiveOpening.openingQty || effectiveOpeningQty < 1) {
+          errors.push('Opening quantity must be at least 1');
+        }
+        for (const key of gateRequiredFields) {
+          if (key === 'selectedLocations') {
+            if (!effectiveOpening.selectedLocations?.length) {
+              errors.push('Allocate stock to at least one rack');
+            } else {
+              const invalidQty = effectiveOpening.selectedLocations.some(
+                (loc) => !loc.qty || Number(loc.qty) < 1
               );
+              if (invalidQty) {
+                errors.push('Enter a valid quantity for each rack');
+              }
+              if (effectiveOpeningQty > 0 && effectiveAllocated !== effectiveOpeningQty) {
+                errors.push(
+                  `Allocated total (${effectiveAllocated}) must equal opening quantity (${effectiveOpeningQty})`
+                );
+              }
             }
+            continue;
           }
-          continue;
-        }
-        if (opening[key] === '' || opening[key] == null) {
-          errors.push(`${key} is required for first inventory intake`);
+          if (effectiveOpening[key] === '' || effectiveOpening[key] == null) {
+            errors.push(`${key} is required for first inventory intake`);
+          }
         }
       }
-    }
-    if (showAdditionalOpening && canRecordStock) {
-      if (!opening.openingQty || openingQtyNum < 1) {
-        errors.push('Opening quantity must be at least 1');
-      }
-      if (!opening.selectedLocations?.length) {
-        errors.push('Allocate stock to at least one rack');
-      } else {
-        const invalidQty = opening.selectedLocations.some(
-          (loc) => !loc.qty || Number(loc.qty) < 1
-        );
-        if (invalidQty) {
-          errors.push('Enter a valid quantity for each rack');
+      if (showAdditionalOpening && canRecordStock) {
+        if (!effectiveOpening.openingQty || effectiveOpeningQty < 1) {
+          errors.push('Opening quantity must be at least 1');
         }
-        if (openingQtyNum > 0 && allocatedTotal !== openingQtyNum) {
-          errors.push(
-            `Allocated total (${allocatedTotal}) must equal opening quantity (${openingQtyNum})`
+        if (!effectiveOpening.selectedLocations?.length) {
+          errors.push('Allocate stock to at least one rack');
+        } else {
+          const invalidQty = effectiveOpening.selectedLocations.some(
+            (loc) => !loc.qty || Number(loc.qty) < 1
+          );
+          if (invalidQty) {
+            errors.push('Enter a valid quantity for each rack');
+          }
+          if (effectiveOpeningQty > 0 && effectiveAllocated !== effectiveOpeningQty) {
+            errors.push(
+              `Allocated total (${effectiveAllocated}) must equal opening quantity (${effectiveOpeningQty})`
+            );
+          }
+        }
+      }
+      return errors;
+    },
+    [
+      mode,
+      master,
+      resolveOpening,
+      gateRequiredFields,
+      showFullOpeningGate,
+      showAdditionalOpening,
+      canEditMaster,
+      canRecordStock,
+    ]
+  );
+
+  const buildOpeningPayload = useCallback(
+    (openingOverride) => {
+      const effectiveOpening = resolveOpening(openingOverride);
+      const locationEntries = (effectiveOpening.selectedLocations || []).map((loc) => ({
+        locationId: loc.locationId,
+        qty: Number(loc.qty),
+      }));
+      return {
+        openingQty: Number(effectiveOpening.openingQty),
+        minStock: Number(effectiveOpening.minStock),
+        maxStock: Number(effectiveOpening.maxStock),
+        deadStockPeriod: effectiveOpening.deadStockPeriod,
+        deadStockQty: Number(effectiveOpening.deadStockQty),
+        locationEntries,
+        openingStatusBucket: effectiveOpening.openingStatusBucket,
+        markAsDeadStock: effectiveOpening.markAsDeadStock,
+        openingReason: 'opening_stock',
+        openingRatePaise: null,
+        remark: effectiveOpening.remark,
+      };
+    },
+    [resolveOpening]
+  );
+
+  const submitInventory = useCallback(
+    async ({ openingOverride } = {}) => {
+      const effectiveOpening = resolveOpening(openingOverride);
+      const effectiveOpeningQty = parsePositiveInt(effectiveOpening.openingQty);
+      const effectiveAllocated = (effectiveOpening.selectedLocations || []).reduce(
+        (sum, loc) => sum + (Number(loc.qty) || 0),
+        0
+      );
+      const effectiveFullyAllocated =
+        effectiveOpeningQty > 0 && effectiveOpeningQty - effectiveAllocated === 0;
+
+      if (
+        canRecordStock &&
+        (showFullOpeningGate || showAdditionalOpening) &&
+        !effectiveFullyAllocated
+      ) {
+        toast.error('Allocate all opening stock to racks before saving');
+        return { success: false };
+      }
+
+      const clientErrors = validateClient(openingOverride);
+      if (clientErrors.length > 0) {
+        setValidationErrors(clientErrors);
+        toast.error('Please complete all required fields');
+        return { success: false };
+      }
+
+      setValidationErrors([]);
+      if (openingOverride) {
+        setOpening(openingOverride);
+      }
+      setSubmitting(true);
+
+      try {
+        if (mode === 'create') {
+          if (!canEditMaster || !canRecordStock) {
+            toast.error('You need both product and inventory permissions');
+            return { success: false };
+          }
+          const openingPayload = buildOpeningPayload(openingOverride);
+          await adminJson('/api/admin/inventory/create-with-opening', {
+            method: 'POST',
+            body: JSON.stringify({
+              product: {
+                ...master,
+                gstPercent: Number(master.gstPercent),
+                costPaise: Number(master.costPaise),
+                mrpPaise: Number(master.mrpPaise),
+                sellingPricePaise: Number(master.sellingPricePaise),
+                maxDiscountPercent: Number(master.maxDiscountPercent),
+                vendorId: master.vendorId || null,
+              },
+              opening: openingPayload,
+            }),
+          });
+          toast.success(
+            openingPayload.locationEntries.length > 1
+              ? `Product created with opening stock at ${openingPayload.locationEntries.length} locations`
+              : 'Product created with opening stock'
+          );
+        } else if (selected) {
+          if (!canRecordStock) {
+            toast.error('Inventory permission required');
+            return { success: false };
+          }
+          const openingPayload = buildOpeningPayload(openingOverride);
+          const body = selected.hasStock
+            ? {
+                productId: selected._id,
+                openingQty: openingPayload.openingQty,
+                locationEntries: openingPayload.locationEntries,
+                openingStatusBucket: openingPayload.openingStatusBucket,
+                markAsDeadStock: openingPayload.markAsDeadStock,
+                openingReason: openingPayload.openingReason,
+                openingRatePaise: null,
+                remark: openingPayload.remark,
+              }
+            : {
+                productId: selected._id,
+                opening: openingPayload,
+              };
+
+          await adminJson('/api/admin/inventory/add-opening', {
+            method: 'POST',
+            body: JSON.stringify(body),
+          });
+          const totalQty = openingPayload.locationEntries.reduce((sum, e) => sum + e.qty, 0);
+          toast.success(
+            openingPayload.locationEntries.length > 1
+              ? `Opening stock recorded at ${openingPayload.locationEntries.length} locations (${totalQty} units total)`
+              : 'Opening stock recorded'
           );
         }
-      }
-    }
-    return errors;
-  }, [mode, master, opening, openingQtyNum, allocatedTotal, gateRequiredFields, showFullOpeningGate, showAdditionalOpening, canEditMaster, canRecordStock]);
 
-  const buildOpeningPayload = useCallback(() => {
-    const locationEntries = (opening.selectedLocations || []).map((loc) => ({
-      locationId: loc.locationId,
-      qty: Number(loc.qty),
-    }));
-    return {
-      openingQty: Number(opening.openingQty),
-      minStock: Number(opening.minStock),
-      maxStock: Number(opening.maxStock),
-      deadStockPeriod: opening.deadStockPeriod,
-      deadStockQty: Number(opening.deadStockQty),
-      locationEntries,
-      openingStatusBucket: opening.openingStatusBucket,
-      markAsDeadStock: opening.markAsDeadStock,
-      openingReason: 'opening_stock',
-      openingRatePaise: null,
-      remark: opening.remark,
-    };
-  }, [opening]);
+        window.location.href = '/admin/inventory';
+        return { success: true };
+      } catch (err) {
+        const details = err.details ?? err.message;
+        toast.error(typeof details === 'string' ? details : 'Failed to save');
+        if (Array.isArray(details)) setValidationErrors(details);
+        else if (typeof details === 'string') setValidationErrors([details]);
+        else if (typeof err.message === 'string') setValidationErrors([err.message]);
+        return { success: false };
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [
+      resolveOpening,
+      canRecordStock,
+      showFullOpeningGate,
+      showAdditionalOpening,
+      validateClient,
+      buildOpeningPayload,
+      mode,
+      canEditMaster,
+      master,
+      selected,
+    ]
+  );
+
+  const submitInventoryRef = useRef(submitInventory);
+  submitInventoryRef.current = submitInventory;
+
+  const handleConfirmAndSave = useCallback(async (form) => {
+    return submitInventoryRef.current({ openingOverride: form });
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (canRecordStock && (showFullOpeningGate || showAdditionalOpening) && !isFullyAllocated) {
-      setAllocationModalOpen(true);
-      toast.error('Allocate all opening stock to racks before saving');
-      return;
-    }
-    const clientErrors = validateClient();
-    if (clientErrors.length > 0) {
-      setValidationErrors(clientErrors);
-      toast.error('Please complete all required fields');
-      return;
-    }
-    setValidationErrors([]);
-    setSubmitting(true);
-
-    try {
-      if (mode === 'create') {
-        if (!canEditMaster || !canRecordStock) {
-          toast.error('You need both product and inventory permissions');
-          return;
-        }
-        const openingPayload = buildOpeningPayload();
-        await adminJson('/api/admin/inventory/create-with-opening', {
-          method: 'POST',
-          body: JSON.stringify({
-            product: {
-              ...master,
-              gstPercent: Number(master.gstPercent),
-              costPaise: Number(master.costPaise),
-              mrpPaise: Number(master.mrpPaise),
-              sellingPricePaise: Number(master.sellingPricePaise),
-              maxDiscountPercent: Number(master.maxDiscountPercent),
-              vendorId: master.vendorId || null,
-            },
-            opening: openingPayload,
-          }),
-        });
-        toast.success(
-          openingPayload.locationEntries.length > 1
-            ? `Product created with opening stock at ${openingPayload.locationEntries.length} locations`
-            : 'Product created with opening stock'
-        );
-      } else if (selected) {
-        if (!canRecordStock) {
-          toast.error('Inventory permission required');
-          return;
-        }
-        const openingPayload = buildOpeningPayload();
-        const body = selected.hasStock
-          ? {
-              productId: selected._id,
-              openingQty: openingPayload.openingQty,
-              locationEntries: openingPayload.locationEntries,
-              openingStatusBucket: openingPayload.openingStatusBucket,
-              markAsDeadStock: openingPayload.markAsDeadStock,
-              openingReason: openingPayload.openingReason,
-              openingRatePaise: null,
-              remark: openingPayload.remark,
-            }
-          : {
-              productId: selected._id,
-              opening: openingPayload,
-            };
-
-        await adminJson('/api/admin/inventory/add-opening', {
-          method: 'POST',
-          body: JSON.stringify(body),
-        });
-        const totalQty = openingPayload.locationEntries.reduce((sum, e) => sum + e.qty, 0);
-        toast.success(
-          openingPayload.locationEntries.length > 1
-            ? `Opening stock recorded at ${openingPayload.locationEntries.length} locations (${totalQty} units total)`
-            : 'Opening stock recorded'
-        );
-      }
-
-      window.location.href = '/admin/inventory';
-    } catch (err) {
-      const details = err.details ?? err.message;
-      toast.error(typeof details === 'string' ? details : 'Failed to save');
-      if (Array.isArray(details)) setValidationErrors(details);
-      else if (typeof details === 'string') setValidationErrors([details]);
-      else if (typeof err.message === 'string') setValidationErrors([err.message]);
-    } finally {
-      setSubmitting(false);
-    }
+    await submitInventory();
   };
 
   if (!meData) {
@@ -429,7 +494,8 @@ export default function AddToInventoryPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    // Full main width so content grows into freed space when sidebar closes (AdminShell lg:ml-64 ↔ lg:ml-0).
+    <div className="w-full space-y-6 pb-8">
       <div className="flex items-center gap-3">
         <Link
           href="/admin/inventory"
@@ -439,110 +505,111 @@ export default function AddToInventoryPage() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Add product to inventory</h1>
-          <p className="text-sm text-gray-500">Search first — avoid duplicate SKUs</p>
+          <p className="text-sm text-gray-500">
+            {isWorking
+              ? mode === 'create'
+                ? 'Fill product details, then allocate opening stock on this page'
+                : 'Allocate opening stock on this page — no popup'
+              : 'Search first — avoid duplicate SKUs'}
+          </p>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input
-            type="text"
-            value={searchQ}
-            onChange={(e) => setSearchQ(e.target.value)}
-            placeholder="Name, SKU, barcode, HSN, brand, tags…"
-            className="w-full pl-10 pr-4 py-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
-            autoFocus
-          />
-        </div>
+      {!isWorking && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 sm:p-6 shadow-sm">
+          <div className="relative">
+            <Search
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+              size={20}
+            />
+            <input
+              type="text"
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              placeholder="Name, SKU, barcode, HSN, brand, tags…"
+              className="w-full pl-12 pr-4 py-4 text-base border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+              autoFocus
+            />
+          </div>
 
-        {debouncedQ && (
-          <div className="mt-3 border border-gray-100 rounded-lg divide-y max-h-64 overflow-y-auto">
-            {showSearchLoading && results.length === 0 ? (
-              <div className="p-4 text-sm text-gray-500 text-center flex items-center justify-center gap-2">
-                <Loader2 className="animate-spin text-emerald-600" size={16} />
-                Searching…
-              </div>
-            ) : results.length === 0 ? (
-              <div className="p-4 text-sm text-gray-500 text-center">
-                No matches — create a new product below
-              </div>
-            ) : (
-              results.map((p) => {
-                const inInventory = Boolean(p.hasStock);
-                const isSelected = selected?._id === p._id;
-                return (
-                  <button
-                    key={p._id}
-                    type="button"
-                    onClick={() => selectExisting(p)}
-                    className={`w-full text-left px-4 py-3 transition-colors flex items-center gap-3 border-l-4 ${
-                      isSelected
-                        ? inInventory
-                          ? 'bg-sky-50 ring-1 ring-sky-200 border-sky-500'
-                          : 'bg-emerald-50 ring-1 ring-emerald-200 border-emerald-500'
-                        : inInventory
+          {debouncedQ && (
+            <div className="mt-4 border border-gray-100 rounded-xl divide-y max-h-80 overflow-y-auto">
+              {showSearchLoading && results.length === 0 ? (
+                <div className="p-4 text-sm text-gray-500 text-center flex items-center justify-center gap-2">
+                  <Loader2 className="animate-spin text-emerald-600" size={16} />
+                  Searching…
+                </div>
+              ) : results.length === 0 ? (
+                <div className="p-4 text-sm text-gray-500 text-center">
+                  No matches — create a new product below
+                </div>
+              ) : (
+                results.map((p) => {
+                  const inInventory = Boolean(p.hasStock);
+                  return (
+                    <button
+                      key={p._id}
+                      type="button"
+                      onClick={() => selectExisting(p)}
+                      className={`w-full text-left px-4 py-3 transition-colors flex items-center gap-3 border-l-4 ${
+                        inInventory
                           ? 'hover:bg-sky-50/80 border-sky-400 bg-sky-50/40'
                           : 'hover:bg-emerald-50 border-transparent'
-                    }`}
-                  >
-                    <div className="h-12 w-12 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-200">
-                      {p.heroImage ? (
-                        <img
-                          src={p.heroImage}
-                          alt=""
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-300">
-                          <Package size={20} />
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="font-medium text-gray-900 truncate">{p.title}</div>
-                        {inInventory && (
-                          <span className="shrink-0 inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-sky-600 text-white">
-                            In inventory
-                          </span>
+                      }`}
+                    >
+                      <div className="h-12 w-12 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-200">
+                        {p.heroImage ? (
+                          <img
+                            src={p.heroImage}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-300">
+                            <Package size={20} />
+                          </div>
                         )}
                       </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {[
-                          p.sku && `SKU ${p.sku}`,
-                          p.barcode && `Barcode ${p.barcode}`,
-                          p.brand,
-                          p.categoryName,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="font-medium text-gray-900 truncate">{p.title}</div>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {[
+                            p.sku && `SKU ${p.sku}`,
+                            p.barcode && `Barcode ${p.barcode}`,
+                            p.brand,
+                            p.categoryName,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </div>
+                        <SearchStockBadges product={p} />
+                        {inInventory && (
+                          <p className="text-[10px] text-sky-700 mt-1">
+                            Click to add stock via stock movement
+                          </p>
+                        )}
                       </div>
-                      <SearchStockBadges product={p} />
-                      {inInventory && (
-                        <p className="text-[10px] text-sky-700 mt-1">
-                          Click to add stock at another location or adjust
-                        </p>
-                      )}
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
 
-        {canEditMaster && (
-          <button
-            type="button"
-            onClick={startCreate}
-            className="mt-3 w-full py-2.5 text-sm font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100"
-          >
-            + Create new product (no match found)
-          </button>
-        )}
-      </div>
+          {canEditMaster && (
+            <button
+              type="button"
+              onClick={startCreate}
+              className="mt-4 w-full py-3 text-sm font-medium text-emerald-700 bg-emerald-50 rounded-xl hover:bg-emerald-100"
+            >
+              + Create new product (no match found)
+            </button>
+          )}
+        </div>
+      )}
 
       {validationErrors.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
@@ -555,54 +622,25 @@ export default function AddToInventoryPage() {
         </div>
       )}
 
-      {(mode === 'create' || mode === 'existing') && (
+      {isWorking && (
         <form onSubmit={handleSubmit} className="space-y-6">
-          {mode === 'existing' && selected && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3">
-              <div className="relative h-14 w-14 flex-shrink-0 rounded-lg overflow-hidden bg-white border border-emerald-200">
-                {selected.heroImage ? (
-                  <img
-                    src={selected.heroImage}
-                    alt=""
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-emerald-300">
-                    <Package size={22} />
-                  </div>
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-emerald-900">{selected.title}</p>
-                <p className="text-sm text-emerald-700">
-                  SKU {selected.sku} · {selected.brand}
-                </p>
-                <p className="text-xs text-emerald-600 mt-1">
-                  {selected.hasStock
-                    ? 'Add stock at an additional location'
-                    : isFullyAllocated
-                      ? `${openingQtyNum} units allocated across ${opening.selectedLocations?.length || 0} rack${(opening.selectedLocations?.length || 0) === 1 ? '' : 's'} — ready to save`
-                      : 'First inventory intake — allocate stock to racks in the popup'}
-                </p>
-                {!selected.hasStock && canRecordStock && (
-                  <button
-                    type="button"
-                    onClick={() => setAllocationModalOpen(true)}
-                    className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:text-accent/80"
-                  >
-                    <Box size={13} />
-                    {isFullyAllocated ? 'Edit allocation' : 'Open allocation'}
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
           {mode === 'create' && canEditMaster && (
             <section className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900">Product master</h2>
-              <p className="text-xs text-gray-500">All money fields in paise (₹1 = 100 paise)</p>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Product master</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    All money fields in paise (₹1 = 100 paise)
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={changeProduct}
+                  className="text-xs font-semibold text-accent hover:underline shrink-0"
+                >
+                  Back to search
+                </button>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Name" required>
                   <input
@@ -777,64 +815,44 @@ export default function AddToInventoryPage() {
             </section>
           )}
 
-          {canRecordStock && mode === 'create' && showFullOpeningGate && (
-            <div
-              className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border px-4 py-3 ${
-                isFullyAllocated
-                  ? 'border-emerald-200 bg-emerald-50/50'
-                  : 'border-gray-200 bg-gray-50/80'
-              }`}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                {isFullyAllocated ? (
-                  <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
-                ) : (
-                  <Box size={18} className="text-accent shrink-0" />
-                )}
-                <p className="text-sm text-gray-700">
-                  {isFullyAllocated
-                    ? `${openingQtyNum} ${master.unit || 'units'} allocated across ${opening.selectedLocations?.length || 0} rack${(opening.selectedLocations?.length || 0) === 1 ? '' : 's'}`
-                    : 'Allocate opening stock to racks before saving'}
-                </p>
-              </div>
+          {showAllocatePanel && (
+            <AllocateStockPanel
+              enabled
+              value={opening}
+              onChange={setOpening}
+              onConfirmAndSave={handleConfirmAndSave}
+              onChangeProduct={changeProduct}
+              submitting={submitting}
+              showInventoryRules={showFullOpeningGate}
+              stockUnit={selected?.stockUnit || master.unit || 'units'}
+              product={allocationProduct}
+              currentOnHand={0}
+            />
+          )}
+
+          {/*
+            Fallback save when inventory rules / allocate panel is hidden
+            (e.g. product write without stock permission).
+          */}
+          {!showAllocatePanel && (
+            <div className="flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setAllocationModalOpen(true)}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold text-accent border border-accent/30 rounded-lg hover:bg-accent/5 shrink-0"
+                onClick={changeProduct}
+                className="px-4 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
               >
-                <Box size={14} />
-                {isFullyAllocated ? 'Edit allocation' : 'Allocate stock to racks'}
+                Back to search
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-6 py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 inline-flex items-center gap-2"
+              >
+                {submitting && <Loader2 size={16} className="animate-spin" />}
+                Save to inventory
               </button>
             </div>
           )}
-
-          <AllocateStockToRacksModal
-            isOpen={allocationModalOpen}
-            onClose={() => setAllocationModalOpen(false)}
-            value={opening}
-            onSave={handleAllocationSave}
-            showInventoryRules={showFullOpeningGate}
-            stockUnit={selected?.stockUnit || master.unit || 'units'}
-            product={allocationProduct}
-            productId={selected?._id || null}
-          />
-
-          <div className="flex justify-end gap-3">
-            <Link
-              href="/admin/inventory"
-              className="px-4 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
-            >
-              Cancel
-            </Link>
-            <button
-              type="submit"
-              disabled={submitting || (canRecordStock && (showFullOpeningGate || showAdditionalOpening) && !isFullyAllocated)}
-              className="px-6 py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 inline-flex items-center gap-2"
-            >
-              {submitting && <Loader2 size={16} className="animate-spin" />}
-              Save to inventory
-            </button>
-          </div>
         </form>
       )}
     </div>

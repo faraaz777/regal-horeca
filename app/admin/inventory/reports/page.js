@@ -11,7 +11,7 @@ const fetcher = (url) => adminJson(url);
 
 const TABS = [
   { id: 'sellable', label: 'Sellable stock' },
-  { id: 'dead_stock', label: 'Dead stock' },
+  { id: 'dead_stock', label: 'Dead stock (tagged)' },
   { id: 'sold', label: 'Sold movements' },
 ];
 
@@ -66,7 +66,7 @@ export default function InventoryReportsPage() {
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">Inventory reports</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Sellable inventory, dead stock, and sold movement history.
+            Sellable inventory, products tagged dead stock, and sold movement history.
           </p>
         </div>
       </div>
@@ -140,10 +140,15 @@ export default function InventoryReportsPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {items.map((row) => (
-                <tr key={`${row.productId}-${row.locationId}-${row.statusBucket}`}>
+                <tr key={`${row.productId}-${row.locationId || 'all'}-${row.statusBucket || 'row'}`}>
                   <td className="px-4 py-3">
                     <p className="font-medium text-gray-900">{row.title}</p>
                     <p className="text-xs font-mono text-gray-500">{row.sku}</p>
+                    {tab === 'dead_stock' && (
+                      <span className="inline-flex mt-1 px-1.5 py-px rounded text-[10px] font-semibold bg-amber-100 text-amber-900">
+                        ⚠ Dead stock
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-700">{row.locationPath}</td>
                   <td className="px-4 py-3 text-right font-semibold">

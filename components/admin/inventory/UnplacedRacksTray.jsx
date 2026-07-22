@@ -34,8 +34,7 @@ export default function UnplacedRacksTray({ racks, onRackClick }) {
                   {formatRackDisplayName(rack)}
                 </p>
                 <p className="text-[10px] text-gray-500 mt-0.5">
-                  {rack.sellableQty} sellable
-                  {rack.deadStockQty > 0 ? ` · ${rack.deadStockQty} dead stock` : ''}
+                  {rack.sellableQty ?? rack.totalQty ?? 0} sellable
                 </p>
               </button>
               <span

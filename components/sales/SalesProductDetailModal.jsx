@@ -337,8 +337,13 @@ export default function SalesProductDetailModal({
                 </div>
 
                 <div className="rounded-lg border border-gray-200 px-3 py-2.5 flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Total sellable stock</span>
-                  <span className="font-semibold text-gray-900">
+                  <span className="text-gray-500">Sellable stock</span>
+                  <span className="font-semibold text-gray-900 flex items-center gap-2">
+                    {(detail?.isDeadStock || detail?.condition === 'HAS_DEAD_STOCK') && (
+                      <span className="px-1.5 py-px rounded text-[10px] font-semibold bg-amber-100 text-amber-900">
+                        ⚠ Dead stock
+                      </span>
+                    )}
                     {detail?.sellableQty ?? preview?.sellableQty ?? 0}{' '}
                     {detail?.stockUnit || preview?.stockUnit || 'Pcs'}
                   </span>
@@ -382,11 +387,8 @@ export default function SalesProductDetailModal({
                           </div>
                           <div className="text-right shrink-0 text-xs text-gray-600">
                             <p>
-                              {loc.sellableQty} {detail.stockUnit} sellable
+                              {loc.sellableQty} {detail.stockUnit}
                             </p>
-                            {loc.deadStockQty > 0 && (
-                              <p className="text-slate-700">{loc.deadStockQty} dead stock</p>
-                            )}
                           </div>
                         </li>
                       ))}

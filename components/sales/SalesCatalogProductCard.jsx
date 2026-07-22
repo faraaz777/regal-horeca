@@ -110,6 +110,11 @@ export default function SalesCatalogProductCard({ product, canAdd, onAdd }) {
               <span className="opacity-75">·</span>
               <span>{stockStatusLabel(stockStatus)}</span>
             </span>
+            {(product.isDeadStock || product.condition === 'HAS_DEAD_STOCK') && (
+              <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-900">
+                ⚠ Dead stock
+              </span>
+            )}
           </div>
         </div>
       </div>

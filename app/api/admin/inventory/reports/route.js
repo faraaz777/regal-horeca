@@ -11,6 +11,10 @@ export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/admin/inventory/reports?type=sellable|dead_stock|sold
+ *
+ * sellable = sellableQty at locations
+ * dead_stock = products with InventoryRule.deadStockMarked (+ sellableQty)
+ * sold = sale fulfillment ledger history
  */
 export async function GET(request) {
   const auth = await requireAuth(request, { permission: 'inventory:read' });

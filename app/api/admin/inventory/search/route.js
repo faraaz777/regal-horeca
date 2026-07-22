@@ -44,7 +44,7 @@ export async function GET(request) {
     const [stockMap, rules, ledgerProductIds] = await Promise.all([
       getStockTotalsMapForProducts(productIds),
       InventoryRule.find({ productId: { $in: productIds } })
-        .select('productId minStock')
+        .select('productId minStock deadStockMarked')
         .lean(),
       StockLedger.distinct('productId', { productId: { $in: productIds } }),
     ]);
@@ -56,7 +56,6 @@ export async function GET(request) {
       const pid = String(p._id);
       const totals = stockMap.get(pid) || {
         sellableQty: 0,
-        deadStockQty: 0,
         soldQty: 0,
         totalQty: 0,
       };
@@ -64,6 +63,7 @@ export async function GET(request) {
       const inInventory = hasLedger || totals.totalQty > 0;
       const rule = ruleByProduct.get(pid);
       const threshold = rule?.minStock ?? 10;
+      const isDeadStock = Boolean(rule?.deadStockMarked);
 
       return {
         _id: p._id,
@@ -81,7 +81,9 @@ export async function GET(request) {
         hasStock: inInventory,
         hasInventoryRule: Boolean(rule),
         sellableQty: totals.sellableQty,
-        deadStockQty: totals.deadStockQty,
+        isDeadStock,
+        deadStockMarked: isDeadStock,
+        condition: isDeadStock ? 'HAS_DEAD_STOCK' : 'NORMAL',
         soldQty: totals.soldQty,
         totalQty: totals.totalQty,
         stockStatus: deriveStockStatus(totals.sellableQty, threshold),

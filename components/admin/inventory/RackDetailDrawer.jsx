@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { X, ExternalLink, Loader2 } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
 import { getRackStatusStyle } from '@/lib/client/locatorUtils';
-import { STATUS_BUCKET_LABELS } from '@/lib/shared/inventoryConstants';
 
 const fetcher = (url) => adminJson(url);
 
@@ -72,14 +71,9 @@ export default function RackDetailDrawer({ rackId, onClose }) {
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs mt-2">
-                  <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold">
-                    {rack.sellableQty} Sellable
+                  <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-800 font-semibold">
+                    {rack.sellableQty ?? rack.totalQty ?? 0} sellable
                   </span>
-                  {rack.deadStockQty > 0 && (
-                    <span className="px-2 py-1 rounded-full bg-slate-200 text-slate-800 font-semibold">
-                      {rack.deadStockQty} Dead stock
-                    </span>
-                  )}
                 </div>
               </div>
 
@@ -92,15 +86,20 @@ export default function RackDetailDrawer({ rackId, onClose }) {
                 ) : (
                   <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
                     {items.map((item) => (
-                      <li
-                        key={`${item.productId}-${item.statusBucket}`}
-                        className="px-3 py-2 text-sm"
-                      >
-                        <p className="font-medium text-gray-900 truncate">{item.title}</p>
-                        <p className="text-xs text-gray-500 font-mono">{item.sku || '—'}</p>
-                        <p className="text-xs mt-0.5">
-                          {item.qty} {item.stockUnit} ·{' '}
-                          {STATUS_BUCKET_LABELS[item.statusBucket] || item.statusBucket}
+                      <li key={item.productId} className="px-3 py-2 text-sm">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-medium text-gray-900 truncate">{item.title}</p>
+                            <p className="text-xs text-gray-500 font-mono">{item.sku || '—'}</p>
+                          </div>
+                          {item.isDeadStock && (
+                            <span className="shrink-0 px-1.5 py-px rounded text-[10px] font-semibold bg-amber-100 text-amber-900">
+                              ⚠ Dead stock
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs mt-0.5 text-gray-700">
+                          {item.qty} {item.stockUnit}
                         </p>
                       </li>
                     ))}

@@ -31,11 +31,6 @@ function ZoneHoverSummary({ zone, summary }) {
               {s.rackStatusCounts.empty > 0 && `${s.rackStatusCounts.empty} empty`}
             </li>
           )}
-          {(s.stockStatusQty?.dead_stock > 0) && (
-            <li className="text-[10px] text-gray-400">
-              {s.stockStatusQty.dead_stock} dead stock
-            </li>
-          )}
         </ul>
       </div>
     </div>

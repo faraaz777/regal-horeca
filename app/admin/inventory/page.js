@@ -9,9 +9,15 @@ import useSWR from 'swr';
 import { Plus, Minus, Search, Package, Eye, Pencil, MapPin } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
 import { canWriteInventory, canWriteProducts } from '@/lib/shared/permissions';
+import dynamic from 'next/dynamic';
 import { LOCATION_PATH_SEP } from '@/lib/shared/inventoryConstants';
-import StockMovementModal from '@/components/admin/inventory/StockMovementModal';
 import MiniBarcode from '@/components/admin/inventory/MiniBarcode';
+
+/** Load movement modal only when opened — keeps the inventory list bundle lighter. */
+const StockMovementModal = dynamic(
+  () => import('@/components/admin/inventory/StockMovementModal'),
+  { ssr: false }
+);
 
 const STATUS_STYLES = {
   in_stock: 'bg-emerald-100 text-emerald-800',
@@ -25,7 +31,8 @@ const STATUS_LABELS = {
   out: 'Out',
 };
 
-const LOCATION_PREVIEW_COUNT = 2;
+/** Preview up to 4 locations in a 2-column grid; expand for the rest. */
+const LOCATION_PREVIEW_COUNT = 4;
 
 /**
  * Rack-first label for the live inventory list.
@@ -54,56 +61,35 @@ function splitLocationDisplay(loc) {
   return { primary, context, title: full, unassigned: false };
 }
 
-function LocationQtyBadges({ loc, unit }) {
-  return (
-    <div className="flex flex-wrap gap-1 justify-end shrink-0 max-w-[55%]">
-      {loc.sellableQty > 0 && (
-        <span className="inline-flex px-1.5 py-px rounded text-[10px] font-semibold bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-100">
-          {loc.sellableQty} Sellable
-        </span>
-      )}
-      {loc.deadStockQty > 0 && (
-        <span className="inline-flex px-1 py-px rounded text-[9px] font-semibold bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-300">
-          {loc.deadStockQty} Dead stock
-        </span>
-      )}
-      {loc.sellableQty <= 0 && (loc.deadStockQty || 0) <= 0 && (
-        <span className="text-[10px] text-gray-500">
-          {loc.totalQty} {unit}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function LocationRow({ loc, unit }) {
+function LocationCard({ loc, unit }) {
   const { primary, context, title, unassigned } = splitLocationDisplay(loc);
+  const qty = loc.totalQty || loc.sellableQty || 0;
 
   return (
-    <li className="flex items-center justify-between gap-3">
-      <div className="flex items-start gap-2 min-w-0">
+    <div className="min-w-0" title={title}>
+      <div className="flex items-center gap-1 min-w-0">
         <MapPin
-          size={13}
-          className={`mt-1 shrink-0 ${unassigned ? 'text-amber-500' : 'text-emerald-600'}`}
+          size={11}
+          className={`shrink-0 ${unassigned ? 'text-amber-500' : 'text-emerald-600'}`}
           aria-hidden
         />
-        <div className="min-w-0 space-y-1" title={title}>
-          <p
-            className={`text-xs font-semibold truncate leading-none ${
-              unassigned ? 'text-amber-800' : 'text-gray-900'
-            }`}
-          >
-            {primary}
-          </p>
-          {context ? (
-            <p className="text-[11px] text-gray-600 truncate leading-none tracking-wide">
-              {context}
-            </p>
-          ) : null}
-        </div>
+        <p
+          className={`text-[11px] font-semibold truncate leading-none min-w-0 ${
+            unassigned ? 'text-amber-800' : 'text-gray-900'
+          }`}
+        >
+          {primary}
+        </p>
+        <span className="inline-flex px-1 py-px rounded text-[9px] font-semibold bg-gray-200 text-gray-900 tabular-nums shrink-0 leading-none ring-1 ring-inset ring-gray-300">
+          {qty} {unit}
+        </span>
       </div>
-      <LocationQtyBadges loc={loc} unit={unit} />
-    </li>
+      {context ? (
+        <p className="pl-[15px] mt-px text-[9px] text-gray-500 truncate tracking-wide leading-tight">
+          {context}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -125,23 +111,23 @@ function StockLocationsCell({ item }) {
   const visible = expanded ? locations : locations.slice(0, LOCATION_PREVIEW_COUNT);
 
   return (
-    <div>
-      <ul className="space-y-2">
+    <div className="w-full max-w-[300px]">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-1">
         {visible.map((loc) => (
-          <LocationRow
+          <LocationCard
             key={loc.locationId || loc.locationPath}
             loc={loc}
             unit={unit}
           />
         ))}
-      </ul>
+      </div>
       {hiddenCount > 0 && (
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-1.5 ml-[18px] text-[11px] font-medium text-emerald-700 hover:text-emerald-900"
+          className="mt-1 text-[10px] font-medium text-emerald-700 hover:text-emerald-900"
         >
-          {expanded ? 'Show less' : `+${hiddenCount} more location${hiddenCount === 1 ? '' : 's'}`}
+          {expanded ? 'Show less' : `Show more (+${hiddenCount})`}
         </button>
       )}
     </div>
@@ -295,7 +281,7 @@ export default function AdminInventoryPage() {
             >
               <option value="">All conditions</option>
               <option value="NORMAL">Normal</option>
-              <option value="HAS_DEAD_STOCK">Has dead stock</option>
+              <option value="HAS_DEAD_STOCK">Dead stock</option>
             </select>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -390,6 +376,11 @@ export default function AdminInventoryPage() {
                             {item.brand}
                             {item.categoryName ? ` · ${item.categoryName}` : ''}
                           </div>
+                          {(item.isDeadStock || item.condition === 'HAS_DEAD_STOCK') && (
+                            <span className="inline-flex mt-1 items-center gap-1 px-1.5 py-px rounded text-[10px] font-semibold bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-200">
+                              ⚠ Dead stock
+                            </span>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -416,9 +407,9 @@ export default function AdminInventoryPage() {
                         )}
                         <span
                           className="min-w-[2.5rem] text-center font-semibold text-gray-900"
-                          title={`Sellable: ${item.sellableQty ?? 0} · Dead stock: ${item.deadStockQty ?? 0}`}
+                          title={`${item.sellableQty ?? 0} ${item.stockUnit || 'Pcs'} on hand`}
                         >
-                          {(item.sellableQty ?? 0) + (item.deadStockQty ?? 0)}
+                          {(item.sellableQty ?? 0)}
                         </span>
                         {canAdjust && (
                           <button
@@ -442,7 +433,7 @@ export default function AdminInventoryPage() {
                         {STATUS_LABELS[item.stockStatus]}
                       </span>
                     </td>
-                    <td className="px-4 py-3 align-top">
+                    <td className="px-4 py-2 align-middle">
                       <StockLocationsCell item={item} />
                     </td>
                     <td className="px-4 py-3 align-middle">
@@ -478,7 +469,7 @@ export default function AdminInventoryPage() {
         </div>
 
         <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 text-xs text-gray-500 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="italic">Sellable qty is a live projection of the ledger.</span>
+          <span className="italic">sellableQty is a live projection of the ledger. Dead stock is a product tag — sales can still sell it.</span>
           <a href="/admin/inventory/movements" className="text-emerald-700 hover:underline not-italic font-medium">
             View movement ledger →
           </a>

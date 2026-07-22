@@ -23,26 +23,7 @@ const SEARCH_STATUS_STYLES = {
   out: 'bg-red-100 text-red-800',
 };
 
-const SEARCH_BUCKET_STYLES = {
-  dead_stock: 'bg-slate-200 text-slate-800',
-};
-
 function SearchStockBadges({ product }) {
-  const buckets = [
-    {
-      key: 'sellable',
-      qty: product.sellableQty ?? 0,
-      label: 'Sellable',
-      style: SEARCH_STATUS_STYLES[product.stockStatus] || SEARCH_STATUS_STYLES.out,
-    },
-    {
-      key: 'dead_stock',
-      qty: product.deadStockQty ?? 0,
-      label: 'Dead stock',
-      style: SEARCH_BUCKET_STYLES.dead_stock,
-    },
-  ].filter((b) => b.qty > 0);
-
   if (!product.hasStock) {
     return (
       <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600">
@@ -51,25 +32,22 @@ function SearchStockBadges({ product }) {
     );
   }
 
-  if (buckets.length === 0) {
-    return (
-      <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-100 text-sky-800">
-        In inventory · 0 units
-      </span>
-    );
-  }
-
+  const onHand = product.sellableQty ?? 0;
   return (
-    <div className="flex flex-wrap gap-1 mt-1">
-      {buckets.map((b) => (
-        <span
-          key={b.key}
-          className={`inline-flex px-1.5 py-px rounded-full text-[10px] font-semibold ${b.style}`}
-        >
-          {b.qty} {b.label}
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <span
+        className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+          SEARCH_STATUS_STYLES[product.stockStatus] || SEARCH_STATUS_STYLES.out
+        }`}
+      >
+        {onHand} on hand
+      </span>
+      {(product.isDeadStock || product.condition === 'HAS_DEAD_STOCK') && (
+        <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-900">
+          ⚠ Dead stock
         </span>
-      ))}
-    </div>
+      )}
+    </span>
   );
 }
 

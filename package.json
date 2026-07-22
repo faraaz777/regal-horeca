@@ -13,6 +13,8 @@
     "migrate:product-filters:dry": "node scripts/migrateProductFilters.mjs --dry-run",
     "migrate:inventory-buckets": "node scripts/migrateInventoryStatusBuckets.mjs",
     "migrate:inventory-buckets:dry": "node scripts/migrateInventoryStatusBuckets.mjs --dry-run",
+    "job:dead-stock": "node scripts/runDeadStockAutomation.mjs",
+    "job:dead-stock:dry": "node scripts/runDeadStockAutomation.mjs --dry-run",
     "seed:super-admin": "node scripts/seed-super-admin.mjs"
   },
   "dependencies": {

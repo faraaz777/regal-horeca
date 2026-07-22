@@ -18,14 +18,11 @@ function RackTooltip({ rack }) {
       <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg min-w-[160px] max-w-[240px]">
         <p className="font-mono font-semibold truncate">{formatRackDisplayName(rack)}</p>
         <p className="text-gray-300 mt-1">
-          {rack.sellableQty > 0 && <span>{rack.sellableQty} Sellable</span>}
-          {rack.deadStockQty > 0 && (
-            <span>
-              {rack.sellableQty > 0 ? ' · ' : ''}
-              {rack.deadStockQty} Dead stock
-            </span>
+          {rack.totalQty > 0 || rack.sellableQty > 0 ? (
+            <span>{rack.sellableQty || rack.totalQty || 0} sellable</span>
+          ) : (
+            <span>Empty</span>
           )}
-          {rack.totalQty === 0 && <span>Empty</span>}
         </p>
       </div>
     </div>
@@ -80,7 +77,7 @@ function RackUnit({
         {rack.name ? (
           <span className="text-[9px] leading-tight truncate w-full text-gray-800/90">{rack.name}</span>
         ) : null}
-        <span className="text-[9px] font-semibold mt-0.5 text-gray-800/80">{rack.sellableQty || 0}</span>
+        <span className="text-[9px] font-semibold mt-0.5 text-gray-800/80">{rack.sellableQty || rack.totalQty || 0}</span>
       </div>
     </div>
   );

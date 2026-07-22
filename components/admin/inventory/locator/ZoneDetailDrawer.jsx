@@ -114,14 +114,12 @@ export default function ZoneDetailDrawer({
             )}
           </div>
 
-          {(summary?.stockStatusQty?.sellable > 0 || summary?.stockStatusQty?.dead_stock > 0) && (
+          {(summary?.stockStatusQty?.sellable > 0) && (
             <div className="text-xs text-gray-600 space-y-1">
-              {summary.stockStatusQty.sellable > 0 && (
-                <p>Sellable qty: <strong>{summary.stockStatusQty.sellable.toLocaleString()}</strong></p>
-              )}
-              {summary.stockStatusQty.dead_stock > 0 && (
-                <p>Dead stock qty: <strong>{summary.stockStatusQty.dead_stock.toLocaleString()}</strong></p>
-              )}
+              <p>
+                Sellable:{' '}
+                <strong>{summary.stockStatusQty.sellable.toLocaleString()}</strong>
+              </p>
             </div>
           )}
 
@@ -165,7 +163,7 @@ export default function ZoneDetailDrawer({
                           <p className="text-xs text-gray-500 font-mono truncate mt-0.5">{rack.code}</p>
                         )}
                         <p className="text-xs text-gray-600 mt-1">
-                          {rack.totalQty} units · {rack.sellableQty} sellable
+                          {rack.sellableQty ?? rack.totalQty ?? 0} sellable
                           {rack.capacity ? ` · ${Math.round((rack.fillPct || 0) * 100)}% full` : ''}
                         </p>
                       </button>

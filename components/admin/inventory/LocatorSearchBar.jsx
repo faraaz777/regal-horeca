@@ -70,6 +70,9 @@ export default function LocatorSearchBar({ layoutRacks, onLocateRacks }) {
                 {(product.sellableQty ?? 0) > 0 && (
                   <p className="text-[10px] text-emerald-700 mt-0.5">{product.sellableQty} sellable</p>
                 )}
+                {(product.isDeadStock || product.condition === 'HAS_DEAD_STOCK') && (
+                  <p className="text-[10px] text-amber-800 mt-0.5">⚠ Dead stock</p>
+                )}
               </button>
             ))
           )}

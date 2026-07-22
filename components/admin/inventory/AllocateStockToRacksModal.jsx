@@ -25,8 +25,6 @@ import { formatRackDisplayName } from '@/lib/shared/locationDisplay';
 import {
   DEAD_STOCK_PERIODS,
   DEAD_STOCK_PERIOD_LABELS,
-  INTAKE_STATUS_BUCKETS,
-  STATUS_BUCKET_LABELS,
 } from '@/lib/shared/inventoryConstants';
 
 const fetcher = (url) => adminJson(url);
@@ -321,19 +319,7 @@ export default function AllocateStockToRacksModal({
     setForm((p) => ({
       ...p,
       markAsDeadStock: checked,
-      openingStatusBucket: checked
-        ? 'dead_stock'
-        : p.openingStatusBucket === 'dead_stock'
-          ? 'sellable'
-          : p.openingStatusBucket,
-    }));
-  };
-
-  const updateOpeningStatus = (bucket) => {
-    setForm((p) => ({
-      ...p,
-      openingStatusBucket: bucket,
-      markAsDeadStock: bucket === 'dead_stock',
+      openingStatusBucket: 'sellable',
     }));
   };
 
@@ -842,19 +828,7 @@ export default function AllocateStockToRacksModal({
               )}
 
               <div className={showInventoryRules ? '' : 'sm:col-span-2'}>
-                <FieldLabel required>Status</FieldLabel>
-                <select
-                  className={selectClass}
-                  value={form.openingStatusBucket}
-                  onChange={(e) => updateOpeningStatus(e.target.value)}
-                >
-                  {INTAKE_STATUS_BUCKETS.map((bucket) => (
-                    <option key={bucket} value={bucket}>
-                      {STATUS_BUCKET_LABELS[bucket]}
-                    </option>
-                  ))}
-                </select>
-                <label className="flex items-start gap-2.5 mt-3 cursor-pointer select-none group">
+                <label className="flex items-start gap-2.5 cursor-pointer select-none group">
                   <input
                     type="checkbox"
                     checked={form.markAsDeadStock}
@@ -863,10 +837,11 @@ export default function AllocateStockToRacksModal({
                   />
                   <span>
                     <span className="text-sm font-semibold text-gray-900 group-hover:text-black">
-                      Mark as dead stock
+                      Dead stock tag
                     </span>
                     <span className="block text-xs font-medium text-gray-500 mt-0.5">
-                      Flags that sales are below the dead-stock target for this product.
+                      Product-wide label only — sales can still sell this item. Stock qty stays on
+                      hand.
                     </span>
                   </span>
                 </label>

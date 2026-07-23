@@ -18,7 +18,7 @@ import { canEditInventoryRules } from '@/lib/shared/permissions';
 import ChromeMovementTabs from './movement/ChromeMovementTabs';
 import ReasonChipRow from './movement/ReasonChipRow';
 import LocationQtyList from './movement/LocationQtyList';
-import NewRackAddPanel from './movement/NewRackAddPanel';
+import NewRackAddPanel from './movement/NewRackAddPanel'; // rack search under New rack
 import TransferTicketPanel from './movement/TransferTicketPanel';
 import RulesPanel, { buildRulesFormFromRule } from './movement/RulesPanel';
 import MaxStockWarnDialog from './MaxStockWarnDialog';

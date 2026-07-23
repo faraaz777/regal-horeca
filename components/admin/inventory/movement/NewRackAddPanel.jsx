@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, Search } from 'lucide-react';
 import { fetchCascadeRacks } from '@/lib/client/locationCascadeApi';
 import { cascadeRacksSwrKey } from '@/lib/client/cascadeRacksSwrKey';
 import { locationRackCode, locationRackName } from '@/lib/client/inventory/locationLabels';
+import { rackMatchesQuery } from '@/lib/client/inventory/rackSearch';
 import LocationCascadePicker from './LocationCascadePicker';
 
-function NewRackFloorRacks({ floorId, occupiedLocationIds, onPickRack }) {
+function NewRackFloorRacks({ floorId, occupiedLocationIds, rackQuery, onPickRack }) {
   const occupiedSet = useMemo(
     () => new Set((occupiedLocationIds || []).map(String)),
     [occupiedLocationIds]
@@ -31,6 +32,11 @@ function NewRackFloorRacks({ floorId, occupiedLocationIds, onPickRack }) {
     return list.filter((rack) => !occupiedSet.has(String(rack._id)));
   }, [rackData, occupiedSet]);
 
+  const filteredRacks = useMemo(
+    () => racks.filter((rack) => rackMatchesQuery(rack, rackQuery)),
+    [racks, rackQuery]
+  );
+
   if (!rackData && isLoading) {
     return (
       <p className="text-xs text-gray-500 flex items-center gap-1.5 px-1 py-2">
@@ -48,9 +54,13 @@ function NewRackFloorRacks({ floorId, occupiedLocationIds, onPickRack }) {
     );
   }
 
+  if (!filteredRacks.length) {
+    return <p className="text-[11px] text-gray-500 px-1 py-1">No racks match your search.</p>;
+  }
+
   return (
     <div className="flex flex-wrap gap-1">
-      {racks.map((rack) => {
+      {filteredRacks.map((rack) => {
         const code = locationRackCode(rack) || String(rack._id).slice(-4);
         const name = locationRackName(rack);
         return (
@@ -86,6 +96,7 @@ export default function NewRackAddPanel({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [branchId, setBranchId] = useState(defaultBranchId ? String(defaultBranchId) : '');
+  const [rackQuery, setRackQuery] = useState('');
 
   useEffect(() => {
     setOpen(defaultOpen);
@@ -96,6 +107,10 @@ export default function NewRackAddPanel({
       setBranchId(String(defaultBranchId));
     }
   }, [defaultBranchId]);
+
+  useEffect(() => {
+    if (!open) setRackQuery('');
+  }, [open]);
 
   const pickRack = (rack, floor, branchIdForRack) => {
     const code = locationRackCode(rack);
@@ -137,6 +152,23 @@ export default function NewRackAddPanel({
             Tap a rack to add it to the list (qty 1). Adjust quantity above.
           </p>
 
+          {/* Inline (not a separate import) so HMR / OneDrive never drops this bar */}
+          <div className="relative">
+            <Search
+              size={14}
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-600"
+              aria-hidden
+            />
+            <input
+              type="text"
+              value={rackQuery}
+              onChange={(e) => setRackQuery(e.target.value)}
+              placeholder="Search racks by code, name, or id..."
+              aria-label="Search racks"
+              className="w-full pl-8 pr-2.5 py-2 text-xs font-medium border-2 border-emerald-400 rounded-md bg-white text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-emerald-200"
+            />
+          </div>
+
           <LocationCascadePicker
             accent="emerald"
             swrKeyPrefix="add"
@@ -148,6 +180,7 @@ export default function NewRackAddPanel({
               <NewRackFloorRacks
                 floorId={String(floor._id)}
                 occupiedLocationIds={occupiedLocationIds}
+                rackQuery={rackQuery}
                 onPickRack={(rack) => pickRack(rack, floor, ctx?.branchId)}
               />
             )}

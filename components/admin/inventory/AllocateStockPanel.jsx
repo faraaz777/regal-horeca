@@ -23,6 +23,7 @@ import {
 } from '@/lib/shared/inventoryConstants';
 import ProductAllocateHeader from '@/components/admin/inventory/allocate/ProductAllocateHeader';
 import AllocateFloorRackGrid from '@/components/admin/inventory/allocate/AllocateFloorRackGrid';
+import RackSearchInput from '@/components/admin/inventory/RackSearchInput';
 import {
   LAST_BRANCH_KEY,
   LAST_FLOOR_KEY,
@@ -72,6 +73,7 @@ export default function AllocateStockPanel({
   const [branchId, setBranchId] = useState('');
   const [branchCode, setBranchCode] = useState('');
   const [pickerKey, setPickerKey] = useState(0);
+  const [rackQuery, setRackQuery] = useState('');
 
   const openingQtyNum = parsePositiveInt(form.openingQty);
   const allocatedTotal = useMemo(
@@ -364,9 +366,17 @@ export default function AllocateStockPanel({
       <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-[minmax(0,1fr)_16rem]">
         <div className="min-w-0">
           <section className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-800 mb-2">
-              Where does it go?
-            </p>
+            <div className="mb-2.5 flex items-center justify-between gap-3 min-w-0">
+              <p className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-emerald-800">
+                Where does it go?
+              </p>
+              <RackSearchInput
+                value={rackQuery}
+                onChange={setRackQuery}
+                accent="emerald"
+                className="w-44 sm:w-52 shrink-0"
+              />
+            </div>
 
             {defaultBranchId ? (
               <LocationCascadePicker
@@ -389,6 +399,7 @@ export default function AllocateStockPanel({
                     disabled={rackSectionDisabled}
                     onQtyChange={setRackQty}
                     swrKeyPrefix="allocate"
+                    rackQuery={rackQuery}
                   />
                 )}
               />

@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import useSWR from 'swr';
 import { Loader2 } from 'lucide-react';
 import { fetchCascadeRacks } from '@/lib/client/locationCascadeApi';
 import { cascadeRacksSwrKey } from '@/lib/client/cascadeRacksSwrKey';
+import { rackMatchesQuery } from '@/lib/client/inventory/rackSearch';
 import { writeStoredId, LAST_FLOOR_KEY } from './allocateHelpers';
 import RackAllocateCard from './RackAllocateCard';
 
@@ -23,6 +24,7 @@ export default function AllocateFloorRackGrid({
   disabled,
   onQtyChange,
   swrKeyPrefix = 'allocate',
+  rackQuery = '',
 }) {
   useEffect(() => {
     if (floor?._id) writeStoredId(LAST_FLOOR_KEY, floor._id);
@@ -46,6 +48,10 @@ export default function AllocateFloorRackGrid({
     }
   );
   const racks = rackData?.racks || [];
+  const filteredRacks = useMemo(
+    () => racks.filter((rack) => rackMatchesQuery(rack, rackQuery)),
+    [racks, rackQuery]
+  );
 
   if (!rackData && isLoading) {
     return (
@@ -60,9 +66,13 @@ export default function AllocateFloorRackGrid({
     return <p className="text-[11px] text-gray-500 px-1 py-1">No racks on this floor.</p>;
   }
 
+  if (!filteredRacks.length) {
+    return <p className="text-[11px] text-gray-500 px-1 py-1">No racks match your search.</p>;
+  }
+
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(7.75rem,1fr))] gap-2">
-      {racks.map((rack) => {
+      {filteredRacks.map((rack) => {
         const rackId = String(rack._id);
         const allocatedQty = allocatedByRackId.get(rackId) || 0;
         const rowMax = remaining + allocatedQty;

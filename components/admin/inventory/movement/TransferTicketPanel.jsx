@@ -11,8 +11,10 @@ import {
   locationRackName,
   locationCodePath,
 } from '@/lib/client/inventory/locationLabels';
+import { rackMatchesQuery } from '@/lib/client/inventory/rackSearch';
 import MovementQtyStepper from './MovementQtyStepper';
 import LocationCascadePicker from './LocationCascadePicker';
+import RackSearchInput from '@/components/admin/inventory/RackSearchInput';
 
 export const TRANSFER_TICKET =
   'rounded-xl border-2 border-gray-900 bg-[#faf8f3] shadow-[3px_3px_0_0_rgba(0,0,0,0.85)]';
@@ -147,6 +149,7 @@ function TransferFloorRacks({
   toLocationId,
   productQtyByLoc,
   stockUnit,
+  rackQuery,
   onSelectRack,
 }) {
   const { data: rackData, isLoading } = useSWR(
@@ -162,6 +165,10 @@ function TransferFloorRacks({
   );
 
   const racks = rackData?.racks || [];
+  const filteredRacks = useMemo(
+    () => racks.filter((rack) => rackMatchesQuery(rack, rackQuery)),
+    [racks, rackQuery]
+  );
 
   if (!rackData && isLoading) {
     return (
@@ -176,9 +183,13 @@ function TransferFloorRacks({
     return <p className="text-[11px] text-gray-500 px-1 py-1">No racks on this floor.</p>;
   }
 
+  if (!filteredRacks.length) {
+    return <p className="text-[11px] text-gray-500 px-1 py-1">No racks match your search.</p>;
+  }
+
   return (
     <div className="flex flex-wrap gap-1">
-      {racks.map((rack) => {
+      {filteredRacks.map((rack) => {
         const id = String(rack._id);
         const isSource = id === String(fromLocationId || '');
         return (
@@ -217,12 +228,17 @@ export default function TransferTicketPanel({
   const [toBranchId, setToBranchId] = useState(
     fromRow?.branchId ? String(fromRow.branchId) : ''
   );
+  const [rackQuery, setRackQuery] = useState('');
 
   useEffect(() => {
     if (fromRow?.branchId) {
       setToBranchId(String(fromRow.branchId));
     }
   }, [fromRow?.branchId, fromRow?.floorId, fromRow?.locationId]);
+
+  useEffect(() => {
+    setRackQuery('');
+  }, [fromLocationId]);
 
   const productQtyByLoc = useMemo(() => {
     const map = {};
@@ -315,6 +331,12 @@ export default function TransferTicketPanel({
             <p className="text-xs text-gray-500 mt-2">Select a source rack first.</p>
           ) : (
             <div className="space-y-2 flex-1">
+              <RackSearchInput
+                value={rackQuery}
+                onChange={setRackQuery}
+                accent="sky"
+              />
+
               <LocationCascadePicker
                 accent="sky"
                 swrKeyPrefix="transfer"
@@ -329,6 +351,7 @@ export default function TransferTicketPanel({
                     toLocationId={toLocationId}
                     productQtyByLoc={productQtyByLoc}
                     stockUnit={stockUnit}
+                    rackQuery={rackQuery}
                     onSelectRack={(rack) => pickRack(rack, floor, ctx?.branchId)}
                   />
                 )}

@@ -4,7 +4,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
-import { Download, Loader2, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Download,
+  Loader2,
+  Search,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  BarChart3,
+  Users,
+  MapPinned,
+  ScrollText,
+} from 'lucide-react';
 import { adminFetch, adminJson } from '@/lib/client/adminFetch';
 import { canReadStockLedger } from '@/lib/shared/permissions';
 import { LEDGER_FILTER_TYPES, LEDGER_FILTER_TYPE_LABELS } from '@/lib/shared/inventoryConstants';
@@ -12,6 +23,13 @@ import LocationSelector from '@/components/admin/inventory/LocationSelector';
 import { resolveCascadeLocation } from '@/lib/client/locationCascadeApi';
 
 const fetcher = (url) => adminJson(url);
+
+const TABS = [
+  { id: 'movements', label: 'Movements', icon: ScrollText },
+  { id: 'position', label: 'Stock Position', icon: MapPinned },
+  { id: 'operators', label: 'Operators', icon: Users },
+  { id: 'insights', label: 'Insights', icon: BarChart3 },
+];
 
 const TYPE_BADGE_STYLES = {
   opening: 'bg-blue-100 text-blue-800',
@@ -21,6 +39,7 @@ const TYPE_BADGE_STYLES = {
   transfer_in: 'bg-violet-100 text-violet-800',
   sale_fulfill: 'bg-sky-100 text-sky-800',
   sold: 'bg-sky-100 text-sky-800',
+  status: 'bg-amber-100 text-amber-800',
 };
 
 function formatTs(value) {
@@ -66,13 +85,22 @@ export default function StockMovementsPage() {
   const role = meData?.user?.role;
   const canView = canReadStockLedger(role);
 
+  const [activeTab, setActiveTab] = useState('movements');
   const [typeFilter, setTypeFilter] = useState('');
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [page, setPage] = useState(1);
-  const [drawerProductId, setDrawerProductId] = useState(initialProductId);
+  const [referenceFilter, setReferenceFilter] = useState('');
+  const [productFilterId, setProductFilterId] = useState(initialProductId);
+  const [operatorFilterId, setOperatorFilterId] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [pages, setPages] = useState({
+    movements: 1,
+    position: 1,
+    operators: 1,
+    insights: 1,
+    references: 1,
+  });
   const [locationFilter, setLocationFilter] = useState({
     branchId: null,
     floorId: null,
@@ -103,38 +131,122 @@ export default function StockMovementsPage() {
     };
   }, [initialLocationId]);
 
-  const ledgerUrl = useMemo(() => {
-    if (!canView) return null;
-    const params = new URLSearchParams({ page: String(page), limit: '50' });
+  const setTabPage = (tabId, value) => {
+    setPages((prev) => ({ ...prev, [tabId]: value }));
+  };
+
+  const resetAllPages = () => {
+    setPages({
+      movements: 1,
+      position: 1,
+      operators: 1,
+      insights: 1,
+      references: 1,
+    });
+  };
+
+  const sharedParams = useMemo(() => {
+    const params = new URLSearchParams();
     if (typeFilter) params.set('type', typeFilter);
     if (search.trim()) params.set('search', search.trim());
     if (dateFrom) params.set('dateFrom', dateFrom);
     if (dateTo) params.set('dateTo', dateTo);
-    if (drawerProductId) params.set('productId', drawerProductId);
+    if (productFilterId) params.set('productId', productFilterId);
     if (locationFilter.locationId) params.set('locationId', locationFilter.locationId);
+    if (operatorFilterId) params.set('userId', operatorFilterId);
+    if (referenceFilter.trim()) params.set('refExact', referenceFilter.trim());
+    return params;
+  }, [
+    typeFilter,
+    search,
+    dateFrom,
+    dateTo,
+    productFilterId,
+    locationFilter.locationId,
+    operatorFilterId,
+    referenceFilter,
+  ]);
+
+  const movementUrl = useMemo(() => {
+    if (!canView || activeTab !== 'movements') return null;
+    const params = new URLSearchParams(sharedParams);
+    params.set('page', String(pages.movements));
+    params.set('limit', '50');
     return `/api/admin/inventory/ledger?${params}`;
-  }, [canView, page, typeFilter, search, dateFrom, dateTo, drawerProductId, locationFilter.locationId]);
+  }, [canView, activeTab, sharedParams, pages.movements]);
 
-  const { data, error, isLoading, isValidating } = useSWR(ledgerUrl, fetcher, {
-    revalidateOnFocus: false,
-    keepPreviousData: true,
-  });
+  const positionUrl = useMemo(() => {
+    if (!canView || activeTab !== 'position') return null;
+    const params = new URLSearchParams();
+    params.set('page', String(pages.position));
+    params.set('limit', '20');
+    if (locationFilter.locationId) params.set('locationId', locationFilter.locationId);
+    if (productFilterId) params.set('productId', productFilterId);
+    if (search.trim()) params.set('search', search.trim());
+    return `/api/admin/inventory/activity/position?${params}`;
+  }, [canView, activeTab, pages.position, locationFilter.locationId, productFilterId, search]);
 
-  const items = data?.items || [];
-  const pagination = data?.pagination || { page: 1, pages: 1, total: 0 };
+  const operatorsUrl = useMemo(() => {
+    if (!canView || activeTab !== 'operators') return null;
+    const params = new URLSearchParams(sharedParams);
+    params.set('page', String(pages.operators));
+    params.set('limit', '20');
+    return `/api/admin/inventory/activity/operators?${params}`;
+  }, [canView, activeTab, sharedParams, pages.operators]);
+
+  const insightsUrl = useMemo(() => {
+    if (!canView || activeTab !== 'insights') return null;
+    const params = new URLSearchParams(sharedParams);
+    return `/api/admin/inventory/activity/insights?${params}`;
+  }, [canView, activeTab, sharedParams]);
+
+  const referencesUrl = useMemo(() => {
+    if (!canView || activeTab !== 'references') return null;
+    const params = new URLSearchParams();
+    params.set('page', String(pages.references));
+    params.set('limit', '20');
+    if (typeFilter) params.set('type', typeFilter);
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    if (productFilterId) params.set('productId', productFilterId);
+    if (locationFilter.locationId) params.set('locationId', locationFilter.locationId);
+    if (search.trim()) params.set('refSearch', search.trim());
+    return `/api/admin/inventory/activity/references?${params}`;
+  }, [
+    canView,
+    activeTab,
+    pages.references,
+    typeFilter,
+    dateFrom,
+    dateTo,
+    productFilterId,
+    locationFilter.locationId,
+    search,
+  ]);
+
+  const movementRes = useSWR(movementUrl, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
+  const positionRes = useSWR(positionUrl, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
+  const operatorsRes = useSWR(operatorsUrl, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
+  const insightsRes = useSWR(insightsUrl, fetcher, { revalidateOnFocus: false });
+  const referencesRes = useSWR(referencesUrl, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
+
+  const movementItems = movementRes.data?.items || [];
+  const movementPagination = movementRes.data?.pagination || { page: 1, pages: 1, total: 0 };
+  const positionItems = positionRes.data?.items || [];
+  const positionPagination = positionRes.data?.pagination || { page: 1, pages: 1, total: 0 };
+  const operatorsItems = operatorsRes.data?.items || [];
+  const operatorsPagination = operatorsRes.data?.pagination || { page: 1, pages: 1, total: 0 };
+  const referenceItems = referencesRes.data?.items || [];
+  const referencePagination = referencesRes.data?.pagination || { page: 1, pages: 1, total: 0 };
+  const insights = insightsRes.data;
 
   const buildExportUrl = useCallback(
     (format) => {
-      const params = new URLSearchParams({ format });
-      if (typeFilter) params.set('type', typeFilter);
-      if (search.trim()) params.set('search', search.trim());
-      if (dateFrom) params.set('dateFrom', dateFrom);
-      if (dateTo) params.set('dateTo', dateTo);
-      if (drawerProductId) params.set('productId', drawerProductId);
-      if (locationFilter.locationId) params.set('locationId', locationFilter.locationId);
+      const params = new URLSearchParams(sharedParams);
+      params.set('format', format);
       return `/api/admin/inventory/ledger/export?${params}`;
     },
-    [typeFilter, search, dateFrom, dateTo, drawerProductId, locationFilter.locationId]
+    [sharedParams]
   );
 
   const handleExport = async (format) => {
@@ -150,21 +262,16 @@ export default function StockMovementsPage() {
   };
 
   if (meData && !canView) {
-    return (
-      <div className="p-8 text-center text-gray-500">
-        You do not have permission to view the stock movement ledger.
-      </div>
-    );
+    return <div className="p-8 text-center text-gray-500">You do not have permission to view stock activity.</div>;
   }
 
   return (
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Stock movements</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Stock Activity</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Append-only ledger — every physical stock change
-            {pagination.total ? ` · ${pagination.total} entries` : ''}
+            Ledger = what happened · Stock = what exists · Operators = who moved it
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -190,19 +297,49 @@ export default function StockMovementsPage() {
 
       <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm space-y-4">
         <div className="flex flex-wrap gap-2">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full border ${
+                  activeTab === tab.id
+                    ? 'border-emerald-600 text-emerald-700 bg-emerald-50'
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <Icon size={14} />
+                {tab.label}
+              </button>
+            );
+          })}
           <button
             type="button"
-            onClick={() => {
-              setTypeFilter('');
-              setPage(1);
-            }}
-            className={`px-3 py-1.5 text-sm font-medium rounded-full border transition-colors ${
-              !typeFilter
+            onClick={() => setActiveTab('references')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full border ${
+              activeTab === 'references'
                 ? 'border-emerald-600 text-emerald-700 bg-emerald-50'
                 : 'border-gray-200 text-gray-600 hover:bg-gray-50'
             }`}
           >
-            All
+            Ref View
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setTypeFilter('');
+              resetAllPages();
+            }}
+            className={`px-3 py-1.5 text-sm font-medium rounded-full border ${
+              !typeFilter ? 'border-emerald-600 text-emerald-700 bg-emerald-50' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            All types
           </button>
           {LEDGER_FILTER_TYPES.map((key) => (
             <button
@@ -210,9 +347,9 @@ export default function StockMovementsPage() {
               type="button"
               onClick={() => {
                 setTypeFilter(key);
-                setPage(1);
+                resetAllPages();
               }}
-              className={`px-3 py-1.5 text-sm font-medium rounded-full border transition-colors ${
+              className={`px-3 py-1.5 text-sm font-medium rounded-full border ${
                 typeFilter === key
                   ? 'border-emerald-600 text-emerald-700 bg-emerald-50'
                   : 'border-gray-200 text-gray-600 hover:bg-gray-50'
@@ -223,16 +360,16 @@ export default function StockMovementsPage() {
           ))}
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-3">
-          <div className="relative flex-1 max-w-md">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
+          <div className="relative lg:col-span-2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
               type="text"
-              placeholder="Search remark or ref…"
+              placeholder={activeTab === 'references' ? 'Search reference…' : 'Search remark or ref…'}
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
-                setPage(1);
+                resetAllPages();
               }}
               className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
             />
@@ -242,7 +379,7 @@ export default function StockMovementsPage() {
             value={dateFrom}
             onChange={(e) => {
               setDateFrom(e.target.value);
-              setPage(1);
+              resetAllPages();
             }}
             className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg"
           />
@@ -251,16 +388,14 @@ export default function StockMovementsPage() {
             value={dateTo}
             onChange={(e) => {
               setDateTo(e.target.value);
-              setPage(1);
+              resetAllPages();
             }}
             className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg"
           />
         </div>
 
         <div className="border-t border-gray-100 pt-4">
-          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Filter by location
-          </p>
+          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Filter by location</p>
           <LocationSelector
             mode="filter"
             selectedBranchId={locationFilter.branchId}
@@ -273,185 +408,392 @@ export default function StockMovementsPage() {
                 rackId: selection.rackId,
                 locationId: selection.locationId,
               });
-              setPage(1);
+              resetAllPages();
             }}
           />
         </div>
 
-        {drawerProductId && (
-          <div className="flex items-center gap-2 text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
-            <span>Filtered to product ledger</span>
+        {(productFilterId || operatorFilterId || referenceFilter) && (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+            {productFilterId && <span>Product filter active</span>}
+            {operatorFilterId && <span>Operator filter active</span>}
+            {referenceFilter && <span>Ref: {referenceFilter}</span>}
             <button
               type="button"
               onClick={() => {
-                setDrawerProductId('');
-                setPage(1);
+                setProductFilterId('');
+                setOperatorFilterId('');
+                setReferenceFilter('');
+                resetAllPages();
               }}
               className="ml-auto inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-900"
             >
               <X size={14} />
-              Clear
+              Clear tagged filters
             </button>
           </div>
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        {error && (
-          <div className="p-4 text-sm text-red-600 bg-red-50 border-b border-red-100">
-            {error.message || 'Failed to load ledger'}
+      {activeTab === 'movements' && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          {movementRes.error && (
+            <div className="p-4 text-sm text-red-600 bg-red-50 border-b border-red-100">
+              {movementRes.error.message || 'Failed to load movements'}
+            </div>
+          )}
+          <div className="p-4 border-b border-gray-100">
+            <p className="text-sm text-gray-600">Append-only ledger · {movementPagination.total || 0} entries</p>
           </div>
-        )}
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                <th className="px-4 py-3 min-w-[200px]">Item</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Change</th>
-                <th className="px-4 py-3">Reason</th>
-                <th className="px-4 py-3">Remark / Ref</th>
-                <th className="px-4 py-3">Location</th>
-                <th className="px-4 py-3">User</th>
-                <th className="px-4 py-3">When</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {(isLoading || isValidating) && items.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
-                    <Loader2 className="inline animate-spin text-emerald-600" size={24} />
-                    <p className="mt-2">Loading movements…</p>
-                  </td>
-                </tr>
-              ) : items.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
-                    No movements found
-                  </td>
-                </tr>
-              ) : (
-                items.map((row) => (
-                  <tr key={row.pairId || row._id} className="hover:bg-gray-50/80">
-                    <td className="px-4 py-3">
+          <div className="divide-y divide-gray-100">
+            {(movementRes.isLoading || movementRes.isValidating) && movementItems.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">
+                <Loader2 className="inline animate-spin text-emerald-600" size={24} />
+                <p className="mt-2">Loading movements…</p>
+              </div>
+            ) : movementItems.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">No movements found</div>
+            ) : (
+              movementItems.map((row) => (
+                <div key={row.pairId || row._id} className="px-4 py-3">
+                  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-2">
+                    <div className="space-y-1">
+                      <p className="text-xs text-gray-500">{formatTs(row.createdAt)}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
+                            TYPE_BADGE_STYLES[row.displayType] ||
+                            TYPE_BADGE_STYLES[row.type] ||
+                            'bg-gray-100 text-gray-700'
+                          }`}
+                        >
+                          {row.typeLabel}
+                        </span>
+                        <span className="font-mono text-sm font-semibold text-gray-900">{row.changeDisplay}</span>
+                        {row.ref ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReferenceFilter(row.ref);
+                              setActiveTab('references');
+                              setTabPage('references', 1);
+                            }}
+                            className="text-xs font-mono text-emerald-700 hover:underline"
+                          >
+                            Ref: {row.ref}
+                          </button>
+                        ) : null}
+                      </div>
                       <button
                         type="button"
                         onClick={() => {
                           const pid = String(row.productId?._id || row.productId);
-                          setDrawerProductId(pid);
-                          setPage(1);
+                          setProductFilterId(pid);
+                          setTabPage('movements', 1);
                         }}
                         className="text-left font-medium text-emerald-800 hover:underline"
                       >
                         {row.productTitle}
                       </button>
-                      {row.productSku && (
-                        <div className="text-xs text-gray-500 font-mono mt-0.5">{row.productSku}</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
-                          TYPE_BADGE_STYLES[row.displayType] ||
-                          TYPE_BADGE_STYLES[row.type] ||
-                          'bg-gray-100 text-gray-700'
-                        }`}
-                      >
-                        {row.typeLabel}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs font-semibold text-gray-900">
-                      {row.changeDisplay}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{row.reasonLabel}</td>
-                    <td className="px-4 py-3 text-gray-600 max-w-[180px]">
-                      <div className="truncate" title={row.remark}>
-                        {row.remark || '—'}
-                      </div>
-                      {row.ref && (
-                        <div className="text-xs text-gray-400 font-mono mt-0.5">{row.ref}</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 text-xs max-w-[160px]">
-                      <span className="truncate block" title={row.locationDisplayPath}>
-                        {row.locationDisplayPath || '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {row.performedBy?.name || row.performedBy?.email || '—'}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">
-                      {formatTs(row.createdAt)}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50 text-sm">
-          <span className="text-gray-500">
-            Page {pagination.page} of {pagination.pages}
-          </span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={pagination.page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="p-1.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-white"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              type="button"
-              disabled={pagination.page >= pagination.pages}
-              onClick={() => setPage((p) => p + 1)}
-              className="p-1.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-white"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {drawerProductId && items[0] && (
-        <div className="fixed inset-y-0 right-0 z-40 w-full max-w-md bg-white border-l border-gray-200 shadow-xl flex flex-col">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-            <div>
-              <h2 className="text-base font-semibold text-gray-900">Product ledger</h2>
-              <p className="text-xs text-gray-500 mt-0.5">{items[0]?.productTitle}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setDrawerProductId('')}
-              className="p-1 rounded-md text-gray-400 hover:bg-gray-100"
-            >
-              <X size={18} />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
-            {items.map((row) => (
-              <div key={row.pairId || row._id} className="px-5 py-3 text-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <span
-                    className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                      TYPE_BADGE_STYLES[row.displayType] || 'bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    {row.typeLabel}
-                  </span>
-                  <span className="text-xs text-gray-400">{formatTs(row.createdAt)}</span>
+                      {row.productSku ? <p className="text-xs text-gray-500 font-mono">{row.productSku}</p> : null}
+                      <p className="text-xs text-gray-600">{row.locationDisplayPath || '—'}</p>
+                      <p className="text-xs text-gray-600">
+                        {row.performedBy?.name || row.performedBy?.email || '—'}
+                        {row.reasonLabel ? ` · ${row.reasonLabel}` : ''}
+                      </p>
+                      {row.remark ? <p className="text-xs text-gray-500">{row.remark}</p> : null}
+                    </div>
+                  </div>
                 </div>
-                <p className="font-mono text-xs font-semibold mt-1">{row.changeDisplay}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {row.reasonLabel}
-                  {row.remark ? ` · ${row.remark}` : ''}
-                </p>
-              </div>
-            ))}
+              ))
+            )}
           </div>
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50 text-sm">
+            <span className="text-gray-500">
+              Page {movementPagination.page} of {movementPagination.pages}
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={movementPagination.page <= 1}
+                onClick={() => setTabPage('movements', Math.max(1, pages.movements - 1))}
+                className="p-1.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-white"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                type="button"
+                disabled={movementPagination.page >= movementPagination.pages}
+                onClick={() => setTabPage('movements', pages.movements + 1)}
+                className="p-1.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-white"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'position' && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+          {(positionRes.isLoading || positionRes.isValidating) && positionItems.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              <Loader2 className="inline animate-spin text-emerald-600" size={24} />
+              <p className="mt-2">Loading stock position…</p>
+            </div>
+          ) : positionItems.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">No stock position rows found</div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {positionItems.map((row) => (
+                <div key={row.productId} className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProductFilterId(row.productId);
+                          setActiveTab('movements');
+                          setTabPage('movements', 1);
+                        }}
+                        className="font-semibold text-gray-900 hover:text-emerald-700"
+                      >
+                        {row.title}
+                      </button>
+                      {row.sku ? <p className="text-xs text-gray-500 font-mono">{row.sku}</p> : null}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-emerald-700">{Number(row.totalQty || 0).toLocaleString()} pcs</p>
+                      <p className="text-[11px] text-gray-500">{formatTs(row.lastLedgerAt)}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {row.locations.map((loc) => (
+                      <div key={`${row.productId}-${loc.locationId}`} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                        <p className="text-xs text-gray-700">{loc.locationDisplayPath}</p>
+                        <p className="text-xs font-semibold text-gray-900 mt-0.5">{Number(loc.qty || 0).toLocaleString()} pcs</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50 text-sm">
+            <span className="text-gray-500">
+              Page {positionPagination.page} of {positionPagination.pages}
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={positionPagination.page <= 1}
+                onClick={() => setTabPage('position', Math.max(1, pages.position - 1))}
+                className="p-1.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-white"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                type="button"
+                disabled={positionPagination.page >= positionPagination.pages}
+                onClick={() => setTabPage('position', pages.position + 1)}
+                className="p-1.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-white"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'references' && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          {(referencesRes.isLoading || referencesRes.isValidating) && referenceItems.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              <Loader2 className="inline animate-spin text-emerald-600" size={24} />
+              <p className="mt-2">Loading references…</p>
+            </div>
+          ) : referenceItems.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">No reference rollups found</div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {referenceItems.map((row) => (
+                <div key={row.ref} className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReferenceFilter(row.ref);
+                        setActiveTab('movements');
+                        setTabPage('movements', 1);
+                      }}
+                      className="font-mono text-sm font-semibold text-emerald-800 hover:underline"
+                    >
+                      {row.ref}
+                    </button>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {row.movementCount} movements · Last: {formatTs(row.lastAt)}
+                    </p>
+                  </div>
+                  <div className="flex gap-4 text-sm">
+                    <span className="text-emerald-700 font-semibold">+{Number(row.addedQty || 0).toLocaleString()}</span>
+                    <span className="text-rose-700 font-semibold">-{Number(row.removedQty || 0).toLocaleString()}</span>
+                    <span className="text-gray-700 font-semibold">
+                      Net {Number(row.netQty || 0) > 0 ? '+' : ''}
+                      {Number(row.netQty || 0).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50 text-sm">
+            <span className="text-gray-500">
+              Page {referencePagination.page} of {referencePagination.pages}
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={referencePagination.page <= 1}
+                onClick={() => setTabPage('references', Math.max(1, pages.references - 1))}
+                className="p-1.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-white"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                type="button"
+                disabled={referencePagination.page >= referencePagination.pages}
+                onClick={() => setTabPage('references', pages.references + 1)}
+                className="p-1.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-white"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'operators' && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          {(operatorsRes.isLoading || operatorsRes.isValidating) && operatorsItems.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              <Loader2 className="inline animate-spin text-emerald-600" size={24} />
+              <p className="mt-2">Loading operators…</p>
+            </div>
+          ) : operatorsItems.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">No operators found</div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {operatorsItems.map((row) => (
+                <div key={row.userId || row.email} className="p-4 flex items-center justify-between gap-3">
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!row.userId) return;
+                        setOperatorFilterId(row.userId);
+                        setActiveTab('movements');
+                        setTabPage('movements', 1);
+                      }}
+                      className="font-semibold text-gray-900 hover:text-emerald-700"
+                    >
+                      {row.name}
+                    </button>
+                    <p className="text-xs text-gray-500">{row.email || '—'}</p>
+                    <p className="text-[11px] text-gray-500">Last movement: {formatTs(row.lastMovementAt)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-gray-900">{row.movementCount} movements</p>
+                    <p className="text-xs text-emerald-700">+{Number(row.plusQty || 0).toLocaleString()} pcs</p>
+                    <p className="text-xs text-rose-700">-{Number(row.minusQty || 0).toLocaleString()} pcs</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50 text-sm">
+            <span className="text-gray-500">
+              Page {operatorsPagination.page} of {operatorsPagination.pages}
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={operatorsPagination.page <= 1}
+                onClick={() => setTabPage('operators', Math.max(1, pages.operators - 1))}
+                className="p-1.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-white"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                type="button"
+                disabled={operatorsPagination.page >= operatorsPagination.pages}
+                onClick={() => setTabPage('operators', pages.operators + 1)}
+                className="p-1.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-white"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'insights' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          {!insights && insightsRes.isLoading ? (
+            <div className="md:col-span-2 xl:col-span-4 p-8 bg-white border border-gray-200 rounded-xl text-center text-gray-500">
+              <Loader2 className="inline animate-spin text-emerald-600" size={24} />
+              <p className="mt-2">Loading insights…</p>
+            </div>
+          ) : (
+            <>
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <p className="text-xs text-gray-500">Stock added</p>
+                <p className="text-2xl font-bold text-emerald-700 mt-1">+{Number(insights?.addedQty || 0).toLocaleString()}</p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <p className="text-xs text-gray-500">Stock removed</p>
+                <p className="text-2xl font-bold text-rose-700 mt-1">-{Number(insights?.removedQty || 0).toLocaleString()}</p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <p className="text-xs text-gray-500">Transfers</p>
+                <p className="text-2xl font-bold text-violet-700 mt-1">{Number(insights?.transferCount || 0).toLocaleString()}</p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <p className="text-xs text-gray-500">Movements</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{Number(insights?.movementCount || 0).toLocaleString()}</p>
+              </div>
+
+              <div className="md:col-span-2 bg-white border border-gray-200 rounded-xl p-4">
+                <p className="text-xs text-gray-500">Most moved item</p>
+                {insights?.topItem ? (
+                  <div className="mt-2">
+                    <p className="font-semibold text-gray-900">{insights.topItem.title}</p>
+                    <p className="text-xs text-gray-500 font-mono">{insights.topItem.sku || '—'}</p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      {Number(insights.topItem.movedQtyAbs || 0).toLocaleString()} pcs · {insights.topItem.movementCount} movements
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400 mt-2">No item data</p>
+                )}
+              </div>
+
+              <div className="md:col-span-2 bg-white border border-gray-200 rounded-xl p-4">
+                <p className="text-xs text-gray-500">Top active racks</p>
+                <div className="mt-2 space-y-2">
+                  {(insights?.topRacks || []).length === 0 ? (
+                    <p className="text-sm text-gray-400">No rack activity</p>
+                  ) : (
+                    (insights?.topRacks || []).map((rack) => (
+                      <div key={rack.locationId} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-700">{rack.locationDisplayPath}</span>
+                        <span className="font-semibold text-gray-900">{rack.movementCount}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

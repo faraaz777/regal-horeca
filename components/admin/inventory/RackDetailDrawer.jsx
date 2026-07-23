@@ -4,13 +4,13 @@ import useSWR from 'swr';
 import Link from 'next/link';
 import { X, ExternalLink, Loader2 } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
-import { getRackStatusStyle } from '@/lib/client/locatorUtils';
+import { getRackPresenceStyle } from '@/lib/client/locatorUtils';
 
 const fetcher = (url) => adminJson(url);
 
 /**
- * Locator rack detail — stock at rack only.
- * Capacity / fill-% UI removed (no artificial rack fullness).
+ * Locator rack detail — Stock snapshot facts only.
+ * No capacity / fill % (physical fullness is not measured in software).
  */
 export default function RackDetailDrawer({ rackId, onClose }) {
   const { data, isLoading, error } = useSWR(
@@ -21,7 +21,9 @@ export default function RackDetailDrawer({ rackId, onClose }) {
 
   const rack = data?.rack;
   const items = data?.items || [];
-  const statusStyle = rack ? getRackStatusStyle(rack.stockStatus) : null;
+  const presence = rack ? getRackPresenceStyle(rack) : null;
+  const skuCount = items.length || Number(rack?.productCount) || 0;
+  const qty = Number(rack?.sellableQty ?? rack?.totalQty) || 0;
 
   return (
     <>
@@ -62,24 +64,27 @@ export default function RackDetailDrawer({ rackId, onClose }) {
                       {rack.displayPathShort}
                     </p>
                   </div>
-                  {statusStyle && (
+                  {presence && (
                     <span
-                      className={`shrink-0 inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusStyle.fill} ${statusStyle.text}`}
+                      className={`shrink-0 inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold ${presence.fill} ${presence.text}`}
                     >
-                      {statusStyle.label}
+                      {presence.label}
                     </span>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs mt-2">
                   <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-800 font-semibold">
-                    {rack.sellableQty ?? rack.totalQty ?? 0} sellable
+                    {skuCount} SKU{skuCount === 1 ? '' : 's'}
+                  </span>
+                  <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-800 font-semibold">
+                    {qty.toLocaleString()} pcs
                   </span>
                 </div>
               </div>
 
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-2">
-                  SKUs at rack ({items.length})
+                  Products at rack ({items.length})
                 </p>
                 {items.length === 0 ? (
                   <p className="text-sm text-gray-400">No stock at this rack</p>
@@ -94,7 +99,7 @@ export default function RackDetailDrawer({ rackId, onClose }) {
                           </div>
                           {item.isDeadStock && (
                             <span className="shrink-0 px-1.5 py-px rounded text-[10px] font-semibold bg-amber-100 text-amber-900">
-                              ⚠ Dead stock
+                              Dead stock
                             </span>
                           )}
                         </div>

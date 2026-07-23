@@ -1,17 +1,17 @@
 'use client';
 
-import { memo, useCallback, useRef, useState, useEffect } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { zoneLabel } from '@/lib/client/zoneUtils';
-import ZoneHoverSummary from '@/components/admin/inventory/locator/ZoneHoverSummary';
 
-const HOVER_DELAY_MS = 200;
-
+/**
+ * Zone chrome only — border + label. Racks are drawn as boxes on the canvas
+ * (auto-grid), not via hover popups.
+ */
 function ZoneUnit({
   zone,
   selected,
   editMode,
   activeTool,
-  heatmapMode,
   summary,
   zoom,
   onSelect,
@@ -19,39 +19,21 @@ function ZoneUnit({
   onChange,
   onChangeEnd,
   dimmed,
-  suppressHover,
+  highlighted,
 }) {
   const latestRef = useRef(zone);
   latestRef.current = zone;
   const dragMoved = useRef(false);
   const historyPushed = useRef(false);
-  const hoverTimer = useRef(null);
-  const [hovered, setHovered] = useState(false);
 
   const canEditZone = editMode && activeTool === 'select' && !zone.locked;
   const rackCount = summary?.rackCount ?? 0;
 
-  useEffect(() => {
-    return () => {
-      if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    };
-  }, []);
-
-  const handleMouseEnter = () => {
-    if (suppressHover) return;
-    hoverTimer.current = setTimeout(() => setHovered(true), HOVER_DELAY_MS);
-  };
-
-  const handleMouseLeave = () => {
-    if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    setHovered(false);
-  };
-
   const handleMouseDown = useCallback(
     (e) => {
-      if (hoverTimer.current) clearTimeout(hoverTimer.current);
-      setHovered(false);
       if (!canEditZone) return;
+      // Let rack tiles receive clicks; only drag from empty zone chrome
+      if (e.target.closest?.('.rack-unit')) return;
       e.stopPropagation();
       dragMoved.current = false;
       historyPushed.current = false;
@@ -126,6 +108,7 @@ function ZoneUnit({
 
   const handleClick = useCallback(
     (e) => {
+      if (e.target.closest?.('.rack-unit')) return;
       e.stopPropagation();
       if (dragMoved.current) return;
       onSelect?.(zone.id);
@@ -136,11 +119,6 @@ function ZoneUnit({
   if (zone.hidden) return null;
 
   const label = zoneLabel(zone, rackCount);
-  const fillOpacity = heatmapMode
-    ? Math.min(0.45, (zone.opacity ?? 1) * 0.7)
-    : hovered
-      ? Math.min(1, (zone.opacity ?? 1) + 0.08)
-      : zone.opacity ?? 1;
 
   return (
     <div
@@ -150,31 +128,28 @@ function ZoneUnit({
         top: zone.y,
         width: zone.width,
         height: zone.height,
-        zIndex: selected ? 8 : zone.zIndex ?? 2,
+        zIndex: highlighted || selected ? 8 : zone.zIndex ?? 2,
+        // Racks sit above (z≥10); empty chrome / label area still receives zone clicks
+        pointerEvents: 'auto',
       }}
       onMouseDown={handleMouseDown}
       onClick={handleClick}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
     >
+      {/*
+        Light zone frame only — racks paint as sibling boxes above this chrome.
+        pointer-events-none so View-mode clicks reach rack tiles underneath/through.
+      */}
       <div
-        className={`absolute inset-0 rounded-md border-2 transition-all duration-150 ${selected ? 'ring-2 ring-blue-500 ring-offset-1 shadow-md' : ''} ${hovered ? 'ring-1 ring-blue-400/70' : ''}`}
+        className={`absolute inset-0 rounded-lg border pointer-events-none transition-all duration-150 ${
+          selected ? 'ring-2 ring-blue-500 ring-offset-1' : ''
+        } ${highlighted ? 'ring-2 ring-sky-500 ring-offset-1' : ''}`}
         style={{
-          backgroundColor: zone.fill || 'rgba(59, 130, 246, 0.12)',
-          borderColor: zone.stroke || 'rgba(37, 99, 235, 0.6)',
-          opacity: fillOpacity,
+          backgroundColor: 'transparent',
+          borderColor: zone.stroke || 'rgba(148, 163, 184, 0.7)',
         }}
       />
 
-      {hovered && !suppressHover && !selected && (
-        <ZoneHoverSummary zone={zone} summary={summary || zone.summary} />
-      )}
-
-      {/*
-        Label lives inside the canvas zoom transform — do not counter-scale with 1/zoom,
-        or it stays screen-sized and bulges when zoomed out.
-      */}
-      <div className="absolute top-1 left-1 max-w-[calc(100%-8px)] px-1.5 py-0.5 rounded bg-white/85 text-[10px] font-semibold text-gray-800 shadow-sm pointer-events-none whitespace-nowrap overflow-hidden text-ellipsis">
+      <div className="absolute top-1 left-1 max-w-[calc(100%-8px)] px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400 pointer-events-none whitespace-nowrap overflow-hidden text-ellipsis">
         {label}
       </div>
 

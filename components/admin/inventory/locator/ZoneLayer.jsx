@@ -8,14 +8,12 @@ function ZoneLayer({
   selectedZoneId,
   editMode,
   activeTool,
-  heatmapMode,
   highlightZoneIds,
   zoom,
   onSelectZone,
   onZoneInteractionStart,
   onZoneChange,
   onZoneChangeEnd,
-  suppressHover,
 }) {
   const sorted = [...(zones || [])].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
 
@@ -28,11 +26,10 @@ function ZoneLayer({
           selected={selectedZoneId === zone.id}
           editMode={editMode}
           activeTool={activeTool}
-          heatmapMode={heatmapMode}
           summary={zone.summary}
           zoom={zoom}
+          highlighted={highlightZoneIds?.has(zone.id)}
           dimmed={highlightZoneIds?.size > 0 && !highlightZoneIds.has(zone.id)}
-          suppressHover={suppressHover}
           onSelect={onSelectZone}
           onInteractionStart={onZoneInteractionStart}
           onChange={onZoneChange}

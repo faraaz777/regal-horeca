@@ -22,6 +22,19 @@ module.exports = {
         'royal-gold': '#C5A059',
         'rich-black': '#121212',
         'warm-white': '#FAFAF9',
+        // Admin shell — warm espresso + gold (hospitality, not cold black/red)
+        shell: {
+          bg: '#1A1612',
+          raised: '#26211C',
+          border: '#3A332C',
+          text: '#F3EEE6',
+          muted: '#A89F93',
+          dim: '#7A7268',
+          gold: '#D4B56A',
+          'gold-soft': '#C5A059',
+          active: '#F3EEE6',
+          'active-fg': '#1A1612',
+        },
         // Legacy support - map to design system
         primary: '#000000',
         'primary-700': '#000000',

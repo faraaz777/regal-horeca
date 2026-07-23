@@ -1,6 +1,6 @@
 'use client';
 
-import { getRackStatusStyle } from '@/lib/client/locatorUtils';
+import { getRackPresenceStyle } from '@/lib/client/locatorUtils';
 import { formatRackDisplayName } from '@/lib/shared/locationDisplay';
 
 export default function UnplacedRacksTray({ racks, onRackClick }) {
@@ -19,7 +19,9 @@ export default function UnplacedRacksTray({ racks, onRackClick }) {
       </p>
       <ul className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
         {racks.map((rack) => {
-          const statusStyle = getRackStatusStyle(rack.stockStatus);
+          const presence = getRackPresenceStyle(rack);
+          const skus = Number(rack.productCount ?? rack.distinctProductCount) || 0;
+          const qty = Number(rack.sellableQty ?? rack.totalQty) || 0;
           return (
             <li
               key={rack._id}
@@ -34,13 +36,15 @@ export default function UnplacedRacksTray({ racks, onRackClick }) {
                   {formatRackDisplayName(rack)}
                 </p>
                 <p className="text-[10px] text-gray-500 mt-0.5">
-                  {rack.sellableQty ?? rack.totalQty ?? 0} sellable
+                  {qty > 0
+                    ? `${skus} SKU${skus === 1 ? '' : 's'} · ${qty.toLocaleString()} pcs`
+                    : 'Empty'}
                 </p>
               </button>
               <span
-                className={`shrink-0 px-1.5 py-px rounded-full text-[9px] font-semibold ${statusStyle.fill} ${statusStyle.text}`}
+                className={`shrink-0 px-1.5 py-px rounded-full text-[9px] font-semibold ${presence.fill} ${presence.text}`}
               >
-                {statusStyle.label}
+                {presence.label}
               </span>
             </li>
           );

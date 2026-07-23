@@ -30,17 +30,18 @@ export default function AllocateFloorRackGrid({
 
   const floorId = floor?._id ? String(floor._id) : '';
   /**
-   * Structure from cascade (cached/prefetched). totalQty from Stock snapshot.
-   * Soft refresh every 25s while this floor is expanded — light multi-user freshness,
-   * not a full realtime system.
+   * Structure from cascade (shared location index). totalQty from Stock snapshot.
+   * Do not auto-refresh every few seconds — that raced cold/warm payloads and
+   * made rack cards appear/disappear on the same floor.
    */
   const { data: rackData, isLoading } = useSWR(
     cascadeRacksSwrKey(swrKeyPrefix, floorId),
     () => fetchCascadeRacks(floorId),
     {
-      revalidateOnFocus: true,
-      dedupingInterval: 15_000,
-      refreshInterval: 25_000,
+      revalidateOnMount: true,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 60_000,
       keepPreviousData: true,
     }
   );

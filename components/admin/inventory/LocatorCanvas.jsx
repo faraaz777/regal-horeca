@@ -16,7 +16,7 @@ import {
   useSensors,
   useDroppable,
 } from '@dnd-kit/core';
-import { Loader2, Pencil, Map as MapIcon, Layers, PackageOpen } from 'lucide-react';
+import { Loader2, Map as MapIcon, PackageOpen } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
 import {
   publishFloorLayout,
@@ -37,14 +37,15 @@ import {
 import {
   DEFAULT_RACK_HEIGHT,
   DEFAULT_RACK_WIDTH,
-  RACK_STATUS_STYLES,
+  RACK_PRESENCE_STYLES,
+  buildZoneRackDisplayPositions,
   racksIntersectMarquee,
 } from '@/lib/client/locatorUtils';
 import { clampRackInsideZone } from '@/lib/shared/rackPlacementUtils';
 import { generateZoneId, nextZoneName } from '@/lib/client/zoneUtils';
 import RackUnit from '@/components/admin/inventory/RackUnit';
 import UnplacedRacksTray from '@/components/admin/inventory/UnplacedRacksTray';
-import LocatorSearchBar from '@/components/admin/inventory/LocatorSearchBar';
+import LocatorFindSidebar from '@/components/admin/inventory/locator/LocatorFindSidebar';
 import LocatorExportButton from '@/components/admin/inventory/LocatorExportButton';
 import RackDetailDrawer from '@/components/admin/inventory/RackDetailDrawer';
 import FloorPlanBackground from '@/components/admin/inventory/locator/FloorPlanBackground';
@@ -104,12 +105,14 @@ export default function LocatorCanvas({ role }) {
   const [loadingCascade, setLoadingCascade] = useState(true);
 
   const [editMode, setEditMode] = useState(false);
-  const [heatmapMode, setHeatmapMode] = useState(false);
   const [activeTool, setActiveTool] = useState('select');
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [selectedZoneId, setSelectedZoneId] = useState(null);
   const [highlightIds, setHighlightIds] = useState(new Set());
   const [highlightZoneIds, setHighlightZoneIds] = useState(new Set());
+  const [findProductId, setFindProductId] = useState(null);
+  const [findProductTitle, setFindProductTitle] = useState('');
+  const [findLocations, setFindLocations] = useState([]);
   const [drawerRackId, setDrawerRackId] = useState(null);
   const [localRacks, setLocalRacks] = useState([]);
   const [localUnplaced, setLocalUnplaced] = useState([]);
@@ -288,13 +291,6 @@ export default function LocatorCanvas({ role }) {
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } })
   );
 
-  const allRacksOnFloor = useMemo(
-    () => [...localRacks, ...localUnplaced],
-    [localRacks, localUnplaced]
-  );
-
-  const maxTotalQty = layout?.maxTotalQty ?? 1;
-
   const drawerZone = useMemo(
     () => localLayout.zones?.find((z) => z.id === drawerZoneId) || null,
     [localLayout.zones, drawerZoneId]
@@ -303,6 +299,12 @@ export default function LocatorCanvas({ role }) {
   const selectedZone = useMemo(
     () => localLayout.zones?.find((z) => z.id === selectedZoneId) || null,
     [localLayout.zones, selectedZoneId]
+  );
+
+  /** Display-only grid cells for zone membership — does not mutate saved x/y. */
+  const zoneRackDisplayPositions = useMemo(
+    () => buildZoneRackDisplayPositions(localLayout.zones, localRacks),
+    [localLayout.zones, localRacks]
   );
 
   const clientToCanvas = useCallback(
@@ -634,49 +636,56 @@ export default function LocatorCanvas({ role }) {
     ]
   );
 
-  const handleLocateRacks = useCallback(
-    async ({ rackIds, product, message }) => {
-      if (message) {
-        toast.error(message);
-        return;
-      }
-      if (!product?._id) return;
+  const clearFindHighlight = useCallback(() => {
+    setHighlightIds(new Set());
+    setHighlightZoneIds(new Set());
+    setFindProductId(null);
+    setFindProductTitle('');
+    setFindLocations([]);
+  }, []);
+
+  /**
+   * Locate via floor Stock API — not search-response location labels.
+   */
+  const handleFindProduct = useCallback(
+    async (row) => {
+      if (!floorId || !row?.productId) return;
+      setFindProductId(row.productId);
+      setFindProductTitle(row.title || '');
 
       try {
-        const detail = await adminJson(`/api/admin/inventory/${product._id}/stock`);
-        const locations = detail.locations || [];
-        const onFloor = locations.filter((loc) => {
-          const rid = String(loc.rackId || loc.locationId);
-          return localRacks.some((r) => r._id === rid) || localUnplaced.some((r) => r._id === rid);
-        });
-
-        if (!onFloor.length) {
-          const otherFloor = locations.find((l) => l.floorId);
-          if (otherFloor?.floorId) {
-            toast(`Product is on another floor — switch floor to locate`, { icon: 'ℹ️' });
-            setFloorId(String(otherFloor.floorId));
-            return;
-          }
-          toast.error('Product not on this floor');
+        const data = await adminJson(
+          `/api/admin/inventory/locations/${floorId}/locate?productId=${encodeURIComponent(row.productId)}`
+        );
+        const locations = data.locations || [];
+        if (!locations.length) {
+          setHighlightIds(new Set());
+          setHighlightZoneIds(new Set());
+          setFindLocations([]);
+          toast.error('No stock for this product on this floor');
           return;
         }
 
-        const ids = onFloor.map((l) => String(l.rackId || l.locationId));
+        const ids = locations.map((l) => String(l.locationId));
         setHighlightIds(new Set(ids));
+        setFindLocations(locations);
         const zoneIds = new Set(
-          localRacks.filter((r) => ids.includes(r._id)).map((r) => r.position?.zoneId).filter(Boolean)
+          locations.map((l) => l.zoneId).filter(Boolean).map(String)
         );
+        for (const r of localRacks) {
+          if (ids.includes(String(r._id)) && r.position?.zoneId) {
+            zoneIds.add(String(r.position.zoneId));
+          }
+        }
         setHighlightZoneIds(zoneIds);
-        toast.success(`Located: ${product.title}`);
-        setTimeout(() => {
-          setHighlightIds(new Set());
-          setHighlightZoneIds(new Set());
-        }, 4000);
+        toast.success(
+          `${data.title || 'Product'}: ${ids.length} rack${ids.length === 1 ? '' : 's'} · ${(data.totalQty || 0).toLocaleString()} pcs`
+        );
       } catch (err) {
         toast.error(err.message || 'Could not locate product');
       }
     },
-    [localRacks, localUnplaced]
+    [floorId, localRacks]
   );
 
   const onViewportMouseDown = (e) => {
@@ -849,7 +858,10 @@ export default function LocatorCanvas({ role }) {
           </select>
           <select
             value={floorId}
-            onChange={(e) => setFloorId(e.target.value)}
+            onChange={(e) => {
+              clearFindHighlight();
+              setFloorId(e.target.value);
+            }}
             className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
           >
             {floors.map((f) => (
@@ -858,141 +870,199 @@ export default function LocatorCanvas({ role }) {
               </option>
             ))}
           </select>
-          {editMode && (
-            <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 px-2 py-1 rounded">
-              Edit mode
+
+          {/* View = find/highlight; Arrange = layout tools (managers) */}
+          {canEdit ? (
+            <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditMode(false);
+                  setActiveTool('select');
+                }}
+                className={`px-3 py-1.5 rounded-md ${
+                  !editMode ? 'bg-sky-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                View
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDrawerZoneId(null);
+                  setEditMode(true);
+                  setActiveTool('select');
+                }}
+                className={`px-3 py-1.5 rounded-md ${
+                  editMode ? 'bg-emerald-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                Arrange
+              </button>
+            </div>
+          ) : (
+            <span className="text-[10px] font-bold uppercase tracking-wide text-sky-700 bg-sky-50 px-2 py-1 rounded">
+              View
             </span>
           )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <LocatorSearchBar layoutRacks={allRacksOnFloor} onLocateRacks={handleLocateRacks} />
-          {canEdit && (
-            <button
-              type="button"
-              onClick={() => {
-                if (!editMode) setDrawerZoneId(null);
-                setEditMode((v) => !v);
-                if (editMode) setActiveTool('select');
-              }}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border ${
-                editMode
-                  ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
-                  : 'border-gray-200 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <Pencil size={14} />
-              {editMode ? 'Editing' : 'Edit layout'}
-            </button>
-          )}
-          {canEdit && localUnplaced.length > 0 && (
+          {canEdit && editMode && localUnplaced.length > 0 && (
             <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded-md">
               {localUnplaced.length} unallocated — use Manage racks on a zone
             </span>
           )}
-          <div className="inline-flex items-center rounded-lg border border-gray-200 overflow-hidden text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => setHeatmapMode(false)}
-              className={`px-3 py-2 flex items-center gap-1.5 ${
-                !heatmapMode ? 'bg-emerald-50 text-emerald-800' : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              <Layers size={14} />
-              Status
-            </button>
-            <button
-              type="button"
-              onClick={() => setHeatmapMode(true)}
-              className={`px-3 py-2 flex items-center gap-1.5 border-l border-gray-200 ${
-                heatmapMode ? 'bg-sky-50 text-sky-800' : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              <Layers size={14} />
-              Fill %
-            </button>
-          </div>
           <LocatorExportButton canvasRef={canvasRef} floorLabel={floorLabel} branchLabel={branchLabel} />
         </div>
       </div>
 
-      <CanvasToolbar
-        activeTool={activeTool}
-        onToolChange={setActiveTool}
-        editMode={editMode}
-        canEdit={canEdit}
-        onZoomIn={() => setZoom((z) => Math.min(2, z + 0.1))}
-        onZoomOut={() => setZoom((z) => Math.max(0.25, z - 0.1))}
-        onFit={fitToCanvas}
-        gridEnabled={gridEnabled}
-        onToggleGrid={() => {
-          pushHistory();
-          const next = {
-            ...localLayout,
-            canvas: { ...localLayout.canvas, gridEnabled: !gridEnabled },
-          };
-          setLocalLayout(next);
-          scheduleAutosave();
-        }}
-        onUpload={() => setUploadOpen(true)}
-        onSave={() => persistLayout()}
-        onPublish={async () => {
-          try {
-            await publishFloorLayout(floorId);
-            toast.success('Layout published');
-            await mutate();
-          } catch (err) {
-            toast.error(err.message || 'Publish failed');
-          }
-        }}
-        saveStatus={saveStatus}
-        canUndo={historyTick >= 0 && historyPast.current.length > 0}
-        canRedo={historyTick >= 0 && historyFuture.current.length > 0}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-      />
+      {editMode && (
+        <CanvasToolbar
+          activeTool={activeTool}
+          onToolChange={setActiveTool}
+          editMode={editMode}
+          canEdit={canEdit}
+          onZoomIn={() => setZoom((z) => Math.min(2, z + 0.1))}
+          onZoomOut={() => setZoom((z) => Math.max(0.25, z - 0.1))}
+          onFit={fitToCanvas}
+          gridEnabled={gridEnabled}
+          onToggleGrid={() => {
+            pushHistory();
+            const next = {
+              ...localLayout,
+              canvas: { ...localLayout.canvas, gridEnabled: !gridEnabled },
+            };
+            setLocalLayout(next);
+            scheduleAutosave();
+          }}
+          onUpload={() => setUploadOpen(true)}
+          onSave={() => persistLayout()}
+          onPublish={async () => {
+            try {
+              await publishFloorLayout(floorId);
+              toast.success('Layout published');
+              await mutate();
+            } catch (err) {
+              toast.error(err.message || 'Publish failed');
+            }
+          }}
+          saveStatus={saveStatus}
+          canUndo={historyTick >= 0 && historyPast.current.length > 0}
+          canRedo={historyTick >= 0 && historyFuture.current.length > 0}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+        />
+      )}
 
-      {heatmapMode && layout?.heatmapNote && (
-        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-          {layout.heatmapNote}
-        </p>
+      {!editMode && (
+        <div className="flex flex-wrap items-center gap-2 justify-end">
+          <button
+            type="button"
+            onClick={() => setZoom((z) => Math.max(0.25, z - 0.1))}
+            className="px-2.5 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg bg-white hover:bg-gray-50"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            onClick={fitToCanvas}
+            className="px-2.5 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg bg-white hover:bg-gray-50"
+          >
+            Fit
+          </button>
+          <button
+            type="button"
+            onClick={() => setZoom((z) => Math.min(2, z + 0.1))}
+            className="px-2.5 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg bg-white hover:bg-gray-50"
+          >
+            +
+          </button>
+        </div>
       )}
 
       <div className="flex gap-4 flex-col xl:flex-row">
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <aside className="w-full xl:w-60 shrink-0 bg-white border border-gray-200 rounded-xl p-3 shadow-sm order-2 xl:order-1">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Layers</h3>
-            <CanvasLayersPanel
-              backgroundImage={localLayout.backgroundImage}
-              zones={localLayout.zones}
-              racks={localRacks}
-              unplacedRacks={localUnplaced}
-              selectedZoneId={selectedZoneId}
-              selectedRackIds={selectedIds}
-              onSelectZone={handleSelectZone}
-              onSelectRack={(id) => handleRackSelect(id, {})}
-              onToggleZoneHidden={(id) => {
-                const z = localLayout.zones.find((x) => x.id === id);
-                if (z) applyZoneUpdate({ ...z, hidden: !z.hidden }, { recordHistory: true });
-              }}
-              onToggleZoneLocked={(id) => {
-                const z = localLayout.zones.find((x) => x.id === id);
-                if (z) applyZoneUpdate({ ...z, locked: !z.locked }, { recordHistory: true });
-              }}
-            />
-            <div className="border-t border-gray-100 my-3" />
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
-              Unplaced racks
-              {localUnplaced.length > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">
-                  {localUnplaced.length}
-                </span>
-              )}
-            </h3>
-            <UnplacedRacksTray racks={localUnplaced} onRackClick={(id) => setDrawerRackId(id)} />
+          <aside className="w-full xl:w-72 shrink-0 bg-white border border-gray-200 rounded-xl p-3 shadow-sm order-2 xl:order-1 flex flex-col gap-3 max-h-[560px]">
+            <div className={!editMode ? 'flex-1 min-h-0' : 'shrink-0 max-h-[280px]'}>
+              <LocatorFindSidebar
+                floorId={floorId}
+                selectedProductId={findProductId}
+                onSelectProduct={handleFindProduct}
+                onClear={clearFindHighlight}
+              />
+            </div>
+
+            {editMode && (
+              <>
+                <div className="border-t border-gray-100" />
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    Layers
+                  </h3>
+                  <CanvasLayersPanel
+                    backgroundImage={localLayout.backgroundImage}
+                    zones={localLayout.zones}
+                    racks={localRacks}
+                    unplacedRacks={localUnplaced}
+                    selectedZoneId={selectedZoneId}
+                    selectedRackIds={selectedIds}
+                    onSelectZone={handleSelectZone}
+                    onSelectRack={(id) => handleRackSelect(id, {})}
+                    onToggleZoneHidden={(id) => {
+                      const z = localLayout.zones.find((x) => x.id === id);
+                      if (z) applyZoneUpdate({ ...z, hidden: !z.hidden }, { recordHistory: true });
+                    }}
+                    onToggleZoneLocked={(id) => {
+                      const z = localLayout.zones.find((x) => x.id === id);
+                      if (z) applyZoneUpdate({ ...z, locked: !z.locked }, { recordHistory: true });
+                    }}
+                  />
+                  <div className="border-t border-gray-100 my-3" />
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
+                    Unplaced racks
+                    {localUnplaced.length > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">
+                        {localUnplaced.length}
+                      </span>
+                    )}
+                  </h3>
+                  <UnplacedRacksTray racks={localUnplaced} onRackClick={(id) => setDrawerRackId(id)} />
+                </div>
+              </>
+            )}
           </aside>
 
           <div className="flex-1 min-w-0 order-1 xl:order-2">
+            {findProductId && findLocations.length > 0 && (
+              <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs">
+                <span className="font-semibold text-sky-900 truncate max-w-[200px]">
+                  {findProductTitle || 'Product'}
+                </span>
+                <span className="text-sky-700">·</span>
+                {findLocations.map((loc) => (
+                  <button
+                    key={loc.locationId}
+                    type="button"
+                    onClick={() => setDrawerRackId(loc.locationId)}
+                    className="inline-flex items-center gap-1 rounded-md border border-sky-300 bg-white px-2 py-0.5 font-mono font-semibold text-sky-800 hover:bg-sky-100"
+                  >
+                    {loc.rackCode}
+                    <span className="font-sans font-normal text-sky-600">
+                      {Number(loc.qty || 0).toLocaleString()} pcs
+                    </span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={clearFindHighlight}
+                  className="ml-auto text-[10px] font-semibold text-sky-700 hover:underline"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+
             <div
               ref={viewportRef}
               className={`relative h-[520px] bg-slate-100 border border-gray-200 rounded-xl overflow-hidden overscroll-contain ${viewportCursorClass}`}
@@ -1022,7 +1092,7 @@ export default function LocatorCanvas({ role }) {
                   coordinateHeight={coordinateHeight}
                 />
 
-                {gridEnabled && (
+                {gridEnabled && editMode && (
                   <div
                     className="absolute inset-0 pointer-events-none"
                     style={{
@@ -1048,10 +1118,8 @@ export default function LocatorCanvas({ role }) {
                   selectedZoneId={selectedZoneId}
                   editMode={editMode}
                   activeTool={activeTool}
-                  heatmapMode={heatmapMode}
                   highlightZoneIds={highlightZoneIds}
                   zoom={zoom}
-                  suppressHover={isDraggingRack || manageRacksOpen || isPanning}
                   onSelectZone={handleSelectZone}
                   onZoneInteractionStart={handleZoneInteractionStart}
                   onZoneChange={(z) => applyZoneUpdate(z)}
@@ -1060,20 +1128,23 @@ export default function LocatorCanvas({ role }) {
 
                 <CanvasDropZone editMode={editMode} activeTool={activeTool}>
                   {localRacks.map((rack) => {
-                    const rackZoneId = rack.position?.zoneId;
-                    // Zone-assigned racks are represented by the rack count on
-                    // the zone. Do not overlay individual rack boxes on it.
-                    if (rackZoneId) return null;
+                    const inZone = Boolean(rack.position?.zoneId);
+                    const displayPosition = inZone
+                      ? zoneRackDisplayPositions.get(String(rack._id))
+                      : null;
+                    // Zone rack without a grid cell yet (zone missing) — skip until layout catches up
+                    if (inZone && !displayPosition) return null;
 
                     return (
                       <RackUnit
                         key={rack._id}
                         rack={rack}
                         selected={selectedIds.has(rack._id)}
-                        editMode={editMode && activeTool === 'select'}
-                        heatmapMode={heatmapMode}
-                        maxTotalQty={maxTotalQty}
+                        /* Zone membership uses auto-grid — do not free-drag inside the zone */
+                        editMode={editMode && activeTool === 'select' && !inZone}
                         highlighted={highlightIds.has(rack._id)}
+                        dimmed={highlightIds.size > 0 && !highlightIds.has(rack._id)}
+                        displayPosition={displayPosition || undefined}
                         onSelect={handleRackSelect}
                       />
                     );
@@ -1085,7 +1156,7 @@ export default function LocatorCanvas({ role }) {
                     <PackageOpen className="mx-auto text-gray-400 mb-2" size={36} />
                     <p className="text-sm font-medium text-gray-600">No floor plan uploaded</p>
                     <p className="text-xs text-gray-500 mt-1 max-w-xs">
-                      Upload an image or continue with the blank canvas. Use Create zone to map sections.
+                      Upload an image or continue with the blank canvas. Use Arrange → Create zone to map sections.
                     </p>
                   </div>
                 )}
@@ -1117,12 +1188,20 @@ export default function LocatorCanvas({ role }) {
             </div>
 
             <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-gray-600">
-              {Object.entries(RACK_STATUS_STYLES).map(([key, style]) => (
+              {Object.entries(RACK_PRESENCE_STYLES).map(([key, style]) => (
                 <span key={key} className="inline-flex items-center gap-1">
-                  <span className={`w-3 h-3 rounded ${style.fill} border ${style.border}`} />
+                  <span className={`w-3 h-3 rounded-md ${style.fill} border ${style.border}`} />
                   {style.label}
                 </span>
               ))}
+              <span className="inline-flex items-center gap-1">
+                <span className="w-3 h-3 rounded-md border border-amber-300 bg-amber-100" />
+                Found
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="w-3 h-3 rounded-md border border-sky-700 bg-sky-600" />
+                Selected
+              </span>
             </div>
           </div>
         </DndContext>

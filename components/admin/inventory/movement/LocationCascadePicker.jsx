@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import useSWR, { preload } from 'swr';
 import { Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import {
@@ -78,8 +78,8 @@ export default function LocationCascadePicker({
     { revalidateOnFocus: false, dedupingInterval: 30_000 }
   );
 
-  const branches = branchData?.branches || [];
-  const floors = floorData?.floors || [];
+  const branches = useMemo(() => branchData?.branches || [], [branchData]);
+  const floors = useMemo(() => floorData?.floors || [], [floorData]);
   const selectedBranch = branches.find((b) => String(b._id) === String(branchId));
 
   const pickBranch = (id) => {
@@ -115,8 +115,8 @@ export default function LocationCascadePicker({
   }, [pickingBranch, branchId, floors, defaultFloorId]);
 
   /**
-   * Prefetch racks for every floor in the branch so expanding a floor
-   * hits SWR cache instead of waiting on a cold cascade call.
+   * Prefetch racks per floor after the branch is chosen.
+   * Server single-flights the location index so parallel prefetches stay consistent.
    */
   useEffect(() => {
     if (pickingBranch || !floors.length) return;

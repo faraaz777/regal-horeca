@@ -152,7 +152,13 @@ function TransferFloorRacks({
   const { data: rackData, isLoading } = useSWR(
     cascadeRacksSwrKey('transfer', floorId),
     () => fetchCascadeRacks(floorId),
-    { revalidateOnFocus: true, dedupingInterval: 15_000, refreshInterval: 25_000, keepPreviousData: true }
+    {
+      revalidateOnMount: true,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 60_000,
+      keepPreviousData: true,
+    }
   );
 
   const racks = rackData?.racks || [];

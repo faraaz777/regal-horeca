@@ -49,10 +49,14 @@ export default function RackAllocateCard({
   const canDecrease = qty > 0 && !disabled;
   const canIncrease = (rowMax == null || qty < rowMax) && !disabled;
 
+  /**
+   * Selected = qty > 0. Stronger wash + glow so the rack stands out
+   * without adding a "Selected" label.
+   */
   const borderTone =
     qty > 0
-      ? 'border-emerald-400 bg-white ring-1 ring-emerald-100'
-      : 'border-gray-200 bg-white';
+      ? 'border-2 border-emerald-500 bg-emerald-50/80 ring-2 ring-emerald-400/50 shadow-md shadow-emerald-500/25'
+      : 'border border-gray-200 bg-white shadow-sm';
 
   const commitDraft = () => {
     const parsed = parseInt(draft, 10);
@@ -62,7 +66,7 @@ export default function RackAllocateCard({
 
   return (
     <div
-      className={`rounded-xl border px-2.5 py-2 flex flex-col gap-1.5 min-w-0 shadow-sm ${borderTone}`}
+      className={`rounded-xl px-2.5 py-2 flex flex-col gap-1.5 min-w-0 transition-[box-shadow,background-color,border-color] duration-150 ${borderTone}`}
     >
       <div className="min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">

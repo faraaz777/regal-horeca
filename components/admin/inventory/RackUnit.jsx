@@ -6,48 +6,62 @@ import { CSS } from '@dnd-kit/utilities';
 import {
   DEFAULT_RACK_HEIGHT,
   DEFAULT_RACK_WIDTH,
-  getHeatmapIntensity,
-  getRackStatusStyle,
-  heatmapFillClass,
+  getRackPresenceStyle,
 } from '@/lib/client/locatorUtils';
-import { formatRackDisplayName } from '@/lib/shared/locationDisplay';
 
-function RackTooltip({ rack }) {
-  return (
-    <div className="pointer-events-none absolute left-1/2 bottom-full mb-2 -translate-x-1/2 z-50 hidden group-hover:block">
-      <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg min-w-[160px] max-w-[240px]">
-        <p className="font-mono font-semibold truncate">{formatRackDisplayName(rack)}</p>
-        <p className="text-gray-300 mt-1">
-          {rack.totalQty > 0 || rack.sellableQty > 0 ? (
-            <span>{rack.sellableQty || rack.totalQty || 0} sellable</span>
-          ) : (
-            <span>Empty</span>
-          )}
-        </p>
-      </div>
-    </div>
-  );
-}
-
+/**
+ * Locator rack tile — reference-style box with centered code.
+ * Pale blue = stock · grey = empty · amber = find · solid blue = selected.
+ * displayPosition overrides layout for zone auto-grid (display only).
+ */
 function RackUnit({
   rack,
   selected,
   editMode,
-  heatmapMode,
-  maxTotalQty,
   highlighted,
+  dimmed,
+  displayPosition,
   onSelect,
 }) {
-  const pos = rack.position || { x: 0, y: 0, width: DEFAULT_RACK_WIDTH, height: DEFAULT_RACK_HEIGHT };
+  const stored = rack.position || {};
+  const pos = displayPosition || {
+    x: stored.x ?? 0,
+    y: stored.y ?? 0,
+    width: stored.width || DEFAULT_RACK_WIDTH,
+    height: stored.height || DEFAULT_RACK_HEIGHT,
+  };
+
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: rack._id,
     disabled: !editMode,
     data: { type: 'placed', rack },
   });
 
-  const statusStyle = getRackStatusStyle(rack.stockStatus);
-  const heatIntensity = getHeatmapIntensity(rack, maxTotalQty);
-  const fillClass = heatmapMode ? heatmapFillClass(heatIntensity) : statusStyle.fill;
+  const presence = getRackPresenceStyle(rack);
+  const qty = Number(rack.sellableQty ?? rack.totalQty) || 0;
+  const skus = Number(rack.productCount ?? rack.distinctProductCount) || 0;
+  const titleBits = [
+    rack.code,
+    rack.name && rack.name !== rack.code ? rack.name : null,
+    qty > 0 ? `${skus} SKU · ${qty.toLocaleString()} pcs` : 'Empty',
+  ].filter(Boolean);
+
+  let fill = presence.fill;
+  let border = presence.border;
+  let text = presence.text;
+  let extra = '';
+
+  if (selected) {
+    fill = 'bg-sky-600';
+    border = 'border-sky-700';
+    text = 'text-white';
+    extra = 'shadow-md';
+  } else if (highlighted) {
+    fill = 'bg-amber-100';
+    border = 'border-amber-300';
+    text = 'text-amber-800';
+    extra = 'shadow-sm';
+  }
 
   const style = {
     position: 'absolute',
@@ -56,28 +70,28 @@ function RackUnit({
     width: pos.width || DEFAULT_RACK_WIDTH,
     height: pos.height || DEFAULT_RACK_HEIGHT,
     transform: transform ? CSS.Translate.toString(transform) : undefined,
-    zIndex: isDragging || selected ? 30 : 10,
+    zIndex: isDragging || selected || highlighted ? 30 : 10,
+    pointerEvents: 'auto',
   };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`group rack-unit ${editMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
-      onClick={(e) => onSelect?.(rack._id, e)}
+      title={titleBits.join(' · ')}
+      className={`rack-unit ${editMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect?.(rack._id, e);
+      }}
       {...(editMode ? { ...listeners, ...attributes } : {})}
     >
       <div
-        className={`relative h-full w-full rounded-lg border-2 shadow-sm flex flex-col items-center justify-center px-1 text-center transition-shadow ${fillClass} ${heatmapMode ? 'border-slate-400' : statusStyle.border} ${selected ? 'ring-2 ring-emerald-500 ring-offset-2' : ''} ${highlighted ? 'ring-2 ring-sky-500 ring-offset-2 animate-pulse' : ''} ${isDragging ? 'opacity-80 shadow-lg' : ''}`}
+        className={`relative h-full w-full rounded-xl border flex items-center justify-center px-0.5 text-center transition-all duration-150 ${fill} ${border} ${text} ${extra} ${dimmed ? 'opacity-35' : ''} ${isDragging ? 'opacity-80 shadow-lg' : ''}`}
       >
-        <RackTooltip rack={rack} />
-        <span className={`text-[10px] font-bold leading-tight truncate w-full ${heatmapMode ? 'text-gray-900' : statusStyle.text}`}>
+        <span className="text-[11px] font-semibold leading-none truncate w-full px-0.5">
           {rack.code}
         </span>
-        {rack.name ? (
-          <span className="text-[9px] leading-tight truncate w-full text-gray-800/90">{rack.name}</span>
-        ) : null}
-        <span className="text-[9px] font-semibold mt-0.5 text-gray-800/80">{rack.sellableQty || rack.totalQty || 0}</span>
       </div>
     </div>
   );

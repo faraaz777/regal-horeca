@@ -494,7 +494,7 @@ export default function AddToInventoryPage() {
   }
 
   return (
-    // Full main width so content grows into freed space when sidebar closes (AdminShell lg:ml-64 ↔ lg:ml-0).
+    // Full main width grows when sidebar collapses to the icon rail (AdminShell lg:ml-64 ↔ lg:ml-16).
     <div className="w-full space-y-6 pb-8">
       <div className="flex items-center gap-3">
         <Link

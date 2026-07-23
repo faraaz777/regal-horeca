@@ -17,7 +17,13 @@ function NewRackFloorRacks({ floorId, occupiedLocationIds, onPickRack }) {
   const { data: rackData, isLoading } = useSWR(
     cascadeRacksSwrKey('add', floorId),
     () => fetchCascadeRacks(floorId),
-    { revalidateOnFocus: false, dedupingInterval: 15_000, keepPreviousData: true }
+    {
+      revalidateOnMount: true,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 60_000,
+      keepPreviousData: true,
+    }
   );
 
   const racks = useMemo(() => {

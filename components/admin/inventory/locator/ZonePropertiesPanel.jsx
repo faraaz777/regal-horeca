@@ -1,7 +1,6 @@
 'use client';
 
 import { countRacksInZone } from '@/lib/client/zoneUtils';
-import ZoneCapacityIndicator from '@/components/admin/inventory/locator/ZoneCapacityIndicator';
 
 export default function ZonePropertiesPanel({
   zone,
@@ -56,7 +55,6 @@ export default function ZonePropertiesPanel({
         {summary?.distinctProductCount != null && (
           <p className="text-[10px] text-gray-500">{summary.distinctProductCount} distinct products</p>
         )}
-        <ZoneCapacityIndicator utilisationPercent={summary?.utilisationPercent} />
         <button
           type="button"
           onClick={() => onManageRacks?.(zone.id)}

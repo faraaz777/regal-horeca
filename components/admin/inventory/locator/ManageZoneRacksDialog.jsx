@@ -11,7 +11,6 @@ import {
   removeRacksFromZone,
 } from '@/lib/client/zoneRackApi';
 import RackAllocationStatusBadge from '@/components/admin/inventory/locator/RackAllocationStatusBadge';
-import ZoneCapacityIndicator from '@/components/admin/inventory/locator/ZoneCapacityIndicator';
 import { formatRackDisplayName } from '@/lib/shared/locationDisplay';
 
 const FILTERS = [
@@ -276,7 +275,6 @@ export default function ManageZoneRacksDialog({
             <span>
               <strong className="text-gray-900">{summary?.distinctProductCount ?? 0}</strong> products
             </span>
-            <ZoneCapacityIndicator utilisationPercent={summary?.utilisationPercent} />
           </div>
         </div>
 

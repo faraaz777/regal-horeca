@@ -35,6 +35,8 @@ export async function GET(request) {
       dateFrom: searchParams.get('dateFrom') || '',
       dateTo: searchParams.get('dateTo') || '',
       search: searchParams.get('search') || '',
+      refExact: searchParams.get('refExact') || '',
+      userId: searchParams.get('userId') || '',
       page: 1,
       limit: 5000,
     };

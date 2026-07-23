@@ -2,9 +2,8 @@
 
 import { useMemo } from 'react';
 import { X, Settings2, Loader2 } from 'lucide-react';
-import { getRackStatusStyle } from '@/lib/client/locatorUtils';
+import { getRackPresenceStyle } from '@/lib/client/locatorUtils';
 import { formatRackDisplayName } from '@/lib/shared/locationDisplay';
-import ZoneCapacityIndicator from '@/components/admin/inventory/locator/ZoneCapacityIndicator';
 
 function StatBadge({ label, value, className = 'bg-slate-100 text-slate-800' }) {
   return (
@@ -79,7 +78,7 @@ export default function ZoneDetailDrawer({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-3 gap-3 text-sm">
             <div className="rounded-lg border border-gray-200 p-3 bg-gray-50">
               <p className="text-[10px] text-gray-500 uppercase font-semibold">Racks</p>
               <p className="text-xl font-bold text-gray-900 mt-0.5">{rackCount}</p>
@@ -94,22 +93,13 @@ export default function ZoneDetailDrawer({
                 {summary?.distinctProductCount ?? '—'}
               </p>
             </div>
-            <div className="rounded-lg border border-gray-200 p-3 bg-gray-50">
-              <p className="text-[10px] text-gray-500 uppercase font-semibold">Capacity</p>
-              <p className="text-sm font-bold text-gray-900 mt-1">
-                <ZoneCapacityIndicator utilisationPercent={summary?.utilisationPercent} />
-              </p>
-            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {statusCounts.inStock > 0 && (
-              <StatBadge label="in stock" value={statusCounts.inStock} className="bg-emerald-100 text-emerald-800" />
+            {(statusCounts.hasStock || 0) > 0 && (
+              <StatBadge label="with stock" value={statusCounts.hasStock} className="bg-emerald-100 text-emerald-800" />
             )}
-            {statusCounts.low > 0 && (
-              <StatBadge label="low" value={statusCounts.low} className="bg-amber-100 text-amber-800" />
-            )}
-            {statusCounts.empty > 0 && (
+            {(statusCounts.empty || 0) > 0 && (
               <StatBadge label="empty" value={statusCounts.empty} className="bg-gray-200 text-gray-700" />
             )}
           </div>
@@ -141,7 +131,9 @@ export default function ZoneDetailDrawer({
             ) : (
               <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
                 {zoneRacks.map((rack) => {
-                  const statusStyle = getRackStatusStyle(rack.stockStatus);
+                  const statusStyle = getRackPresenceStyle(rack);
+                  const skus = Number(rack.productCount ?? rack.distinctProductCount) || 0;
+                  const qty = Number(rack.sellableQty ?? rack.totalQty) || 0;
                   return (
                     <li key={rack._id}>
                       <button
@@ -163,8 +155,9 @@ export default function ZoneDetailDrawer({
                           <p className="text-xs text-gray-500 font-mono truncate mt-0.5">{rack.code}</p>
                         )}
                         <p className="text-xs text-gray-600 mt-1">
-                          {rack.sellableQty ?? rack.totalQty ?? 0} sellable
-                          {rack.capacity ? ` · ${Math.round((rack.fillPct || 0) * 100)}% full` : ''}
+                          {skus > 0
+                            ? `${skus} SKU${skus === 1 ? '' : 's'} · ${qty.toLocaleString()} pcs`
+                            : 'Empty'}
                         </p>
                       </button>
                     </li>

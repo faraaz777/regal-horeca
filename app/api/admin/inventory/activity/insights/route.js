@@ -2,15 +2,14 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import { requireAuth } from '@/lib/server/auth/requireAuth';
 import { canReadStockLedger } from '@/lib/shared/permissions';
-import { listStockLedgerEntries } from '@/lib/server/inventory/ledgerListService';
+import { getActivityInsights } from '@/lib/server/inventory/stockActivityHubService';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/admin/inventory/ledger
+ * GET /api/admin/inventory/activity/insights
  *
- * Paginated stock movement ledger (append-only).
- * Permissions: super_admin, inventory_manager, inventory_supervisor
+ * Lightweight movement insights for quick operations checks.
  */
 export async function GET(request) {
   const auth = await requireAuth(request);
@@ -22,10 +21,7 @@ export async function GET(request) {
   try {
     await connectToDatabase();
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
-
-    const data = await listStockLedgerEntries({
+    const data = await getActivityInsights({
       productId: searchParams.get('productId') || '',
       locationId: searchParams.get('locationId') || '',
       type: searchParams.get('type') || '',
@@ -34,13 +30,12 @@ export async function GET(request) {
       search: searchParams.get('search') || '',
       refExact: searchParams.get('refExact') || '',
       userId: searchParams.get('userId') || '',
-      page,
-      limit,
     });
-
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Ledger list error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to load ledger' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to load insights' },
+      { status: 500 }
+    );
   }
 }

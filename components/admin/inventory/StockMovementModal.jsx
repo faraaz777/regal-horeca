@@ -29,7 +29,7 @@ const MOVEMENT_TABS = ['add', 'minus', 'transfer'];
 
 const EMPTY_FORM = {
   quantity: '1',
-  reason: 'opening_stock',
+  reason: 'purchase',
   statusBucket: 'sellable',
   remark: '',
   locationId: '',
@@ -53,7 +53,7 @@ export default function StockMovementModal({
   const [tab, setTab] = useState(startTab);
   const [form, setForm] = useState(() => ({
     ...EMPTY_FORM,
-    reason: startTab === 'minus' ? 'sold' : 'opening_stock',
+    reason: startTab === 'minus' ? 'sold' : 'purchase',
   }));
   const [fromSel, setFromSel] = useState(EMPTY_LOCATION);
   const [toSel, setToSel] = useState(EMPTY_LOCATION);
@@ -95,7 +95,7 @@ export default function StockMovementModal({
       remark: p.remark,
       reason:
         key === 'add'
-          ? 'opening_stock'
+          ? 'purchase'
           : key === 'minus'
             ? 'sold'
             : p.reason,

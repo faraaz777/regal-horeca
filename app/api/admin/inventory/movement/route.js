@@ -116,7 +116,7 @@ export async function POST(request) {
       const stock = await recordBatchStockAdd({
         productId,
         lines,
-        reason: reason || 'opening_stock',
+        reason: reason || 'purchase',
         remark,
         ref,
         userId: auth.session.userId,

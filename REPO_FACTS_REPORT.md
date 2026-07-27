@@ -349,7 +349,7 @@ hooks/
 | Aspect | Details | File Path |
 |--------|---------|-----------|
 | Configuration | Environment variable | `NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER` |
-| Default Number | `917093913311` | `lib/utils/whatsapp.js` line 12 |
+| Default Number | `917893960311` | `lib/utils/whatsapp.js` line 12 |
 | Link Generator | `getWhatsAppBusinessLink(message)` | `lib/utils/whatsapp.js` |
 | Usage | Product page "Buy Now", Enquiry form submission | Multiple pages |
 

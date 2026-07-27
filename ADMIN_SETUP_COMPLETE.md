@@ -109,8 +109,8 @@ R2_PUBLIC_URL=https://your-bucket-name.r2.cloudflarestorage.com
    MONGODB_URI=mongodb://localhost:27017/regal-horeca
 
    # WhatsApp Business Number (with country code, no + sign)
-   # Example: 917093913311 for India (91 is country code + 7093913311)
-   NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER=917093913311
+   # Example: 917893960311 for India (91 is country code + 7893960311)
+   NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER=917893960311
    ```
 
 ## 🎯 Key Features

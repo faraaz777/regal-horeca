@@ -90,7 +90,7 @@ export default function Footer() {
                 <Youtube className="w-6 h-6" />
               </a>
               <a 
-                href="https://wa.me/917093913311" 
+                href="https://wa.me/917893960311" 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="text-white/70 hover:text-white transition-colors" 

@@ -66,8 +66,8 @@ A modern, production-ready Next.js application for managing and displaying a HoR
    NEXT_PUBLIC_APP_URL=http://localhost:3000
 
    # WhatsApp Business Number (with country code, no + sign)
-   # Example: 917093913311 for India (91 is country code + 7093913311)
-   NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER=917093913311
+   # Example: 917893960311 for India (91 is country code + 7893960311)
+   NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER=917893960311
    ```
 
 4. **Run the development server**

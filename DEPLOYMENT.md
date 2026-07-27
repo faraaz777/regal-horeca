@@ -36,7 +36,7 @@ JWT_SECRET=your-super-secret-jwt-key-min-32-characters-long
 NEXT_PUBLIC_APP_URL=https://yourdomain.com
 
 # WhatsApp Business Number (with country code, no + sign)
-NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER=917093913311
+NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER=917893960311
 ```
 
 ### Optional Variables

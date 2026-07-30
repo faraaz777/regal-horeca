@@ -7,7 +7,11 @@ import JsBarcode from 'jsbarcode';
  * Compact scannable barcode for inventory list testing.
  * Encodes the product barcode value only (not SKU).
  */
-export default function MiniBarcode({ value }) {
+export default function MiniBarcode({
+  value,
+  className = 'block w-full max-w-[110px] h-[22px] mt-1',
+  height = 22,
+}) {
   const svgRef = useRef(null);
   const code = String(value || '').trim();
 
@@ -17,7 +21,7 @@ export default function MiniBarcode({ value }) {
       JsBarcode(svgRef.current, code, {
         format: 'CODE128',
         width: 1,
-        height: 22,
+        height,
         displayValue: false,
         margin: 0,
         background: 'transparent',
@@ -28,14 +32,14 @@ export default function MiniBarcode({ value }) {
         svgRef.current.innerHTML = '';
       }
     }
-  }, [code]);
+  }, [code, height]);
 
   if (!code) return null;
 
   return (
     <svg
       ref={svgRef}
-      className="block w-full max-w-[110px] h-[22px] mt-1"
+      className={className}
       aria-label={`Barcode ${code}`}
     />
   );

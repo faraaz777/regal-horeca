@@ -22,6 +22,7 @@ import NewRackAddPanel from './movement/NewRackAddPanel'; // rack search under N
 import TransferTicketPanel from './movement/TransferTicketPanel';
 import RulesPanel, { buildRulesFormFromRule } from './movement/RulesPanel';
 import MaxStockWarnDialog from './MaxStockWarnDialog';
+import ProductImageThumb from './ProductImageThumb';
 
 const fetcher = (url) => adminJson(url);
 
@@ -583,6 +584,8 @@ export default function StockMovementModal({
   const onHandQty = summary.sellableQty ?? 0;
   const afterMinusQty = Math.max(0, onHandQty - totalMinusQty);
   const afterAddQty = onHandQty + totalAddQty;
+  const productImage =
+    stockData?.product?.heroImage || item.heroImage || '';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
@@ -595,17 +598,29 @@ export default function StockMovementModal({
         aria-labelledby="stock-movement-title"
       >
         <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3 shrink-0">
-          <div className="min-w-0 pr-2">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-gray-400 mb-1">
-              Stock movement
-            </p>
-            <h2
-              id="stock-movement-title"
-              className="text-[15px] sm:text-base font-semibold text-gray-900 leading-snug line-clamp-2"
-              title={item.title}
-            >
-              {item.title}
-            </h2>
+          <div className="flex items-start gap-3 min-w-0 pr-2">
+            <ProductImageThumb
+              src={productImage}
+              alt={item.title}
+              size={72}
+            />
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-gray-400 mb-1">
+                Stock movement
+              </p>
+              <h2
+                id="stock-movement-title"
+                className="text-[15px] sm:text-base font-semibold text-gray-900 leading-snug line-clamp-2"
+                title={item.title}
+              >
+                {item.title}
+              </h2>
+              {(stockData?.product?.sku || item.sku) ? (
+                <p className="text-xs text-gray-500 font-mono mt-0.5">
+                  {stockData?.product?.sku || item.sku}
+                </p>
+              ) : null}
+            </div>
           </div>
           <button
             type="button"

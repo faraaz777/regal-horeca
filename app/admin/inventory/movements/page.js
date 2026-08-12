@@ -20,6 +20,7 @@ import { adminFetch, adminJson } from '@/lib/client/adminFetch';
 import { canReadStockLedger } from '@/lib/shared/permissions';
 import { LEDGER_FILTER_TYPES, LEDGER_FILTER_TYPE_LABELS } from '@/lib/shared/inventoryConstants';
 import LocationSelector from '@/components/admin/inventory/LocationSelector';
+import ProductImageThumb from '@/components/admin/inventory/ProductImageThumb';
 import { resolveCascadeLocation } from '@/lib/client/locationCascadeApi';
 
 const fetcher = (url) => adminJson(url);
@@ -457,7 +458,13 @@ export default function StockMovementsPage() {
               movementItems.map((row) => (
                 <div key={row.pairId || row._id} className="px-4 py-3">
                   <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-2">
-                    <div className="space-y-1">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <ProductImageThumb
+                        src={row.productHeroImage}
+                        alt={row.productTitle || 'Product'}
+                        size={56}
+                      />
+                      <div className="space-y-1 min-w-0">
                       <p className="text-xs text-gray-500">{formatTs(row.createdAt)}</p>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span
@@ -502,6 +509,7 @@ export default function StockMovementsPage() {
                         {row.reasonLabel ? ` · ${row.reasonLabel}` : ''}
                       </p>
                       {row.remark ? <p className="text-xs text-gray-500">{row.remark}</p> : null}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -548,21 +556,28 @@ export default function StockMovementsPage() {
               {positionItems.map((row) => (
                 <div key={row.productId} className="p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setProductFilterId(row.productId);
-                          setActiveTab('movements');
-                          setTabPage('movements', 1);
-                        }}
-                        className="font-semibold text-gray-900 hover:text-emerald-700"
-                      >
-                        {row.title}
-                      </button>
-                      {row.sku ? <p className="text-xs text-gray-500 font-mono">{row.sku}</p> : null}
+                    <div className="flex items-start gap-3 min-w-0">
+                      <ProductImageThumb
+                        src={row.heroImage}
+                        alt={row.title || 'Product'}
+                        size={56}
+                      />
+                      <div className="min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProductFilterId(row.productId);
+                            setActiveTab('movements');
+                            setTabPage('movements', 1);
+                          }}
+                          className="font-semibold text-gray-900 hover:text-emerald-700 text-left"
+                        >
+                          {row.title}
+                        </button>
+                        {row.sku ? <p className="text-xs text-gray-500 font-mono">{row.sku}</p> : null}
+                      </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <p className="text-sm font-semibold text-emerald-700">{Number(row.totalQty || 0).toLocaleString()} pcs</p>
                       <p className="text-[11px] text-gray-500">{formatTs(row.lastLedgerAt)}</p>
                     </div>

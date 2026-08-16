@@ -22,7 +22,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
-import { canWriteInventory, canWriteProducts } from '@/lib/shared/permissions';
+import { canWriteInventory } from '@/lib/shared/permissions';
 import dynamic from 'next/dynamic';
 import { LOCATION_PATH_SEP } from '@/lib/shared/inventoryConstants';
 import MiniBarcode from '@/components/admin/inventory/MiniBarcode';
@@ -458,7 +458,7 @@ export default function AdminInventoryPage() {
   const { data: meData } = useSWR('/api/auth/me', fetcher, { revalidateOnFocus: false });
   const role = meData?.user?.role;
   const canAdjust = canWriteInventory(role);
-  const canAddToInventory = canWriteInventory(role) || canWriteProducts(role);
+  const canAddToInventory = canWriteInventory(role);
 
   const [search, setSearch] = useState(initialSearch);
   const debouncedSearch = useDebounce(search.trim(), 300);

@@ -1,3 +1,14 @@
+/**
+ * GET/PATCH/DELETE /api/sales/collections/:id
+ *
+ * Collection detail includes products plus the presentation set (scenes + pins).
+ * PATCH accepts name/description/thumbnail/pinned and presentationSet.
+ *
+ * Permissions:
+ * GET  sales:collections:read
+ * PATCH/DELETE sales:collections:write
+ */
+
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import { requireAuth } from '@/lib/server/auth/requireAuth';
@@ -52,6 +63,12 @@ export async function PATCH(request, { params }) {
     }
     if (result.error === 'invalid_thumbnail') {
       return NextResponse.json({ error: 'Invalid thumbnail URL' }, { status: 400 });
+    }
+    if (result.error === 'invalid_scene') {
+      return NextResponse.json({ error: 'Invalid presentation image URL' }, { status: 400 });
+    }
+    if (result.error === 'too_many_scenes') {
+      return NextResponse.json({ error: 'Too many presentation photos' }, { status: 400 });
     }
 
     return NextResponse.json({ success: true, collection: result.collection });

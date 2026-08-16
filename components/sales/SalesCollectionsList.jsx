@@ -88,7 +88,7 @@ export default function SalesCollectionsList() {
             Curated product lists for quoting. Save from the catalog, then add to a customer bucket.
           </p>
         </div>
-        <Link href="/admin/sales" className="text-sm text-primary hover:underline shrink-0">
+        <Link href="/admin/sales" className="inline-flex items-center min-h-[44px] text-sm text-primary hover:underline shrink-0">
           Back to sales floor
         </Link>
       </div>
@@ -97,7 +97,7 @@ export default function SalesCollectionsList() {
         <button
           type="button"
           onClick={() => setCreating(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-white rounded-lg hover:opacity-90"
+          className="inline-flex items-center gap-2 min-h-[44px] px-5 py-2.5 text-sm font-medium bg-primary text-white rounded-lg hover:opacity-90"
         >
           <PlusIcon className="w-4 h-4" />
           New sales collection
@@ -113,7 +113,7 @@ export default function SalesCollectionsList() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
+              className="w-full border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm"
               placeholder="e.g. Hotel starter kit"
               maxLength={120}
               autoFocus
@@ -147,14 +147,14 @@ export default function SalesCollectionsList() {
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 text-sm font-medium bg-primary text-white rounded-md disabled:opacity-50"
+              className="px-5 py-3 min-h-[44px] text-sm font-medium bg-primary text-white rounded-md disabled:opacity-50"
             >
               {submitting ? 'Creating…' : 'Create'}
             </button>
             <button
               type="button"
               onClick={resetForm}
-              className="px-4 py-2 text-sm text-gray-600"
+              className="px-5 py-3 min-h-[44px] text-sm text-gray-600"
             >
               Cancel
             </button>
@@ -176,7 +176,7 @@ export default function SalesCollectionsList() {
           {collections.map((c) => (
             <li
               key={c._id}
-              className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex items-center gap-3"
+              className="bg-white border border-gray-200 rounded-lg px-4 py-4 flex items-center gap-3"
             >
               <Link
                 href={`/admin/sales/collections/${c._id}`}
@@ -207,7 +207,7 @@ export default function SalesCollectionsList() {
                 type="button"
                 disabled={deletingId === c._id}
                 onClick={() => handleDelete(c._id, c.name)}
-                className="p-2 text-gray-400 hover:text-red-600 disabled:opacity-50 shrink-0"
+                className="p-3 text-gray-400 hover:text-red-600 disabled:opacity-50 shrink-0 min-h-[44px] min-w-[44px]"
                 title="Delete collection"
                 aria-label={`Delete ${c.name}`}
               >

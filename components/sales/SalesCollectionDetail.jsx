@@ -6,10 +6,11 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { adminJson } from '@/lib/client/adminFetch';
 import { primeSalesSessionCache } from '@/lib/client/salesSessionCache';
-import SalesCatalogProductCard from '@/components/sales/SalesCatalogProductCard';
-import SalesCollectionThumbnailInput, {
-  SalesCollectionThumb,
-} from '@/components/sales/SalesCollectionThumbnail';
+import { ChevronLeftIcon, Grid2x2Icon, ListIcon, PlusIcon, SearchIcon } from '@/components/Icons';
+import SalesCollectionCover from '@/components/sales/SalesCollectionCover';
+import SalesCollectionAddProductsModal from '@/components/sales/SalesCollectionAddProductsModal';
+import SalesCollectionPresentationSet from '@/components/sales/SalesCollectionPresentationSet';
+import SalesCollectionProductRow from '@/components/sales/SalesCollectionProductRow';
 
 const fetcher = (url) => adminJson(url);
 
@@ -26,6 +27,8 @@ export default function SalesCollectionDetail({ collectionId }) {
   const [addingAll, setAddingAll] = useState(false);
   const [removingId, setRemovingId] = useState(null);
   const [savingThumb, setSavingThumb] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [cardView, setCardView] = useState(false);
 
   const draftBuckets = useMemo(
     () => (sessionData?.buckets || []).filter((b) => b.status === 'draft'),
@@ -38,21 +41,26 @@ export default function SalesCollectionDetail({ collectionId }) {
   const collection = data?.collection;
   const products = data?.products || [];
 
-  const handleAddProduct = async (product) => {
+  const handleAddProduct = async (product, options = {}) => {
     if (!activeBucket) {
       toast.error('Open the sales floor and add a customer bucket first');
       return;
     }
+
+    const quantity = Math.max(
+      1,
+      parseInt(options.quantity, 10) || product.suggestedQty || 1
+    );
 
     try {
       await adminJson(`/api/sales/buckets/${activeBucket._id}/lines`, {
         method: 'POST',
         body: JSON.stringify({
           productId: product.id,
-          quantity: product.suggestedQty || 1,
+          quantity,
         }),
       });
-      toast.success(`Added ${product.title}`);
+      toast.success(`Added ${product.title}${quantity > 1 ? ` × ${quantity}` : ''}`);
       mutateSession();
     } catch (e) {
       toast.error(e.message || 'Failed to add product');
@@ -76,7 +84,7 @@ export default function SalesCollectionDetail({ collectionId }) {
       toast.success(
         skipped > 0
           ? `Added ${res.added} products (${skipped} skipped)`
-          : `Added ${res.added} products to bucket`
+          : `Added ${res.added} products to quote`
       );
       mutateSession();
     } catch (e) {
@@ -108,25 +116,25 @@ export default function SalesCollectionDetail({ collectionId }) {
         method: 'PATCH',
         body: JSON.stringify({ thumbnailUrl: nextUrl }),
       });
-      toast.success(nextUrl ? 'Cover image updated' : 'Cover image removed');
+      toast.success(nextUrl ? 'Cover updated' : 'Cover removed');
       mutate();
     } catch (e) {
-      toast.error(e.message || 'Failed to update cover image');
+      toast.error(e.message || 'Failed to update cover');
     } finally {
       setSavingThumb(false);
     }
   };
 
   if (isLoading) {
-    return <p className="text-sm text-gray-500">Loading collection…</p>;
+    return <p className="text-sm text-black/40">Loading collection…</p>;
   }
 
   if (error || !collection) {
     return (
       <div className="space-y-3">
         <p className="text-sm text-red-600">{error?.message || 'Collection not found'}</p>
-        <Link href="/admin/sales/collections" className="text-sm text-primary hover:underline">
-          Back to sales collections
+        <Link href="/admin/sales/collections" className="text-sm text-rich-black hover:underline">
+          Back to collections
         </Link>
       </div>
     );
@@ -134,110 +142,138 @@ export default function SalesCollectionDetail({ collectionId }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 flex gap-4">
-          <SalesCollectionThumb
-            url={collection.thumbnailUrl}
-            name={collection.name}
-            size="lg"
-          />
-          <div className="min-w-0">
+      <div className="flex flex-wrap items-center gap-4">
+        <SalesCollectionCover
+          url={collection.thumbnailUrl || ''}
+          name={collection.name}
+          onChange={handleThumbnailChange}
+          disabled={savingThumb}
+        />
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1 min-w-0">
             <Link
               href="/admin/sales/collections"
-              className="text-xs text-gray-500 hover:text-primary"
+              className="shrink-0 w-11 h-11 inline-flex items-center justify-center text-black/40 hover:text-rich-black"
+              aria-label="Back to collections"
             >
-              ← My sales collections
+              <ChevronLeftIcon className="w-5 h-5" />
             </Link>
-            <h1 className="text-xl font-semibold text-gray-900 mt-1">{collection.name}</h1>
-            {collection.description && (
-              <p className="text-sm text-gray-500 mt-1">{collection.description}</p>
-            )}
-            <p className="text-xs text-gray-400 mt-1">
-              {products.length} product{products.length === 1 ? '' : 's'}
-            </p>
-            <div className="mt-3">
-              <SalesCollectionThumbnailInput
-                value={collection.thumbnailUrl || ''}
-                onChange={handleThumbnailChange}
-                name={collection.name}
-                disabled={savingThumb}
-                compact
-              />
-            </div>
+            <h1 className="font-display text-[1.75rem] sm:text-[2rem] font-semibold text-rich-black truncate leading-tight tracking-tight">
+              {collection.name}
+            </h1>
           </div>
+          <div className="pl-11 text-[10px] font-semibold uppercase tracking-[0.18em] text-black/35">
+            {products.length} product{products.length === 1 ? '' : 's'}
+          </div>
+          {collection.description && (
+            <p className="pl-11 text-sm text-black/40 mt-1 line-clamp-1">{collection.description}</p>
+          )}
         </div>
 
-        <div className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-wrap items-center gap-2 ml-auto">
           {draftBuckets.length > 0 ? (
-            <label className="text-xs text-gray-600">
-              <span className="block mb-1">Add to bucket</span>
-              <select
-                value={activeBucketId}
-                onChange={(e) => setSelectedBucketId(e.target.value)}
-                className="border border-gray-200 rounded-md px-2 py-1.5 text-sm min-w-[10rem]"
-              >
-                {draftBuckets.map((b) => (
-                  <option key={b._id} value={b._id}>
-                    {b.customerName || `Customer ${b.displayNumber}`}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <select
+              value={activeBucketId}
+              onChange={(e) => setSelectedBucketId(e.target.value)}
+              aria-label="Quote customer"
+              className="border border-black/10 bg-warm-white px-3 py-2.5 text-sm min-w-[10rem] min-h-[44px] rounded-sm text-rich-black focus:outline-none focus:border-rich-black"
+            >
+              {draftBuckets.map((b) => (
+                <option key={b._id} value={b._id}>
+                  {b.customerName || `Customer ${b.displayNumber}`}
+                </option>
+              ))}
+            </select>
           ) : (
-            <p className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded">
-              No draft buckets —{' '}
-              <Link href="/admin/sales" className="underline">
-                open sales floor
-              </Link>
-            </p>
+            <Link href="/admin/sales" className="text-xs text-black/50 underline min-h-[44px] inline-flex items-center">
+              Open sales floor for a quote
+            </Link>
           )}
-
           <button
             type="button"
             disabled={!activeBucket || products.length === 0 || addingAll}
             onClick={handleAddAll}
-            className="px-4 py-2 text-sm font-medium bg-primary text-white rounded-md disabled:opacity-40"
+            className="min-h-[44px] px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.14em] bg-rich-black text-white disabled:opacity-35 rounded-sm hover:opacity-90 transition-opacity"
           >
-            {addingAll ? 'Adding…' : 'Add all to bucket'}
+            {addingAll ? 'Adding…' : 'Add all'}
           </button>
         </div>
       </div>
 
-      {products.length === 0 ? (
-        <div className="bg-gray-50 border border-dashed border-gray-200 rounded-lg p-8 text-center">
-          <p className="text-sm text-gray-600">This collection is empty.</p>
-          <Link href="/admin/sales" className="text-sm text-primary hover:underline mt-2 inline-block">
-            Browse catalog to save products
-          </Link>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {products.map((p) => (
-            <div key={p.id} className="relative">
-              <SalesCatalogProductCard
-                product={p}
-                canAdd={Boolean(activeBucket)}
-                onAdd={() => handleAddProduct(p)}
-              />
-              {(p.collectionNote || p.suggestedQty > 1) && (
-                <div className="mt-1 px-1 text-[11px] text-gray-500">
-                  {p.suggestedQty > 1 && <span>Qty {p.suggestedQty}</span>}
-                  {p.collectionNote && (
-                    <span className={p.suggestedQty > 1 ? ' · ' : ''}>{p.collectionNote}</span>
-                  )}
-                </div>
-              )}
+      <div className="lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(280px,1fr)] lg:gap-6 lg:items-start">
+        <SalesCollectionPresentationSet
+          collectionId={collectionId}
+          presentationSet={collection.presentationSet}
+          products={products}
+          canAddToBucket={Boolean(activeBucket)}
+          onAddToBucket={handleAddProduct}
+          onUpdated={mutate}
+        />
+
+        <div className="mt-4 lg:mt-0 lg:max-h-[calc(100dvh-11rem)] lg:overflow-y-auto border-t lg:border-t-0 lg:border-l border-black/[0.06] lg:pl-5 pt-3 lg:pt-0">
+          <div className="sticky top-0 z-10 flex items-center gap-2 mb-3 bg-white">
+            <button
+              type="button"
+              onClick={() => setPickerOpen(true)}
+              className="min-h-[44px] flex-1 flex items-center gap-2.5 px-3 text-sm text-black/35 bg-warm-white border border-black/10 rounded-sm hover:border-black/25 hover:text-rich-black text-left transition-colors"
+            >
+              <SearchIcon className="w-4 h-4 shrink-0" />
+              <span className="flex-1">Add products</span>
+              <PlusIcon className="w-4 h-4 shrink-0 text-rich-black" />
+            </button>
+            <div className="shrink-0 flex items-center border border-black/10 rounded-sm p-0.5 bg-warm-white">
               <button
                 type="button"
-                disabled={removingId === p.id}
-                onClick={() => handleRemove(p.id, p.title)}
-                className="absolute top-2 left-2 z-10 text-[10px] px-1.5 py-0.5 rounded bg-white/90 border border-gray-200 text-gray-500 hover:text-red-600 disabled:opacity-50"
+                onClick={() => setCardView(false)}
+                aria-pressed={!cardView}
+                aria-label="List view"
+                className={`w-9 h-9 inline-flex items-center justify-center rounded-sm ${
+                  cardView ? 'text-black/35' : 'bg-rich-black text-white'
+                }`}
               >
-                Remove
+                <ListIcon className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCardView(true)}
+                aria-pressed={cardView}
+                aria-label="Card view"
+                className={`w-9 h-9 inline-flex items-center justify-center rounded-sm ${
+                  cardView ? 'bg-rich-black text-white' : 'text-black/35'
+                }`}
+              >
+                <Grid2x2Icon className="w-4 h-4" />
               </button>
             </div>
-          ))}
+          </div>
+          {products.length === 0 ? (
+            <p className="py-8 text-sm text-black/40">No products in this collection yet.</p>
+          ) : (
+            <div className={cardView ? 'grid grid-cols-2 gap-2' : ''}>
+              {products.map((p) => (
+                <SalesCollectionProductRow
+                  key={p.id}
+                  product={p}
+                  layout={cardView ? 'card' : 'list'}
+                  canAdd={Boolean(activeBucket)}
+                  onAdd={handleAddProduct}
+                  onRemove={handleRemove}
+                  removing={removingId === p.id}
+                />
+              ))}
+            </div>
+          )}
         </div>
+      </div>
+
+      {pickerOpen && (
+        <SalesCollectionAddProductsModal
+          collectionId={collectionId}
+          existingProductIds={products.map((p) => p.id)}
+          onClose={() => setPickerOpen(false)}
+          onAdded={() => mutate()}
+        />
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { adminJson } from '@/lib/client/adminFetch';
 import SalesCatalogProductCard from '@/components/sales/SalesCatalogProductCard';
 import SalesCatalogCategoryNav from '@/components/sales/SalesCatalogCategoryNav';
+import { SearchIcon } from '@/components/Icons';
 
 const fetcher = (url) => adminJson(url);
 
@@ -25,38 +26,40 @@ function buildCatalogUrl({ q, brands, priceMin, priceMax, stock, category, sort 
 function FilterSection({ title, children, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border-b border-gray-100 pb-3 last:border-b-0">
+    <div className="border-b border-black/5 pb-4 last:border-b-0">
       <button
         type="button"
-        className="w-full flex items-center justify-between text-left text-sm font-semibold text-gray-800 py-1"
+        className="w-full flex items-center justify-between text-left min-h-[44px] lg:min-h-0 py-2 lg:py-1"
         onClick={() => setOpen((v) => !v)}
       >
-        {title}
-        <span className="text-gray-400 text-xs">{open ? '−' : '+'}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-black/45">
+          {title}
+        </span>
+        <span className="text-black/30 text-xs">{open ? '−' : '+'}</span>
       </button>
-      {open && <div className="mt-2">{children}</div>}
+      {open && <div className="mt-3">{children}</div>}
     </div>
   );
 }
 
 function FilterSidebarPanel({ children, onClear, hasActiveFilters, className = '' }) {
   return (
-    <div
-      className={`flex flex-col h-full min-h-0 bg-white border border-gray-200 rounded-lg overflow-hidden ${className}`}
-    >
-      <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/80">
-        <h2 className="text-sm font-semibold text-gray-900">Filters</h2>
+    <div className={`flex flex-col h-full min-h-0 bg-white overflow-hidden ${className}`}>
+      <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-black/5">
+        <h2 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-black/50">
+          Filters
+        </h2>
         {hasActiveFilters && (
           <button
             type="button"
             onClick={onClear}
-            className="text-xs text-gray-600 underline hover:text-gray-900"
+            className="text-[10px] uppercase tracking-wider text-black/45 underline hover:text-rich-black min-h-[44px] lg:min-h-0 px-1"
           >
             Clear all
           </button>
         )}
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y px-4 py-3 pb-8 [scrollbar-gutter:stable]">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y px-5 py-4 pb-8 [scrollbar-gutter:stable]">
         {children}
       </div>
     </div>
@@ -153,13 +156,16 @@ export default function SalesCatalogBrowse({ activeBucket, onAddProduct }) {
   const filterBody = (
     <div className="space-y-1">
       <FilterSection title="Availability">
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {[
             { value: 'all', label: 'All products' },
             { value: 'in_stock', label: 'In stock' },
             { value: 'out', label: 'Out of stock' },
           ].map((opt) => (
-            <label key={opt.value} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+            <label
+              key={opt.value}
+              className="flex items-center gap-2.5 text-sm text-rich-black/80 cursor-pointer min-h-[44px] lg:min-h-0"
+            >
               <input
                 type="radio"
                 name="stock"
@@ -171,7 +177,7 @@ export default function SalesCatalogBrowse({ activeBucket, onAddProduct }) {
             </label>
           ))}
         </div>
-        <p className="text-[11px] text-gray-400 mt-2">Stock from live inventory ledger</p>
+        <p className="text-[11px] text-black/35 mt-2.5">Stock from live inventory ledger</p>
       </FilterSection>
 
       <SalesCatalogCategoryNav selectedSlug={category} onSelect={setCategory} />
@@ -182,7 +188,7 @@ export default function SalesCatalogBrowse({ activeBucket, onAddProduct }) {
             type="number"
             min={0}
             placeholder={`Min${facets.priceRange?.min ? ` ${facets.priceRange.min}` : ''}`}
-            className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+            className="w-full border-b border-black/15 bg-transparent px-0 py-3 lg:py-2 text-base lg:text-sm focus:outline-none focus:border-rich-black"
             value={priceMinInput}
             onChange={(e) => setPriceMinInput(e.target.value)}
           />
@@ -190,7 +196,7 @@ export default function SalesCatalogBrowse({ activeBucket, onAddProduct }) {
             type="number"
             min={0}
             placeholder={`Max${facets.priceRange?.max ? ` ${facets.priceRange.max}` : ''}`}
-            className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+            className="w-full border-b border-black/15 bg-transparent px-0 py-3 lg:py-2 text-base lg:text-sm focus:outline-none focus:border-rich-black"
             value={priceMaxInput}
             onChange={(e) => setPriceMaxInput(e.target.value)}
           />
@@ -199,11 +205,11 @@ export default function SalesCatalogBrowse({ activeBucket, onAddProduct }) {
 
       {facets.brands?.length > 0 && (
         <FilterSection title="Brand" defaultOpen={facets.brands.length <= 12}>
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {facets.brands.map((b) => (
               <label
                 key={b.name}
-                className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"
+                className="flex items-center gap-2.5 text-sm text-rich-black/80 cursor-pointer min-h-[44px] lg:min-h-0"
               >
                 <input
                   type="checkbox"
@@ -212,7 +218,7 @@ export default function SalesCatalogBrowse({ activeBucket, onAddProduct }) {
                   className="accent-black rounded"
                 />
                 <span className="truncate flex-1">{b.name}</span>
-                <span className="text-xs text-gray-400 shrink-0">{b.count}</span>
+                <span className="text-xs text-black/30 shrink-0">{b.count}</span>
               </label>
             ))}
           </div>
@@ -222,33 +228,37 @@ export default function SalesCatalogBrowse({ activeBucket, onAddProduct }) {
   );
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
-        <input
-          type="search"
-          placeholder="Search name, SKU, barcode, tags, colour, category…"
-          className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
-        {searchInput && (
-          <button
-            type="button"
-            className="px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-md"
-            onClick={() => {
-              setSearch('');
-              setSearchInput('');
-            }}
-          >
-            Clear
-          </button>
-        )}
+    <div className="space-y-5 lg:h-full lg:min-h-0 lg:flex lg:flex-col">
+      <div className="flex gap-2 items-center shrink-0">
+        <div className="flex-1 flex items-center gap-2.5 rounded-full bg-white border border-black/[0.08] px-4 py-3 lg:py-2.5 shadow-[0_1px_0_rgba(0,0,0,0.03)] focus-within:border-black/20">
+          <SearchIcon className="w-5 h-5 text-black/40 shrink-0" />
+          <input
+            type="search"
+            placeholder="Search name, SKU, barcode, tags, colour, category…"
+            className="flex-1 min-w-0 bg-transparent text-base lg:text-sm placeholder:text-black/35 focus:outline-none"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+          {searchInput ? (
+            <button
+              type="button"
+              className="h-9 w-9 lg:h-6 lg:w-6 shrink-0 rounded-full text-black/40 hover:text-rich-black hover:bg-black/5 text-lg lg:text-sm leading-none"
+              onClick={() => {
+                setSearch('');
+                setSearchInput('');
+              }}
+              aria-label="Clear search"
+            >
+              ×
+            </button>
+          ) : null}
+        </div>
         <button
           type="button"
-          className="lg:hidden px-3 py-2 text-sm border border-gray-300 rounded-md"
+          className="lg:hidden inline-flex items-center min-h-[48px] px-4 py-2.5 text-sm font-semibold rounded-full border border-black/15 text-rich-black"
           onClick={() => setMobileFiltersOpen((v) => !v)}
         >
-          Filters{hasActiveFilters ? ' •' : ''}
+          Filters{hasActiveFilters ? ' ·' : ''}
         </button>
       </div>
 
@@ -260,17 +270,17 @@ export default function SalesCatalogBrowse({ activeBucket, onAddProduct }) {
             className="absolute inset-0 bg-black/40"
             onClick={() => setMobileFiltersOpen(false)}
           />
-          <div className="absolute inset-x-0 bottom-0 h-[min(88vh,720px)] flex flex-col rounded-t-2xl shadow-2xl">
+          <div className="absolute inset-y-0 left-0 w-[min(100vw,22rem)] flex flex-col bg-white shadow-2xl">
             <FilterSidebarPanel
               hasActiveFilters={hasActiveFilters}
               onClear={clearFilters}
-              className="h-full rounded-t-2xl rounded-b-none border-b-0"
+              className="h-full"
             >
-              <div className="flex items-center justify-end -mt-1 mb-2 lg:hidden">
+              <div className="flex items-center justify-end -mt-1 mb-3 lg:hidden">
                 <button
                   type="button"
                   onClick={() => setMobileFiltersOpen(false)}
-                  className="text-xs font-medium text-gray-600 px-3 py-1.5 rounded-md border border-gray-200"
+                  className="text-sm font-semibold text-black/60 px-3 min-h-[44px]"
                 >
                   Done
                 </button>
@@ -281,8 +291,8 @@ export default function SalesCatalogBrowse({ activeBucket, onAddProduct }) {
         </div>
       )}
 
-      <div className="flex gap-6 items-start">
-        <aside className="hidden lg:block w-64 shrink-0 self-start sticky top-6 h-[calc(100vh-3rem)]">
+      <div className="flex gap-8 items-start lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+        <aside className="hidden lg:block w-60 shrink-0 h-full border-r border-black/5">
           <FilterSidebarPanel
             hasActiveFilters={hasActiveFilters}
             onClear={clearFilters}
@@ -292,46 +302,46 @@ export default function SalesCatalogBrowse({ activeBucket, onAddProduct }) {
           </FilterSidebarPanel>
         </aside>
 
-        <div className="flex-1 min-w-0 space-y-3">
+        <div className="flex-1 min-w-0 space-y-4 lg:h-full lg:overflow-y-auto">
           {hasActiveFilters && (
-            <p className="text-xs text-gray-500">
-              {catalogData?.pagination?.total ?? '…'} products match your filters
+            <p className="text-[11px] uppercase tracking-wider text-black/40">
+              {catalogData?.pagination?.total ?? '…'} products match
             </p>
           )}
 
           {catalogError && (
-            <p className="text-sm text-red-600">
+            <p className="text-sm text-accent">
               Could not load catalog: {catalogError.message || 'Unknown error'}
             </p>
           )}
 
           {catalogLoading && !catalogData ? (
-            <p className="text-sm text-gray-500">Loading catalog…</p>
+            <p className="text-sm text-black/40 py-12 text-center">Loading catalog…</p>
           ) : catalogItems.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-              <p className="text-gray-600 text-sm">
+            <div className="bg-white py-16 text-center">
+              <p className="text-black/50 text-sm">
                 {search || hasActiveFilters
                   ? 'No products match your search or filters.'
                   : 'No products found in the catalog.'}
               </p>
             </div>
           ) : (
-            <div className="grid sm:grid-cols-2 xl:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 3xl:grid-cols-3 gap-4">
               {catalogItems.map((p) => (
                 <SalesCatalogProductCard
                   key={p.id}
                   product={p}
                   canAdd={canAdd}
-                  onAdd={() => onAddProduct(p)}
+                  onAdd={onAddProduct}
                 />
               ))}
             </div>
           )}
 
           {catalogData?.pagination?.total > catalogItems.length && (
-            <p className="text-xs text-gray-500">
-              Showing {catalogItems.length} of {catalogData.pagination.total} products. Refine
-              search or filters to narrow results.
+            <p className="text-[11px] text-black/40 text-center pt-2">
+              Showing {catalogItems.length} of {catalogData.pagination.total}. Refine search to
+              narrow results.
             </p>
           )}
         </div>

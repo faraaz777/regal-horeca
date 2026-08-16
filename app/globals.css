@@ -36,6 +36,18 @@ body {
   @apply bg-black/40;
 }
 
+/* Quote item list: hide native bars so Windows classic scrollbars
+ * do not eat the narrow column. Fade edges in the panel show overflow. */
+.quote-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.quote-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 /* Custom animations for product page */
 @keyframes fade-in {
   from {

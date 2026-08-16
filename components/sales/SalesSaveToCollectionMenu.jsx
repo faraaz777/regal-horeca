@@ -105,7 +105,7 @@ export default function SalesSaveToCollectionMenu({
         className={
           variant === 'text'
             ? 'px-3 py-2 text-sm font-medium border border-gray-200 rounded-md text-gray-700 hover:bg-gray-50'
-            : 'p-1 rounded-full bg-white/90 border border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-white shadow-sm'
+            : 'p-2.5 lg:p-1.5 rounded-full bg-white/90 border border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-white shadow-sm min-h-[40px] min-w-[40px] lg:min-h-0 lg:min-w-0 flex items-center justify-center'
         }
         title="Save to collection"
         aria-label={`Save ${productTitle || 'product'} to collection`}
@@ -133,7 +133,7 @@ export default function SalesSaveToCollectionMenu({
                   type="button"
                   disabled={savingId === c._id}
                   onClick={() => saveToCollection(c._id, c.name)}
-                  className="w-full text-left px-3 py-2 hover:bg-gray-50 disabled:opacity-50 truncate"
+                  className="w-full text-left px-3 py-3 hover:bg-gray-50 disabled:opacity-50 truncate min-h-[44px]"
                 >
                   {c.name}
                   {c.itemCount > 0 && (
@@ -177,7 +177,7 @@ export default function SalesSaveToCollectionMenu({
                 <button
                   type="button"
                   onClick={() => setCreating(true)}
-                  className="w-full text-left px-3 py-2 text-primary hover:bg-gray-50 border-t border-gray-100 flex items-center gap-1.5"
+                  className="w-full text-left px-3 py-3 text-primary hover:bg-gray-50 border-t border-gray-100 flex items-center gap-1.5 min-h-[44px]"
                 >
                   <PlusIcon className="w-3.5 h-3.5" />
                   New collection

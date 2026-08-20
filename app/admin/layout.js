@@ -6,7 +6,7 @@ import AdminShell from '@/components/admin/AdminShell';
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
 
-  if (pathname?.startsWith('/admin/login')) {
+  if (pathname?.startsWith('/admin/login') || pathname?.startsWith('/admin/change-password')) {
     return children;
   }
 

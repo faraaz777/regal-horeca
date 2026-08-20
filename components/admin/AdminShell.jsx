@@ -22,12 +22,14 @@ import {
   ScrollText,
   Building2,
   LogOut,
+  KeyRound,
   Plus,
   ArrowLeftRight,
   MapPin,
   Map,
   Layers,
   Inbox,
+  Banknote,
 } from 'lucide-react';
 import { filterNavForRole, isNavItemActive } from '@/lib/admin/navConfig';
 import { adminJson, adminFetch } from '@/lib/client/adminFetch';
@@ -57,6 +59,7 @@ const NAV_ICONS = {
   '/admin/company-profile': Building2,
   '/admin/sales/collections': Layers,
   '/admin/sales/requests': Inbox,
+  '/admin/sales/my-sales': Banknote,
 };
 
 function userInitials(name = '') {
@@ -99,8 +102,14 @@ export default function AdminShell({ children }) {
     }
   }, [meError, router]);
 
+  useEffect(() => {
+    if (user?.mustChangePassword) {
+      router.replace('/admin/change-password');
+    }
+  }, [user, router]);
+
   const { data: enquiriesData } = useSWR(
-    user ? '/api/enquiries?limit=1&skip=0&status=new' : null,
+    user && !user.mustChangePassword ? '/api/enquiries?limit=1&skip=0&status=new' : null,
     enquiriesFetcher,
     {
       revalidateOnFocus: false,
@@ -362,6 +371,20 @@ export default function AdminShell({ children }) {
         </nav>
 
         <div className={`pt-2 border-t border-shell-border pb-4 ${expanded ? 'px-3' : 'px-2'}`}>
+          <Link
+            href="/admin/change-password"
+            title="Change password"
+            className={`group flex w-full items-center rounded-lg text-[13px] font-medium text-shell-dim hover:text-shell-text hover:bg-shell-raised transition-colors ${
+              expanded ? 'gap-3 px-3 py-2.5' : 'justify-center px-0 py-2.5'
+            }`}
+          >
+            <KeyRound
+              size={17}
+              strokeWidth={1.75}
+              className="shrink-0 text-shell-gold/70 group-hover:text-shell-gold transition-colors"
+            />
+            {expanded && <span>Change password</span>}
+          </Link>
           <button
             type="button"
             onClick={handleLogout}

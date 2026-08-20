@@ -12,6 +12,11 @@ import {
 } from '@/lib/server/auth/refreshToken';
 import { writeAuditLog } from '@/lib/server/audit/writeAuditLog';
 
+/**
+ * POST /api/auth/login
+ *
+ * Issues access + refresh cookies. Inactive users cannot sign in.
+ */
 export async function POST(request) {
   try {
     await connectToDatabase();
@@ -62,6 +67,7 @@ export async function POST(request) {
         email: user.email,
         name: user.name,
         role: user.role,
+        mustChangePassword: Boolean(user.mustChangePassword),
       },
     });
 

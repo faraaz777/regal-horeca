@@ -100,7 +100,11 @@ export default function InventoryReportsPage() {
             setSearch(e.target.value);
             setPage(1);
           }}
-          placeholder="Search product, SKU, location…"
+          placeholder={
+            tab === 'sold'
+              ? 'Search product, SKU, sold for, or recorded by…'
+              : 'Search product, SKU, location…'
+          }
           className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg"
         />
       </div>
@@ -176,7 +180,8 @@ export default function InventoryReportsPage() {
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3 text-right">Qty sold</th>
                 <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">User</th>
+                <th className="px-4 py-3">Sold for</th>
+                <th className="px-4 py-3">Recorded by</th>
                 <th className="px-4 py-3">Reference</th>
               </tr>
             </thead>
@@ -191,7 +196,12 @@ export default function InventoryReportsPage() {
                     {row.qty} {row.stockUnit}
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-600">{formatDate(row.date)}</td>
-                  <td className="px-4 py-3 text-sm text-gray-800">{row.userName}</td>
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                    {row.soldForName || '—'}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {row.recordedByName || row.userName || '—'}
+                  </td>
                   <td className="px-4 py-3 text-xs text-gray-600">{row.customerRef || '—'}</td>
                 </tr>
               ))}

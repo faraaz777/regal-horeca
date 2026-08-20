@@ -14,6 +14,7 @@ import {
   MAX_MOVEMENT_REMARK_LENGTH,
   MAX_MOVEMENT_REF_LENGTH,
 } from '@/lib/shared/inventoryConstants';
+import { resolveSoldForUser } from '@/lib/server/users/userService';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,6 +91,21 @@ export async function POST(request) {
       }
     }
 
+    /**
+     * A Sold movement has to say whose sale it is, so reports can separate the
+     * staff member credited with the sale from whoever keyed it in. The other
+     * minus reasons — manual adjustment, showroom, other — are not sales and
+     * are never asked.
+     */
+    let soldFor = null;
+    if (action === 'minus' && (reason || 'sold') === 'sold') {
+      try {
+        soldFor = await resolveSoldForUser(body.soldForUserId);
+      } catch (err) {
+        return NextResponse.json({ error: err.message }, { status: 400 });
+      }
+    }
+
     if (
       action === 'minus' &&
       Array.isArray(lines) &&
@@ -101,6 +117,7 @@ export async function POST(request) {
         reason: reason || 'sold',
         remark,
         ref,
+        soldFor,
         userId: auth.session.userId,
         actorRole: auth.session.role,
         request,
@@ -137,6 +154,7 @@ export async function POST(request) {
       reason: reason || (action === 'minus' ? 'sold' : 'manual_adjustment'),
       remark: remark || '',
       ref: ref || '',
+      soldFor,
       locationId: locationId || null,
       fromLocationId: fromLocationId || null,
       toLocationId: toLocationId || null,

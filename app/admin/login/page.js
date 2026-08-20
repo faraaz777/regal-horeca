@@ -17,13 +17,17 @@ function LoginForm() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await adminJson('/api/auth/login', {
+      const next = searchParams.get('next') || '/admin/dashboard';
+      const res = await adminJson('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email: email.trim(), password }),
       });
       toast.success('Signed in');
-      const next = searchParams.get('next') || '/admin/dashboard';
-      router.push(next);
+      if (res.user?.mustChangePassword) {
+        router.push('/admin/change-password');
+      } else {
+        router.push(next);
+      }
       router.refresh();
     } catch (err) {
       toast.error(err.message || 'Login failed');

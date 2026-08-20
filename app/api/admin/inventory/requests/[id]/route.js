@@ -55,6 +55,20 @@ export async function PATCH(request, { params }) {
     if (result.error === 'reservation_failed' || result.error === 'fulfill_failed') {
       return NextResponse.json({ error: result.message }, { status: 409 });
     }
+    if (result.error === 'allocation_mismatch') {
+      return NextResponse.json({ error: result.message }, { status: 400 });
+    }
+    /**
+     * Rejecting an approved request returns its stock first. If that fails the
+     * request stays approved so the reject can be retried — surfaced as a
+     * conflict rather than a success.
+     */
+    if (result.error === 'release_failed') {
+      return NextResponse.json(
+        { error: `Could not return reserved stock: ${result.message}` },
+        { status: 409 }
+      );
+    }
 
     return NextResponse.json({ success: true, request: result.request });
   } catch (error) {

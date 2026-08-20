@@ -22,6 +22,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Local diagnostic dumps from inventory scripts
+scripts/_sold-for-backfill-*.json
+scripts/_lost-reserved-stock-*.json
+
 # Local env files
 .env*.local
 .env

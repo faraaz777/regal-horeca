@@ -94,6 +94,8 @@ export default function StockMovementsPage() {
   const [referenceFilter, setReferenceFilter] = useState('');
   const [productFilterId, setProductFilterId] = useState(initialProductId);
   const [operatorFilterId, setOperatorFilterId] = useState('');
+  /** Whose sale it was, as opposed to who keyed the movement in. */
+  const [soldForFilterId, setSoldForFilterId] = useState('');
   const [exporting, setExporting] = useState(false);
   const [pages, setPages] = useState({
     movements: 1,
@@ -155,6 +157,7 @@ export default function StockMovementsPage() {
     if (productFilterId) params.set('productId', productFilterId);
     if (locationFilter.locationId) params.set('locationId', locationFilter.locationId);
     if (operatorFilterId) params.set('userId', operatorFilterId);
+    if (soldForFilterId) params.set('soldForUserId', soldForFilterId);
     if (referenceFilter.trim()) params.set('refExact', referenceFilter.trim());
     return params;
   }, [
@@ -165,6 +168,7 @@ export default function StockMovementsPage() {
     productFilterId,
     locationFilter.locationId,
     operatorFilterId,
+    soldForFilterId,
     referenceFilter,
   ]);
 
@@ -272,7 +276,7 @@ export default function StockMovementsPage() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Stock Activity</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Ledger = what happened · Stock = what exists · Operators = who moved it
+            Ledger = what happened · Stock = what exists · Operators = who entered it
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -414,16 +418,18 @@ export default function StockMovementsPage() {
           />
         </div>
 
-        {(productFilterId || operatorFilterId || referenceFilter) && (
+        {(productFilterId || operatorFilterId || soldForFilterId || referenceFilter) && (
           <div className="flex flex-wrap items-center gap-2 text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
             {productFilterId && <span>Product filter active</span>}
-            {operatorFilterId && <span>Operator filter active</span>}
+            {operatorFilterId && <span>Recorded-by filter active</span>}
+            {soldForFilterId && <span>Sold-for filter active</span>}
             {referenceFilter && <span>Ref: {referenceFilter}</span>}
             <button
               type="button"
               onClick={() => {
                 setProductFilterId('');
                 setOperatorFilterId('');
+                setSoldForFilterId('');
                 setReferenceFilter('');
                 resetAllPages();
               }}
@@ -505,9 +511,25 @@ export default function StockMovementsPage() {
                       {row.productSku ? <p className="text-xs text-gray-500 font-mono">{row.productSku}</p> : null}
                       <p className="text-xs text-gray-600">{row.locationDisplayPath || '—'}</p>
                       <p className="text-xs text-gray-600">
-                        {row.performedBy?.name || row.performedBy?.email || '—'}
+                        Recorded by {row.performedBy?.name || row.performedBy?.email || '—'}
                         {row.reasonLabel ? ` · ${row.reasonLabel}` : ''}
                       </p>
+                      {row.soldForName ? (
+                        <p className="text-xs text-gray-600">
+                          Sold for{' '}
+                          <button
+                            type="button"
+                            disabled={!row.soldForUserId}
+                            onClick={() => {
+                              setSoldForFilterId(String(row.soldForUserId));
+                              setTabPage('movements', 1);
+                            }}
+                            className="font-semibold text-emerald-700 hover:underline disabled:text-gray-600 disabled:no-underline"
+                          >
+                            {row.soldForName}
+                          </button>
+                        </p>
+                      ) : null}
                       {row.remark ? <p className="text-xs text-gray-500">{row.remark}</p> : null}
                       </div>
                     </div>

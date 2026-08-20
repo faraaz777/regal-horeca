@@ -4,7 +4,7 @@ import { requireAuth } from '@/lib/server/auth/requireAuth';
 import { writeAuditLog } from '@/lib/server/audit/writeAuditLog';
 
 export async function POST(request) {
-  const auth = await requireAuth(request);
+  const auth = await requireAuth(request, { allowMustChangePassword: true });
   if (auth.error) return auth.error;
 
   const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;

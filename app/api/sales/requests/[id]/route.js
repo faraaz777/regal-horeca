@@ -51,6 +51,17 @@ export async function PATCH(request, { params }) {
     if (result.error === 'invalid_transition') {
       return NextResponse.json({ error: 'Request cannot be cancelled in current status' }, { status: 400 });
     }
+    /**
+     * Cancelling an approved request returns its stock first. If that fails
+     * the request stays approved so the cancel can be retried, rather than
+     * reporting success while the stock is still missing from sellable.
+     */
+    if (result.error === 'release_failed') {
+      return NextResponse.json(
+        { error: `Could not return reserved stock: ${result.message}` },
+        { status: 409 }
+      );
+    }
 
     return NextResponse.json({ success: true, request: result.request });
   } catch (error) {

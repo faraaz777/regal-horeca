@@ -16,7 +16,9 @@ export async function GET(request) {
     const parsed = requestsListSchema.safeParse({
       status: searchParams.get('status') || undefined,
       page: searchParams.get('page') || 1,
-      limit: searchParams.get('limit') || 20,
+      limit: searchParams.get('limit') || 50,
+      q: searchParams.get('q') || '',
+      days: searchParams.get('days') || undefined,
     });
 
     if (!parsed.success) {

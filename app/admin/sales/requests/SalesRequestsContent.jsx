@@ -247,6 +247,14 @@ export default function SalesRequestsContent() {
                               {cloningId === r._id ? 'Creating…' : 'New request'}
                             </button>
                           )}
+                          {r.status === 'fulfilled' && (
+                            <Link
+                              href={`/admin/sales/requests/${r._id}/slip`}
+                              className="text-sm min-h-[40px] px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 inline-flex items-center"
+                            >
+                              Charge sheet
+                            </Link>
+                          )}
                         </div>
                       </div>
 

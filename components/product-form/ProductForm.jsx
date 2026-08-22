@@ -4080,7 +4080,7 @@ export default function ProductForm({
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-2 text-gray-700">Discount %</label>
+                    <label className="block text-sm font-medium mb-2 text-gray-700">Max Discount %</label>
                     <input
                       type="number"
                       min="0"

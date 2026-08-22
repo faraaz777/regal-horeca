@@ -1,8 +1,8 @@
 /**
- * Admin Stats API Route
- * 
- * Provides unified statistics for the admin dashboard.
- * Consolidates multiple API calls into a single endpoint for better performance.
+ * GET /api/admin/stats
+ *
+ * Owner glance plus leftover catalog counts. Operational numbers are scoped
+ * to the caller's role so a salesman does not receive warehouse cost value.
  */
 
 import { NextResponse } from 'next/server';
@@ -10,87 +10,127 @@ import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
 import Category from '@/lib/models/Category';
 import BusinessType from '@/lib/models/BusinessType';
-import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
+import Enquiry from '@/lib/models/Enquiry';
+import InventoryRequest from '@/lib/models/InventoryRequest';
+import StockLedger from '@/lib/models/StockLedger';
+import { requireAuth } from '@/lib/server/auth/requireAuth';
+import { hasPermission } from '@/lib/shared/permissions';
+import { getSellableStockTotals } from '@/lib/server/inventory/inventoryReportsService';
+import { getMySales, istMonthAndTodayStarts } from '@/lib/server/sales/mySalesService';
+import { NEEDS_ACTION_STATUSES } from '@/lib/shared/salesConstants';
+import { buildEnquiryListQuery } from '@/lib/server/enquiries/enquiryAccess';
 
-/** Active rows that are real catalog SKUs: standalones + every child variant (not parent carriers). */
 const ADMIN_TOTAL_PRODUCTS_MATCH = {
   deletedAt: null,
   productType: { $ne: 'parent' },
 };
 
+async function soldQtySince(since, extra = {}) {
+  const [row] = await StockLedger.aggregate([
+    { $match: { type: 'sale_fulfill', createdAt: { $gte: since }, ...extra } },
+    { $group: { _id: null, qty: { $sum: { $abs: '$qty' } } } },
+  ]);
+  return row?.qty || 0;
+}
+
 export async function GET(request) {
-  const authError = await assertAdmin(request);
-  if (authError) return authError;
+  const auth = await requireAuth(request);
+  if (auth.error) return auth.error;
 
   try {
     await connectToDatabase();
+    const role = auth.session.role;
+    const { todayStart, monthStart } = istMonthAndTodayStarts();
 
-    // Total = standalones + all child variants (each variant row is one product).
-    // Parent carriers are excluded — they are grouping shells, not sellable SKUs.
-    const [statsResult] = await Product.aggregate([
-      { $match: ADMIN_TOTAL_PRODUCTS_MATCH },
-      {
-        $facet: {
-          total: [{ $count: 'count' }],
-          featured: [
-            { $match: { featured: true } },
-            { $count: 'count' }
-          ],
-          statusBreakdown: [
-            {
-              $group: {
-                _id: '$status',
-                count: { $sum: 1 }
-              }
-            }
-          ],
-        }
-      }
-    ]);
+    const ops = {};
 
-    // Recent products: standalones + variants only (no parent carriers).
-    const recentProducts = await Product.find(ADMIN_TOTAL_PRODUCTS_MATCH)
-      .select('title heroImage createdAt status slug')
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .lean();
+    if (hasPermission(role, 'inventory:read')) {
+      const [stock, soldToday, soldMonth] = await Promise.all([
+        getSellableStockTotals(),
+        soldQtySince(todayStart),
+        soldQtySince(monthStart),
+      ]);
+      ops.sellableQty = stock.qty;
+      ops.sellableValue = stock.value;
+      ops.soldTodayQty = soldToday;
+      ops.soldMonthQty = soldMonth;
+    } else if (hasPermission(role, 'sales:requests:read')) {
+      const mine = await getMySales(auth.session);
+      ops.soldTodayQty = mine.todayQty;
+      ops.soldMonthQty = mine.monthQty;
+    }
 
-    // Get counts for categories and business types
-    const [totalCategories, totalBusinessTypes] = await Promise.all([
-      Category.countDocuments(),
-      BusinessType.countDocuments(),
-    ]);
+    if (hasPermission(role, 'inventory:requests:approve')) {
+      ops.openRequests = await InventoryRequest.countDocuments({
+        status: { $in: NEEDS_ACTION_STATUSES },
+      });
+    } else if (hasPermission(role, 'sales:requests:read')) {
+      ops.openRequests = await InventoryRequest.countDocuments({
+        salesUserId: auth.session.userId,
+        status: { $in: NEEDS_ACTION_STATUSES },
+      });
+    }
 
-    // Process status breakdown
-    const statusDistribution = {};
-    statsResult.statusBreakdown.forEach(item => {
-      statusDistribution[item._id] = item.count;
-    });
+    if (hasPermission(role, 'enquiries:read')) {
+      ops.newEnquiries = await Enquiry.countDocuments(
+        buildEnquiryListQuery(auth.session, { status: 'new' })
+      );
+    }
 
-    const totalProducts = statsResult.total[0]?.count || 0;
-    const featuredProducts = statsResult.featured[0]?.count || 0;
-    const inStockProducts = statusDistribution['In Stock'] || 0;
-    const outOfStockProducts = statusDistribution['Out of Stock'] || 0;
-    const preOrderProducts = statusDistribution['Pre-Order'] || 0;
+    const canSeeCatalog = hasPermission(role, 'products:write') || role === 'super_admin';
+    let catalog = {};
+    let recentProducts = [];
 
-    return NextResponse.json({
-      success: true,
-      stats: {
-        totalProducts,
+    if (canSeeCatalog) {
+      const [statsResult] = await Product.aggregate([
+        { $match: ADMIN_TOTAL_PRODUCTS_MATCH },
+        {
+          $facet: {
+            total: [{ $count: 'count' }],
+            featured: [{ $match: { featured: true } }, { $count: 'count' }],
+            statusBreakdown: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+          },
+        },
+      ]);
+
+      recentProducts = await Product.find(ADMIN_TOTAL_PRODUCTS_MATCH)
+        .select('title heroImage createdAt status slug')
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .lean();
+
+      const [totalCategories, totalBusinessTypes] = await Promise.all([
+        Category.countDocuments(),
+        BusinessType.countDocuments(),
+      ]);
+
+      const statusDistribution = {};
+      (statsResult.statusBreakdown || []).forEach((item) => {
+        statusDistribution[item._id] = item.count;
+      });
+
+      catalog = {
+        totalProducts: statsResult.total[0]?.count || 0,
         totalCategories,
         totalBusinessTypes,
-        featuredProducts,
-        inStockProducts,
-        outOfStockProducts,
-        preOrderProducts,
+        featuredProducts: statsResult.featured[0]?.count || 0,
+        inStockProducts: statusDistribution['In Stock'] || 0,
+        outOfStockProducts: statusDistribution['Out of Stock'] || 0,
+        preOrderProducts: statusDistribution['Pre-Order'] || 0,
         statusDistribution,
+      };
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        stats: { ...catalog, ...ops },
+        recentProducts,
       },
-      recentProducts,
-    }, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
-      },
-    });
+      {
+        headers: { 'Cache-Control': 'private, no-store' },
+      }
+    );
   } catch (error) {
     console.error('Error fetching admin stats:', error);
     return NextResponse.json(
@@ -99,4 +139,3 @@ export async function GET(request) {
     );
   }
 }
-

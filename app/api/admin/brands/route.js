@@ -1,16 +1,15 @@
 /**
- * Admin Categories API Route
+ * Admin Brands API Route
  *
- * Uncached categories for admin UI (Add Product, Manage Categories).
- * Same response shape as GET /api/categories. Requires admin session cookie.
+ * Uncached flat brand list for admin menu builder and legacy UI.
  *
- * GET /api/admin/categories?tree=true - Tree (no-store)
- * GET /api/admin/categories - Flat list (no-store)
+ * GET /api/admin/brands - Flat list (no-store)
+ * GET /api/admin/brands?tree=true - Tree (no-store)
  */
 
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
-import Category from '@/lib/models/Category';
+import Brand from '@/lib/models/Brand';
 import { assertAdmin } from '@/lib/server/auth/adminApiGuard';
 
 export const dynamic = 'force-dynamic';
@@ -35,10 +34,10 @@ export async function GET(request) {
     const parentId = searchParams.get('parent');
 
     if (asTree) {
-      const tree = await Category.buildTree();
+      const tree = await Brand.buildTree();
       const plainTree = JSON.parse(JSON.stringify(tree));
       return NextResponse.json(
-        { success: true, categories: plainTree },
+        { success: true, brands: plainTree },
         { headers: NO_STORE_HEADERS }
       );
     }
@@ -46,26 +45,22 @@ export async function GET(request) {
     const query = {};
     if (level) query.level = level;
     if (parentId !== null && parentId !== undefined) {
-      if (parentId === 'null') {
-        query.parent = null;
-      } else {
-        query.parent = parentId;
-      }
+      query.parent = parentId === 'null' ? null : parentId;
     }
 
-    const categories = await Category.find(query)
+    const brands = await Brand.find(query)
       .populate('parent', 'name slug level')
       .sort({ sortOrder: 1, name: 1 })
       .lean();
 
     return NextResponse.json(
-      { success: true, categories },
+      { success: true, brands },
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('Error fetching admin categories:', error);
+    console.error('Error fetching admin brands:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch categories', details: error.message },
+      { error: 'Failed to fetch brands', details: error.message },
       { status: 500 }
     );
   }

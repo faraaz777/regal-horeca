@@ -657,6 +657,12 @@ export default function AdminInventoryPage() {
             >
               Reports
             </Link>
+            <Link
+              href="/admin/inventory/product-sheet"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-gray-800 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Stock sheet
+            </Link>
             {canAddToInventory && (
               <Link
                 href="/admin/inventory/add"
@@ -772,6 +778,13 @@ export default function AdminInventoryPage() {
                       <option value="HAS_DEAD_STOCK">Dead stock</option>
                     </select>
                   </div>
+                  <Link
+                    href="/admin/inventory/product-sheet"
+                    onClick={() => setFiltersOpen(false)}
+                    className="block w-full text-center px-3 py-2 text-sm font-semibold text-gray-800 bg-white border border-gray-200 rounded-lg"
+                  >
+                    Stock sheet
+                  </Link>
                   <Link
                     href="/admin/inventory/reports"
                     onClick={() => setFiltersOpen(false)}

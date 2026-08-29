@@ -133,10 +133,10 @@ export async function PUT(request, { params }) {
 
 /**
  * DELETE /api/categories/[id]
- * Deletes a category
+ * Deletes a category. Permissions: super_admin only.
  */
 export async function DELETE(request, { params }) {
-  const auth = await requireAuth(request, { permission: 'categories:write' });
+  const auth = await requireAuth(request, { roles: ['super_admin'] });
   if (auth.error) return auth.error;
 
   try {

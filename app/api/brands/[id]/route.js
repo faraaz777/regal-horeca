@@ -107,10 +107,10 @@ export async function PUT(request, { params }) {
 
 /**
  * DELETE /api/brands/[id]
- * Deletes a brand
+ * Deletes a brand. Permissions: super_admin only.
  */
 export async function DELETE(request, { params }) {
-  const auth = await requireAuth(request, { permission: 'brands:write' });
+  const auth = await requireAuth(request, { roles: ['super_admin'] });
   if (auth.error) return auth.error;
 
   try {

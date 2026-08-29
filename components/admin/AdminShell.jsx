@@ -30,6 +30,7 @@ import {
   Layers,
   Inbox,
   Banknote,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { filterNavForRole, isNavItemActive } from '@/lib/admin/navConfig';
 import { adminJson, adminFetch } from '@/lib/client/adminFetch';
@@ -47,6 +48,7 @@ const NAV_ICONS = {
   '/admin/inventory/movements': ArrowLeftRight,
   '/admin/inventory/locations': MapPin,
   '/admin/inventory/locator': Map,
+  '/admin/inventory/product-sheet': FileSpreadsheet,
   '/admin/products': Boxes,
   '/admin/categories': FolderTree,
   '/admin/brands': Tag,
@@ -162,10 +164,10 @@ export default function AdminShell({ children }) {
     }`;
 
   return (
-    <div className="flex h-screen bg-gray-100 relative overflow-hidden">
+    <div className="flex h-screen bg-gray-100 relative overflow-hidden print:h-auto print:overflow-visible print:bg-white">
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden print:hidden"
           onClick={() => setIsSidebarOpen(false)}
           aria-hidden
         />
@@ -174,7 +176,7 @@ export default function AdminShell({ children }) {
       <button
         type="button"
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="fixed top-4 left-4 z-50 lg:hidden bg-shell-bg text-shell-text p-2 rounded-lg hover:bg-shell-raised transition-colors border border-shell-border"
+        className="fixed top-4 left-4 z-50 lg:hidden bg-shell-bg text-shell-text p-2 rounded-lg hover:bg-shell-raised transition-colors border border-shell-border print:hidden"
         aria-label="Toggle sidebar"
       >
         {isSidebarOpen ? <X size={22} /> : <Menu size={22} />}
@@ -187,7 +189,7 @@ export default function AdminShell({ children }) {
       */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-shell-bg text-shell-text border-r border-shell-border
-          transition-[width,transform] duration-300 ease-in-out
+          transition-[width,transform] duration-300 ease-in-out print:hidden
           ${
             isSidebarOpen
               ? 'translate-x-0 w-64'
@@ -404,7 +406,7 @@ export default function AdminShell({ children }) {
       </aside>
 
       <main
-        className={`flex-1 pt-16 sm:pt-6 lg:pt-8 p-4 sm:p-6 lg:p-8 overflow-y-auto transition-all duration-300 ${
+        className={`flex-1 pt-16 sm:pt-6 lg:pt-8 p-4 sm:p-6 lg:p-8 overflow-y-auto transition-all duration-300 print:ml-0 print:pt-0 print:p-0 print:overflow-visible ${
           isSidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
         }`}
       >

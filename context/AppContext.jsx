@@ -55,6 +55,8 @@ export function useAppContext() {
     upsertCategory: taxonomy.upsertCategory,
     removeCategory: taxonomy.removeCategory,
     refreshBrands: taxonomy.refreshBrands,
+    upsertBrand: taxonomy.upsertBrand,
+    removeBrand: taxonomy.removeBrand,
     refreshProducts: async () => {},
   };
 }

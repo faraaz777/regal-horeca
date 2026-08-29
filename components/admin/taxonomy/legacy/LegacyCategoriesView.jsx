@@ -1,0 +1,849 @@
+﻿
+
+
+
+// /**
+//  * Admin Categories Page
+//  * 
+//  * Category management page with:
+//  * - List all categories in tree structure
+//  * - Create new categories
+//  * - Edit categories
+//  * - Delete categories (with validation)
+//  */
+
+'use client';
+
+import { useState, useEffect, useMemo } from 'react';
+import toast from 'react-hot-toast';
+import { compressImageFile } from '@/lib/client/imageCompression';
+import { useAppContext } from '@/context/AppContext';
+import { PlusIcon, EditIcon, TrashIcon, ChevronRightIcon, ChevronDownIcon } from '@/components/Icons';
+import { showToast } from '@/lib/utils/toast';
+import { apiClient, ApiError } from '@/lib/utils/apiClient';
+import { buildCategoryTree } from '@/lib/utils/categoryUtils';
+import { adminFetch } from '@/lib/client/adminFetch';
+import { useTaxonomyPermissions } from '@/components/admin/taxonomy/hooks/useTaxonomyPermissions';
+
+export default function LegacyCategoriesView() {
+  const { upsertCategory, removeCategory } = useAppContext();
+  const { canDelete } = useTaxonomyPermissions();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [categoriesList, setCategoriesList] = useState([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [expandedCategories, setExpandedCategories] = useState(new Set());
+
+  // Fetch categories from admin endpoint (uncached, instant list updates)
+  const fetchCategoriesList = async () => {
+    try {
+      setIsLoadingCategories(true);
+      setError('');
+      const data = await apiClient.request('/api/admin/categories');
+      if (data.success) {
+        const cats = data.categories || [];
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Fetched categories:', cats.length);
+        }
+        setCategoriesList(cats);
+        return cats;
+      } else {
+        setError(data.error || 'Failed to load categories');
+        return [];
+      }
+    } catch (error) {
+      setError(error?.message || 'Failed to load categories');
+      return [];
+    } finally {
+      setIsLoadingCategories(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategoriesList();
+  }, []);
+
+  const handleAddCategory = () => {
+    setEditingCategory(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEditCategory = (category) => {
+    setEditingCategory(category);
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteCategory = async (categoryId) => {
+    if (!canDelete) {
+      showToast.error('Only Super Admin can delete categories.');
+      return;
+    }
+    // Check if category has children
+    const hasChildren = categoriesList.some(c => {
+      const cParent = c.parent?._id || c.parent;
+      return cParent?.toString() === categoryId?.toString();
+    });
+    
+    if (hasChildren) {
+      showToast.error('Cannot delete category with children. Please delete or reassign its children first.');
+      return;
+    }
+
+    if (!window.confirm('Are you sure you want to delete this category?')) {
+      return;
+    }
+
+    const toastId = showToast.loading('Deleting category...');
+    setLoading(true);
+    setError('');
+
+    try {
+      await apiClient.requestWithRetry(`/api/categories/${categoryId}`, {
+        method: 'DELETE',
+      });
+
+      showToast.success('Category deleted successfully');
+      setCategoriesList((prev) => prev.filter((c) => (c._id || c.id)?.toString() !== categoryId?.toString()));
+      removeCategory(categoryId);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        showToast.error(error.message);
+        setError(error.message);
+      } else {
+        showToast.error('An error occurred while deleting the category');
+        setError('An error occurred while deleting the category');
+      }
+    } finally {
+      toast.dismiss(toastId);
+      setLoading(false);
+    }
+  };
+
+  const handleSaveCategory = async (categoryData) => {
+    const toastId = showToast.loading(editingCategory ? 'Updating category...' : 'Creating category...');
+    setLoading(true);
+    setError('');
+
+    try {
+      // Generate slug if not provided
+      if (!categoryData.slug) {
+        categoryData.slug = categoryData.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '');
+      }
+
+      const url = editingCategory 
+        ? `/api/categories/${editingCategory._id || editingCategory.id}`
+        : '/api/categories';
+      
+      const method = editingCategory ? 'PUT' : 'POST';
+
+      const res = await apiClient.requestWithRetry(url, {
+        method,
+        body: categoryData,
+      });
+
+      const savedCategory = res?.category;
+      if (savedCategory) {
+        // Update admin list immediately (no refetch)
+        setCategoriesList((prev) => {
+          const next = Array.isArray(prev) ? [...prev] : [];
+          const savedId = (savedCategory._id || savedCategory.id)?.toString?.() ?? (savedCategory._id || savedCategory.id);
+          const idx = next.findIndex((c) => (c._id || c.id)?.toString?.() === savedId);
+          if (idx >= 0) {
+            next[idx] = { ...next[idx], ...savedCategory };
+          } else {
+            next.push(savedCategory);
+          }
+          // keep stable alphabetical order like API
+          next.sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')));
+          return next;
+        });
+
+        // Update global categories context for Add Product, etc.
+        upsertCategory(savedCategory);
+      }
+
+      showToast.success(editingCategory ? 'Category updated successfully' : 'Category created successfully');
+      setIsModalOpen(false);
+      setEditingCategory(null);
+      
+      // If this is a child category, expand its parent
+      if (categoryData.parent) {
+        const parentIdStr = (savedCategory?.parent?._id || savedCategory?.parent || categoryData.parent?._id || categoryData.parent)?.toString?.() 
+          ?? (savedCategory?.parent?._id || savedCategory?.parent || categoryData.parent?._id || categoryData.parent);
+        if (parentIdStr) {
+          setExpandedCategories(prev => {
+            const newSet = new Set(prev);
+            newSet.add(parentIdStr);
+            return newSet;
+          });
+        }
+      }
+    } catch (error) {
+      if (error instanceof ApiError) {
+        showToast.error(error.message);
+        setError(error.message);
+      } else {
+        showToast.error(`An error occurred while ${editingCategory ? 'updating' : 'creating'} the category`);
+        setError(`An error occurred while ${editingCategory ? 'updating' : 'creating'} the category`);
+      }
+    } finally {
+      toast.dismiss(toastId);
+      setLoading(false);
+    }
+  };
+
+  // Toggle expand/collapse for a category
+  const toggleCategory = (categoryId) => {
+    const categoryIdStr = categoryId?.toString();
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryIdStr)) {
+        newSet.delete(categoryIdStr);  // Collapse
+      } else {
+        newSet.add(categoryIdStr);     // Expand
+      }
+      return newSet;
+    });
+  };
+
+  // Expand all categories recursively
+  const expandAllCategories = (tree) => {
+    const allIds = new Set();
+    const collectIds = (categories) => {
+      categories.forEach(cat => {
+        if (cat.children && cat.children.length > 0) {
+          allIds.add((cat._id || cat.id).toString());
+          collectIds(cat.children);
+        }
+      });
+    };
+    collectIds(tree);
+    setExpandedCategories(allIds);
+  };
+
+  // Collapse all categories
+  const collapseAllCategories = () => {
+    setExpandedCategories(new Set());
+  };
+
+  // Helper function to get category ID (normalized to string)
+  const getCategoryId = (category) => {
+    const id = category._id || category.id;
+    if (!id) return null;
+    // Handle ObjectId objects
+    if (typeof id === 'object' && id.toString) {
+      return id.toString();
+    }
+    return String(id);
+  };
+
+  // Rebuild tree whenever categoriesList changes (optimized utility, no repeated .filter())
+  const categoryTree = useMemo(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Rebuilding category tree with', categoriesList.length, 'categories');
+    }
+    const tree = buildCategoryTree(categoriesList || []);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Built tree with', tree.length, 'root categories');
+    }
+    return tree;
+  }, [categoriesList]);
+
+  const CategoryRow = ({ category, level }) => {
+    const categoryId = category._id || category.id;
+    const categoryIdStr = getCategoryId(category);
+    // Check if category has children (handle both array and undefined)
+    const hasChildren = Array.isArray(category.children) && category.children.length > 0;
+    const isExpanded = expandedCategories.has(categoryIdStr);
+
+    return (
+      <>
+        {/* Desktop Table Row */}
+        <tr className="bg-white hover:bg-gray-50 transition-colors hidden md:table-row">
+          <td 
+            className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 cursor-pointer"
+            style={{ paddingLeft: `${1.5 + level * 2}rem` }}
+            onClick={() => hasChildren && toggleCategory(categoryId)}
+          >
+            <div className="flex items-center gap-2">
+              {hasChildren ? (
+                <span className="text-gray-400 hover:text-gray-600 transition-colors">
+                  {isExpanded ? (
+                    <ChevronDownIcon className="w-4 h-4" />
+                  ) : (
+                    <ChevronRightIcon className="w-4 h-4" />
+                  )}
+                </span>
+              ) : (
+                <span className="w-4 h-4"></span>
+              )}
+              <span className={hasChildren ? 'font-semibold' : ''}>{category.name}</span>
+            </div>
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{category.slug}</td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">{category.level}</td>
+          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent row toggle
+                handleEditCategory(category);
+              }} 
+              className="text-indigo-600 hover:text-indigo-900 mr-4"
+              disabled={loading}
+              title="Edit category"
+            >
+              <EditIcon />
+            </button>
+            {canDelete && (
+            <button 
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent row toggle
+                handleDeleteCategory(categoryId);
+              }} 
+              className="text-red-600 hover:text-red-900"
+              disabled={loading}
+              title="Delete category"
+            >
+              <TrashIcon />
+            </button>
+            )}
+          </td>
+        </tr>
+        
+        {/* Mobile Card */}
+        <div className="md:hidden bg-white border-b border-gray-200 p-4 hover:bg-gray-50 transition-colors">
+          <div 
+            className="flex items-start justify-between gap-3"
+            onClick={() => hasChildren && toggleCategory(categoryId)}
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                {hasChildren ? (
+                  <span className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0">
+                    {isExpanded ? (
+                      <ChevronDownIcon className="w-4 h-4" />
+                    ) : (
+                      <ChevronRightIcon className="w-4 h-4" />
+                    )}
+                  </span>
+                ) : (
+                  <span className="w-4 h-4 flex-shrink-0"></span>
+                )}
+                <span className={`text-sm font-medium text-gray-900 ${hasChildren ? 'font-semibold' : ''}`} style={{ paddingLeft: `${level * 0.75}rem` }}>
+                  {category.name}
+                </span>
+              </div>
+              <div className="text-xs text-gray-500 mb-1" style={{ paddingLeft: `${(level + 1) * 0.75 + 1}rem` }}>
+                <span className="font-medium">Slug:</span> {category.slug}
+              </div>
+              <div className="text-xs text-gray-500 capitalize" style={{ paddingLeft: `${(level + 1) * 0.75 + 1}rem` }}>
+                <span className="font-medium">Level:</span> {category.level}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent row toggle
+                  handleEditCategory(category);
+                }} 
+                className="text-indigo-600 hover:text-indigo-900 p-2"
+                disabled={loading}
+                title="Edit category"
+              >
+                <EditIcon />
+              </button>
+              {canDelete && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent row toggle
+                  handleDeleteCategory(categoryId);
+                }} 
+                className="text-red-600 hover:text-red-900 p-2"
+                disabled={loading}
+                title="Delete category"
+              >
+                <TrashIcon />
+              </button>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {hasChildren && isExpanded && Array.isArray(category.children) && category.children.map(child => (
+          <CategoryRow key={getCategoryId(child) || (child._id || child.id)} category={child} level={level + 1} />
+        ))}
+      </>
+    );
+  };
+
+  return (
+    <div>
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 text-sm">
+          {error}
+        </div>
+      )}
+      
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Manage Categories</h1>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
+          {categoryTree.length > 0 && (
+            <>
+              <button 
+                onClick={() => expandAllCategories(categoryTree)} 
+                className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-3 sm:px-4 rounded-md text-xs sm:text-sm transition-colors"
+                title="Expand all categories"
+              >
+                Expand All
+              </button>
+              <button 
+                onClick={collapseAllCategories} 
+                className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-3 sm:px-4 rounded-md text-xs sm:text-sm transition-colors"
+                title="Collapse all categories"
+              >
+                Collapse All
+              </button>
+            </>
+          )}
+          <button 
+            onClick={handleAddCategory} 
+            className="bg-primary hover:bg-primary-700 text-white font-bold py-2 px-3 sm:px-4 rounded-md flex items-center gap-2 text-sm sm:text-base"
+          >
+            <PlusIcon /> <span className="hidden sm:inline">Add Category</span><span className="sm:hidden">Add</span>
+          </button>
+        </div>
+      </div>
+      
+      <div className="bg-white shadow-md rounded-lg overflow-hidden">
+        {isLoadingCategories ? (
+          <div className="px-4 sm:px-6 py-8 text-center text-gray-500 text-sm sm:text-base">
+            Loading categories...
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Slug</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Level</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {categoryTree.map(cat => (
+                    <CategoryRow key={cat._id || cat.id} category={cat} level={0} />
+                  ))}
+                  {categoryTree.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                        No categories found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Mobile Card View */}
+            <div className="md:hidden divide-y divide-gray-200">
+              {categoryTree.map(cat => (
+                <CategoryRow key={cat._id || cat.id} category={cat} level={0} />
+              ))}
+              {categoryTree.length === 0 && (
+                <div className="px-4 py-8 text-center text-gray-500 text-sm">
+                  No categories found
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {isModalOpen && (
+        <CategoryForm
+          category={editingCategory}
+          allCategories={categoriesList}
+          onSave={handleSaveCategory}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingCategory(null);
+            setError('');
+          }}
+          loading={loading}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Uploads a file to Cloudflare R2 via the API
+ * Compresses images on frontend before upload to prevent HTTP 413 errors
+ */
+async function uploadToR2(file, folder = 'categories') {
+  const MAX_INPUT_SIZE = 15 * 1024 * 1024; // 15MB - reject files larger than this
+  const MAX_OUTPUT_SIZE = 1.5 * 1024 * 1024; // 1.5MB - only compress if larger than this
+  
+  try {
+    // Hard pre-check: Reject files larger than 15MB
+    if (file.size > MAX_INPUT_SIZE) {
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      throw new Error(`File size (${fileSizeMB}MB) exceeds the maximum allowed size of 15MB. Please choose a smaller image.`);
+    }
+    
+    // Validate file type
+    const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validImageTypes.includes(file.type)) {
+      throw new Error(`Invalid file type. Only images (JPEG, PNG, GIF, WebP) are allowed.`);
+    }
+    
+    let fileToUpload = file;
+    
+    // Compress image if it's larger than 1.5MB (preserve original quality for smaller images)
+    if (file.size > MAX_OUTPUT_SIZE) {
+      try {
+        const compressionOptions = {
+          maxSizeMB: 1.5, // Target 1.5MB max
+          useWebWorker: true, // Use Web Worker for better performance
+          fileType: file.type, // Preserve original file type
+          preserveExif: false, // Remove EXIF data to reduce size
+        };
+        
+        fileToUpload = await compressImageFile(file, compressionOptions);
+        
+        // Validate compressed file size before uploading
+        if (fileToUpload.size > MAX_OUTPUT_SIZE * 1.1) { // Allow 10% buffer
+          const compressedSizeMB = (fileToUpload.size / (1024 * 1024)).toFixed(2);
+          throw new Error(`Compression failed: Image is still ${compressedSizeMB}MB after compression. Please try a smaller image.`);
+        }
+      } catch (compressionError) {
+        // If compression fails, provide helpful error message
+        if (compressionError.message.includes('Compression failed')) {
+          throw compressionError;
+        }
+        throw new Error(`Image compression failed: ${compressionError.message}. Please try a different image.`);
+      }
+    }
+    
+    // Create FormData with compressed file (preserve original filename)
+    const formData = new FormData();
+    formData.append('file', fileToUpload, file.name);
+    
+    // Upload to server
+    const response = await adminFetch(`/api/upload?folder=${folder}`, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok || !data.success) {
+      const errorMessage = data.error || 'Upload failed';
+      const errorDetails = data.details ? `: ${data.details}` : '';
+      throw new Error(`${errorMessage}${errorDetails}`);
+    }
+    
+    return data.url;
+  } catch (error) {
+    // Re-throw with clear error message
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(`Upload failed: ${String(error)}`);
+  }
+}
+
+/**
+ * Category Form Component
+ * Modal form for creating/editing categories
+ */
+function CategoryForm({ category, allCategories, onSave, onClose, loading }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    slug: '',
+    level: 'department',
+    parent: null,
+    tagline: '',
+    image: '',
+  });
+  const [error, setError] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+
+  useEffect(() => {
+    if (category) {
+      const parentId = category.parent?._id || category.parent;
+      setFormData({
+        ...category,
+        parent: parentId || null,
+      });
+    } else {
+      setFormData({
+        name: '',
+        slug: '',
+        level: 'department',
+        parent: null,
+        tagline: '',
+        image: '',
+      });
+    }
+  }, [category]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    
+    if (name === 'level') {
+      setFormData({ ...formData, level: value, parent: null });
+    } else if (name === 'parent') {
+      setFormData({ ...formData, [name]: value || null });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setError('');
+
+    try {
+      const imageUrl = await uploadToR2(file, 'categories');
+      setFormData({ ...formData, image: imageUrl });
+      showToast.success('Image uploaded successfully');
+    } catch (error) {
+      console.error('Upload failed', error);
+      setError(`Image upload failed: ${error.message}`);
+      showToast.error(`Image upload failed: ${error.message}`);
+    } finally {
+      setIsUploading(false);
+      // Reset file input
+      e.target.value = '';
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!formData.name) {
+      setError('Please provide a category name.');
+      return;
+    }
+
+    onSave(formData);
+  };
+
+  const levelOptions = ['department', 'category', 'subcategory', 'type'];
+  const currentLevelIndex = levelOptions.indexOf(formData.level || 'department');
+  const parentLevel = currentLevelIndex > 0 ? levelOptions[currentLevelIndex - 1] : null;
+  const parentOptions = parentLevel 
+    ? allCategories.filter(c => c.level === parentLevel) 
+    : [];
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <form onSubmit={handleSubmit}>
+          <div className="p-4 sm:p-6 border-b">
+            <h2 className="text-xl sm:text-2xl font-bold">
+              {category ? 'Edit Category' : 'Create New Category'}
+            </h2>
+          </div>
+          <div className="p-4 sm:p-6 space-y-4">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                {error}
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium mb-1">Name *</label>
+              <input 
+                name="name" 
+                value={formData.name || ''} 
+                onChange={handleChange} 
+                className="w-full mt-1 p-2.5 sm:p-2 border border-gray-300 rounded-md shadow-sm text-base" 
+                required 
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Slug (URL)</label>
+              <input 
+                name="slug" 
+                value={formData.slug || ''} 
+                onChange={handleChange} 
+                placeholder="auto-generated-if-left-blank" 
+                className="w-full mt-1 p-2.5 sm:p-2 border border-gray-300 rounded-md shadow-sm text-base" 
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Level</label>
+              <select 
+                name="level" 
+                value={formData.level} 
+                onChange={handleChange} 
+                className="w-full mt-1 p-2.5 sm:p-2 border border-gray-300 rounded-md shadow-sm text-base"
+              >
+                {levelOptions.map(level => (
+                  <option key={level} value={level}>
+                    {level.charAt(0).toUpperCase() + level.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {parentLevel && (
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Parent {parentLevel.charAt(0).toUpperCase() + parentLevel.slice(1)}
+                </label>
+                <select 
+                  name="parent" 
+                  value={formData.parent?._id || formData.parent || ''} 
+                  onChange={handleChange} 
+                  className="w-full mt-1 p-2.5 sm:p-2 border border-gray-300 rounded-md shadow-sm text-base"
+                >
+                  <option value="">Select a parent</option>
+                  {parentOptions.map(p => (
+                    <option key={p._id || p.id} value={p._id || p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium mb-1">Tagline</label>
+              <input 
+                name="tagline" 
+                value={formData.tagline || ''} 
+                onChange={handleChange} 
+                className="w-full mt-1 p-2.5 sm:p-2 border border-gray-300 rounded-md shadow-sm text-base" 
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Category Image</label>
+              
+              {/* Image Upload Section */}
+              <div className="mb-3">
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Upload Image
+                </label>
+                <div className="flex items-center gap-2">
+                  <label className="flex-1 cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                      onChange={handleImageUpload}
+                      disabled={isUploading || loading}
+                      className="hidden"
+                    />
+                    <div className={`w-full px-4 py-2.5 border-2 border-dashed rounded-md text-center transition-colors ${
+                      isUploading 
+                        ? 'border-gray-300 bg-gray-50 cursor-not-allowed' 
+                        : 'border-gray-300 hover:border-primary hover:bg-primary/5 cursor-pointer'
+                    }`}>
+                      {isUploading ? (
+                        <span className="text-sm text-gray-500">Uploading...</span>
+                      ) : (
+                        <span className="text-sm text-gray-600">
+                          Click to upload or drag and drop
+                        </span>
+                      )}
+                    </div>
+                  </label>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Max file size: 15MB. Supported formats: JPEG, PNG, GIF, WebP
+                </p>
+              </div>
+
+              {/* Divider */}
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">OR</span>
+                </div>
+              </div>
+
+              {/* Image URL Input */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-2">
+                  Image URL
+                </label>
+                <input 
+                  name="image" 
+                  type="url"
+                  value={formData.image || ''} 
+                  onChange={handleChange} 
+                  placeholder="https://example.com/image.jpg"
+                  className="w-full mt-1 p-2.5 sm:p-2 border border-gray-300 rounded-md shadow-sm text-base" 
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Enter the full URL of the category image (e.g., from Unsplash, your CDN, or uploaded images)
+                </p>
+              </div>
+
+              {/* Image Preview */}
+              {formData.image && (
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-2">
+                    Preview
+                  </label>
+                  <div className="relative w-full h-48 border border-gray-300 rounded-md overflow-hidden bg-gray-50">
+                    <img
+                      src={formData.image}
+                      alt="Category preview"
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
+                    />
+                    <div className="hidden w-full h-full items-center justify-center text-sm text-gray-400">
+                      Failed to load image
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, image: '' })}
+                    className="mt-2 text-xs text-red-600 hover:text-red-800"
+                  >
+                    Remove image
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 p-4 border-t bg-gray-50">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="w-full sm:w-auto px-6 py-2.5 sm:py-2 bg-gray-200 text-gray-700 rounded-md font-semibold hover:bg-gray-300 text-base"
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              className="w-full sm:w-auto px-6 py-2.5 sm:py-2 bg-primary text-white rounded-md font-semibold hover:bg-primary-700 text-base"
+              disabled={loading}
+            >
+              {loading ? 'Saving...' : 'Save Category'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+

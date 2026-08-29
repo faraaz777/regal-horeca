@@ -68,6 +68,12 @@ export default function InventoryReportsPage() {
           <p className="text-sm text-gray-500 mt-1">
             Sellable inventory, products tagged dead stock, and sold movement history.
           </p>
+          <Link
+            href="/admin/inventory/product-sheet"
+            className="inline-flex mt-3 text-sm font-medium text-emerald-800 hover:underline"
+          >
+            Product stock sheet (variants + print)
+          </Link>
         </div>
       </div>
 

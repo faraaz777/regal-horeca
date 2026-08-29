@@ -117,12 +117,52 @@ export function TaxonomyProvider({ children, initialCategories = [] }) {
 
   const refreshBrands = useCallback(async () => {
     try {
+      const response = await fetch('/api/admin/brands');
+      const data = await response.json();
+      if (response.ok && data.success) {
+        await mutateBrands(data.brands || [], { revalidate: false });
+        return data.brands || [];
+      }
       const next = await fetchBrandsFlat();
       await mutateBrands(next, { revalidate: false });
     } catch (error) {
       console.error('Failed to refresh brands:', error);
     }
   }, [mutateBrands]);
+
+  const upsertBrand = useCallback(
+    (brand) => {
+      if (!brand) return;
+      const id = (brand._id || brand.id)?.toString?.() ?? (brand._id || brand.id);
+      if (!id) return;
+
+      mutateBrands(
+        (prev) => {
+          const list = Array.isArray(prev) ? [...prev] : [];
+          const idx = list.findIndex((b) => (b._id || b.id)?.toString?.() === id);
+          if (idx >= 0) {
+            list[idx] = { ...list[idx], ...brand };
+            return list;
+          }
+          return [...list, brand];
+        },
+        { revalidate: false }
+      );
+    },
+    [mutateBrands]
+  );
+
+  const removeBrand = useCallback(
+    (brandId) => {
+      const id = brandId?.toString?.() ?? brandId;
+      if (!id) return;
+      mutateBrands(
+        (prev) => (Array.isArray(prev) ? prev.filter((b) => (b._id || b.id)?.toString?.() !== id) : []),
+        { revalidate: false }
+      );
+    },
+    [mutateBrands]
+  );
 
   const value = useMemo(
     () => ({
@@ -134,6 +174,8 @@ export function TaxonomyProvider({ children, initialCategories = [] }) {
       upsertCategory,
       removeCategory,
       refreshBrands,
+      upsertBrand,
+      removeBrand,
     }),
     [
       categories,
@@ -144,6 +186,8 @@ export function TaxonomyProvider({ children, initialCategories = [] }) {
       upsertCategory,
       removeCategory,
       refreshBrands,
+      upsertBrand,
+      removeBrand,
     ]
   );
 

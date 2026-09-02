@@ -97,6 +97,7 @@ export default function EnquiryDetailPage() {
   });
   const currentUser = meData?.user;
   const canDeleteEnquiry = currentUser?.role === 'super_admin';
+  const canAssignEnquiry = currentUser?.role === 'super_admin';
 
   const { data, error, isLoading, mutate } = useSWR(
     enquiryId ? `/api/enquiries/${enquiryId}` : null,
@@ -140,10 +141,10 @@ export default function EnquiryDetailPage() {
         body: JSON.stringify({
           status,
           priority,
-          assignedToUserId: assignedToUserId || null,
           notes,
           phone,
           userType,
+          ...(canAssignEnquiry ? { assignedToUserId: assignedToUserId || null } : {}),
         }),
       });
 
@@ -806,18 +807,24 @@ export default function EnquiryDetailPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Assigned To</label>
-                <select
-                  value={assignedToUserId}
-                  onChange={(e) => setAssignedToUserId(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  <option value="">Unassigned</option>
-                  {assignees.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.name} ({user.role.replace('_', ' ')})
-                    </option>
-                  ))}
-                </select>
+                {canAssignEnquiry ? (
+                  <select
+                    value={assignedToUserId}
+                    onChange={(e) => setAssignedToUserId(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="">Unassigned</option>
+                    {assignees.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} ({user.role.replace('_', ' ')})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="px-4 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm text-gray-800">
+                    {enquiry?.assignedToName || enquiry?.assignedToUserId?.name || 'Unassigned'}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>

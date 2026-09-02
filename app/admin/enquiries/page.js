@@ -61,11 +61,18 @@ export default function AdminEnquiriesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+  const [assignedMine, setAssignedMine] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedCards, setExpandedCards] = useState(new Set()); // For mobile card expansion
 
   // Build URL with filters and pagination
-  const getEnquiriesUrl = (page, search, status, priority) => {
+  const { data: meData } = useSWR('/api/auth/me', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60000,
+  });
+  const myUserId = meData?.user?.id || meData?.user?._id;
+
+  const getEnquiriesUrl = (page, search, status, priority, mine) => {
     const skip = (page - 1) * ITEMS_PER_PAGE;
     let url = `/api/enquiries?limit=${ITEMS_PER_PAGE}&skip=${skip}`;
     if (search) {
@@ -77,12 +84,17 @@ export default function AdminEnquiriesPage() {
     if (priority && priority !== 'all') {
       url += `&priority=${priority}`;
     }
+    if (mine && myUserId) {
+      url += `&assignedToUserId=${encodeURIComponent(myUserId)}`;
+    }
     return url;
   };
 
-  // Use SWR for data fetching
+  const waitingForMe = assignedMine && !myUserId;
   const { data, error, isLoading, mutate } = useSWR(
-    getEnquiriesUrl(currentPage, searchTerm, statusFilter, priorityFilter),
+    waitingForMe
+      ? null
+      : getEnquiriesUrl(currentPage, searchTerm, statusFilter, priorityFilter, assignedMine),
     fetcher,
     {
       revalidateOnFocus: false, // Disable auto-refresh on focus
@@ -243,12 +255,27 @@ export default function AdminEnquiriesPage() {
             <option value="normal">Normal</option>
             <option value="low">Low</option>
           </select>
+          <button
+            type="button"
+            onClick={() => {
+              setAssignedMine((on) => !on);
+              setCurrentPage(1);
+            }}
+            className={`px-4 py-2 border rounded-md text-sm font-medium whitespace-nowrap ${
+              assignedMine
+                ? 'border-primary ring-2 ring-primary bg-white text-gray-900'
+                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
+            aria-pressed={assignedMine}
+          >
+            Assigned to me
+          </button>
         </div>
       </div>
 
       {/* Enquiries List - Desktop Table / Mobile Cards */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        {isLoading ? (
+        {isLoading || waitingForMe ? (
           <div className="p-8 text-center text-gray-600">Loading enquiries...</div>
         ) : error ? (
           <div className="p-8 text-center text-red-600">Error loading enquiries. Please try again.</div>

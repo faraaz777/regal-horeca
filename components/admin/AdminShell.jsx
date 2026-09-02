@@ -22,12 +22,15 @@ import {
   ScrollText,
   Building2,
   LogOut,
+  KeyRound,
   Plus,
   ArrowLeftRight,
   MapPin,
   Map,
   Layers,
   Inbox,
+  Banknote,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { filterNavForRole, isNavItemActive } from '@/lib/admin/navConfig';
 import { adminJson, adminFetch } from '@/lib/client/adminFetch';
@@ -45,6 +48,7 @@ const NAV_ICONS = {
   '/admin/inventory/movements': ArrowLeftRight,
   '/admin/inventory/locations': MapPin,
   '/admin/inventory/locator': Map,
+  '/admin/inventory/product-sheet': FileSpreadsheet,
   '/admin/products': Boxes,
   '/admin/categories': FolderTree,
   '/admin/brands': Tag,
@@ -57,6 +61,7 @@ const NAV_ICONS = {
   '/admin/company-profile': Building2,
   '/admin/sales/collections': Layers,
   '/admin/sales/requests': Inbox,
+  '/admin/sales/my-sales': Banknote,
 };
 
 function userInitials(name = '') {
@@ -99,8 +104,14 @@ export default function AdminShell({ children }) {
     }
   }, [meError, router]);
 
+  useEffect(() => {
+    if (user?.mustChangePassword) {
+      router.replace('/admin/change-password');
+    }
+  }, [user, router]);
+
   const { data: enquiriesData } = useSWR(
-    user ? '/api/enquiries?limit=1&skip=0&status=new' : null,
+    user && !user.mustChangePassword ? '/api/enquiries?limit=1&skip=0&status=new' : null,
     enquiriesFetcher,
     {
       revalidateOnFocus: false,
@@ -153,10 +164,10 @@ export default function AdminShell({ children }) {
     }`;
 
   return (
-    <div className="flex h-screen bg-gray-100 relative overflow-hidden">
+    <div className="flex h-screen bg-gray-100 relative overflow-hidden print:h-auto print:overflow-visible print:bg-white">
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden print:hidden"
           onClick={() => setIsSidebarOpen(false)}
           aria-hidden
         />
@@ -165,7 +176,7 @@ export default function AdminShell({ children }) {
       <button
         type="button"
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="fixed top-4 left-4 z-50 lg:hidden bg-shell-bg text-shell-text p-2 rounded-lg hover:bg-shell-raised transition-colors border border-shell-border"
+        className="fixed top-4 left-4 z-50 lg:hidden bg-shell-bg text-shell-text p-2 rounded-lg hover:bg-shell-raised transition-colors border border-shell-border print:hidden"
         aria-label="Toggle sidebar"
       >
         {isSidebarOpen ? <X size={22} /> : <Menu size={22} />}
@@ -178,7 +189,7 @@ export default function AdminShell({ children }) {
       */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-shell-bg text-shell-text border-r border-shell-border
-          transition-[width,transform] duration-300 ease-in-out
+          transition-[width,transform] duration-300 ease-in-out print:hidden
           ${
             isSidebarOpen
               ? 'translate-x-0 w-64'
@@ -362,6 +373,20 @@ export default function AdminShell({ children }) {
         </nav>
 
         <div className={`pt-2 border-t border-shell-border pb-4 ${expanded ? 'px-3' : 'px-2'}`}>
+          <Link
+            href="/admin/change-password"
+            title="Change password"
+            className={`group flex w-full items-center rounded-lg text-[13px] font-medium text-shell-dim hover:text-shell-text hover:bg-shell-raised transition-colors ${
+              expanded ? 'gap-3 px-3 py-2.5' : 'justify-center px-0 py-2.5'
+            }`}
+          >
+            <KeyRound
+              size={17}
+              strokeWidth={1.75}
+              className="shrink-0 text-shell-gold/70 group-hover:text-shell-gold transition-colors"
+            />
+            {expanded && <span>Change password</span>}
+          </Link>
           <button
             type="button"
             onClick={handleLogout}
@@ -381,7 +406,7 @@ export default function AdminShell({ children }) {
       </aside>
 
       <main
-        className={`flex-1 pt-16 sm:pt-6 lg:pt-8 p-4 sm:p-6 lg:p-8 overflow-y-auto transition-all duration-300 ${
+        className={`flex-1 pt-16 sm:pt-6 lg:pt-8 p-4 sm:p-6 lg:p-8 overflow-y-auto transition-all duration-300 print:ml-0 print:pt-0 print:p-0 print:overflow-visible ${
           isSidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
         }`}
       >

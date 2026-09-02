@@ -37,6 +37,7 @@ export async function GET(request) {
       search: searchParams.get('search') || '',
       refExact: searchParams.get('refExact') || '',
       userId: searchParams.get('userId') || '',
+      soldForUserId: searchParams.get('soldForUserId') || '',
       page: 1,
       limit: 5000,
     };
@@ -58,7 +59,8 @@ export async function GET(request) {
         { header: 'Remark', key: 'remark', width: 24 },
         { header: 'Ref', key: 'ref', width: 16 },
         { header: 'Location', key: 'location', width: 28 },
-        { header: 'User', key: 'user', width: 20 },
+        { header: 'Recorded by', key: 'user', width: 20 },
+        { header: 'Sold for', key: 'soldFor', width: 20 },
         { header: 'Qty', key: 'qty', width: 8 },
       ];
 
@@ -74,6 +76,7 @@ export async function GET(request) {
           ref: row.ref || '',
           location: row.locationDisplayPath || row.locationId?.path || '',
           user: row.performedBy?.name || row.performedBy?.email || '',
+          soldFor: row.soldForName || '',
           qty: row.qty ?? '',
         });
       }

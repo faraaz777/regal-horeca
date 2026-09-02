@@ -106,7 +106,7 @@ export async function PUT(request, { params }) {
  * Deletes a business type
  */
 export async function DELETE(request, { params }) {
-  const auth = await requireAuth(request, { permission: 'business-types:write' });
+  const auth = await requireAuth(request, { roles: ['super_admin'] });
   if (auth.error) return auth.error;
 
   try {

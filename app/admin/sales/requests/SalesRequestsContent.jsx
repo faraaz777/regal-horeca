@@ -139,7 +139,7 @@ export default function SalesRequestsContent() {
             Track submissions, outcomes, and start new requests from past orders.
           </p>
         </div>
-        <Link href="/admin/sales" className="text-sm text-gray-600 hover:underline shrink-0">
+        <Link href="/admin/sales" className="inline-flex items-center min-h-[44px] text-sm text-gray-600 hover:underline shrink-0">
           ← Back to sales floor
         </Link>
       </div>
@@ -161,7 +161,7 @@ export default function SalesRequestsContent() {
         <input
           type="search"
           placeholder="Search request #, customer, product, SKU…"
-          className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm"
+          className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-base sm:text-sm min-h-[48px]"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
         />
@@ -171,7 +171,7 @@ export default function SalesRequestsContent() {
               key={d.value || 'all'}
               type="button"
               onClick={() => setDaysFilter(d.value)}
-              className={`px-3 py-1.5 rounded-full text-xs border whitespace-nowrap ${
+              className={`min-h-[40px] px-4 py-2 rounded-full text-sm border whitespace-nowrap ${
                 days === d.value ? 'bg-black text-white border-black' : 'border-gray-300'
               }`}
             >
@@ -186,7 +186,7 @@ export default function SalesRequestsContent() {
           <Link
             key={s || 'all'}
             href={buildPageUrl({ status: s, days, q: qParam })}
-            className={`px-3 py-1 rounded-full text-xs border ${
+            className={`inline-flex items-center min-h-[40px] px-4 py-2 rounded-full text-sm border ${
               status === s ? 'bg-black text-white border-black' : 'border-gray-300'
             }`}
           >
@@ -216,11 +216,11 @@ export default function SalesRequestsContent() {
                 {group.items.map((r) => {
                   const isExpanded = expandedId === r._id;
                   return (
-                    <li key={r._id} className="px-4 py-3">
+                    <li key={r._id} className="px-4 py-4">
                       <div className="flex items-start justify-between gap-4">
                         <button
                           type="button"
-                          className="min-w-0 text-left flex-1"
+                          className="min-w-0 text-left flex-1 py-1"
                           onClick={() => setExpandedId(isExpanded ? null : r._id)}
                         >
                           <p className="font-medium text-gray-900">{r.requestNumber}</p>
@@ -242,10 +242,18 @@ export default function SalesRequestsContent() {
                               type="button"
                               disabled={cloningId === r._id}
                               onClick={() => handleClone(r._id)}
-                              className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+                              className="text-sm min-h-[40px] px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
                             >
                               {cloningId === r._id ? 'Creating…' : 'New request'}
                             </button>
+                          )}
+                          {r.status === 'fulfilled' && (
+                            <Link
+                              href={`/admin/sales/requests/${r._id}/slip`}
+                              className="text-sm min-h-[40px] px-3 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 inline-flex items-center"
+                            >
+                              Charge sheet
+                            </Link>
                           )}
                         </div>
                       </div>

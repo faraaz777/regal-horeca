@@ -55,7 +55,7 @@ export async function GET(request) {
 
     const categories = await Category.find(query)
       .populate('parent', 'name slug level')
-      .sort({ name: 1 })
+      .sort({ sortOrder: 1, name: 1 })
       .lean();
 
     return NextResponse.json(

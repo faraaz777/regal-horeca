@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import User from '@/lib/server/models/User';
 import { requireAuth } from '@/lib/server/auth/requireAuth';
+import { ENQUIRY_ASSIGNEE_ROLES } from '@/lib/shared/roles';
 
 /** Active staff who can be assigned enquiries */
 export async function GET(request) {
@@ -11,7 +12,7 @@ export async function GET(request) {
   await connectToDatabase();
   const users = await User.find({
     isActive: true,
-    role: { $in: ['super_admin', 'data_entry', 'sales'] },
+    role: { $in: ENQUIRY_ASSIGNEE_ROLES },
   })
     .select('name email role')
     .sort({ name: 1 })

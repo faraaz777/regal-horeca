@@ -106,8 +106,8 @@ export default function SalesCatalogCategoryNav({ selectedSlug, onSelect }) {
 
   if (isLoading && !departments.length) {
     return (
-      <div className="pt-4 border-t border-gray-200">
-        <p className="text-xs text-gray-400">Loading categories…</p>
+      <div className="pt-4 border-t border-black/5">
+        <p className="text-xs text-black/35">Loading categories…</p>
       </div>
     );
   }
@@ -115,16 +115,16 @@ export default function SalesCatalogCategoryNav({ selectedSlug, onSelect }) {
   if (!departments.length) return null;
 
   return (
-    <div className="pt-3 mt-1 border-t border-gray-100">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-[10px] font-bold text-gray-800 uppercase tracking-widest">
+    <div className="pt-4 mt-1 border-t border-black/5">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-[10px] font-semibold text-black/45 uppercase tracking-[0.18em]">
           Browse by category
         </h3>
         {selectedSlug && (
           <button
             type="button"
             onClick={() => selectCategory('')}
-            className="text-[10px] uppercase tracking-wider text-gray-600 hover:text-gray-900 underline"
+            className="text-[10px] uppercase tracking-wider text-black/40 hover:text-rich-black underline"
           >
             All
           </button>
@@ -136,7 +136,7 @@ export default function SalesCatalogCategoryNav({ selectedSlug, onSelect }) {
             <button
               type="button"
               onClick={handleNavBack}
-              className="flex items-center gap-1.5 w-full text-left text-xs font-semibold text-gray-500 hover:text-gray-800 py-2 px-1 border-b border-gray-100"
+              className="flex items-center gap-1.5 w-full text-left text-sm lg:text-xs font-medium text-black/45 hover:text-rich-black min-h-[44px] lg:min-h-0 py-3 lg:py-2 border-b border-black/5"
             >
               <ChevronLeftIcon className="w-3.5 h-3.5 shrink-0" />
               Back to {navStack[navStack.length - 2]?.name || 'Categories'}
@@ -146,10 +146,10 @@ export default function SalesCatalogCategoryNav({ selectedSlug, onSelect }) {
               <button
                 type="button"
                 onClick={() => selectCategory(currentMenu.slug)}
-                className={`w-full text-left py-2 px-1 text-xs font-medium border-b border-gray-100 ${
+                className={`w-full text-left min-h-[44px] lg:min-h-0 py-3 lg:py-2 text-sm lg:text-xs font-medium border-b border-black/5 ${
                   selectedSlug === currentMenu.slug
-                    ? 'text-black bg-gray-50'
-                    : 'text-gray-700 hover:bg-gray-50'
+                    ? 'text-rich-black'
+                    : 'text-black/60 hover:text-rich-black'
                 }`}
               >
                 All in {currentMenu.name}
@@ -164,30 +164,30 @@ export default function SalesCatalogCategoryNav({ selectedSlug, onSelect }) {
 
                 if (hasChildren) {
                   return (
-                    <div key={id} className="border-b border-gray-50">
+                    <div key={id} className="border-b border-black/5">
                       <button
                         type="button"
                         onClick={() => toggleAccordion(id)}
-                        className="flex items-center justify-between w-full py-2 px-1 text-left hover:bg-gray-50"
+                        className="flex items-center justify-between w-full min-h-[44px] lg:min-h-0 py-3 lg:py-2 text-left hover:bg-warm-white/80"
                       >
-                        <span className="text-xs font-medium text-gray-800 uppercase tracking-wide truncate pr-2">
+                        <span className="text-xs font-medium text-rich-black uppercase tracking-wide truncate pr-2">
                           {item.name}
                         </span>
                         <ChevronDownIcon
-                          className={`w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform ${
+                          className={`w-3.5 h-3.5 text-black/30 shrink-0 transition-transform ${
                             openAccordions[id] ? 'rotate-180' : ''
                           }`}
                         />
                       </button>
                       {openAccordions[id] && (
-                        <div className="bg-gray-50 py-1 pl-2 space-y-0.5">
+                        <div className="bg-warm-white/60 py-1 pl-2 space-y-0.5 mb-2">
                           <button
                             type="button"
                             onClick={() => selectCategory(item.slug)}
-                            className={`block w-full text-left py-1.5 px-2 text-xs border-l-2 ${
+                            className={`block w-full text-left py-1.5 px-2 text-xs border-l ${
                               isSelected
-                                ? 'text-black border-black font-medium'
-                                : 'text-gray-600 border-transparent hover:text-gray-900 hover:border-gray-300'
+                                ? 'text-rich-black border-accent font-medium'
+                                : 'text-black/55 border-transparent hover:text-rich-black hover:border-black/20'
                             }`}
                           >
                             All {item.name}
@@ -197,10 +197,10 @@ export default function SalesCatalogCategoryNav({ selectedSlug, onSelect }) {
                               key={itemId(sub)}
                               type="button"
                               onClick={() => selectCategory(sub.slug)}
-                              className={`block w-full text-left py-1.5 px-2 text-xs border-l-2 ${
+                              className={`block w-full text-left min-h-[40px] py-2.5 px-2 text-sm border-l ${
                                 selectedSlug === sub.slug
-                                  ? 'text-black border-black font-medium'
-                                  : 'text-gray-600 border-transparent hover:text-gray-900 hover:border-gray-300'
+                                  ? 'text-rich-black border-accent font-medium'
+                                  : 'text-black/55 border-transparent hover:text-rich-black hover:border-black/20'
                               }`}
                             >
                               {sub.name}
@@ -217,8 +217,8 @@ export default function SalesCatalogCategoryNav({ selectedSlug, onSelect }) {
                     key={id}
                     type="button"
                     onClick={() => selectCategory(item.slug)}
-                    className={`flex items-center w-full py-2 px-1 text-left text-xs font-medium border-b border-gray-50 hover:bg-gray-50 ${
-                      isSelected ? 'text-black bg-gray-50' : 'text-gray-800'
+                    className={`flex items-center w-full min-h-[44px] lg:min-h-0 py-3 lg:py-2 text-left text-sm lg:text-xs font-medium border-b border-black/5 hover:bg-warm-white/80 ${
+                      isSelected ? 'text-rich-black' : 'text-black/70'
                     }`}
                   >
                     {item.name}
@@ -228,7 +228,7 @@ export default function SalesCatalogCategoryNav({ selectedSlug, onSelect }) {
             </div>
           </>
         ) : (
-          <div className="py-1">
+          <div className="py-0.5">
             {departments.map((dept) => {
               const deptSlug = dept.slug;
               const id = itemId(dept);
@@ -241,13 +241,15 @@ export default function SalesCatalogCategoryNav({ selectedSlug, onSelect }) {
                     key={id}
                     type="button"
                     onClick={() => handleNavForward(dept)}
-                    className="flex items-center justify-between w-full py-2 px-1 text-left hover:bg-gray-50 border-b border-gray-50"
+                    className="flex items-center justify-between w-full min-h-[44px] lg:min-h-0 py-3 lg:py-2 text-left hover:bg-warm-white/80 border-b border-black/5"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <CategoryIcon categorySlug={deptSlug} className="w-4 h-4 text-gray-500 shrink-0" />
-                      <span className="text-xs font-medium text-gray-800 uppercase truncate">{dept.name}</span>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <CategoryIcon categorySlug={deptSlug} className="w-4 h-4 text-black/40 shrink-0" />
+                      <span className="text-xs font-medium text-rich-black uppercase tracking-wide truncate">
+                        {dept.name}
+                      </span>
                     </div>
-                    <ChevronRightIcon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                    <ChevronRightIcon className="w-3.5 h-3.5 text-black/30 shrink-0" />
                   </button>
                 );
               }
@@ -257,14 +259,14 @@ export default function SalesCatalogCategoryNav({ selectedSlug, onSelect }) {
                   key={id}
                   type="button"
                   onClick={() => selectCategory(deptSlug)}
-                  className={`flex items-center gap-2 w-full py-2 px-1 text-left border-b border-gray-50 hover:bg-gray-50 ${
-                    isSelected ? 'bg-gray-50' : ''
+                  className={`flex items-center gap-2.5 w-full min-h-[44px] lg:min-h-0 py-3 lg:py-2 text-left border-b border-black/5 hover:bg-warm-white/80 ${
+                    isSelected ? 'bg-warm-white/80' : ''
                   }`}
                 >
-                  <CategoryIcon categorySlug={deptSlug} className="w-4 h-4 text-gray-500 shrink-0" />
+                  <CategoryIcon categorySlug={deptSlug} className="w-4 h-4 text-black/40 shrink-0" />
                   <span
-                    className={`text-xs font-medium truncate ${
-                      isSelected ? 'text-black' : 'text-gray-800'
+                    className={`text-xs font-medium uppercase tracking-wide truncate ${
+                      isSelected ? 'text-rich-black' : 'text-black/70'
                     }`}
                   >
                     {dept.name}

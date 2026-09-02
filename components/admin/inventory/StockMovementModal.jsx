@@ -18,6 +18,7 @@ import { canEditInventoryRules } from '@/lib/shared/permissions';
 import ChromeMovementTabs from './movement/ChromeMovementTabs';
 import ReasonChipRow from './movement/ReasonChipRow';
 import LocationQtyList from './movement/LocationQtyList';
+import SoldForPicker from './movement/SoldForPicker';
 import NewRackAddPanel from './movement/NewRackAddPanel'; // rack search under New rack
 import TransferTicketPanel from './movement/TransferTicketPanel';
 import RulesPanel, { buildRulesFormFromRule } from './movement/RulesPanel';
@@ -33,6 +34,7 @@ const EMPTY_FORM = {
   reason: 'purchase',
   statusBucket: 'sellable',
   remark: '',
+  soldForUserId: '',
   locationId: '',
   fromLocationId: '',
   toLocationId: '',
@@ -185,6 +187,8 @@ export default function StockMovementModal({
     () => Object.values(addQuantities).reduce((sum, qty) => sum + (Number(qty) || 0), 0),
     [addQuantities]
   );
+  /** Only a Sold removal is a sale, so only it needs someone to credit. */
+  const isSoldMovement = tab === 'minus' && form.reason === 'sold';
   const minusExceedsStock = useMemo(() => {
     return sellableLocationRows.some((row) => {
       const locId = String(row.locationId);
@@ -421,6 +425,11 @@ export default function StockMovementModal({
         return;
       }
 
+      if (isSoldMovement && !form.soldForUserId) {
+        toast.error('Choose whose sale this is');
+        return;
+      }
+
       setSubmitting(true);
       try {
         await adminJson('/api/admin/inventory/movement', {
@@ -430,6 +439,7 @@ export default function StockMovementModal({
             action: 'minus',
             reason: form.reason,
             remark: form.remark,
+            soldForUserId: isSoldMovement ? form.soldForUserId : null,
             lines,
           }),
         });
@@ -712,6 +722,13 @@ export default function StockMovementModal({
                   </div>
                 )}
 
+                {isSoldMovement && (
+                  <SoldForPicker
+                    value={form.soldForUserId}
+                    onChange={(userId) => update('soldForUserId', userId)}
+                  />
+                )}
+
                 <details className="group">
                   <summary className="cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-800 list-none">
                     + Optional note
@@ -868,7 +885,8 @@ export default function StockMovementModal({
                   (tab === 'minus' &&
                     (sellableLocationRows.length === 0 ||
                       totalMinusQty <= 0 ||
-                      minusExceedsStock)) ||
+                      minusExceedsStock ||
+                      (isSoldMovement && !form.soldForUserId))) ||
                   (tab === 'add' && totalAddQty <= 0) ||
                   (tab === 'transfer' &&
                     (sellableLocationRows.length === 0 ||

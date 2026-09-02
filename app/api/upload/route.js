@@ -3,7 +3,10 @@ import { uploadToR2 } from '@/lib/utils/r2Upload';
 import { optimizeImage } from '@/lib/utils/imageOptimizer';
 import { requireAuth } from '@/lib/server/auth/requireAuth';
 import { hasPermission } from '@/lib/shared/permissions';
-import { SALES_COLLECTION_THUMBNAIL_FOLDER } from '@/lib/shared/salesConstants';
+import {
+  SALES_COLLECTION_SCENE_FOLDER,
+  SALES_COLLECTION_THUMBNAIL_FOLDER,
+} from '@/lib/shared/salesConstants';
 
 const VALID_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
 const VALID_DOCUMENT_TYPES = ['application/pdf'];
@@ -17,8 +20,12 @@ async function assertUploadAccess(request, folder) {
     return { session, imagesOnly: false };
   }
 
+  const salesImageFolders = [
+    SALES_COLLECTION_THUMBNAIL_FOLDER,
+    SALES_COLLECTION_SCENE_FOLDER,
+  ];
   if (
-    folder === SALES_COLLECTION_THUMBNAIL_FOLDER &&
+    salesImageFolders.includes(folder) &&
     hasPermission(session.role, 'sales:collections:write')
   ) {
     return { session, imagesOnly: true };

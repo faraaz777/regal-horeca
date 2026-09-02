@@ -13,6 +13,11 @@ import Enquiry from '@/lib/models/Enquiry';
 import Customer from '@/lib/models/Customer';
 import EnquiryItem from '@/lib/models/EnquiryItem';
 import { normalizePhone } from '@/lib/utils/phone';
+import {
+  isRealEmail,
+  normalizeCustomerIdentity,
+  normalizeEmail,
+} from '@/lib/shared/customerIdentity';
 import { requireAuth } from '@/lib/server/auth/requireAuth';
 import { buildEnquiryListQuery } from '@/lib/server/enquiries/enquiryAccess';
 import mongoose from 'mongoose';
@@ -49,13 +54,15 @@ export async function POST(request) {
       );
     }
 
-    // Normalize phone number for consistent matching
     const normalizedPhone = normalizePhone(phone);
-
-    // For light capture flow, name and email are optional
-    // If not provided, use defaults
-    const enquiryName = name || 'Guest User';
-    const enquiryEmail = email || `${normalizedPhone}@temp.regal-horeca.com`;
+    const identity = normalizeCustomerIdentity({
+      name,
+      phone: normalizedPhone,
+      email,
+      companyName: company,
+    });
+    const enquiryName = identity.name;
+    const enquiryEmail = identity.email;
 
     // Handle backward compatibility: if category (singular) is provided, convert to categories array
     const categoriesArray = categories || (category ? [category] : []);
@@ -69,16 +76,13 @@ export async function POST(request) {
           quantity: p.quantity || 1,
         }));
 
-    // Find or create customer - ALWAYS link by phone if phone exists
-    // This ensures all enquiries from the same phone number are linked
+    /**
+     * Link only when a real phone or email exists.
+     * Same phone always maps to the same Customer.
+     */
     let customer = null;
-    if (normalizedPhone) {
-      customer = await Customer.findOrCreate({
-        name: enquiryName,
-        email: enquiryEmail,
-        phone: normalizedPhone,
-        companyName: company || '',
-      });
+    if (identity.hasIdentity) {
+      customer = await Customer.findOrCreate(identity);
     }
 
     // Determine enquiry type
@@ -93,9 +97,9 @@ export async function POST(request) {
     // Create new enquiry with normalized phone
     const enquiry = new Enquiry({
       customerId: customer?._id || null,
-      name: enquiryName, // Keep for backward compatibility
-      email: enquiryEmail,
-      phone: normalizedPhone, // Store normalized phone for consistency
+      name: enquiryName,
+      ...(isRealEmail(enquiryEmail) ? { email: normalizeEmail(enquiryEmail) } : {}),
+      phone: normalizedPhone,
       company: company || '',
       state: state || '',
       source: source,

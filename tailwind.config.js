@@ -50,6 +50,9 @@ module.exports = {
         serif: ['Playfair Display', 'serif'],
         display: ['Cormorant Garamond', 'Georgia', 'serif'],
       },
+      screens: {
+        '3xl': '1920px',
+      },
     },
   },
   plugins: [],

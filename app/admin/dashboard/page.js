@@ -1,24 +1,41 @@
-/**
- * Admin Dashboard Page
- * 
- * Enhanced dashboard with optimized data fetching, recent products, quick actions, and charts
- */
-
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import useSWR from 'swr';
-import { useAppContext } from '@/context/AppContext';
-import { PlusIcon } from '@/components/Icons';
-
 import { adminJson } from '@/lib/client/adminFetch';
+import { hasPermission } from '@/lib/shared/permissions';
 
-const fetcher = async (url) => adminJson(url);
+const fetcher = (url) => adminJson(url);
+
+function formatMoney(n) {
+  return `₹${Number(n || 0).toLocaleString('en-IN', {
+    maximumFractionDigits: 0,
+  })}`;
+}
+
+function StatCard({ name, value, sub, href }) {
+  const inner = (
+    <>
+      <h3 className="text-sm font-medium text-gray-500">{name}</h3>
+      <p className="mt-2 text-3xl font-bold tabular-nums text-gray-900">{value}</p>
+      {sub ? <p className="text-xs text-gray-500 mt-1">{sub}</p> : null}
+    </>
+  );
+  const className =
+    'block p-5 bg-white rounded-lg border border-gray-200 hover:border-gray-300';
+  if (!href) return <div className={className}>{inner}</div>;
+  return (
+    <Link href={href} className={className}>
+      {inner}
+    </Link>
+  );
+}
 
 export default function AdminDashboardPage() {
-  // Single unified API call instead of 5-6 separate calls
+  const { data: meData } = useSWR('/api/auth/me', fetcher, { revalidateOnFocus: false });
+  const role = meData?.user?.role;
+
   const { data: statsResponse, error: statsError, isLoading: statsLoading } = useSWR(
     '/api/admin/stats',
     fetcher,
@@ -28,156 +45,162 @@ export default function AdminDashboardPage() {
   const stats = statsResponse?.stats || {};
   const recentProducts = statsResponse?.recentProducts || [];
   const statusDistribution = stats.statusDistribution || {};
+  const loading = statsLoading ? '…' : null;
 
-  // Fix hydration error by only setting time on client side
-  const [currentTime, setCurrentTime] = useState('');
-  
-  useEffect(() => {
-    setCurrentTime(new Date().toLocaleTimeString());
-  }, []);
+  const canInventory = hasPermission(role, 'inventory:read');
+  const canRequests = hasPermission(role, 'inventory:requests:approve');
+  const canSales = hasPermission(role, 'sales:requests:read');
+  const canEnquiries = hasPermission(role, 'enquiries:read');
+  const canCatalog = hasPermission(role, 'products:write') || role === 'super_admin';
 
-  const statCards = [
-    { name: 'Total Products', value: stats.totalProducts || 0, link: '/admin/products', color: 'blue' },
-    { name: 'Total Categories', value: stats.totalCategories || 0, link: '/admin/categories', color: 'green' },
-    { name: 'Business Types', value: stats.totalBusinessTypes || 0, link: '/admin/business-types', color: 'purple' },
-    { name: 'Featured Products', value: stats.featuredProducts || 0, link: '/admin/products', color: 'yellow' },
-  ];
-
-  const quickActions = [
-    { name: 'Add Product', link: '/admin/products/add', icon: PlusIcon },
-    { name: 'Add Category', link: '/admin/categories', icon: PlusIcon },
-    { name: 'Add Business Type', link: '/admin/business-types', icon: PlusIcon },
-  ];
+  const opsCards = [];
+  if (canInventory) {
+    opsCards.push({
+      name: 'Sellable stock',
+      value: loading ?? Number(stats.sellableQty || 0).toLocaleString('en-IN'),
+      sub: loading ? '' : `${formatMoney(stats.sellableValue)} at cost`,
+      href: '/admin/inventory/reports',
+    });
+  }
+  if (canInventory || canSales) {
+    opsCards.push({
+      name: 'Sold today',
+      value: loading ?? `${Number(stats.soldTodayQty || 0).toLocaleString('en-IN')} pcs`,
+      sub: loading
+        ? ''
+        : `This month ${Number(stats.soldMonthQty || 0).toLocaleString('en-IN')} pcs`,
+      href: canSales ? '/admin/sales/my-sales' : '/admin/inventory/reports',
+    });
+  }
+  if (canRequests || canSales) {
+    opsCards.push({
+      name: canRequests ? 'Requests waiting' : 'My open requests',
+      value: loading ?? stats.openRequests ?? 0,
+      href: canRequests ? '/admin/inventory/requests' : '/admin/sales/requests',
+    });
+  }
+  if (canEnquiries) {
+    opsCards.push({
+      name: 'New enquiries',
+      value: loading ?? stats.newEnquiries ?? 0,
+      href: '/admin/enquiries',
+    });
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+      <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Dashboard</h1>
-        {currentTime && (
-          <div className="text-xs sm:text-sm text-gray-500">
-            Last updated: {currentTime}
-          </div>
-        )}
+        <p className="text-sm text-gray-500 mt-1">
+          Today at a glance. Each card opens the existing page behind the number.
+        </p>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards.map((stat) => (
-          <Link 
-            href={stat.link} 
-            key={stat.name} 
-            className="block p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow"
-          >
-            <h3 className="text-lg font-medium text-gray-500">{stat.name}</h3>
-            <p className="mt-2 text-4xl font-bold text-primary">
-              {statsLoading ? '...' : stat.value}
-            </p>
-          </Link>
-        ))}
-      </div>
+      {statsError ? (
+        <p className="text-sm text-red-600">Could not load dashboard figures.</p>
+      ) : null}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Products */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-800">Recent Products</h2>
-            <Link href="/admin/products" className="text-sm text-primary hover:underline">
-              View All
-            </Link>
-          </div>
-          {statsLoading ? (
-            <div className="text-center py-8 text-gray-500">
-              <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-              <p className="mt-2">Loading...</p>
+      {opsCards.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {opsCards.map((card) => (
+            <StatCard key={card.name} {...card} />
+          ))}
+        </div>
+      )}
+
+      {canCatalog && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            name="Products"
+            value={loading ?? stats.totalProducts ?? 0}
+            href="/admin/products"
+          />
+          <StatCard
+            name="Categories"
+            value={loading ?? stats.totalCategories ?? 0}
+            href="/admin/categories"
+          />
+          <StatCard
+            name="Business types"
+            value={loading ?? stats.totalBusinessTypes ?? 0}
+            href="/admin/business-types"
+          />
+          <StatCard
+            name="Featured"
+            value={loading ?? stats.featuredProducts ?? 0}
+            href="/admin/products"
+          />
+        </div>
+      )}
+
+      {canCatalog && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-gray-800">Recent products</h2>
+              <Link href="/admin/products" className="text-sm text-gray-600 hover:underline">
+                View all
+              </Link>
             </div>
-          ) : recentProducts && recentProducts.length > 0 ? (
-            <div className="space-y-3">
-              {recentProducts.map((product) => (
-                <Link
-                  key={product._id || product.id}
-                  href={`/admin/products`}
-                  className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors"
-                >
-                  <div className="relative h-12 w-12 flex-shrink-0">
-                    <Image
-                      src={product.heroImage}
-                      alt={product.title}
-                      fill
-                      sizes="48px"
-                      unoptimized
-                      className="rounded-md object-cover"
-                      loading="lazy"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
+            {statsLoading ? (
+              <p className="text-sm text-gray-500">Loading…</p>
+            ) : recentProducts.length === 0 ? (
+              <p className="text-sm text-gray-500">No products yet</p>
+            ) : (
+              <div className="space-y-2">
+                {recentProducts.map((product) => (
+                  <Link
+                    key={product._id || product.id}
+                    href="/admin/products"
+                    className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg"
+                  >
+                    <div className="relative h-10 w-10 flex-shrink-0">
+                      {product.heroImage ? (
+                        <Image
+                          src={product.heroImage}
+                          alt={product.title}
+                          fill
+                          sizes="40px"
+                          unoptimized
+                          className="rounded-md object-cover"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded-md bg-gray-100" />
+                      )}
+                    </div>
+                    <p className="text-sm font-medium text-gray-900 truncate flex-1">
                       {product.title}
                     </p>
-                    <p className="text-xs text-gray-500">
-                      {product.createdAt ? new Date(product.createdAt).toLocaleDateString() : 'N/A'}
-                    </p>
-                  </div>
-                  <span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
-                    product.status === 'In Stock' 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {product.status}
-                  </span>
-                </Link>
-              ))}
+                    <span className="text-xs text-gray-500">{product.status}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {(stats.totalProducts || 0) > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 p-5">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Catalog status</h2>
+              <div className="space-y-3">
+                {Object.entries(statusDistribution).map(([status, count]) => {
+                  const total = stats.totalProducts || 0;
+                  const percentage = total > 0 ? (count / total) * 100 : 0;
+                  return (
+                    <div key={status} className="flex items-center gap-4">
+                      <div className="w-24 text-sm text-gray-600">{status}</div>
+                      <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="h-full bg-gray-700"
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                      <div className="w-10 text-sm tabular-nums text-gray-700 text-right">{count}</div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">No products yet</div>
           )}
-        </div>
-
-        {/* Quick Actions */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Quick Actions</h2>
-          <div className="space-y-2">
-            {quickActions.map((action) => (
-              <Link
-                key={action.name}
-                href={action.link}
-                className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors"
-              >
-                <action.icon className="w-5 h-5 text-primary" />
-                <span className="text-sm font-medium text-gray-700">{action.name}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Status Distribution Chart (Simple) */}
-      {(stats.totalProducts || 0) > 0 && (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Product Status Distribution</h2>
-          <div className="space-y-3">
-            {Object.entries(statusDistribution).map(([status, count]) => {
-              const total = stats.totalProducts || 0;
-              const percentage = total > 0 ? (count / total) * 100 : 0;
-              return (
-                <div key={status} className="flex items-center gap-4">
-                  <div className="w-24 text-sm text-gray-600">{status}</div>
-                  <div className="flex-1 bg-gray-200 rounded-full h-6 relative overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${
-                        status === 'In Stock' ? 'bg-green-500' :
-                        status === 'Out of Stock' ? 'bg-red-500' :
-                        'bg-yellow-500'
-                      }`}
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
-                  <div className="w-12 text-sm font-medium text-gray-700 text-right">
-                    {count}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </div>
       )}
     </div>

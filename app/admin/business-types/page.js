@@ -2,11 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import useSWR from 'swr';
 import { PlusIcon, EditIcon, TrashIcon } from '@/components/Icons';
 import { showToast } from '@/lib/utils/toast';
 import { apiClient, ApiError } from '@/lib/utils/apiClient';
+import { canDeleteTaxonomy } from '@/lib/shared/permissions';
+import { adminJson } from '@/lib/client/adminFetch';
 
 export default function AdminBusinessTypesPage() {
+  const { data: meData } = useSWR('/api/auth/me', (url) => adminJson(url), {
+    revalidateOnFocus: false,
+  });
+  const canDelete = canDeleteTaxonomy(meData?.user?.role);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBusinessType, setEditingBusinessType] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -49,6 +56,11 @@ export default function AdminBusinessTypesPage() {
   };
 
   const handleDeleteBusinessType = async (id) => {
+    if (!canDelete) {
+      showToast.error('Only Super Admin can delete business types.');
+      return;
+    }
+
     if (!window.confirm('Are you sure you want to delete this business type?')) {
       return;
     }
@@ -168,6 +180,7 @@ export default function AdminBusinessTypesPage() {
                     >
                       <EditIcon />
                     </button>
+                    {canDelete && (
                     <button
                       onClick={() => handleDeleteBusinessType(bt._id || bt.id)}
                       className="text-red-600 hover:text-red-900"
@@ -176,6 +189,7 @@ export default function AdminBusinessTypesPage() {
                     >
                       <TrashIcon />
                     </button>
+                    )}
                   </td>
                 </tr>
               ))}

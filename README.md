@@ -42,33 +42,7 @@ A modern, production-ready Next.js application for managing and displaying a HoR
 3. **Set up environment variables**
    
    Create a `.env.local` file in the root directory:
-   ```env
-   # MongoDB Configuration
-   MONGODB_URI=mongodb://localhost:27017/regal-horeca
-   # Or use MongoDB Atlas:
-   # MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/regal-horeca
 
-   # Cloudflare R2 Configuration
-   R2_ACCOUNT_ID=your-r2-account-id
-   R2_ACCESS_KEY_ID=your-r2-access-key-id
-   R2_SECRET_ACCESS_KEY=your-r2-secret-access-key
-   R2_BUCKET_NAME=your-bucket-name
-   R2_PUBLIC_URL=https://your-bucket-name.r2.cloudflarestorage.com
-   # Or use custom domain:
-   # R2_PUBLIC_URL=https://cdn.yourdomain.com
-
-   # Admin Authentication
-   ADMIN_EMAIL=admin@regal.com
-   ADMIN_PASSWORD=Admin@123456
-   JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-
-   # Application URL
-   NEXT_PUBLIC_APP_URL=http://localhost:3000
-
-   # WhatsApp Business Number (with country code, no + sign)
-   # Example: 917893960311 for India (91 is country code + 7893960311)
-   NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER=917893960311
-   ```
 
 4. **Run the development server**
    ```bash

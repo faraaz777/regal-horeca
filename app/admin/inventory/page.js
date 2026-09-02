@@ -22,7 +22,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
-import { canWriteInventory, canWriteProducts } from '@/lib/shared/permissions';
+import { canWriteInventory } from '@/lib/shared/permissions';
 import dynamic from 'next/dynamic';
 import { LOCATION_PATH_SEP } from '@/lib/shared/inventoryConstants';
 import MiniBarcode from '@/components/admin/inventory/MiniBarcode';
@@ -458,7 +458,7 @@ export default function AdminInventoryPage() {
   const { data: meData } = useSWR('/api/auth/me', fetcher, { revalidateOnFocus: false });
   const role = meData?.user?.role;
   const canAdjust = canWriteInventory(role);
-  const canAddToInventory = canWriteInventory(role) || canWriteProducts(role);
+  const canAddToInventory = canWriteInventory(role);
 
   const [search, setSearch] = useState(initialSearch);
   const debouncedSearch = useDebounce(search.trim(), 300);
@@ -657,6 +657,12 @@ export default function AdminInventoryPage() {
             >
               Reports
             </Link>
+            <Link
+              href="/admin/inventory/product-sheet"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-gray-800 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Stock sheet
+            </Link>
             {canAddToInventory && (
               <Link
                 href="/admin/inventory/add"
@@ -772,6 +778,13 @@ export default function AdminInventoryPage() {
                       <option value="HAS_DEAD_STOCK">Dead stock</option>
                     </select>
                   </div>
+                  <Link
+                    href="/admin/inventory/product-sheet"
+                    onClick={() => setFiltersOpen(false)}
+                    className="block w-full text-center px-3 py-2 text-sm font-semibold text-gray-800 bg-white border border-gray-200 rounded-lg"
+                  >
+                    Stock sheet
+                  </Link>
                   <Link
                     href="/admin/inventory/reports"
                     onClick={() => setFiltersOpen(false)}

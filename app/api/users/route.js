@@ -1,28 +1,39 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
-import User, { USER_ROLES } from '@/lib/server/models/User';
+import User from '@/lib/server/models/User';
 import { requireAuth } from '@/lib/server/auth/requireAuth';
-import { hashPassword } from '@/lib/server/auth/password';
+import { hashPassword, generateTempPassword } from '@/lib/server/auth/password';
 import { writeAuditLog } from '@/lib/server/audit/writeAuditLog';
+import { createUserSchema, usersListQuerySchema, formatZodError } from '@/lib/server/users/schemas';
+import { sanitizeUser } from '@/lib/server/users/userService';
 
-function sanitizeUser(user) {
-  return {
-    id: String(user._id),
-    email: user.email,
-    name: user.name,
-    role: user.role,
-    isActive: user.isActive,
-    lastLoginAt: user.lastLoginAt,
-    createdAt: user.createdAt,
-  };
-}
-
+/**
+ * GET /api/users
+ *
+ * Lists staff accounts. Default is active only so former staff do not
+ * clutter the team list.
+ *
+ * Permissions: super_admin
+ */
 export async function GET(request) {
   const auth = await requireAuth(request, { roles: ['super_admin'] });
   if (auth.error) return auth.error;
 
   await connectToDatabase();
-  const users = await User.find({}).sort({ createdAt: -1 }).lean();
+  const { searchParams } = new URL(request.url);
+  const parsed = usersListQuerySchema.safeParse({
+    status: searchParams.get('status') || 'active',
+  });
+  if (!parsed.success) {
+    return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
+  }
+
+  const query =
+    parsed.data.status === 'all'
+      ? {}
+      : { isActive: parsed.data.status === 'active' };
+
+  const users = await User.find(query).sort({ createdAt: -1 }).limit(100).lean();
 
   return NextResponse.json({
     success: true,
@@ -30,6 +41,14 @@ export async function GET(request) {
   });
 }
 
+/**
+ * POST /api/users
+ *
+ * Creates a staff account with a one-time temp password. The plaintext
+ * is returned once so the admin can share it; it is never stored.
+ *
+ * Permissions: super_admin
+ */
 export async function POST(request) {
   const auth = await requireAuth(request, { roles: ['super_admin'] });
   if (auth.error) return auth.error;
@@ -37,31 +56,28 @@ export async function POST(request) {
   try {
     await connectToDatabase();
     const body = await request.json();
-    const email = String(body?.email || '').trim().toLowerCase();
-    const name = String(body?.name || '').trim();
-    const password = body?.password;
-    const role = body?.role || 'viewer';
-
-    if (!email || !name || !password) {
-      return NextResponse.json({ error: 'Email, name, and password are required' }, { status: 400 });
+    const parsed = createUserSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
 
-    if (!USER_ROLES.includes(role)) {
-      return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
-    }
+    const { email, name, role } = parsed.data;
+    const normalizedEmail = email.toLowerCase();
 
-    const existing = await User.findOne({ email }).lean();
+    const existing = await User.findOne({ email: normalizedEmail }).lean();
     if (existing) {
       return NextResponse.json({ error: 'Email already in use' }, { status: 409 });
     }
 
-    const passwordHash = await hashPassword(password);
+    const temporaryPassword = generateTempPassword();
+    const passwordHash = await hashPassword(temporaryPassword);
     const user = await User.create({
-      email,
+      email: normalizedEmail,
       name,
       passwordHash,
       role,
       isActive: true,
+      mustChangePassword: true,
       createdBy: auth.session.userId,
     });
 
@@ -70,11 +86,14 @@ export async function POST(request) {
       action: 'user.created',
       entityType: 'User',
       entityId: user._id,
-      after: { email, role, name },
+      after: { email: normalizedEmail, role, name },
       request,
     });
 
-    return NextResponse.json({ success: true, user: sanitizeUser(user) }, { status: 201 });
+    return NextResponse.json(
+      { success: true, user: sanitizeUser(user), temporaryPassword },
+      { status: 201 }
+    );
   } catch (error) {
     console.error('Create user error:', error);
     return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });

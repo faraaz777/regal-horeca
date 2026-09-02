@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
  * GET /api/admin/inventory/ledger
  *
  * Paginated stock movement ledger (append-only).
- * Permissions: super_admin, inventory_manager, inventory_supervisor
+ * Permissions: super_admin, inventory_manager
  */
 export async function GET(request) {
   const auth = await requireAuth(request);
@@ -34,6 +34,7 @@ export async function GET(request) {
       search: searchParams.get('search') || '',
       refExact: searchParams.get('refExact') || '',
       userId: searchParams.get('userId') || '',
+      soldForUserId: searchParams.get('soldForUserId') || '',
       page,
       limit,
     });

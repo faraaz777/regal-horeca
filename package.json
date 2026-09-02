@@ -15,7 +15,28 @@
     "migrate:inventory-buckets:dry": "node scripts/migrateInventoryStatusBuckets.mjs --dry-run",
     "job:dead-stock": "node scripts/runDeadStockAutomation.mjs",
     "job:dead-stock:dry": "node scripts/runDeadStockAutomation.mjs --dry-run",
+<<<<<<< Updated upstream
     "seed:super-admin": "node scripts/seed-super-admin.mjs"
+=======
+    "seed:super-admin": "node scripts/seed-super-admin.mjs",
+    "test:ai-dto": "node scripts/testPublicAiProductDto.mjs",
+    "test:ai-thread": "node scripts/testAiThreadPersistence.mjs",
+    "test:ai-upload": "node scripts/testAiGuestImage.mjs",
+    "audit:ai-products": "node scripts/auditAiProductCompleteness.mjs --limit=50",
+    "remove:ocean-inventory": "node scripts/removeOceanFromInventory.mjs",
+    "remove:ocean-inventory:dry": "node scripts/removeOceanFromInventory.mjs --dry-run",
+    "remove:a1-inventory": "node scripts/removeOceanFromInventory.mjs --brand=A1",
+    "remove:a1-inventory:dry": "node scripts/removeOceanFromInventory.mjs --dry-run --brand=A1",
+    "remove:enrich-inventory": "node scripts/removeOceanFromInventory.mjs --brand=Enrich",
+    "remove:enrich-inventory:dry": "node scripts/removeOceanFromInventory.mjs --dry-run --brand=Enrich",
+    "remove:mazda-inventory": "node scripts/removeOceanFromInventory.mjs --brand=Mazda",
+    "remove:mazda-inventory:dry": "node scripts/removeOceanFromInventory.mjs --dry-run --brand=Mazda",
+    "remove:superware-inventory": "node scripts/removeOceanFromInventory.mjs --brand=Superware",
+    "remove:superware-inventory:dry": "node scripts/removeOceanFromInventory.mjs --dry-run --brand=Superware"
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.540.0",

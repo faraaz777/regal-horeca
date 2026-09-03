@@ -25,6 +25,7 @@ yarn-error.log*
 # Local diagnostic dumps from inventory scripts
 scripts/_sold-for-backfill-*.json
 scripts/_lost-reserved-stock-*.json
+scripts/mongo-dumps/
 
 # Local env files
 .env*.local

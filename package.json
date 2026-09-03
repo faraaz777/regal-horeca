@@ -16,6 +16,7 @@
     "job:dead-stock": "node scripts/runDeadStockAutomation.mjs",
     "job:dead-stock:dry": "node scripts/runDeadStockAutomation.mjs --dry-run",
     "seed:super-admin": "node scripts/seed-super-admin.mjs",
+    "dump:mongo": "node scripts/dumpMongoCollections.mjs",
     "remove:ocean-inventory": "node scripts/removeOceanFromInventory.mjs",
     "remove:ocean-inventory:dry": "node scripts/removeOceanFromInventory.mjs --dry-run",
     "remove:a1-inventory": "node scripts/removeOceanFromInventory.mjs --brand=A1",

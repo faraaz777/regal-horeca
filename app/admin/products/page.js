@@ -14,6 +14,31 @@ import { childRowListedInStorefrontCatalog } from '@/lib/utils/storefrontCatalog
 
 const ITEMS_PER_PAGE = 20;
 
+/**
+ * List-view price: a single SKU shows one amount; a parent/carrier shows
+ * the lowest-to-highest variant price so admins can scan the family at a glance.
+ */
+function formatAdminListPrice(product, variantRows, isCarrier) {
+  if (!isCarrier) {
+    const amount = Number(product?.price);
+    return Number.isFinite(amount) ? `₹${amount}` : '—';
+  }
+
+  const amounts = (variantRows || [])
+    .map((row) => Number(row?.price ?? row?.sellingPrice))
+    .filter((n) => Number.isFinite(n));
+
+  if (!amounts.length) {
+    const own = Number(product?.price);
+    return Number.isFinite(own) && own > 0 ? `₹${own}` : '—';
+  }
+
+  const min = Math.min(...amounts);
+  const max = Math.max(...amounts);
+  if (min === max) return `₹${min}`;
+  return `₹${min} – ₹${max}`;
+}
+
 /** Emerald “In catalog” pill: opens storefront PDP for this row’s slug in a new tab. */
 function StorefrontInCatalogBadge({ slug, size = 'md' }) {
   const trimmed = slug != null ? String(slug).trim() : '';
@@ -110,7 +135,7 @@ export default function AdminProductsPage() {
     if (filter === 'deleted') {
       url += '&showDeleted=true';
     }
-    if (filter === 'active' && rowKind && rowKind !== 'all') {
+    if (rowKind && rowKind !== 'all') {
       url += `&adminListFilter=${encodeURIComponent(rowKind)}`;
     }
     return url;
@@ -699,33 +724,56 @@ export default function AdminProductsPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 sm:mb-6 gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Manage Products</h1>
-          <div className="flex gap-2 mt-3" role="tablist" aria-label="Product list filter">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={listFilter === 'active'}
-              onClick={() => setListFilter('active')}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                listFilter === 'active'
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Active
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={listFilter === 'deleted'}
-              onClick={() => setListFilter('deleted')}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                listFilter === 'deleted'
-                  ? 'bg-primary text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Deleted
-            </button>
+          <div className="flex flex-wrap items-center gap-3 mt-3">
+            <div className="flex gap-2" role="tablist" aria-label="Product list filter">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={listFilter === 'active'}
+                onClick={() => setListFilter('active')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  listFilter === 'active'
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Active
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={listFilter === 'deleted'}
+                onClick={() => setListFilter('deleted')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  listFilter === 'deleted'
+                    ? 'bg-primary text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Deleted
+              </button>
+            </div>
+            <div className="inline-flex items-center gap-2 select-none">
+              <span className="text-sm font-medium text-gray-700">Parents only</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={adminListFilter === 'parents'}
+                aria-label="Show parent products only"
+                onClick={() => {
+                  setAdminListFilter((prev) => (prev === 'parents' ? 'all' : 'parents'));
+                }}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                  adminListFilter === 'parents' ? 'bg-primary' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    adminListFilter === 'parents' ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
           </div>
         </div>
         <div className="flex gap-3 w-full md:w-auto flex-wrap">
@@ -1032,7 +1080,9 @@ export default function AdminProductsPage() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.brand}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{isCarrier ? '—' : `₹${product.price}`}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatAdminListPrice(product, displayChildren, isCarrier)}
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className="text-xs text-gray-400">—</span>
                           </td>
@@ -1438,12 +1488,10 @@ export default function AdminProductsPage() {
                           )}
                           <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-2">
                             <span>{product.brand}</span>
-                            {!isCarrier && (
-                              <>
-                                <span>•</span>
-                                <span className="font-semibold text-gray-900">₹{product.price}</span>
-                              </>
-                            )}
+                            <span>•</span>
+                            <span className="font-semibold text-gray-900">
+                              {formatAdminListPrice(product, displayChildren, isCarrier)}
+                            </span>
                           </div>
                         </div>
                         {!isBulkMode && listFilter === 'active' && (

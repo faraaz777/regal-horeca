@@ -1,0 +1,221 @@
+{
+  "appliedAt": "2026-08-29T14:22:42.921Z",
+  "brand": "Superware",
+  "plan": [
+    {
+      "productId": "6980d55f6bebb5ff532c5fd4",
+      "sku": "Dinner Plate 11\" - p 6161-11",
+      "title": "DINNER PLATE 11\" | INDIAN ROUND | SUPERWARE",
+      "brand": "Superware",
+      "onHandQty": 560,
+      "ledgerRows": 8,
+      "stockRows": 3,
+      "hasRule": true
+    }
+  ],
+  "backup": {
+    "products": [
+      {
+        "_id": "6980d55f6bebb5ff532c5fd4",
+        "title": "DINNER PLATE 11\" | INDIAN ROUND | SUPERWARE",
+        "slug": "dinner-plate-11-indian-round-superware",
+        "brand": "Superware",
+        "sku": "Dinner Plate 11\" - p 6161-11"
+      }
+    ],
+    "collections": {
+      "stockledgers": [
+        {
+          "_id": "6a62428b05a6f5bee8ab9ab9",
+          "productId": "6980d55f6bebb5ff532c5fd4",
+          "locationId": "6a61f76750f01111b830384a",
+          "type": "opening",
+          "statusBucket": "sellable",
+          "qty": 220,
+          "reason": "opening_stock",
+          "remark": "Ghj",
+          "ref": "",
+          "ratePaise": null,
+          "deadStockMarked": false,
+          "performedBy": "6a4f7b9570dc52b56611002a",
+          "createdAt": "2026-07-23T16:34:19.176Z",
+          "__v": 0
+        },
+        {
+          "_id": "6a62428b05a6f5bee8ab9ab2",
+          "productId": "6980d55f6bebb5ff532c5fd4",
+          "locationId": "6a4f7fda0add54ed8d68a8be",
+          "type": "opening",
+          "statusBucket": "sellable",
+          "qty": 280,
+          "reason": "opening_stock",
+          "remark": "Ghj",
+          "ref": "",
+          "ratePaise": null,
+          "deadStockMarked": false,
+          "performedBy": "6a4f7b9570dc52b56611002a",
+          "createdAt": "2026-07-23T16:34:19.148Z",
+          "__v": 0
+        },
+        {
+          "_id": "6a624359f435c8eef4d51469",
+          "productId": "6980d55f6bebb5ff532c5fd4",
+          "locationId": "6a61f76750f01111b830384a",
+          "type": "adjustment_add",
+          "statusBucket": "sellable",
+          "qty": 20,
+          "reason": "manual_adjustment",
+          "remark": "",
+          "ref": "",
+          "ratePaise": null,
+          "deadStockMarked": false,
+          "performedBy": "6a4f7b9570dc52b56611002a",
+          "createdAt": "2026-07-23T16:37:45.102Z",
+          "__v": 0
+        },
+        {
+          "_id": "6a624359f435c8eef4d51461",
+          "productId": "6980d55f6bebb5ff532c5fd4",
+          "locationId": "6a4f7fda0add54ed8d68a8be",
+          "type": "adjustment_add",
+          "statusBucket": "sellable",
+          "qty": 40,
+          "reason": "manual_adjustment",
+          "remark": "",
+          "ref": "",
+          "ratePaise": null,
+          "deadStockMarked": false,
+          "performedBy": "6a4f7b9570dc52b56611002a",
+          "createdAt": "2026-07-23T16:37:45.069Z",
+          "__v": 0
+        },
+        {
+          "_id": "6a624367f435c8eef4d514a1",
+          "productId": "6980d55f6bebb5ff532c5fd4",
+          "locationId": "6a4f7fda0add54ed8d68a8be",
+          "type": "adjustment_minus",
+          "statusBucket": "sellable",
+          "qty": -200,
+          "reason": "sold",
+          "remark": "",
+          "ref": "",
+          "ratePaise": null,
+          "deadStockMarked": false,
+          "performedBy": "6a4f7b9570dc52b56611002a",
+          "createdAt": "2026-07-23T16:37:59.433Z",
+          "__v": 0
+        },
+        {
+          "_id": "6a624367f435c8eef4d514a9",
+          "productId": "6980d55f6bebb5ff532c5fd4",
+          "locationId": "6a4f7fda0add54ed8d68a8be",
+          "type": "sale_fulfill",
+          "statusBucket": "sold",
+          "qty": 200,
+          "reason": "sold",
+          "remark": "",
+          "ref": "",
+          "ratePaise": null,
+          "deadStockMarked": false,
+          "performedBy": "6a4f7b9570dc52b56611002a",
+          "createdAt": "2026-07-23T16:37:59.444Z",
+          "__v": 0
+        },
+        {
+          "_id": "6a62437e05a6f5bee8ab9ad1",
+          "productId": "6980d55f6bebb5ff532c5fd4",
+          "locationId": "6a61f76750f01111b830384a",
+          "type": "transfer_out",
+          "statusBucket": "sellable",
+          "qty": -38,
+          "reason": "transfer",
+          "remark": "",
+          "ref": "",
+          "ratePaise": null,
+          "deadStockMarked": false,
+          "performedBy": "6a4f7b9570dc52b56611002a",
+          "createdAt": "2026-07-23T16:38:22.543Z",
+          "__v": 0
+        },
+        {
+          "_id": "6a62437e05a6f5bee8ab9ada",
+          "productId": "6980d55f6bebb5ff532c5fd4",
+          "locationId": "6a4f7fda0add54ed8d68a8be",
+          "type": "transfer_in",
+          "statusBucket": "sellable",
+          "qty": 38,
+          "reason": "transfer",
+          "remark": "",
+          "ref": "",
+          "ratePaise": null,
+          "deadStockMarked": false,
+          "performedBy": "6a4f7b9570dc52b56611002a",
+          "createdAt": "2026-07-23T16:38:22.560Z",
+          "__v": 0
+        }
+      ],
+      "stocks": [
+        {
+          "_id": "6a62437e05a6f5bee8ab9adf",
+          "productId": "6980d55f6bebb5ff532c5fd4",
+          "locationId": "6a4f7fda0add54ed8d68a8be",
+          "branchId": "6a4f7f37062fdc24f2ca9a87",
+          "floorId": "6a4f7f6b062fdc24f2ca9ac4",
+          "rackId": "6a4f7fda0add54ed8d68a8be",
+          "statusBucket": "sellable",
+          "qty": 158,
+          "lastLedgerAt": "2026-07-23T16:38:22.560Z",
+          "__v": 0,
+          "createdAt": "2026-07-23T16:38:22.571Z",
+          "updatedAt": "2026-07-23T16:38:22.571Z"
+        },
+        {
+          "_id": "6a62437e05a6f5bee8ab9ae0",
+          "productId": "6980d55f6bebb5ff532c5fd4",
+          "locationId": "6a61f76750f01111b830384a",
+          "branchId": "6a4f7f37062fdc24f2ca9a87",
+          "floorId": "6a4f7f6b062fdc24f2ca9ac4",
+          "rackId": "6a61f76750f01111b830384a",
+          "statusBucket": "sellable",
+          "qty": 202,
+          "lastLedgerAt": "2026-07-23T16:38:22.560Z",
+          "__v": 0,
+          "createdAt": "2026-07-23T16:38:22.571Z",
+          "updatedAt": "2026-07-23T16:38:22.571Z"
+        },
+        {
+          "_id": "6a62437e05a6f5bee8ab9ae1",
+          "productId": "6980d55f6bebb5ff532c5fd4",
+          "locationId": "6a4f7fda0add54ed8d68a8be",
+          "branchId": "6a4f7f37062fdc24f2ca9a87",
+          "floorId": "6a4f7f6b062fdc24f2ca9ac4",
+          "rackId": "6a4f7fda0add54ed8d68a8be",
+          "statusBucket": "sold",
+          "qty": 200,
+          "lastLedgerAt": "2026-07-23T16:38:22.560Z",
+          "__v": 0,
+          "createdAt": "2026-07-23T16:38:22.571Z",
+          "updatedAt": "2026-07-23T16:38:22.571Z"
+        }
+      ],
+      "inventoryrules": [
+        {
+          "_id": "6a62428b05a6f5bee8ab9ab0",
+          "productId": "6980d55f6bebb5ff532c5fd4",
+          "minStock": 100,
+          "maxStock": 1000,
+          "reorderQty": 0,
+          "deadStockPeriod": "month",
+          "deadStockQty": 50,
+          "deadStockMarked": false,
+          "createdBy": "6a4f7b9570dc52b56611002a",
+          "createdAt": "2026-07-23T16:34:19.119Z",
+          "updatedAt": "2026-07-23T16:34:19.119Z",
+          "__v": 0
+        }
+      ],
+      "inventorystocks": [],
+      "inventorytransactions": []
+    }
+  }
+}

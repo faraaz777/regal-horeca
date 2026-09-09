@@ -229,6 +229,21 @@ export default function AllocateStockPanel({
   );
 
   const handleReset = useCallback(() => {
+    const hasDetails =
+      form.openingQty !== '' ||
+      (Array.isArray(form.selectedLocations) && form.selectedLocations.length > 0) ||
+      form.minStock !== '' ||
+      form.maxStock !== '' ||
+      form.deadStockQty !== '' ||
+      Boolean(form.remark && form.remark.trim());
+
+    if (hasDetails) {
+      const ok = window.confirm(
+        'Reset all entered allocation and rule details? You will lose unsaved changes.'
+      );
+      if (!ok) return;
+    }
+
     onChange((p) => ({
       ...p,
       openingQty: '',
@@ -243,7 +258,7 @@ export default function AllocateStockPanel({
     }));
     setMaxWarnPending(null);
     setPickerKey((k) => k + 1);
-  }, [onChange]);
+  }, [onChange, form]);
 
   const toggleMarkAsDeadStock = (checked) => {
     onChange((p) => ({

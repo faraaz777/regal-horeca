@@ -102,10 +102,13 @@ export async function POST(request, { params }) {
     const built = buildChildPayloadFromVariantRow(
       {
         name: body.title || body.name,
-        size: body.variationAttributes?.size,
-        color: body.variationAttributes?.color,
-        weight: body.variationAttributes?.weight,
-        unitCount: body.variationAttributes?.unitCount,
+        size: body.variationAttributes?.size ?? body.size,
+        color: body.variationAttributes?.color ?? body.color,
+        colorHex: body.variationAttributes?.colorHex ?? body.colorHex,
+        colorSwatch: body.variationAttributes?.colorSwatch ?? body.colorSwatch,
+        colorDetails: body.variationAttributes?.colorDetails ?? body.colorDetails,
+        weight: body.variationAttributes?.weight ?? body.weight,
+        unitCount: body.variationAttributes?.unitCount ?? body.unitCount,
         unit: body.variationAttributes?.unit ?? body.unit,
         sku: body.sku,
         barcode: body.barcode,

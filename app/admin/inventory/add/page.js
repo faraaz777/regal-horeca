@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
@@ -61,6 +61,134 @@ function parsePositiveInt(value) {
   return Number.isNaN(n) ? 0 : n;
 }
 
+const CACHE_STORAGE_KEY = 'regal_inventory_add_draft_v1';
+
+// Unique load token generated each time the JavaScript bundle executes on a page load.
+// When the page is reloaded (F5 / browser refresh), this token changes, automatically invalidating stale storage.
+const CURRENT_PAGE_LOAD_ID =
+  typeof window !== 'undefined'
+    ? `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+    : 'ssr';
+
+// In-memory module cache: persists across Next.js client-side page switches and product changes
+let memoryCache = {
+  pageLoadId: CURRENT_PAGE_LOAD_ID,
+  activeProduct: null,
+  activeOpening: null,
+  searchQ: '',
+  draftsByProductId: {},
+};
+
+function isPageReload() {
+  if (typeof window === 'undefined') return false;
+  try {
+    const navEntries = performance.getEntriesByType?.('navigation');
+    if (navEntries && navEntries.length > 0) {
+      return navEntries[0].type === 'reload';
+    }
+    if (window.performance?.navigation) {
+      return window.performance.navigation.type === 1;
+    }
+  } catch {}
+  return false;
+}
+
+function clearAllDraftCache() {
+  memoryCache = {
+    pageLoadId: CURRENT_PAGE_LOAD_ID,
+    activeProduct: null,
+    activeOpening: null,
+    searchQ: '',
+    draftsByProductId: {},
+  };
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.removeItem(CACHE_STORAGE_KEY);
+    } catch {}
+  }
+}
+
+function loadDraftCache() {
+  if (typeof window === 'undefined') return null;
+
+  // If the browser just reloaded this page, wipe the cache so the page starts fresh
+  if (isPageReload()) {
+    clearAllDraftCache();
+    return null;
+  }
+
+  // 1. Check in-memory cache first (persists across Next.js client-side page switching)
+  if (
+    memoryCache &&
+    memoryCache.pageLoadId === CURRENT_PAGE_LOAD_ID &&
+    (memoryCache.activeProduct ||
+      Object.keys(memoryCache.draftsByProductId || {}).length > 0)
+  ) {
+    return memoryCache;
+  }
+
+  // 2. Fall back to sessionStorage if matching this page load
+  try {
+    const raw = sessionStorage.getItem(CACHE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.pageLoadId === CURRENT_PAGE_LOAD_ID) {
+      memoryCache = parsed;
+      return parsed;
+    } else {
+      // Created in an earlier browser load before reload — discard it
+      sessionStorage.removeItem(CACHE_STORAGE_KEY);
+      return null;
+    }
+  } catch {
+    return null;
+  }
+}
+
+function saveDraftCache({ activeProduct, activeOpening, searchQ }) {
+  if (typeof window === 'undefined') return;
+
+  const drafts = { ...(memoryCache.draftsByProductId || {}) };
+  if (activeProduct?._id) {
+    drafts[String(activeProduct._id)] = {
+      product: activeProduct,
+      opening: activeOpening || EMPTY_OPENING,
+    };
+  }
+
+  memoryCache = {
+    pageLoadId: CURRENT_PAGE_LOAD_ID,
+    activeProduct: activeProduct || null,
+    activeOpening: activeOpening || null,
+    searchQ: typeof searchQ === 'string' ? searchQ : memoryCache.searchQ || '',
+    draftsByProductId: drafts,
+  };
+
+  try {
+    sessionStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(memoryCache));
+  } catch {}
+}
+
+function discardProductDraft(productId) {
+  if (!productId) return;
+  const idStr = String(productId);
+  if (memoryCache?.draftsByProductId) {
+    delete memoryCache.draftsByProductId[idStr];
+  }
+  if (
+    memoryCache?.activeProduct &&
+    String(memoryCache.activeProduct._id) === idStr
+  ) {
+    memoryCache.activeProduct = null;
+    memoryCache.activeOpening = null;
+  }
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(memoryCache));
+    } catch {}
+  }
+}
+
 export default function AddToInventoryPage() {
   const router = useRouter();
   const { data: meData } = useSWR('/api/auth/me', fetcher);
@@ -74,6 +202,77 @@ export default function AddToInventoryPage() {
   const [opening, setOpening] = useState(EMPTY_OPENING);
   const [submitting, setSubmitting] = useState(false);
   const [validationErrors, setValidationErrors] = useState([]);
+  const isNavigatingAwayAllowedRef = useRef(false);
+  const isHydratedRef = useRef(false);
+
+  // Restore cached draft on client mount if not reloaded
+  useEffect(() => {
+    isHydratedRef.current = true;
+    const cached = loadDraftCache();
+    if (cached) {
+      if (cached.activeProduct) {
+        setSelected(cached.activeProduct);
+        if (cached.activeOpening) {
+          setOpening(cached.activeOpening);
+        }
+      } else if (cached.searchQ) {
+        setSearchQ(cached.searchQ);
+      }
+    }
+  }, []);
+
+  // Sync to cache whenever product, opening details, or search query change
+  useEffect(() => {
+    if (!isHydratedRef.current) return;
+    saveDraftCache({
+      activeProduct: selected,
+      activeOpening: opening,
+      searchQ,
+    });
+  }, [selected, opening, searchQ]);
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (!selected) return false;
+    const hasQty =
+      opening.openingQty !== '' &&
+      opening.openingQty !== undefined &&
+      opening.openingQty !== null;
+    const hasLocations =
+      Array.isArray(opening.selectedLocations) &&
+      opening.selectedLocations.length > 0;
+    const hasMin =
+      opening.minStock !== '' &&
+      opening.minStock !== undefined &&
+      opening.minStock !== null;
+    const hasMax =
+      opening.maxStock !== '' &&
+      opening.maxStock !== undefined &&
+      opening.maxStock !== null;
+    const hasDeadQty =
+      opening.deadStockQty !== '' &&
+      opening.deadStockQty !== undefined &&
+      opening.deadStockQty !== null;
+    const hasRemark = Boolean(opening.remark && opening.remark.trim());
+    const hasDeadStockFlag = Boolean(opening.markAsDeadStock);
+    const changedPeriod = Boolean(
+      opening.deadStockPeriod && opening.deadStockPeriod !== 'month'
+    );
+    const changedStatus = Boolean(
+      opening.openingStatusBucket && opening.openingStatusBucket !== 'sellable'
+    );
+
+    return (
+      hasQty ||
+      hasLocations ||
+      hasMin ||
+      hasMax ||
+      hasDeadQty ||
+      hasRemark ||
+      hasDeadStockFlag ||
+      changedPeriod ||
+      changedStatus
+    );
+  }, [selected, opening]);
 
   const searchUrl = debouncedQ
     ? `/api/admin/inventory/search?q=${encodeURIComponent(debouncedQ)}&limit=50`
@@ -116,6 +315,9 @@ export default function AddToInventoryPage() {
     []
   );
 
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+
   const selectExisting = useCallback(
     (product) => {
       if (product.hasStock) {
@@ -125,19 +327,171 @@ export default function AddToInventoryPage() {
         );
         return;
       }
+
+      const productIdStr = String(product._id);
+      const existingDraft = memoryCache?.draftsByProductId?.[productIdStr];
+
       setSelected(product);
-      setOpening(EMPTY_OPENING);
+      if (existingDraft?.opening) {
+        setOpening(existingDraft.opening);
+        toast.success(`Restored cached details for ${product.title || 'product'}`);
+      } else {
+        setOpening(EMPTY_OPENING);
+      }
       setValidationErrors([]);
       setSearchQ('');
+
+      try {
+        window.history.pushState(
+          { step: 'allocate', productId: product._id },
+          '',
+          window.location.href
+        );
+      } catch {}
     },
     [router]
   );
 
-  const changeProduct = useCallback(() => {
+  const handleBackToSelectProduct = useCallback(() => {
+    const ok = window.confirm(
+      'Are you sure you want to go back to select a product and discard the changes?'
+    );
+    if (!ok) return false;
+
+    if (selected?._id) {
+      discardProductDraft(selected._id);
+    }
     setSelected(null);
     setOpening(EMPTY_OPENING);
     setValidationErrors([]);
-  }, []);
+    saveDraftCache({ activeProduct: null, activeOpening: null, searchQ: '' });
+
+    try {
+      if (window.history.state?.step === 'allocate') {
+        window.history.replaceState({ step: 'search' }, '', window.location.href);
+      }
+    } catch {}
+
+    toast('Changes discarded');
+    return true;
+  }, [selected]);
+
+  const handleBackClick = useCallback(
+    (e) => {
+      if (e) e.preventDefault();
+      if (selected) {
+        handleBackToSelectProduct();
+      } else {
+        router.push('/admin/inventory');
+      }
+    },
+    [selected, handleBackToSelectProduct, router]
+  );
+
+  const changeProduct = useCallback(() => {
+    handleBackToSelectProduct();
+  }, [handleBackToSelectProduct]);
+
+  const discardDraft = useCallback(() => {
+    handleBackToSelectProduct();
+  }, [handleBackToSelectProduct]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isNavigatingAwayAllowedRef.current) return;
+      if (!hasUnsavedChanges) return;
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    };
+
+    const handleAnchorClick = (e) => {
+      if (isNavigatingAwayAllowedRef.current) return;
+      if (!hasUnsavedChanges) return;
+      if (
+        e.defaultPrevented ||
+        e.button !== 0 ||
+        e.metaKey ||
+        e.ctrlKey ||
+        e.shiftKey ||
+        e.altKey
+      ) {
+        return;
+      }
+
+      const anchor = e.target.closest('a[href]');
+      if (!anchor) return;
+      if (anchor.target === '_blank' || anchor.hasAttribute('download')) return;
+
+      const href = anchor.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+      if (href.startsWith('mailto:') || href.startsWith('tel:')) return;
+
+      try {
+        const targetUrl = new URL(anchor.href, window.location.href);
+        if (
+          targetUrl.origin === window.location.origin &&
+          targetUrl.pathname === window.location.pathname &&
+          targetUrl.search === window.location.search
+        ) {
+          return;
+        }
+      } catch {
+        if (href === window.location.pathname + window.location.search) return;
+      }
+
+      const leave = window.confirm(
+        'You have unsaved changes. Leave this page? (Your entered details will stay cached until you reload the page.)'
+      );
+      if (!leave) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+      } else {
+        isNavigatingAwayAllowedRef.current = true;
+      }
+    };
+
+    const handlePopState = () => {
+      if (isNavigatingAwayAllowedRef.current) return;
+
+      if (selectedRef.current) {
+        const ok = window.confirm(
+          'Are you sure you want to go back to select a product and discard the changes?'
+        );
+        if (!ok) {
+          try {
+            window.history.pushState(
+              { step: 'allocate', productId: selectedRef.current._id },
+              '',
+              window.location.href
+            );
+          } catch {}
+          return;
+        }
+
+        if (selectedRef.current?._id) {
+          discardProductDraft(selectedRef.current._id);
+        }
+        setSelected(null);
+        setOpening(EMPTY_OPENING);
+        setValidationErrors([]);
+        saveDraftCache({ activeProduct: null, activeOpening: null, searchQ: '' });
+        toast('Changes discarded');
+        return;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('click', handleAnchorClick, true);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('click', handleAnchorClick, true);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [hasUnsavedChanges]);
 
   /**
    * Confirm & Save may pass fresh opening from the panel — avoid stale state.
@@ -267,6 +621,8 @@ export default function AddToInventoryPage() {
             : 'Opening stock recorded'
         );
 
+        clearAllDraftCache();
+        isNavigatingAwayAllowedRef.current = true;
         window.location.href = '/admin/inventory';
         return { success: true };
       } catch (err) {
@@ -321,17 +677,36 @@ export default function AddToInventoryPage() {
   return (
     <div className="w-full space-y-6 pb-8">
       <div className="flex items-center gap-3">
-        <Link
-          href="/admin/inventory"
-          className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"
+        <button
+          type="button"
+          onClick={handleBackClick}
+          className="p-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+          title={selected ? 'Back to select product' : 'Back to inventory'}
+          aria-label={selected ? 'Back to select product' : 'Back to inventory'}
         >
           <ArrowLeft size={18} />
-        </Link>
+        </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Add product to inventory</h1>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-2xl font-bold text-gray-900">Add product to inventory</h1>
+            {hasUnsavedChanges && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                Unsaved changes (cached)
+              </span>
+            )}
+            {hasUnsavedChanges && (
+              <button
+                type="button"
+                onClick={discardDraft}
+                className="text-xs text-gray-500 hover:text-red-600 transition-colors underline"
+              >
+                Discard draft
+              </button>
+            )}
+          </div>
           <p className="text-sm text-gray-500">
             {isWorking
-              ? 'Allocate opening stock on this page — no popup'
+              ? 'Allocate opening stock on this page — details remain cached while switching until page reload'
               : 'Search an existing product — create new SKUs from Add Product'}
           </p>
         </div>

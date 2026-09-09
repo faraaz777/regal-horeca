@@ -101,8 +101,13 @@ function getPredefinedColorSwatchClassName(color) {
   return '';
 }
 
-function resolveColorDisplay(name, colorVariants = []) {
-  const trimmed = String(name || '').trim();
+function resolveColorDisplay(nameOrObj, colorVariants = []) {
+  if (!nameOrObj) return null;
+  const trimmed = String(
+    typeof nameOrObj === 'object'
+      ? (nameOrObj.colorName || nameOrObj.color || nameOrObj.name || '')
+      : nameOrObj || ''
+  ).trim();
   if (!trimmed) return null;
   const lower = trimmed.toLowerCase();
   const predefined = AVAILABLE_COLORS.find((c) => c.name.toLowerCase() === lower);
@@ -116,9 +121,23 @@ function resolveColorDisplay(name, colorVariants = []) {
   const fromVariants = (colorVariants || []).find(
     (v) => String(v?.colorName || '').trim().toLowerCase() === lower
   );
+  if (fromVariants) {
+    return {
+      colorName: fromVariants.colorName,
+      colorHex: fromVariants.colorHex,
+      swatch: fromVariants.swatch,
+    };
+  }
+  if (typeof nameOrObj === 'object' && nameOrObj.colorHex) {
+    return {
+      colorName: trimmed,
+      colorHex: nameOrObj.colorHex,
+      swatch: nameOrObj.swatch || nameOrObj.colorSwatch || undefined,
+    };
+  }
   return {
     colorName: trimmed,
-    colorHex: fromVariants?.colorHex || '#CCCCCC',
+    colorHex: '#CCCCCC',
     swatch: undefined,
   };
 }
@@ -667,8 +686,21 @@ export default function ProductForm({
   ]);
 
   const childAssignedColorDisplay = useMemo(
-    () => resolveColorDisplay(childAssignedColorName, formData.colorVariants),
-    [childAssignedColorName, formData.colorVariants]
+    () =>
+      resolveColorDisplay(
+        product?.variationAttributes?.colorDetails ||
+          product?.variationAttributes ||
+          formData?.variationAttributes?.colorDetails ||
+          formData?.variationAttributes ||
+          childAssignedColorName,
+        formData.colorVariants
+      ),
+    [
+      childAssignedColorName,
+      formData.colorVariants,
+      product?.variationAttributes,
+      formData?.variationAttributes,
+    ]
   );
 
   const childAssignedColorIsPredefined = useMemo(() => {
@@ -745,12 +777,19 @@ export default function ProductForm({
     if (activeChildren && activeChildren.length > 0) {
       incomingVariants = activeChildren.map((child) => {
         const attrs = child.variationAttributes || {};
+        const colorName = attrs.color || '';
+        const colorHex = attrs.colorHex || attrs.colorDetails?.colorHex || '';
+        const colorSwatch = attrs.colorSwatch || attrs.colorDetails?.swatch || '';
+        const colorDetails = attrs.colorDetails || (colorName ? { colorName, colorHex, swatch: colorSwatch } : null);
         return {
           variantId: '',
           name: child.title,
           size: attrs.size || '',
           unit: attrs.unit || '',
-          color: attrs.color || '',
+          color: colorName,
+          colorHex,
+          colorSwatch,
+          colorDetails,
           unitCount: attrs.unitCount || '',
           weight: attrs.weight || '',
           isDefault: String(product?.defaultChildProductId || '') === String(child._id || ''),
@@ -782,32 +821,50 @@ export default function ProductForm({
       return;
     }
 
-    const normalized = incomingVariants.map((variant) => ({
-      _rowId: createVariantRowId(),
-      variantId: String(variant?.variantId || '').trim() || generatePersistedVariantId(),
-      name: String(variant?.name || '').trim() || String(product?.title || ''),
-      size: String(variant?.size || '').trim(),
-      unit: String(variant?.unit || '').trim(),
-      color: String(variant?.color || '').trim(),
-      unitCount: String(variant?.unitCount || '').trim(),
-      weight: String(variant?.weight || '').trim(),
-      isDefault: Boolean(variant?.isDefault),
-      showInCatalog: variant?.showInCatalog === true,
-      images: Array.isArray(variant?.images) ? variant.images.filter(Boolean) : [],
-      sku: String(variant?.sku || '').trim(),
-      barcode: String(variant?.barcode || '').trim(),
-      hsnCode: String(variant?.hsnCode || '').trim(),
-      gstPercent: Number(variant?.gstPercent || 0),
-      mrp: Number(variant?.mrp || 0),
-      sellingPrice: Number(variant?.sellingPrice || variant?.price || 0),
-      discountPercent: Number(variant?.discountPercent || 0),
-      marginPrice: Number(variant?.marginPrice || 0),
-      price: Number(variant?.sellingPrice || variant?.price || 0),
-      // Persist child product id when hydrating from `product.children` so callers
-      // can issue PATCH/DELETE against the existing variant rather than recreating it.
-      _childProductId: variant?._childProductId || null,
-      _legacyParentVariantId: variant?._legacyParentVariantId || '',
-    }));
+    const normalized = incomingVariants.map((variant) => {
+      const colorName = String(variant?.color || '').trim();
+      const resolvedColor = resolveColorDisplay(
+        variant?.colorDetails || (variant?.colorHex ? { colorName, colorHex: variant.colorHex, swatch: variant.colorSwatch } : colorName),
+        formData.colorVariants || product?.colorVariants
+      );
+      const colorHex = String(variant?.colorHex || resolvedColor?.colorHex || '').trim();
+      const colorSwatch = String(variant?.colorSwatch || resolvedColor?.swatch || '').trim();
+      const colorDetails = variant?.colorDetails || (colorName ? {
+        colorName,
+        colorHex,
+        swatch: colorSwatch,
+      } : null);
+
+      return {
+        _rowId: createVariantRowId(),
+        variantId: String(variant?.variantId || '').trim() || generatePersistedVariantId(),
+        name: String(variant?.name || '').trim() || String(product?.title || ''),
+        size: String(variant?.size || '').trim(),
+        unit: String(variant?.unit || '').trim(),
+        color: colorName,
+        colorHex,
+        colorSwatch,
+        colorDetails,
+        unitCount: String(variant?.unitCount || '').trim(),
+        weight: String(variant?.weight || '').trim(),
+        isDefault: Boolean(variant?.isDefault),
+        showInCatalog: variant?.showInCatalog === true,
+        images: Array.isArray(variant?.images) ? variant.images.filter(Boolean) : [],
+        sku: String(variant?.sku || '').trim(),
+        barcode: String(variant?.barcode || '').trim(),
+        hsnCode: String(variant?.hsnCode || '').trim(),
+        gstPercent: Number(variant?.gstPercent || 0),
+        mrp: Number(variant?.mrp || 0),
+        sellingPrice: Number(variant?.sellingPrice || variant?.price || 0),
+        discountPercent: Number(variant?.discountPercent || 0),
+        marginPrice: Number(variant?.marginPrice || 0),
+        price: Number(variant?.sellingPrice || variant?.price || 0),
+        // Persist child product id when hydrating from `product.children` so callers
+        // can issue PATCH/DELETE against the existing variant rather than recreating it.
+        _childProductId: variant?._childProductId || null,
+        _legacyParentVariantId: variant?._legacyParentVariantId || '',
+      };
+    });
 
     initialChildIdsRef.current = normalized
       .map((row) => row._childProductId)
@@ -937,22 +994,64 @@ export default function ProductForm({
     [formData.colorVariants]
   );
 
-  /** All 17 predefined colours + any legacy row value not in the catalog list. */
+  /** Color options for variant rows:
+   * - When parent product has selected colours, STRICTLY show only those parent colours
+   *   (plus any existing saved row colours so existing data is never hidden).
+   * - Only if NO parent colours have been chosen at all, fall back to the 17 predefined colours.
+   */
   const variantTableColorOptions = useMemo(() => {
     const seen = new Set();
     const out = [];
-    const add = (name) => {
-      const label = String(name || '').trim();
+    const parentColors = formData.colorVariants || [];
+    const hasParentColors = parentColors.length > 0;
+
+    const add = (colorObjOrName, isParent = false) => {
+      const rawName =
+        typeof colorObjOrName === 'string'
+          ? colorObjOrName
+          : colorObjOrName?.colorName || colorObjOrName?.name;
+      const label = String(rawName || '').trim();
       if (!label) return;
       const key = label.toLowerCase();
       if (seen.has(key)) return;
       seen.add(key);
-      out.push(label);
+
+      const resolved = resolveColorDisplay(
+        typeof colorObjOrName === 'object' ? colorObjOrName : label,
+        formData.colorVariants
+      );
+
+      out.push({
+        name: resolved?.colorName || label,
+        hex: resolved?.colorHex || '#CCCCCC',
+        swatch: resolved?.swatch || '',
+        isParentColor:
+          isParent ||
+          parentColors.some(
+            (cv) => String(cv?.colorName || '').trim().toLowerCase() === key
+          ),
+      });
     };
-    AVAILABLE_COLORS.forEach((c) => add(c.name));
-    (variantRows || []).forEach((row) => add(row?.color));
+
+    // 1. Parent selected colors first (including custom colors)
+    parentColors.forEach((cv) => add(cv, true));
+
+    // 2. Existing row colors (ensures legacy/saved variants don't lose their selected option)
+    (variantRows || []).forEach((row) => {
+      if (row?.colorDetails) {
+        add(row.colorDetails, false);
+      } else if (row?.color) {
+        add({ colorName: row.color, colorHex: row.colorHex, swatch: row.colorSwatch }, false);
+      }
+    });
+
+    // 3. Fallback: ONLY include predefined catalog colors if NO parent colors were selected
+    if (!hasParentColors) {
+      AVAILABLE_COLORS.forEach((c) => add(c, false));
+    }
+
     return out;
-  }, [variantRows]);
+  }, [formData.colorVariants, variantRows]);
 
   const getVariantCombinationKey = (combo) =>
     [combo.size || '', combo.color || '', combo.weight || '', combo.unitCount || '']
@@ -968,6 +1067,9 @@ export default function ProductForm({
     size: '',
     unit: '',
     color: '',
+    colorHex: '',
+    colorSwatch: '',
+    colorDetails: null,
     unitCount: '',
     weight: '',
     isDefault: false,
@@ -1050,11 +1152,23 @@ export default function ProductForm({
         return vid ? existing : { ...existing, variantId: generatePersistedVariantId() };
       }
 
+      const colorName = combo.color || '';
+      const colorDisplay = resolveColorDisplay(colorName, formData.colorVariants);
+
       return {
         ...createEmptyVariantRow(),
         size: combo.size || '',
         unit: '',
-        color: combo.color || '',
+        color: colorName,
+        colorHex: colorDisplay?.colorHex || '',
+        colorSwatch: colorDisplay?.swatch || '',
+        colorDetails: colorDisplay
+          ? {
+              colorName: colorDisplay.colorName,
+              colorHex: colorDisplay.colorHex,
+              swatch: colorDisplay.swatch || '',
+            }
+          : null,
         unitCount: combo.unitCount || '',
         weight: combo.weight || '',
       };
@@ -1068,6 +1182,24 @@ export default function ProductForm({
     setVariantRows((prev) =>
       prev.map((row, rowIndex) => {
         if (rowIndex !== index) return row;
+
+        if (field === 'color') {
+          const colorName = String(value || '').trim();
+          const colorDisplay = resolveColorDisplay(colorName, formData.colorVariants);
+          return {
+            ...row,
+            color: colorName,
+            colorHex: colorDisplay?.colorHex || '',
+            colorSwatch: colorDisplay?.swatch || '',
+            colorDetails: colorDisplay
+              ? {
+                  colorName: colorDisplay.colorName,
+                  colorHex: colorDisplay.colorHex,
+                  swatch: colorDisplay.swatch || '',
+                }
+              : null,
+          };
+        }
 
         const normalizedValue = ['mrp', 'sellingPrice', 'marginPrice'].includes(field)
           ? sanitizeNumberInput(value)
@@ -3076,33 +3208,51 @@ export default function ProductForm({
     const rowsForVariantSubmit = isChildProduct ? [] : (variantRows || []);
     const normalizedVariants = rowsForVariantSubmit
       .filter((row) => row && typeof row === 'object')
-      .map((row) => ({
-        variantId: String(row.variantId || '').trim() || generatePersistedVariantId(),
-        images: (() => {
-          const explicitImages = Array.isArray(row.images) ? row.images.filter(Boolean) : [];
-          if (explicitImages.length > 0) return explicitImages;
-          return formData.heroImage ? [formData.heroImage] : [];
-        })(),
-        name: String(row.name || formData.title || '').trim(),
-        size: String(row.size || '').trim(),
-        unit: String(row.unit || '').trim(),
-        color: String(row.color || '').trim(),
-        unitCount: String(row.unitCount || '').trim(),
-        weight: String(row.weight || '').trim(),
-        isDefault: Boolean(row.isDefault),
-        showInCatalog: row.showInCatalog === true,
-        sku: String(row.sku || '').trim(),
-        barcode: String(row.barcode || '').trim(),
-        hsnCode: String(row.hsnCode || '').trim(),
-        gstPercent: Number(row.gstPercent || 0),
-        mrp: Number(row.mrp || 0),
-        sellingPrice: Number(row.sellingPrice || 0),
-        discountPercent: Number(row.discountPercent || 0),
-        marginPrice: Number(row.marginPrice || 0),
-        price: Number(row.sellingPrice || row.price || 0),
-        _childProductId: row._childProductId || null,
-        _legacyParentVariantId: row._legacyParentVariantId || '',
-      }))
+      .map((row) => {
+        const colorName = String(row.color || '').trim();
+        const resolvedColor = resolveColorDisplay(
+          row.colorDetails || (row.colorHex ? { colorName, colorHex: row.colorHex, swatch: row.colorSwatch } : colorName),
+          formData.colorVariants
+        );
+        const colorHex = String(row.colorHex || resolvedColor?.colorHex || '').trim();
+        const colorSwatch = String(row.colorSwatch || resolvedColor?.swatch || '').trim();
+        const colorDetails = resolvedColor ? {
+          colorName: resolvedColor.colorName,
+          colorHex: resolvedColor.colorHex,
+          swatch: resolvedColor.swatch || '',
+        } : null;
+
+        return {
+          variantId: String(row.variantId || '').trim() || generatePersistedVariantId(),
+          images: (() => {
+            const explicitImages = Array.isArray(row.images) ? row.images.filter(Boolean) : [];
+            if (explicitImages.length > 0) return explicitImages;
+            return formData.heroImage ? [formData.heroImage] : [];
+          })(),
+          name: String(row.name || formData.title || '').trim(),
+          size: String(row.size || '').trim(),
+          unit: String(row.unit || '').trim(),
+          color: colorName,
+          colorHex,
+          colorSwatch,
+          colorDetails,
+          unitCount: String(row.unitCount || '').trim(),
+          weight: String(row.weight || '').trim(),
+          isDefault: Boolean(row.isDefault),
+          showInCatalog: row.showInCatalog === true,
+          sku: String(row.sku || '').trim(),
+          barcode: String(row.barcode || '').trim(),
+          hsnCode: String(row.hsnCode || '').trim(),
+          gstPercent: Number(row.gstPercent || 0),
+          mrp: Number(row.mrp || 0),
+          sellingPrice: Number(row.sellingPrice || 0),
+          discountPercent: Number(row.discountPercent || 0),
+          marginPrice: Number(row.marginPrice || 0),
+          price: Number(row.sellingPrice || row.price || 0),
+          _childProductId: row._childProductId || null,
+          _legacyParentVariantId: row._legacyParentVariantId || '',
+        };
+      })
       .filter(
         (row) =>
           row.name ||
@@ -3328,8 +3478,32 @@ export default function ProductForm({
     // Don't persist row-private fields on the embedded `variants[]` payload.
     const variantsForLegacyEmbed = variantRowsForChildren.map(({ _childProductId, _legacyParentVariantId, ...rest }) => rest);
 
+    // Auto-sync parent colorVariants: ensure every variant's color has a corresponding definition
+    // on the parent so the storefront color picker and catalog filters stay completely in sync.
+    const existingColorVariants = Array.isArray(formData.colorVariants) ? [...formData.colorVariants] : [];
+    const existingColorNames = new Set(
+      existingColorVariants.map((cv) => String(cv?.colorName || '').trim().toLowerCase())
+    );
+
+    normalizedVariants.forEach((row) => {
+      const rowColor = String(row.color || '').trim();
+      if (!rowColor) return;
+      const lower = rowColor.toLowerCase();
+      if (!existingColorNames.has(lower)) {
+        const resolved = resolveColorDisplay(row.colorDetails || rowColor, existingColorVariants);
+        existingColorVariants.push({
+          colorName: resolved?.colorName || rowColor,
+          colorHex: resolved?.colorHex || '#CCCCCC',
+          images: [],
+          isDefault: existingColorVariants.length === 0,
+        });
+        existingColorNames.add(lower);
+      }
+    });
+
     const finalProduct = {
       ...formData,
+      colorVariants: existingColorVariants,
       gstPercent: Number(formData.gstPercent || 0),
       mrp: Number(formData.mrp || 0),
       sellingPrice: Number(formData.sellingPrice || 0),
@@ -3743,19 +3917,40 @@ export default function ProductForm({
                     </td>
                     {variantFieldSelection.color && (
                       <td className="w-[160px] min-w-[160px] px-3 py-7 align-top">
-                        <select
-                          value={row.color || ''}
-                          onChange={(e) => handleVariantRowChange(index, 'color', e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-full p-2.5 border border-gray-300 rounded-md bg-white"
-                        >
-                          <option value="">Select colour</option>
-                          {variantTableColorOptions.map((name) => (
-                            <option key={name} value={name}>
-                              {name}
-                            </option>
-                          ))}
-                        </select>
+                        {(() => {
+                          const display = row.color
+                            ? resolveColorDisplay(
+                                row.colorDetails || (row.colorHex ? { colorName: row.color, colorHex: row.colorHex, swatch: row.colorSwatch } : row.color),
+                                formData.colorVariants
+                              )
+                            : null;
+                          return (
+                            <div className="relative w-full">
+                              {display && (
+                                <span
+                                  style={display.swatch ? undefined : { backgroundColor: display.colorHex }}
+                                  className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full border border-black/15 pointer-events-none z-10 ${getPredefinedColorSwatchClassName(display)}`}
+                                  title={`${display.colorName} (${display.colorHex})`}
+                                />
+                              )}
+                              <select
+                                value={row.color || ''}
+                                onChange={(e) => handleVariantRowChange(index, 'color', e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                className={`w-full p-2.5 border border-gray-300 rounded-md bg-white text-sm ${
+                                  display ? 'pl-8' : 'pl-2.5'
+                                }`}
+                              >
+                                <option value="">Select colour</option>
+                                {variantTableColorOptions.map((opt) => (
+                                  <option key={opt.name} value={opt.name}>
+                                    {opt.name}{!opt.isParentColor && (formData.colorVariants || []).length > 0 ? ' (Existing Row)' : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          );
+                        })()}
                       </td>
                     )}
                     {variantFieldSelection.unitCount && <td className="w-[130px] min-w-[130px] px-3 py-2"><input type="text" value={row.unitCount || ''} onChange={(e) => handleVariantRowChange(index, 'unitCount', e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-md" /></td>}

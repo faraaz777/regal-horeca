@@ -1,8 +1,6 @@
-# Taxonomy Menu Builder — Internal Architecture
+# Taxonomy Menu Builder
 
-## Purpose
-
-Shopify-style menu builder for **Categories** (4 levels) and **Brands** (3 levels), with a **Classic** toggle so legacy UI can be removed later without scattered conditionals.
+Shopify-style nested menu for **Categories** (4 levels) and **Brands** (3 levels). This is the only admin UI — the old table + modal (“Classic”) view has been removed.
 
 ## Entry points
 
@@ -11,52 +9,55 @@ Shopify-style menu builder for **Categories** (4 levels) and **Brands** (3 level
 | `/admin/categories` | `app/admin/categories/page.js` | `CATEGORY_TAXONOMY_CONFIG` |
 | `/admin/brands` | `app/admin/brands/page.js` | `BRAND_TAXONOMY_CONFIG` |
 
-Toggle key: `localStorage['regal.admin.taxonomy.ui']` → `classic` | `menu-builder` (default: `menu-builder`)
+Both pages render `TaxonomyAdminPage`. Entity differences live in config, not in page JSX.
 
 ## Module map
 
 ```
 lib/taxonomy/
-  taxonomyConfig.js      — per-entity config (levels, APIs, fields)
-  taxonomyTreeUtils.js   — O(n) tree build, flatten, search, slugify
-  taxonomyValidation.js  — parent/level validation on reorder
+  taxonomyConfig.js        — levels, APIs, fields per entity
+  taxonomyTreeUtils.js     — tree build, flatten, search, sibling slots
+  taxonomyValidation.js    — parent/level checks on reorder
 
 components/admin/taxonomy/
-  TaxonomyMenuBuilder.jsx   — main UI (search, DnD, inline add)
-  TaxonomyMenuRow.jsx       — single sortable row
-  TaxonomyEditPanel.jsx     — slide-over edit
-  TaxonomyUiToggle.jsx      — classic / menu-builder switch
-  hooks/useTaxonomyData.js  — fetch + optimistic CRUD + reorder
-  hooks/useTaxonomyUiMode.js
-  legacy/LegacyCategoriesView.jsx  — old table UI (deletable)
-  legacy/LegacyBrandsView.jsx
+  TaxonomyAdminPage.jsx    — page chrome (title + builder)
+  TaxonomyMenuBuilder.jsx  — list composition
+  TaxonomyToolbar.jsx      — search, expand/collapse
+  TaxonomyMenuRow.jsx      — sortable row
+  TaxonomySameLevelAddRow.jsx
+  TaxonomyRootAdd.jsx      — add top-level department
+  TaxonomyEditPanel.jsx    — slide-over edit
+  TaxonomyAddContext.jsx
+  TaxonomyLevelBadge.jsx
+  TaxonomyRowShell.jsx
+  TaxonomyTreeIndent.jsx
+  taxonomyMenuLayout.js
+  uploadTaxonomyImage.js
+  hooks/
+    useTaxonomyData.js         — fetch + optimistic CRUD + reorder
+    useTaxonomySearch.js       — debounce, auto-expand, filter
+    useTaxonomyDragReorder.js  — sibling reorder + nest-on-drop
+    useTaxonomyPermissions.js  — super_admin delete only
 
 app/api/admin/
-  categories/route.js     — uncached flat/tree list
-  brands/route.js         — uncached flat/tree list
-  taxonomy/reorder/route.js — POST sibling reorder, PATCH batch move
+  categories/route.js
+  brands/route.js
+  taxonomy/reorder/route.js
 ```
 
 ## Data flow
 
-1. **Load**: `GET /api/admin/{categories|brands}` → flat list → `buildTaxonomyMaps` → tree
+1. **Load**: `GET /api/admin/{categories|brands}` → flat list → tree
 2. **Create**: contextual parent/level → `POST /api/{categories|brands}` → optimistic upsert
 3. **Edit**: slide-over → `PUT /api/{categories|brands}/:id`
-4. **Delete**: `DELETE` + block if children exist
-5. **Reorder**: drag among siblings or nest → `POST /api/admin/taxonomy/reorder` with `{ type, parentId, orderedIds }`
+4. **Delete**: `DELETE` — Super Admin only; blocked if children exist
+5. **Reorder**: drag among siblings or nest → `POST /api/admin/taxonomy/reorder`
 
-## Schema addition
+## Schema
 
-`sortOrder: Number` on Category and Brand. Siblings sort by `sortOrder` then `name`. Existing rows default to `0`.
+`sortOrder: Number` on Category and Brand. Siblings sort by `sortOrder` then `name`. Existing rows default to `0`. Drag-and-drop writes order to the DB.
 
-## Removing legacy (Phase 4)
+## Not in scope
 
-1. Delete `components/admin/taxonomy/legacy/*`
-2. Remove toggle from `page.js` — render `TaxonomyMenuBuilder` only
-3. Delete `TaxonomyUiToggle.jsx` and `useTaxonomyUiMode.js`
-4. Remove `TAXONOMY_UI_STORAGE_KEY` from config
-
-## Not in scope yet
-
-- ProductForm cascade → searchable `TaxonomyPicker` (Phase 3)
+- ProductForm cascade → searchable `TaxonomyPicker`
 - Business Types (flat list, separate page)

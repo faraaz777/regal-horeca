@@ -2,7 +2,7 @@
  * PATCH /api/admin/taxonomy/reorder
  *
  * Batch update parent, level, and sortOrder for category or brand menu items.
- * Used by the menu-builder drag-and-drop UI.
+ * Used by the taxonomy menu drag-and-drop UI.
  *
  * Permissions: categories:write or brands:write (by type)
  */

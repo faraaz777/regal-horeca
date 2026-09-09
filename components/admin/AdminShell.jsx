@@ -32,8 +32,14 @@ import {
   Banknote,
   FileSpreadsheet,
 } from 'lucide-react';
-import { filterNavForRole, isNavItemActive } from '@/lib/admin/navConfig';
+import {
+  collectNavHrefs,
+  filterNavSectionsForRole,
+  findActiveNavSectionId,
+} from '@/lib/admin/navConfig';
 import { adminJson, adminFetch } from '@/lib/client/adminFetch';
+import AdminNavList from '@/components/admin/AdminNavList';
+import { useCollapsedNavSections } from '@/components/admin/hooks/useCollapsedNavSections';
 
 const enquiriesFetcher = async (url) => {
   const data = await adminJson(url);
@@ -82,15 +88,16 @@ export default function AdminShell({ children }) {
   });
 
   const user = meData?.user;
-  const navItems = user ? filterNavForRole(user.role) : [];
-  const navHrefs = useMemo(
-    () =>
-      navItems.flatMap((item) => [
-        item.href,
-        ...(item.children || []).map((child) => child.href),
-      ]),
-    [navItems]
+  const navSections = useMemo(
+    () => (user ? filterNavSectionsForRole(user.role) : []),
+    [user]
   );
+  const navHrefs = useMemo(() => collectNavHrefs(navSections), [navSections]);
+  const activeSectionId = useMemo(
+    () => findActiveNavSectionId(pathname, navSections, navHrefs),
+    [pathname, navSections, navHrefs]
+  );
+  const { collapsedIds, toggleSection } = useCollapsedNavSections(activeSectionId);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -278,98 +285,24 @@ export default function AdminShell({ children }) {
         <div className={`h-px bg-shell-border ${expanded ? 'mx-3' : 'mx-2'}`} />
 
         <nav
-          className={`flex-1 overflow-y-auto overflow-x-hidden py-3 space-y-0.5 ${
+          className={`flex-1 overflow-y-auto overflow-x-hidden py-3 ${
             expanded ? 'px-3' : 'px-2'
           }`}
+          aria-label="Control Hub"
         >
-          {navItems.map((item) => {
-            const isActive = isNavItemActive(pathname, item.href, navHrefs);
-            const Icon = NAV_ICONS[item.href] || Package;
-            const showEnquiryBadge = item.href === '/admin/enquiries' && newEnquiriesCount > 0;
-
-            return (
-              <div key={item.href}>
-                <Link
-                  href={item.href}
-                  onClick={closeOnMobile}
-                  title={item.label}
-                  className={navLinkClass(isActive)}
-                >
-                  <Icon
-                    size={17}
-                    strokeWidth={isActive ? 2.25 : 1.75}
-                    className={iconClass(isActive)}
-                  />
-                  {expanded && (
-                    <span className="flex-1 truncate text-[13px]">{item.label}</span>
-                  )}
-                  {showEnquiryBadge && (
-                    <span
-                      className={`text-[10px] font-bold rounded-full tabular-nums bg-accent text-white ${
-                        expanded
-                          ? 'ml-1 px-1.5 py-0.5'
-                          : 'absolute top-1 right-1 px-1 min-w-[1rem] text-center leading-4'
-                      }`}
-                    >
-                      {newEnquiriesCount}
-                    </span>
-                  )}
-                </Link>
-
-                {expanded && item.children?.length > 0 && (
-                  <div className="mt-0.5 ml-4 pl-3 border-l border-shell-border space-y-0.5">
-                    {item.children.map((child) => {
-                      const childActive = isNavItemActive(pathname, child.href, navHrefs);
-                      const ChildIcon = NAV_ICONS[child.href];
-                      return (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          onClick={closeOnMobile}
-                          title={child.label}
-                          className={`flex items-center gap-2 w-full text-left px-2.5 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
-                            childActive
-                              ? 'bg-shell-raised text-shell-text'
-                              : 'text-shell-dim hover:text-shell-muted hover:bg-shell-raised/60'
-                          }`}
-                        >
-                          {ChildIcon ? (
-                            <ChildIcon
-                              size={13}
-                              strokeWidth={1.75}
-                              className="shrink-0 text-shell-gold/80"
-                            />
-                          ) : null}
-                          <span className="truncate">{child.label}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {!expanded &&
-                  item.children?.map((child) => {
-                    const childActive = isNavItemActive(pathname, child.href, navHrefs);
-                    const ChildIcon = NAV_ICONS[child.href] || Package;
-                    return (
-                      <Link
-                        key={child.href}
-                        href={child.href}
-                        onClick={closeOnMobile}
-                        title={child.label}
-                        className={navLinkClass(childActive)}
-                      >
-                        <ChildIcon
-                          size={17}
-                          strokeWidth={childActive ? 2.25 : 1.75}
-                          className={iconClass(childActive)}
-                        />
-                      </Link>
-                    );
-                  })}
-              </div>
-            );
-          })}
+          <AdminNavList
+            sections={navSections}
+            expanded={expanded}
+            pathname={pathname}
+            navHrefs={navHrefs}
+            newEnquiriesCount={newEnquiriesCount}
+            closeOnMobile={closeOnMobile}
+            navLinkClass={navLinkClass}
+            iconClass={iconClass}
+            icons={NAV_ICONS}
+            collapsedIds={collapsedIds}
+            toggleSection={toggleSection}
+          />
         </nav>
 
         <div className={`pt-2 border-t border-shell-border pb-4 ${expanded ? 'px-3' : 'px-2'}`}>

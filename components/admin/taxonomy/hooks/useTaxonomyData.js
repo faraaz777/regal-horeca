@@ -8,7 +8,6 @@ import { showToast } from '@/lib/utils/toast';
 import {
   buildTaxonomyMaps,
   buildTaxonomyTree,
-  compareTaxonomySiblings,
   deriveLevelFromParent,
   getTaxonomyId,
   getTaxonomyParentId,
@@ -17,8 +16,10 @@ import {
 } from '@/lib/taxonomy/taxonomyTreeUtils';
 
 /**
- * Shared data layer for menu-builder (categories + brands).
- * Optimistic updates — no full refetch after mutations.
+ * Taxonomy data layer (categories + brands).
+ *
+ * Optimistic create/update/delete/reorder so the menu list does not
+ * refetch the full tree after every mutation.
  */
 export function useTaxonomyData(config) {
   const { upsertCategory, removeCategory, upsertBrand, removeBrand } = useAppContext();
@@ -290,6 +291,5 @@ export function useTaxonomyData(config) {
     collapseAll,
     canAddChild,
     getChildLevel,
-    compareTaxonomySiblings,
   };
 }

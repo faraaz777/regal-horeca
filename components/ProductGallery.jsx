@@ -12,7 +12,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 export default function ProductGallery({
   images,
   title,
-  isPremium = false,
   featured = false,
   isLiked = false,
   onToggleWishlist,
@@ -29,7 +28,7 @@ export default function ProductGallery({
     return null;
   }
 
-  const badgeText = isPremium ? 'Premium' : (featured ? 'Exclusive' : null);
+  const badgeText = featured ? 'Exclusive' : null;
 
   return (
      <div className="flex flex-col items-start w-full">

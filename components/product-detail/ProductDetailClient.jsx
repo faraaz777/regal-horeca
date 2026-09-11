@@ -1357,7 +1357,6 @@ export default function ProductDetailClient({ initialProduct = null }) {
               <ProductGallery
                 images={allImages}
                 title={product.title}
-                isPremium={product.isPremium}
                 featured={product.featured}
                 isLiked={isLiked}
                 onToggleWishlist={handleWishlistToggle}

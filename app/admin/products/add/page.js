@@ -1,92 +1,66 @@
-
-
-
-
-
-
-
-
-
-
-// /**
-//  * Admin Add Product Page
-//  * 
-//  * Page for creating new products.
-//  * Uses ProductForm component with empty product data.
-//  */
+/**
+ * Admin Add Product
+ *
+ * Related/FBT search is owned by ProductForm (type-to-search). This page does
+ * not prefetch the catalog — that 1000-row request was unused until merchandising.
+ *
+ * Excel import is optional: it prefills this same form (no _id). Save still
+ * goes through createAdminProduct.
+ */
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import useSWR from 'swr';
-import { useAppContext } from '@/context/AppContext';
 import ProductForm from '@/components/ProductForm';
+import ProductImportPanel, { ProductImportButtons } from '@/components/admin/products/ProductImportPanel';
 import { showToast } from '@/lib/utils/toast';
-import { apiClient, ApiError } from '@/lib/utils/apiClient';
-import { saveProductChildren } from '@/lib/utils/saveProductChildren';
-
-// SWR fetcher function
-const fetcher = (url) => fetch(url).then(res => res.json());
+import { ApiError } from '@/lib/utils/apiClient';
+import { createAdminProduct } from '@/lib/client/saveAdminProduct';
+import { readImportProductDraft } from '@/lib/client/productImportDraft';
 
 export default function AdminAddProductPage() {
-  const { categories } = useAppContext();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isVariantsOnlyView, setIsVariantsOnlyView] = useState(false);
-  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
-  const [duplicateProduct, setDuplicateProduct] = useState(null);
-  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(true);
+  const [seedProduct, setSeedProduct] = useState(null);
+  const [seedSource, setSeedSource] = useState(null);
+  const [formKey, setFormKey] = useState(0);
+  const [importOpen, setImportOpen] = useState(false);
+  const [isCheckingSeed, setIsCheckingSeed] = useState(true);
 
-  // Fetch products based on selected category
-  // If category is selected, fetch products in that category
-  // Otherwise, fetch latest products (increased limit for better related products selection)
-  const productsUrl = useMemo(() => {
-    if (selectedCategoryId && categories.length > 0) {
-      // Find category slug from ID
-      const category = categories.find(c => {
-        const cId = c._id || c.id;
-        return cId?.toString() === selectedCategoryId?.toString();
-      });
-      
-      if (category?.slug) {
-        // Fetch products filtered by category slug (increased limit)
-        return `/api/products?limit=1000&category=${category.slug}`;
-      }
-    }
-    // Fetch latest products when no category selected (increased limit)
-    return '/api/products?limit=1000&sortBy=newest';
-  }, [selectedCategoryId, categories]);
-
-  const { data: productsData } = useSWR(productsUrl, fetcher, {
-    revalidateOnFocus: false,
-    dedupingInterval: 300000, // Cache for 5 minutes
-  });
-
-  const products = productsData?.products || [];
-
-  // Check for duplicate product data in sessionStorage on mount
   useEffect(() => {
     try {
+      const imported = readImportProductDraft();
+      if (imported) {
+        setSeedProduct(imported);
+        setSeedSource('import');
+        setFormKey((key) => key + 1);
+        return;
+      }
+
       const duplicateData = sessionStorage.getItem('duplicateProductData');
       if (duplicateData) {
-        const parsedData = JSON.parse(duplicateData);
-        console.log('Loaded duplicate product data:', parsedData);
-        setDuplicateProduct(parsedData);
-        // Clear sessionStorage after reading
+        setSeedProduct(JSON.parse(duplicateData));
+        setSeedSource('duplicate');
         sessionStorage.removeItem('duplicateProductData');
-      } else {
-        console.log('No duplicate product data found in sessionStorage');
       }
-    } catch (error) {
-      console.error('Error parsing duplicate product data:', error);
-      showToast.error('Failed to load duplicate product data');
+    } catch (err) {
+      console.error('Error parsing product seed data:', err);
+      showToast.error('Failed to load copied or imported product data');
     } finally {
-      setIsCheckingDuplicate(false);
+      setIsCheckingSeed(false);
     }
-  }, []); // Run only once on mount
+  }, []);
+
+  const applyImport = (payload) => {
+    setSeedProduct(payload);
+    setSeedSource('import');
+    setFormKey((key) => key + 1);
+    setError('');
+    showToast.success('Spreadsheet row loaded. Review and Save when ready.');
+  };
 
   const handleSave = async (productData) => {
     const toastId = showToast.loading('Creating product...');
@@ -101,45 +75,24 @@ export default function AdminAddProductPage() {
           .replace(/(^-|-$)/g, '');
       }
 
-      // Pull form-only metadata before sending to the parent endpoint.
-      const variantRows = Array.isArray(productData._variantRows) ? productData._variantRows : [];
-      const variationTheme = Array.isArray(productData.variationTheme) ? productData.variationTheme : [];
-
-      const response = await apiClient.requestWithRetry('/api/products', {
-        method: 'POST',
-        body: productData,
-      });
-
-      const createdProduct = response?.product || response?.data?.product;
-      const parentId = createdProduct?._id || createdProduct?.id;
-
-      if (variantRows.length > 0 && parentId) {
-        const result = await saveProductChildren({
-          parentId,
-          parent: { title: productData.title },
-          variantRows,
-          variationTheme,
-        });
-        if (result.errors.length > 0) {
-          const firstMsg = result.errors[0]?.message || 'Unknown error';
-          showToast.error(
-            `${result.errors.length} variant(s) failed to save: ${firstMsg}`
-          );
-          console.error('Variant save errors:', result.errors);
-          return;
-        }
+      const { children } = await createAdminProduct(productData);
+      if (children.errors?.length > 0) {
+        const firstMsg = children.errors[0]?.message || 'Unknown error';
+        showToast.error(`${children.errors.length} variant(s) failed to save: ${firstMsg}`);
+        return;
       }
 
+      const variantCount = children.created || 0;
       showToast.success(
-        variantRows.length > 0
-          ? `Product created with ${variantRows.length} variant(s)`
+        variantCount > 0
+          ? `Product created with ${variantCount} variant(s)`
           : 'Product created successfully'
       );
       router.push('/admin/products');
-    } catch (error) {
-      if (error instanceof ApiError) {
-        showToast.error(error.message);
-        setError(error.message);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        showToast.error(err.message);
+        setError(err.message);
       } else {
         showToast.error('An error occurred while creating the product');
         setError('An error occurred while creating the product');
@@ -150,45 +103,67 @@ export default function AdminAddProductPage() {
     }
   };
 
-  const handleCancel = () => {
-    router.push('/admin/products');
-  };
-
-  // Don't render form until we've checked for duplicate data
-  if (isCheckingDuplicate) {
+  if (isCheckingSeed) {
     return (
-      <div className="max-w-4xl mx-auto w-full">
-        <div className="px-4 sm:px-6 py-8 text-center text-gray-500">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          <p className="mt-2 text-sm">Loading...</p>
-        </div>
+      <div className="mx-auto w-full max-w-6xl px-4 py-8 text-center text-gray-500">
+        <div className="inline-block h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+        <p className="mt-2 text-sm">Loading…</p>
       </div>
     );
   }
 
+  const heading =
+    seedSource === 'import'
+      ? 'Add product (from Excel)'
+      : seedSource === 'duplicate'
+        ? 'Duplicate product'
+        : 'Add product';
+
   return (
-    <div className={`mx-auto w-full ${isVariantsOnlyView ? 'max-w-[96vw] 2xl:max-w-[1800px]' : 'max-w-4xl'}`}>
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 text-sm sm:text-base">
+    <div className="mx-auto w-full max-w-6xl px-4 pb-8">
+      {error ? (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
-      )}
-      
-      <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">
-        {duplicateProduct ? 'Duplicate Product' : 'Add New Product'}
-      </h1>
-      {duplicateProduct && (
-        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mb-4 text-sm">
-          <p>This product is being duplicated. Please review and modify the fields as needed before saving.</p>
+      ) : null}
+
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="mb-1 text-2xl font-bold text-gray-900 sm:text-3xl">{heading}</h1>
+          <p className="text-sm text-gray-500">
+            Identity and a hero image are enough to save. Selling, media, and extras can wait.
+          </p>
         </div>
-      )}
-      <ProductForm 
-        product={duplicateProduct || null}
-        allProducts={products}
+        <div className="flex flex-wrap gap-2">
+          <ProductImportButtons onImport={() => setImportOpen(true)} />
+        </div>
+      </div>
+
+      {seedSource === 'duplicate' ? (
+        <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+          Review the copied fields before saving. SKU and barcode should be unique.
+        </div>
+      ) : null}
+      {seedSource === 'import' ? (
+        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Loaded from Excel. Review brand, category, pricing, and upload a hero image if it is
+          missing — then Save. Nothing was written to the catalog yet.
+        </div>
+      ) : null}
+
+      <ProductForm
+        key={formKey}
+        product={seedProduct || null}
+        allProducts={[]}
         onSave={handleSave}
-        onCancel={handleCancel}
-        onCategoryChange={setSelectedCategoryId}
-        onVariantsOnlyChange={setIsVariantsOnlyView}
+        onCancel={() => router.push('/admin/products')}
+        saving={loading}
+      />
+
+      <ProductImportPanel
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onOpenInForm={applyImport}
       />
     </div>
   );

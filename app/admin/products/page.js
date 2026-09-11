@@ -6,13 +6,59 @@ import Image from 'next/image';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
 import { PlusIcon, EditIcon, TrashIcon, SearchIcon, ChevronLeftIcon, ChevronRightIcon, DuplicateIcon, RestoreIcon } from '@/components/Icons';
-import ProductForm from '@/components/ProductForm';
 import { showToast } from '@/lib/utils/toast';
 import { apiClient, ApiError } from '@/lib/utils/apiClient';
-import { saveProductChildren } from '@/lib/utils/saveProductChildren';
+import { adminJson } from '@/lib/client/adminFetch';
 import { childRowListedInStorefrontCatalog } from '@/lib/utils/storefrontCatalogFilter';
+import ProductImportPanel, { ProductImportButtons } from '@/components/admin/products/ProductImportPanel';
+import { storeImportProductDraft } from '@/lib/client/productImportDraft';
 
 const ITEMS_PER_PAGE = 20;
+
+/** Build confirm copy from delete-dependencies API payload. */
+function formatSoftDeleteWarning(deps, fallbackTitle) {
+  const title = deps?.title || fallbackTitle || 'This product';
+  const lines = [];
+  if (deps?.stock?.totalQty > 0) lines.push(`Stock: ${deps.stock.totalQty} pcs`);
+  if (deps?.ledgerCount > 0) lines.push(`Ledger history: ${deps.ledgerCount} entries`);
+  if (deps?.openBuckets > 0) lines.push(`Open sales quotes: ${deps.openBuckets}`);
+  if (deps?.openRequests > 0) lines.push(`Open stock requests: ${deps.openRequests}`);
+  if (deps?.collections > 0) lines.push(`Sales collections: ${deps.collections}`);
+  if (deps?.enquiryItems > 0) lines.push(`Enquiry items: ${deps.enquiryItems}`);
+  if (deps?.childrenCount > 0) lines.push(`Variant children: ${deps.childrenCount}`);
+
+  if (lines.length === 0) {
+    return (
+      `Move "${title}" to trash?\n\n` +
+      'It will leave Active catalog/sales/inventory flows. You can restore it later from the Deleted tab.'
+    );
+  }
+
+  return (
+    `Move "${title}" to trash?\n\n` +
+    'This product still has active or historical dependencies:\n\n' +
+    lines.map((l) => `• ${l}`).join('\n') +
+    '\n\nTrash hides it from new work but keeps history. Continue?'
+  );
+}
+
+function formatHardDeleteConfirm(deps) {
+  const title = deps?.title || 'This product';
+  if (!deps?.canHardDelete) {
+    return (
+      `Cannot permanently delete "${title}".\n\n` +
+      (deps?.blockers || []).map((b) => `• ${b}`).join('\n')
+    );
+  }
+  return (
+    `DELETE FOREVER — this cannot be undone.\n\n` +
+    `Product: ${title}\n` +
+    (deps?.sku ? `SKU: ${deps.sku}\n` : '') +
+    (deps?.childrenCount ? `Also removes ${deps.childrenCount} variant child row(s).\n` : '') +
+    `\nDependencies: none\n\n` +
+    'Continue?'
+  );
+}
 
 /**
  * List-view price: a single SKU shows one amount; a parent/carrier shows
@@ -71,8 +117,6 @@ function StorefrontInCatalogBadge({ slug, size = 'md' }) {
   );
 }
 
-import { adminJson, adminFetch } from '@/lib/client/adminFetch';
-
 const fetcher = async (url) => adminJson(url);
 
 // Error Display Component with Retry
@@ -107,12 +151,6 @@ const ErrorDisplay = ({ error, onRetry }) => {
 
 export default function AdminProductsPage() {
   const router = useRouter();
-  
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isVariantsOnlyView, setIsVariantsOnlyView] = useState(false);
-  /** 'variants' when opening parent from a child (Variants section); otherwise 'full'. */
-  const [editFormInitialView, setEditFormInitialView] = useState('full');
-  const [editingProduct, setEditingProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -124,6 +162,12 @@ export default function AdminProductsPage() {
   const [adminListFilter, setAdminListFilter] = useState('all');
   /** Parent _id -> bool (expanded). Drives the variant child rows. */
   const [expandedParents, setExpandedParents] = useState({});
+  const [importOpen, setImportOpen] = useState(false);
+
+  const { data: meData } = useSWR('/api/auth/me', (url) => adminJson(url), {
+    revalidateOnFocus: false,
+  });
+  const canHardDelete = meData?.user?.role === 'super_admin';
 
   // Admin list endpoint: returns parents/children/standalones in one shot, ignoring
   // the storefront visibility filter so admins see hidden variants.
@@ -149,14 +193,6 @@ export default function AdminProductsPage() {
       revalidateOnFocus: false,
       keepPreviousData: true,
     }
-  );
-
-  // When viewing Deleted, related-product pickers still need an active catalog pool.
-  // The picker pool intentionally uses the public route (which already excludes parents).
-  const { data: activePickerData } = useSWR(
-    listFilter === 'deleted' ? '/api/products?limit=300&page=1' : null,
-    fetcher,
-    { revalidateOnFocus: false }
   );
 
   const products = data?.products || [];
@@ -295,7 +331,6 @@ export default function AdminProductsPage() {
   const toggleParentExpanded = (parentId) => {
     setExpandedParents((prev) => ({ ...prev, [parentId]: !prev[parentId] }));
   };
-  const allProductsForForm = listFilter === 'deleted' ? (activePickerData?.products || []) : products;
   const totalProducts = data?.total || 0;
 
   // Handle search with debounce
@@ -321,96 +356,19 @@ export default function AdminProductsPage() {
     router.push('/admin/products/add');
   };
     
-  const handleEditProduct = async (product, options = {}) => {
-    const variantsOnly = Boolean(options.variantsOnly);
+  const handleEditProduct = (product, options = {}) => {
     const productId = product._id || product.id;
     if (!productId) {
       showToast.error('Product ID not found');
       return;
     }
-
-    const toastId = showToast.loading('Loading product details...');
-    setLoading(true);
-
-    try {
-      const response = await fetch(`/api/products/${productId}`);
-      const data = await response.json();
-
-      if (data.success && data.product) {
-        let editingPayload = data.product;
-
-        // For parents, the public product route already returns merged content
-        // (because resolveProduct picks the default child) — but for the EDIT
-        // form we want the parent's own copy + the canonical list of children
-        // so the variant table can render. Refetch via the admin children endpoint.
-        if (product.productType === 'parent') {
-          try {
-            const childrenData = await adminJson(`/api/admin/products/${productId}/children`);
-            if (childrenData?.success) {
-              editingPayload = {
-                ...childrenData.parent,
-                children: childrenData.children,
-              };
-            }
-          } catch (e) {
-            console.error('Failed to load variant children:', e);
-          }
-        }
-
-        setEditingProduct(editingPayload);
-        setEditFormInitialView(variantsOnly ? 'variants' : 'full');
-        setIsVariantsOnlyView(variantsOnly);
-        setIsEditModalOpen(true);
-      } else {
-        showToast.error(data.error || 'Failed to load product details');
-      }
-    } catch (error) {
-      console.error('Error fetching product:', error);
-      showToast.error('Failed to load product details');
-    } finally {
-      toast.dismiss(toastId);
-      setLoading(false);
-    }
-  };
-
-  const formatChildVariantSummary = (child) => {
-    const attrs = child?.variationAttributes || {};
-    const parts = [attrs.size, attrs.color, attrs.weight, attrs.unitCount]
-      .map((v) => String(v || '').trim())
-      .filter(Boolean);
-    const label = parts.join(' / ');
-    const title = String(child?.title || '').trim();
-    if (title && label) return `${title} (${label})`;
-    return title || label || String(child?.sku || '').trim() || 'Variant';
+    const variantsOnly = Boolean(options.variantsOnly);
+    const qs = variantsOnly ? '?step=selling' : '';
+    router.push(`/admin/products/${productId}/edit${qs}`);
   };
 
   const buildDeleteProductConfirmMessage = (productId, productHint) => {
-    const deletedId = String(productId);
-    const isChild = productHint?.productType === 'child';
-    const linkedInOpenParentForm =
-      isEditModalOpen &&
-      editingProduct?.productType === 'parent' &&
-      Array.isArray(editingProduct?.children) &&
-      editingProduct.children.some((c) => String(c._id || c.id) === deletedId);
-
-    if (linkedInOpenParentForm) {
-      const child = editingProduct.children.find(
-        (c) => String(c._id || c.id) === deletedId
-      );
-      const summary = formatChildVariantSummary(child);
-      return (
-        'WARNING: This child product is linked to a variant row.\n\n' +
-        `Variant: ${summary}\n` +
-        (child?.sku ? `SKU: ${child.sku}\n` : '') +
-        `Child product ID: ${deletedId}\n\n` +
-        'Deleting will:\n' +
-        '• Move this child product to trash\n' +
-        '• Remove it from the Variants section in the open parent editor\n\n' +
-        'Continue?'
-      );
-    }
-
-    if (isChild) {
+    if (productHint?.productType === 'child') {
       return (
         'WARNING: Child variant product\n\n' +
         'This product is a child variant (not a standalone listing). Deleting it removes the variant from the storefront and parent product page.\n\n' +
@@ -423,7 +381,20 @@ export default function AdminProductsPage() {
   };
 
   const handleDeleteProduct = async (productId, productHint = null) => {
-    if (!window.confirm(buildDeleteProductConfirmMessage(productId, productHint))) {
+    let confirmMessage = buildDeleteProductConfirmMessage(productId, productHint);
+    try {
+      const preview = await adminJson(`/api/products/${productId}/delete-dependencies`);
+      if (preview?.dependencies) {
+        confirmMessage = formatSoftDeleteWarning(
+          preview.dependencies,
+          productHint?.title || preview.dependencies.title
+        );
+      }
+    } catch {
+      // Fall back to the static confirm if the preview API fails.
+    }
+
+    if (!window.confirm(confirmMessage)) {
       return;
     }
 
@@ -436,33 +407,54 @@ export default function AdminProductsPage() {
       });
 
       showToast.success('Product moved to trash');
-
-      const deletedId = String(productId);
-      setEditingProduct((prev) => {
-        if (!prev?.children?.length) return prev;
-        const nextChildren = prev.children.filter(
-          (c) => String(c._id || c.id) !== deletedId
-        );
-        if (nextChildren.length === prev.children.length) return prev;
-        return { ...prev, children: nextChildren };
-      });
-      if (
-        isEditModalOpen &&
-        editingProduct &&
-        String(editingProduct._id || editingProduct.id) === deletedId
-      ) {
-        setIsEditModalOpen(false);
-        setIsVariantsOnlyView(false);
-        setEditFormInitialView('full');
-        setEditingProduct(null);
-      }
-
       mutate(); // Refresh data using SWR
     } catch (error) {
       if (error instanceof ApiError) {
         showToast.error(error.message);
       } else {
         showToast.error('Failed to delete product');
+      }
+    } finally {
+      toast.dismiss(toastId);
+      setLoading(false);
+    }
+  };
+
+  const handleHardDeleteProduct = async (productId, productHint = null) => {
+    if (!canHardDelete) {
+      showToast.error('Only Super Admin can permanently delete products.');
+      return;
+    }
+
+    let deps = null;
+    try {
+      const preview = await adminJson(`/api/products/${productId}/delete-dependencies`);
+      deps = preview?.dependencies || null;
+    } catch (error) {
+      showToast.error(error?.message || 'Could not check product dependencies');
+      return;
+    }
+
+    const message = formatHardDeleteConfirm(deps);
+    if (!deps?.canHardDelete) {
+      window.alert(message);
+      return;
+    }
+    if (!window.confirm(message)) return;
+
+    const toastId = showToast.loading('Deleting forever...');
+    setLoading(true);
+    try {
+      await apiClient.requestWithRetry(`/api/products/${productId}/permanent`, {
+        method: 'DELETE',
+      });
+      showToast.success(`Permanently deleted "${deps?.title || productHint?.title || 'product'}"`);
+      mutate();
+    } catch (error) {
+      if (error instanceof ApiError) {
+        showToast.error(error.message);
+      } else {
+        showToast.error('Failed to permanently delete product');
       }
     } finally {
       toast.dismiss(toastId);
@@ -626,63 +618,6 @@ export default function AdminProductsPage() {
     }
   };
 
-  const handleSaveEditedProduct = async (productData) => {
-    const toastId = showToast.loading('Saving product...');
-    setLoading(true);
-
-    try {
-      const productId = editingProduct._id || editingProduct.id;
-      const variantRows = Array.isArray(productData._variantRows) ? productData._variantRows : [];
-      const variationTheme = Array.isArray(productData.variationTheme) ? productData.variationTheme : [];
-      const initialChildIds = Array.isArray(productData._initialChildIds)
-        ? productData._initialChildIds
-        : [];
-
-      await apiClient.requestWithRetry(`/api/products/${productId}`, {
-        method: 'PUT',
-        body: productData,
-      });
-
-      const result = await saveProductChildren({
-        parentId: productId,
-        parent: { title: productData.title || editingProduct?.title },
-        variantRows,
-        variationTheme,
-        initialChildIds,
-      });
-      if (result.errors.length > 0) {
-        const firstMsg = result.errors[0]?.message || 'Unknown error';
-        showToast.error(
-          `${result.errors.length} variant(s) failed to save: ${firstMsg}`
-        );
-        console.error('Variant save errors:', result.errors);
-        return;
-      }
-
-      const syncedCount = result.created + result.updated;
-      const deletedCount = result.deleted || 0;
-      showToast.success(
-        syncedCount > 0 || deletedCount > 0
-          ? `Product updated. Synced ${syncedCount} variant(s)${deletedCount > 0 ? `, removed ${deletedCount} from trash` : ''}.`
-          : 'Product updated successfully'
-      );
-      setIsEditModalOpen(false);
-      setIsVariantsOnlyView(false);
-      setEditFormInitialView('full');
-      setEditingProduct(null);
-      mutate();
-    } catch (error) {
-      if (error instanceof ApiError) {
-        showToast.error(error.message);
-      } else {
-        showToast.error('Failed to update product');
-      }
-    } finally {
-      toast.dismiss(toastId);
-      setLoading(false);
-    }
-  };
-
   const totalPages = Math.ceil(totalProducts / ITEMS_PER_PAGE);
   const startItem = totalProducts > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0;
   const endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalProducts);
@@ -834,6 +769,7 @@ export default function AdminProductsPage() {
               >
                 Bulk Actions
               </button>
+              <ProductImportButtons onImport={() => setImportOpen(true)} />
               <button 
                 onClick={handleAddProduct} 
                 className="bg-primary hover:bg-primary-700 text-white font-bold py-2.5 sm:py-2 px-3 sm:px-4 rounded-md flex items-center gap-2 whitespace-nowrap transition-colors text-xs sm:text-sm"
@@ -1135,12 +1071,22 @@ export default function AdminProductsPage() {
                                 </button>
                                 <button
                                   onClick={() => handleEditProduct(product)}
-                                  className="text-indigo-600 hover:text-indigo-900"
+                                  className="text-indigo-600 hover:text-indigo-900 mr-4"
                                   disabled={loading}
                                   title="Edit (e.g. change slug if restore fails)"
                                 >
                                   <EditIcon />
                                 </button>
+                                {canHardDelete && (
+                                  <button
+                                    onClick={() => handleHardDeleteProduct(productId, product)}
+                                    className="text-xs font-semibold text-red-700 hover:text-red-900 underline"
+                                    disabled={loading}
+                                    title="Permanently delete if nothing depends on this product"
+                                  >
+                                    Delete forever
+                                  </button>
+                                )}
                               </>
                             )}
                           </td>
@@ -1530,7 +1476,7 @@ export default function AdminProductsPage() {
                           </div>
                         )}
                         {!isBulkMode && listFilter === 'deleted' && (
-                          <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
                             <button 
                               onClick={() => handleRestoreProduct(productId)} 
                               className="text-emerald-600 hover:text-emerald-900 p-2"
@@ -1547,6 +1493,16 @@ export default function AdminProductsPage() {
                             >
                               <EditIcon />
                             </button>
+                            {canHardDelete && (
+                              <button
+                                onClick={() => handleHardDeleteProduct(productId, product)}
+                                className="text-xs font-semibold text-red-700 hover:text-red-900 underline px-1"
+                                disabled={loading}
+                                title="Permanently delete if nothing depends on this product"
+                              >
+                                Delete forever
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1734,38 +1690,19 @@ export default function AdminProductsPage() {
           </>
         )}
       </div>
-
-      {isEditModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className={`bg-white rounded-lg shadow-xl w-full max-h-[95vh] flex flex-col overflow-hidden ${isVariantsOnlyView ? 'max-w-[96vw] 2xl:max-w-[1800px]' : 'max-w-4xl'}`}>
-            <div className="p-4 sm:p-6 border-b">
-              <h2 className="text-xl sm:text-2xl font-bold">Edit Product</h2>
-            </div>
-            <div className="flex-grow overflow-y-auto p-2 sm:p-6">
-              <ProductForm 
-                product={editingProduct} 
-                allProducts={allProductsForForm}
-                initialView={editFormInitialView}
-                onSave={handleSaveEditedProduct}
-                onVariantsOnlyChange={setIsVariantsOnlyView}
-                onOpenParent={(parentId) => {
-                  if (!parentId) return;
-                  void handleEditProduct(
-                    { _id: parentId, productType: 'parent' },
-                    { variantsOnly: true }
-                  );
-                }}
-                onCancel={() => {
-                  setIsVariantsOnlyView(false);
-                  setEditFormInitialView('full');
-                  setIsEditModalOpen(false);
-                  setEditingProduct(null);
-                }} 
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      <ProductImportPanel
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onOpenInForm={(payload) => {
+          try {
+            storeImportProductDraft(payload);
+            router.push('/admin/products/add?import=true');
+          } catch (storageError) {
+            console.error('Error storing import draft:', storageError);
+            showToast.error('Could not open the imported product. Try a smaller row (fewer images).');
+          }
+        }}
+      />
     </div>
   );
 }

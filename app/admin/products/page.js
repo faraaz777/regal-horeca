@@ -28,16 +28,29 @@ function formatSoftDeleteWarning(deps, fallbackTitle) {
   if (deps?.childrenCount > 0) lines.push(`Variant children: ${deps.childrenCount}`);
 
   if (lines.length === 0) {
+    if (deps?.productType === 'parent') {
+      return (
+        `Move "${title}" to trash?\n\n` +
+        'This is the parent product. Trash hides the family from catalog/sales/inventory. ' +
+        'Any remaining variant SKUs are moved to trash with it. You can restore from the Deleted tab.'
+      );
+    }
     return (
       `Move "${title}" to trash?\n\n` +
       'It will leave Active catalog/sales/inventory flows. You can restore it later from the Deleted tab.'
     );
   }
 
+  const cascadeNote =
+    deps?.productType === 'parent'
+      ? '\n\nThis parent and all of its variant SKUs will be moved to trash together.'
+      : '';
+
   return (
     `Move "${title}" to trash?\n\n` +
     'This product still has active or historical dependencies:\n\n' +
     lines.map((l) => `• ${l}`).join('\n') +
+    cascadeNote +
     '\n\nTrash hides it from new work but keeps history. Continue?'
   );
 }
@@ -373,6 +386,14 @@ export default function AdminProductsPage() {
         'WARNING: Child variant product\n\n' +
         'This product is a child variant (not a standalone listing). Deleting it removes the variant from the storefront and parent product page.\n\n' +
         'If you edit the parent later, this variant will no longer appear in the Variants table.\n\n' +
+        'Continue?'
+      );
+    }
+
+    if (productHint?.productType === 'parent') {
+      return (
+        'Move this parent product to trash?\n\n' +
+        'The family card and all remaining variant SKUs will be hidden. You can restore them from the Deleted tab.\n\n' +
         'Continue?'
       );
     }
@@ -1033,30 +1054,28 @@ export default function AdminProductsPage() {
                                 >
                                   <EditIcon />
                                 </button>
-                                {/* Variant carriers (new parents AND legacy products with embedded
-                                    variants) only get Edit. Duplicate/Delete is hidden here so
-                                    admins can't orphan variants from the list view; both flows
-                                    are owned by the parent edit modal. */}
-                                {!isCarrier && (
-                                  <>
-                                    <button
-                                      onClick={() => handleDuplicateProduct(product)}
-                                      className="text-blue-600 hover:text-blue-900 mr-4"
-                                      disabled={loading}
-                                      title="Duplicate product"
-                                    >
-                                      <DuplicateIcon />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteProduct(productId, product)}
-                                      className="text-red-600 hover:text-red-900"
-                                      disabled={loading}
-                                      title="Move to trash"
-                                    >
-                                      <TrashIcon />
-                                    </button>
-                                  </>
-                                )}
+                                {!isCarrier ? (
+                                  <button
+                                    onClick={() => handleDuplicateProduct(product)}
+                                    className="text-blue-600 hover:text-blue-900 mr-4"
+                                    disabled={loading}
+                                    title="Duplicate product"
+                                  >
+                                    <DuplicateIcon />
+                                  </button>
+                                ) : null}
+                                <button
+                                  onClick={() => handleDeleteProduct(productId, product)}
+                                  className="text-red-600 hover:text-red-900"
+                                  disabled={loading}
+                                  title={
+                                    isCarrier
+                                      ? 'Move this parent and its variants to trash'
+                                      : 'Move to trash'
+                                  }
+                                >
+                                  <TrashIcon />
+                                </button>
                               </>
                             )}
                             {!isBulkMode && listFilter === 'deleted' && (
@@ -1450,29 +1469,28 @@ export default function AdminProductsPage() {
                             >
                               <EditIcon />
                             </button>
-                            {/* Carriers (new parents OR legacy products with embedded variants)
-                                only get Edit. Variants are managed inside the parent edit modal.
-                                Standalones keep the full action set. */}
-                            {!isCarrier && (
-                              <>
-                                <button
-                                  onClick={() => handleDuplicateProduct(product)}
-                                  className="text-blue-600 hover:text-blue-900 p-2"
-                                  disabled={loading}
-                                  title="Duplicate product"
-                                >
-                                  <DuplicateIcon />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteProduct(productId, product)}
-                                  className="text-red-600 hover:text-red-900 p-2"
-                                  disabled={loading}
-                                  title="Move to trash"
-                                >
-                                  <TrashIcon />
-                                </button>
-                              </>
-                            )}
+                            {!isCarrier ? (
+                              <button
+                                onClick={() => handleDuplicateProduct(product)}
+                                className="text-blue-600 hover:text-blue-900 p-2"
+                                disabled={loading}
+                                title="Duplicate product"
+                              >
+                                <DuplicateIcon />
+                              </button>
+                            ) : null}
+                            <button
+                              onClick={() => handleDeleteProduct(productId, product)}
+                              className="text-red-600 hover:text-red-900 p-2"
+                              disabled={loading}
+                              title={
+                                isCarrier
+                                  ? 'Move this parent and its variants to trash'
+                                  : 'Move to trash'
+                              }
+                            >
+                              <TrashIcon />
+                            </button>
                           </div>
                         )}
                         {!isBulkMode && listFilter === 'deleted' && (

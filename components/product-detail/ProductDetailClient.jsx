@@ -738,29 +738,63 @@ export default function ProductDetailClient({ initialProduct = null }) {
   const { primary: primaryTitle, secondary: secondaryTitle } = splitProductTitle(product.title);
   const secondaryIsLabel = isLikelyLabel(secondaryTitle);
 
-  const getDisplayImages = () => {
-    if (activeVariant) {
-      const variantImages = Array.isArray(activeVariant.images) ? activeVariant.images.filter(Boolean) : [];
-      if (variantImages.length > 0) return variantImages;
+  /**
+   * SKU-first gallery with shared extras.
+   *
+   * Catalog card and the large PDP image stay on the selected child (row Upload).
+   * Media → Gallery lives on the parent and is appended after SKU shots.
+   * Parent hero is not stacked when the SKU already has an image — fallback only.
+   *
+   * Read parent.gallery directly. Merged product.gallery is the child's row photos.
+   */
+  const dedupeImageUrls = (urls) => {
+    const seen = new Set();
+    const out = [];
+    for (const url of urls || []) {
+      const key = String(url || '').trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(key);
+    }
+    return out;
+  };
 
-      const activeVariantColor = String(activeVariant.color || '').trim().toLowerCase();
-      if (activeVariantColor) {
-        const matchedColorVariant = (product?.colorVariants || []).find(
-          (variant) => String(variant?.colorName || '').trim().toLowerCase() === activeVariantColor
-        );
-        const matchedColorImages = Array.isArray(matchedColorVariant?.images)
-          ? matchedColorVariant.images.filter(Boolean)
-          : [];
-        if (matchedColorImages.length > 0) return matchedColorImages;
+  const getDisplayImages = () => {
+    const parentGallery = Array.isArray(product?.parent?.gallery)
+      ? product.parent.gallery.filter(Boolean)
+      : [];
+
+    if (activeVariant) {
+      let skuImages = Array.isArray(activeVariant.images) ? activeVariant.images.filter(Boolean) : [];
+
+      if (skuImages.length === 0) {
+        const activeVariantColor = String(activeVariant.color || '').trim().toLowerCase();
+        if (activeVariantColor) {
+          const matchedColorVariant = (product?.colorVariants || []).find(
+            (variant) => String(variant?.colorName || '').trim().toLowerCase() === activeVariantColor
+          );
+          skuImages = Array.isArray(matchedColorVariant?.images)
+            ? matchedColorVariant.images.filter(Boolean)
+            : [];
+        }
       }
 
-      // For remaining variants without image data, fallback to main hero image only.
-      return [product?.heroImage].filter(Boolean);
+      if (skuImages.length > 0) {
+        return dedupeImageUrls([...skuImages, ...parentGallery]);
+      }
+
+      const fallbackHero = product?.parent?.heroImage || product?.heroImage;
+      return dedupeImageUrls([fallbackHero, ...parentGallery].filter(Boolean));
     }
+
     if (selectedColor && selectedColor.images && selectedColor.images.length > 0) {
-      return selectedColor.images.filter(Boolean);
+      return dedupeImageUrls([
+        ...selectedColor.images.filter(Boolean),
+        ...(product?.gallery || []),
+      ]);
     }
-    return [product.heroImage, ...(product.gallery || [])].filter(Boolean);
+
+    return dedupeImageUrls([product?.heroImage, ...(product?.gallery || [])].filter(Boolean));
   };
   const allImages = getDisplayImages();
 

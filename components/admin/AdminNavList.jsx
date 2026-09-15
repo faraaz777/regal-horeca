@@ -44,7 +44,7 @@ export default function AdminNavList({
                   sectionIndex === 0 ? 'mt-0' : 'mt-3'
                 }`}
               >
-                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-shell-gold/80">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-shell-dim">
                   {section.label}
                 </span>
                 <ChevronDown
@@ -118,7 +118,7 @@ export default function AdminNavList({
                                 <ChildIcon
                                   size={13}
                                   strokeWidth={1.75}
-                                  className="shrink-0 text-shell-gold/80"
+                                  className="shrink-0 text-shell-dim"
                                 />
                               ) : null}
                               <span className="truncate">{child.label}</span>

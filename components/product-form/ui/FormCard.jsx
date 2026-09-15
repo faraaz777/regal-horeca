@@ -13,6 +13,8 @@ export default function FormCard({
   className = '',
   compact = false,
 }) {
+  const hasBody = children != null && children !== false;
+
   return (
     <section
       className={`bg-white border border-gray-200 rounded-xl shadow-sm ${
@@ -20,9 +22,15 @@ export default function FormCard({
       } ${className}`}
     >
       {title ? (
-        <header className={`border-b border-gray-100 ${compact ? 'mb-3 pb-2' : 'mb-5 pb-3'}`}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
+        <header
+          className={
+            hasBody
+              ? `border-b border-gray-100 ${compact ? 'mb-3 pb-2' : 'mb-5 pb-3'}`
+              : ''
+          }
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 flex-1">
               <h3
                 className={`font-semibold text-gray-900 ${
                   compact ? 'text-base' : 'text-base sm:text-lg'
@@ -37,12 +45,12 @@ export default function FormCard({
               ) : null}
             </div>
             {headerAction ? (
-              <div className="shrink-0 self-center">{headerAction}</div>
+              <div className="w-full shrink-0 sm:w-auto sm:max-w-[min(100%,28rem)]">{headerAction}</div>
             ) : null}
           </div>
         </header>
       ) : null}
-      <div className={compact ? 'space-y-3' : 'space-y-4'}>{children}</div>
+      {hasBody ? <div className={compact ? 'space-y-3' : 'space-y-4'}>{children}</div> : null}
     </section>
   );
 }

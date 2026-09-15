@@ -6,8 +6,28 @@ import FormCard from '@/components/product-form/ui/FormCard';
 import CascadeSelect from '@/components/product-form/ui/CascadeSelect';
 import FormAccordion from '@/components/product-form/ui/FormAccordion';
 import { BRAND_LEVEL_ORDER, LOCKED_CHILD_FIELD_CLASS } from '@/components/product-form/constants';
+import { getBrandAncestry } from '@/components/product-form/lib/taxonomyAncestry';
 import { getTextLength } from '@/components/product-form/lib/formatters';
 import { useProductForm } from '@/components/product-form/ProductFormContext';
+
+/**
+ * Resolve brandSelection ids to a readable path so operators can see
+ * which leaf they linked even when the input shows the department name.
+ */
+function formatBrandTreePath(selection, brands) {
+  if (!selection || !brands?.length) return '';
+  return BRAND_LEVEL_ORDER.map((level) => {
+    const id = selection[level];
+    if (!id) return null;
+    const node = brands.find((b) => {
+      const nodeId = b._id || b.id;
+      return nodeId?.toString() === id.toString();
+    });
+    return node?.name || null;
+  })
+    .filter(Boolean)
+    .join(' → ');
+}
 
 function AiCopyButton({ value, title, onClick, loading, cooldown }) {
   const disabled = loading || cooldown || !title || title.trim().length < 3;
@@ -63,12 +83,23 @@ export default function ProductIdentitySection() {
     handleAdditionalCategoryChange,
     addAdditionalCategory,
     removeAdditionalCategory,
+    brandSelection,
     additionalBrandSelections,
     handleAdditionalBrandCategoryChange,
     addAdditionalBrandCategory,
     removeAdditionalBrandCategory,
     handleBusinessTypeChange,
   } = useProductForm();
+
+  const linkedBrandPath = (() => {
+    if (!formData.brandCategoryId) return '';
+    const hasSelection =
+      brandSelection?.department || brandSelection?.category || brandSelection?.subcategory;
+    const selection = hasSelection
+      ? brandSelection
+      : getBrandAncestry(formData.brandCategoryId, brands || []);
+    return formatBrandTreePath(selection, brands || []);
+  })();
 
   return (
     <div className="space-y-4">
@@ -146,7 +177,9 @@ export default function ProductIdentitySection() {
               </div>
             ) : null}
             {formData.brand && formData.brandCategoryId ? (
-              <p className="mt-1 text-xs text-emerald-600">Linked to the brand tree</p>
+              <p className="mt-1 text-xs text-emerald-600">
+                {linkedBrandPath || 'Linked to the brand tree'}
+              </p>
             ) : formData.brand && !formData.brandCategoryId ? (
               <p className="mt-1 text-xs text-amber-600">
                 Pick a suggestion to link this brand in the catalog tree

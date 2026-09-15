@@ -64,9 +64,12 @@ export default function ProductFormShell() {
     { id: 'hero', label: 'Hero image', done: hasHero },
     {
       id: 'sell',
-      label: variantWorkflowEnabled ? 'At least one variant' : 'Selling type',
-      done: hasVariantsChoice !== null && (hasVariantsChoice === false || (variantRows || []).length > 0),
-      hint: 'Catalog-ready',
+      label: variantWorkflowEnabled ? 'Default child SKU' : 'Selling type',
+      done:
+        hasVariantsChoice !== null &&
+        (hasVariantsChoice === false ||
+          ((variantRows || []).length > 0 && (variantRows || []).some((row) => row.isDefault))),
+      hint: variantWorkflowEnabled ? 'Def radio in Variant SKUs' : 'Catalog-ready',
     },
   ];
   const catalogReadyCount = [hasTitle, hasBrand, hasCategory, hasHero, hasSkuPath && hasVariantsChoice !== null].filter(
@@ -94,7 +97,7 @@ export default function ProductFormShell() {
       ) : null}
 
       <form id="product-form" onSubmit={handleSubmit} className="flex flex-col gap-6">
-        <div className="sticky top-0 z-30 -mx-1 border-b border-gray-200 bg-gray-100/95 px-1 py-3 backdrop-blur">
+        <div className="sticky top-0 z-30 -mx-1 border-b border-gray-200/80 bg-gray-100/95 px-2 py-3.5 backdrop-blur sm:px-3">
           <ProductFormStepper currentStep={currentStep} onStepChange={setCurrentStep} />
         </div>
 

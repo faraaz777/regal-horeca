@@ -1,5 +1,7 @@
 /**
- * Auto-tags from title, brand, SKU, taxonomy, filters, specs, colours, and featured.
+ * Auto-tags from title, brand, SKU, taxonomy, filters, specs, colours,
+ * Selling variant axes (size / colour / weight / unit count), and featured.
+ *
  * Used for search — tags are not catalog sidebar filters.
  */
 
@@ -40,6 +42,28 @@ function splitCompoundValue(value) {
   }
 
   return Array.from(parts).filter(Boolean);
+}
+
+function addAxisValueTag(tags, raw, key) {
+  if (raw == null || !String(raw).trim()) return;
+  const normalized = normalizeTag(String(raw));
+  if (!normalized) return;
+
+  tags.add(normalized);
+  if (key) {
+    const keyTag = normalizeTag(key);
+    if (keyTag) tags.add(`${keyTag}-${normalized}`);
+  }
+  splitCompoundValue(String(raw)).forEach((part) => {
+    if (part && part !== normalized) tags.add(part);
+  });
+}
+
+function parseCommaList(raw) {
+  return String(raw || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
 }
 
 function extractKeywordsFromTitle(title) {
@@ -141,32 +165,109 @@ function extractSpecificationTags(specifications) {
   return Array.from(tags);
 }
 
-export function generateTags(formData, categories, brands, businessTypes) {
+/**
+ * Selling axes for search:
+ * - variantRows (SKU matrix)
+ * - variantBuilderInputs chips (before Generate)
+ * - priceBySize sizes (standalone commerce)
+ * - variationAttributes (child SKU edit)
+ *
+ * Dedupes against filter/colour tags naturally via Set in generateTags.
+ */
+function extractVariantAxisTags({
+  variantRows,
+  variantBuilderInputs,
+  priceBySize,
+  variationAttributes,
+} = {}) {
   const tags = new Set();
 
-  extractKeywordsFromTitle(formData.title).forEach((keyword) => tags.add(keyword));
+  if (Array.isArray(variantRows)) {
+    variantRows.forEach((row) => {
+      if (!row || typeof row !== 'object') return;
+      addAxisValueTag(tags, row.size, 'size');
+      addAxisValueTag(tags, row.color, 'colour');
+      addAxisValueTag(tags, row.weight, 'weight');
+      addAxisValueTag(tags, row.unitCount, 'unit-count');
+    });
+  }
 
-  if (formData.brand && formData.brand.trim()) {
-    const brandTag = normalizeTag(formData.brand);
+  if (variantBuilderInputs && typeof variantBuilderInputs === 'object') {
+    parseCommaList(variantBuilderInputs.size).forEach((value) => addAxisValueTag(tags, value, 'size'));
+    parseCommaList(variantBuilderInputs.weight).forEach((value) => addAxisValueTag(tags, value, 'weight'));
+    parseCommaList(variantBuilderInputs.unitCount).forEach((value) =>
+      addAxisValueTag(tags, value, 'unit-count')
+    );
+  }
+
+  if (Array.isArray(priceBySize)) {
+    priceBySize.forEach((row) => {
+      if (!row || typeof row !== 'object') return;
+      addAxisValueTag(tags, row.size, 'size');
+    });
+  }
+
+  if (variationAttributes && typeof variationAttributes === 'object') {
+    addAxisValueTag(tags, variationAttributes.size, 'size');
+    addAxisValueTag(tags, variationAttributes.color, 'colour');
+    addAxisValueTag(tags, variationAttributes.weight, 'weight');
+    addAxisValueTag(tags, variationAttributes.unitCount, 'unit-count');
+  }
+
+  return Array.from(tags);
+}
+
+/**
+ * Merge manual tags with generated ones (normalized, unique, sorted).
+ * Manual tags are kept; generated fill gaps — never wipe user additions.
+ */
+export function mergeProductTags(existingTags = [], generatedTags = []) {
+  const merged = new Set();
+  [...(existingTags || []), ...(generatedTags || [])].forEach((tag) => {
+    const normalized = normalizeTag(tag);
+    if (normalized) merged.add(normalized);
+  });
+  return Array.from(merged)
+    .filter((tag) => tag && tag.trim().length > 0)
+    .sort();
+}
+
+/**
+ * @param {object} formData
+ * @param {array} categories
+ * @param {array} brands
+ * @param {array} businessTypes
+ * @param {object} [options]
+ * @param {array} [options.variantRows]
+ * @param {object} [options.variantBuilderInputs]
+ */
+export function generateTags(formData, categories, brands, businessTypes, options = {}) {
+  const tags = new Set();
+  const data = formData || {};
+
+  extractKeywordsFromTitle(data.title).forEach((keyword) => tags.add(keyword));
+
+  if (data.brand && data.brand.trim()) {
+    const brandTag = normalizeTag(data.brand);
     if (brandTag) tags.add(brandTag);
   }
 
-  if (formData.sku && formData.sku.trim()) {
-    const skuTag = normalizeTag(formData.sku);
+  if (data.sku && data.sku.trim()) {
+    const skuTag = normalizeTag(data.sku);
     if (skuTag) tags.add(skuTag);
   }
 
-  extractCategoryTags(formData.categoryId, formData.categoryIds, categories).forEach((tag) =>
+  extractCategoryTags(data.categoryId, data.categoryIds, categories || []).forEach((tag) =>
     tags.add(tag)
   );
-  extractBrandCategoryTags(formData.brandCategoryId, formData.brandCategoryIds, brands).forEach(
+  extractBrandCategoryTags(data.brandCategoryId, data.brandCategoryIds, brands || []).forEach(
     (tag) => tags.add(tag)
   );
-  extractFilterTags(formData.filters).forEach((tag) => tags.add(tag));
-  extractSpecificationTags(formData.specifications).forEach((tag) => tags.add(tag));
+  extractFilterTags(data.filters).forEach((tag) => tags.add(tag));
+  extractSpecificationTags(data.specifications).forEach((tag) => tags.add(tag));
 
-  if (Array.isArray(formData.colorVariants)) {
-    formData.colorVariants.forEach((variant) => {
+  if (Array.isArray(data.colorVariants)) {
+    data.colorVariants.forEach((variant) => {
       if (variant.colorName && variant.colorName.trim()) {
         const colorTag = normalizeTag(variant.colorName);
         if (colorTag) tags.add(colorTag);
@@ -174,8 +275,15 @@ export function generateTags(formData, categories, brands, businessTypes) {
     });
   }
 
-  if (Array.isArray(formData.businessTypeSlugs) && Array.isArray(businessTypes)) {
-    formData.businessTypeSlugs.forEach((slug) => {
+  extractVariantAxisTags({
+    variantRows: options.variantRows,
+    variantBuilderInputs: options.variantBuilderInputs,
+    priceBySize: data.priceBySize,
+    variationAttributes: data.variationAttributes,
+  }).forEach((tag) => tags.add(tag));
+
+  if (Array.isArray(data.businessTypeSlugs) && Array.isArray(businessTypes)) {
+    data.businessTypeSlugs.forEach((slug) => {
       const businessType = businessTypes.find((bt) => bt.slug === slug);
       if (businessType && businessType.name) {
         const btTag = normalizeTag(businessType.name);
@@ -184,7 +292,7 @@ export function generateTags(formData, categories, brands, businessTypes) {
     });
   }
 
-  if (formData.featured) tags.add('featured');
+  if (data.featured) tags.add('featured');
 
   return Array.from(tags)
     .filter((tag) => tag && tag.trim().length > 0)

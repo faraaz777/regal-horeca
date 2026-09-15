@@ -167,7 +167,7 @@ export default function AdminShell({ children }) {
     `shrink-0 ${
       isActive
         ? 'text-shell-active-fg'
-        : 'text-shell-gold group-hover:text-shell-gold'
+        : 'text-shell-muted group-hover:text-shell-text'
     }`;
 
   return (
@@ -192,7 +192,7 @@ export default function AdminShell({ children }) {
       {/*
         Desktop: open = labels (w-64), closed = icon rail (w-16) so icons stay.
         Mobile: closed slides fully off-canvas; open is the full drawer.
-        Palette: warm espresso + gold — brand hospitality tones, not cold black/red.
+        Palette: neutral charcoal — tokens live under shell.* in tailwind.config.
       */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-shell-bg text-shell-text border-r border-shell-border
@@ -213,7 +213,7 @@ export default function AdminShell({ children }) {
                   className="min-w-0"
                   title="Regal Control Hub"
                 >
-                  <p className="text-[10px] font-semibold tracking-[0.28em] uppercase text-shell-gold">
+                  <p className="text-[10px] font-semibold tracking-[0.28em] uppercase text-shell-muted">
                     Regal
                   </p>
                   <p className="text-xs text-shell-dim mt-0.5 truncate">Control Hub</p>
@@ -239,7 +239,7 @@ export default function AdminShell({ children }) {
 
               <div className="flex items-center gap-2.5 rounded-lg bg-shell-raised border border-shell-border/80 px-2.5 py-2">
                 <div
-                  className="shrink-0 h-9 w-9 rounded-full bg-shell-gold text-shell-bg flex items-center justify-center text-xs font-bold"
+                  className="shrink-0 h-9 w-9 rounded-full bg-shell-raised border border-shell-border text-shell-text flex items-center justify-center text-xs font-bold"
                   aria-hidden
                 >
                   {userInitials(user.name)}
@@ -263,7 +263,7 @@ export default function AdminShell({ children }) {
                 className="flex justify-center"
               >
                 <div
-                  className="h-9 w-9 rounded-full bg-shell-gold text-shell-bg flex items-center justify-center text-xs font-bold"
+                  className="h-9 w-9 rounded-full bg-shell-raised border border-shell-border text-shell-text flex items-center justify-center text-xs font-bold"
                   aria-hidden
                 >
                   {userInitials(user.name)}
@@ -316,7 +316,7 @@ export default function AdminShell({ children }) {
             <KeyRound
               size={17}
               strokeWidth={1.75}
-              className="shrink-0 text-shell-gold/70 group-hover:text-shell-gold transition-colors"
+              className="shrink-0 text-shell-dim group-hover:text-shell-muted transition-colors"
             />
             {expanded && <span>Change password</span>}
           </Link>
@@ -331,7 +331,7 @@ export default function AdminShell({ children }) {
             <LogOut
               size={17}
               strokeWidth={1.75}
-              className="shrink-0 text-shell-gold/70 group-hover:text-shell-gold transition-colors"
+              className="shrink-0 text-shell-dim group-hover:text-shell-muted transition-colors"
             />
             {expanded && <span>Logout</span>}
           </button>

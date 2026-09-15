@@ -25,6 +25,24 @@ export const AVAILABLE_COLORS = [
   { name: 'Beige', hex: '#F5F5DC' },
 ];
 
+/**
+ * Colour isDefault only seeds which PDP swatch opens first.
+ * Commercial default is the child SKU (Def), not colour.
+ * Keep exactly one colour flagged when any colours exist.
+ */
+export function ensureOneDefaultColorVariant(variants = []) {
+  const list = (Array.isArray(variants) ? variants : []).map((v) => ({ ...v }));
+  if (list.length === 0) return list;
+
+  const firstDefaultIndex = list.findIndex((v) => v.isDefault);
+  const keepIndex = firstDefaultIndex >= 0 ? firstDefaultIndex : 0;
+
+  return list.map((v, index) => ({
+    ...v,
+    isDefault: index === keepIndex,
+  }));
+}
+
 export function getPredefinedColorSwatchClassName(color) {
   if (color?.swatch === 'transparent') {
     return 'bg-[length:6px_6px] bg-[position:0_0,3px_3px] bg-[image:linear-gradient(45deg,#ccc_25%,transparent_25%),linear-gradient(-45deg,#ccc_25%,transparent_25%)]';

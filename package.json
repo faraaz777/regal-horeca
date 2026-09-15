@@ -11,6 +11,8 @@
     "migrate:variants:dry": "node scripts/migrateVariantsToChildren.mjs --dry-run",
     "migrate:product-filters": "node scripts/migrateProductFilters.mjs",
     "migrate:product-filters:dry": "node scripts/migrateProductFilters.mjs --dry-run",
+    "migrate:unset-is-premium": "node scripts/unsetProductIsPremium.mjs",
+    "migrate:unset-is-premium:dry": "node scripts/unsetProductIsPremium.mjs --dry-run",
     "migrate:inventory-buckets": "node scripts/migrateInventoryStatusBuckets.mjs",
     "migrate:inventory-buckets:dry": "node scripts/migrateInventoryStatusBuckets.mjs --dry-run",
     "job:dead-stock": "node scripts/runDeadStockAutomation.mjs",

@@ -27,16 +27,33 @@ import {
 } from '@/components/product-form/lib/formatters';
 import {
   AVAILABLE_COLORS,
+  ensureOneDefaultColorVariant,
   resolveColorDisplay,
 } from '@/components/product-form/lib/colors';
 import { uploadProductFile } from '@/components/product-form/lib/uploadProductFile';
 import {
   generateTags as generateProductTags,
+  mergeProductTags,
   normalizeTag,
 } from '@/components/product-form/lib/generateProductTags';
 import { getCategoryAncestry, getBrandAncestry } from '@/components/product-form/lib/taxonomyAncestry';
 import { ProductFormProvider } from '@/components/product-form/ProductFormContext';
 import ProductFormShell from '@/components/product-form/ui/ProductFormShell';
+
+/**
+ * Commercial default is the child SKU (Def).
+ * Always keep exactly one default row whenever the matrix is non-empty.
+ */
+function ensureOneDefaultVariantRow(rows = []) {
+  const list = Array.isArray(rows) ? rows.map((row) => ({ ...row })) : [];
+  if (list.length === 0) return list;
+  const firstDefaultIndex = list.findIndex((row) => row.isDefault);
+  const keepIndex = firstDefaultIndex >= 0 ? firstDefaultIndex : 0;
+  return list.map((row, index) => ({
+    ...row,
+    isDefault: index === keepIndex,
+  }));
+}
 
 export default function ProductForm({
   product,
@@ -85,7 +102,6 @@ export default function ProductForm({
     relatedProductIds: [],
     frequentlyOrderedTogetherProductIds: [],
     featured: false,
-    isPremium: false,
     tags: [],
     tagsInput: '',
     status: 'In Stock',
@@ -362,7 +378,7 @@ export default function ProductForm({
       .filter(Boolean)
       .map((id) => String(id));
 
-    setVariantRows(normalized);
+    setVariantRows(ensureOneDefaultVariantRow(normalized));
 
     setVariantFieldSelection({
       size: normalized.some((row) => row.size),
@@ -445,20 +461,20 @@ export default function ProductForm({
   const renderVariantOptionValueChips = (field) => {
     const values = parseOptionValues(variantBuilderInputs[field]);
     if (values.length === 0) {
-      return <p className="text-xs text-gray-400 mt-2">No values yet — add one above.</p>;
+      return <p className="mt-2 text-xs text-gray-400">No values yet — add one above.</p>;
     }
     return (
-      <ul className="flex flex-wrap gap-1.5 mt-2 list-none">
+      <ul className="mt-2 flex list-none flex-wrap gap-1.5">
         {values.map((value) => (
           <li
             key={`${field}-${value}`}
-            className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 text-xs font-medium text-gray-800 bg-white border border-gray-300 rounded-full"
+            className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-0.5 text-xs font-medium text-gray-800"
           >
             <span>{value}</span>
             <button
               type="button"
               onClick={() => removeVariantOptionValue(field, value)}
-              className="inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-500 hover:bg-red-50 hover:text-red-600"
+              className="inline-flex h-4 w-4 items-center justify-center rounded text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
               title={`Remove ${value}`}
               aria-label={`Remove ${value}`}
             >
@@ -666,7 +682,7 @@ export default function ProductForm({
     });
 
     setError('');
-    setVariantRows(nextRows);
+    setVariantRows(ensureOneDefaultVariantRow(nextRows));
   };
 
   const handleVariantRowChange = (index, field, value) => {
@@ -886,7 +902,7 @@ export default function ProductForm({
   };
 
   const handleAddSingleVariantRow = () => {
-    setVariantRows((prev) => [...prev, createEmptyVariantRow()]);
+    setVariantRows((prev) => ensureOneDefaultVariantRow([...prev, createEmptyVariantRow()]));
     setError('');
   };
 
@@ -968,7 +984,9 @@ export default function ProductForm({
       }
     }
 
-    setVariantRows((prev) => prev.filter((_, rowIndex) => rowIndex !== index));
+    setVariantRows((prev) =>
+      ensureOneDefaultVariantRow(prev.filter((_, rowIndex) => rowIndex !== index))
+    );
     // Only offer undo for unsaved rows — persisted children are already soft-deleted in the API.
     if (!childId) {
       setRecentlyDeletedVariantRow({ row: rowToDelete, index });
@@ -994,7 +1012,7 @@ export default function ProductForm({
       const next = [...prev];
       const safeIndex = Math.max(0, Math.min(index, next.length));
       next.splice(safeIndex, 0, row);
-      return next;
+      return ensureOneDefaultVariantRow(next);
     });
     setRecentlyDeletedVariantRow(null);
   };
@@ -1047,30 +1065,29 @@ export default function ProductForm({
   };
 
   /**
-   * Handle auto-generate tags button click
+   * Handle auto-generate tags button click.
+   * Merges into existing tags — never wipes manual entries.
    */
   const handleAutoGenerateTags = () => {
-    const generatedTags = generateProductTags(formData, categories, brands, businessTypes);
-    
-    // Merge with existing tags
-    const existingTags = formData.tagsInput 
-      ? formData.tagsInput.split(',').map(t => normalizeTag(t)).filter(Boolean)
+    const generatedTags = generateProductTags(formData, categories, brands, businessTypes, {
+      variantRows,
+      variantBuilderInputs,
+    });
+
+    const existingTags = formData.tagsInput
+      ? formData.tagsInput.split(',').map((t) => normalizeTag(t)).filter(Boolean)
       : [];
-    
-    // Combine and remove duplicates
-    const allTags = Array.from(new Set([...existingTags, ...generatedTags]));
-    
-    // Update form data
-    setFormData(prev => ({
+
+    const allTags = mergeProductTags(existingTags, generatedTags);
+
+    setFormData((prev) => ({
       ...prev,
-      tagsInput: allTags.join(', ')
+      tagsInput: allTags.join(', '),
     }));
-    
-    // Show preview
+
     setGeneratedTagsPreview(generatedTags);
     setShowTagsPreview(true);
-    
-    // Auto-hide preview after 5 seconds
+
     setTimeout(() => {
       setShowTagsPreview(false);
     }, 5000);
@@ -1200,19 +1217,22 @@ export default function ProductForm({
     autoTagDebounceRef.current = setTimeout(() => {
       // Only auto-generate if form has substantial data
       if (formData.title && formData.title.trim().length > 3) {
-        const generatedTags = generateProductTags(formData, categories, brands, businessTypes);
+        const generatedTags = generateProductTags(formData, categories, brands, businessTypes, {
+          variantRows,
+          variantBuilderInputs,
+        });
         if (generatedTags.length > 0) {
           // Re-check existing tags (user might have edited in the meantime)
-          const currentTags = formData.tagsInput 
-            ? formData.tagsInput.split(',').map(t => normalizeTag(t)).filter(Boolean)
+          const currentTags = formData.tagsInput
+            ? formData.tagsInput.split(',').map((t) => normalizeTag(t)).filter(Boolean)
             : [];
-          
+
           // Only update if tags input is still empty or minimal
           if (currentTags.length <= 2) {
-            const allTags = Array.from(new Set([...currentTags, ...generatedTags]));
-            setFormData(prev => ({
+            const allTags = mergeProductTags(currentTags, generatedTags);
+            setFormData((prev) => ({
               ...prev,
-              tagsInput: allTags.join(', ')
+              tagsInput: allTags.join(', '),
             }));
           }
         }
@@ -1238,6 +1258,10 @@ export default function ProductForm({
     formData.businessTypeSlugs,
     formData.featured,
     formData.tagsInput, // Include to check if user manually edited
+    formData.priceBySize,
+    formData.variationAttributes,
+    variantRows,
+    variantBuilderInputs,
     categories,
     brands,
     businessTypes,
@@ -1307,6 +1331,7 @@ export default function ProductForm({
         tagsInput: (product.tags || []).join(', '),
         filters: filters,
         availableSizes: product.availableSizes || '',
+        colorVariants: ensureOneDefaultColorVariant(product.colorVariants || []),
         // Ensure these fields are properly initialized
         gallery: product.gallery || [],
         specifications: product.specifications || [],
@@ -2530,19 +2555,18 @@ export default function ProductForm({
 
   const handleColorChange = (color) => {
     const currentVariants = formData.colorVariants || [];
-    const isSelected = currentVariants.some(v => v.colorName === color.name);
-    
+    const isSelected = currentVariants.some((v) => v.colorName === color.name);
+
     if (isSelected) {
-      // Removing a color - if it was default, we don't need to reassign
-      const newVariants = currentVariants.filter(v => v.colorName !== color.name);
+      const newVariants = ensureOneDefaultColorVariant(
+        currentVariants.filter((v) => v.colorName !== color.name)
+      );
       setFormData({ ...formData, colorVariants: newVariants });
     } else {
-      // Adding a new color - set as default if it's the first one
-      const isFirstColor = currentVariants.length === 0;
-      const newVariants = [
+      const newVariants = ensureOneDefaultColorVariant([
         ...currentVariants,
-        { colorName: color.name, colorHex: color.hex, images: [], isDefault: isFirstColor }
-      ];
+        { colorName: color.name, colorHex: color.hex, images: [], isDefault: false },
+      ]);
       setFormData({ ...formData, colorVariants: newVariants });
     }
   };
@@ -2558,18 +2582,20 @@ export default function ProductForm({
     }
 
     const currentVariants = formData.colorVariants || [];
-    // Check if color name already exists
-    if (currentVariants.some(v => v.colorName.toLowerCase() === customColorName.trim().toLowerCase())) {
+    if (currentVariants.some((v) => v.colorName.toLowerCase() === customColorName.trim().toLowerCase())) {
       setError('A color with this name already exists');
       return;
     }
 
-    // Set as default if it's the first color
-    const isFirstColor = currentVariants.length === 0;
-    const newVariants = [
+    const newVariants = ensureOneDefaultColorVariant([
       ...currentVariants,
-      { colorName: customColorName.trim(), colorHex: customColorHex.toUpperCase(), images: [], isDefault: isFirstColor }
-    ];
+      {
+        colorName: customColorName.trim(),
+        colorHex: customColorHex.toUpperCase(),
+        images: [],
+        isDefault: false,
+      },
+    ]);
     setFormData({ ...formData, colorVariants: newVariants });
     setShowColorPicker(false);
     setCustomColorName('');
@@ -2579,26 +2605,9 @@ export default function ProductForm({
 
   const handleRemoveCustomColor = (colorName) => {
     const currentVariants = formData.colorVariants || [];
-    const removedVariant = currentVariants.find(v => v.colorName === colorName);
-    const newVariants = currentVariants.filter(v => v.colorName !== colorName);
-    
-    // If removed variant was default and there are other variants, set first one as default
-    if (removedVariant?.isDefault && newVariants.length > 0) {
-      newVariants[0] = { ...newVariants[0], isDefault: true };
-    }
-    
-    setFormData({ ...formData, colorVariants: newVariants });
-  };
-
-  /**
-   * Set a color variant as the default (only one can be default at a time)
-   */
-  const handleSetDefaultColor = (colorName) => {
-    const currentVariants = formData.colorVariants || [];
-    const newVariants = currentVariants.map(v => ({
-      ...v,
-      isDefault: v.colorName === colorName
-    }));
+    const newVariants = ensureOneDefaultColorVariant(
+      currentVariants.filter((v) => v.colorName !== colorName)
+    );
     setFormData({ ...formData, colorVariants: newVariants });
   };
 
@@ -2841,9 +2850,29 @@ export default function ProductForm({
       }
     }
     
-    const tags = formData.tagsInput 
-      ? formData.tagsInput.split(',').map(t => t.trim()).filter(Boolean) 
-      : [];
+    /**
+     * Always merge generated tags on Save so search stays complete even if
+     * the user never opened Content or clicked Auto-generate.
+     * Manual tags are preserved; generator only fills gaps.
+     */
+    const existingTags = formData.tagsInput
+      ? formData.tagsInput.split(',').map((t) => normalizeTag(t)).filter(Boolean)
+      : Array.isArray(formData.tags)
+        ? formData.tags.map((t) => normalizeTag(t)).filter(Boolean)
+        : [];
+    const generatedTags = generateProductTags(formData, categories, brands, businessTypes, {
+      variantRows,
+      variantBuilderInputs,
+    });
+    const tags = mergeProductTags(existingTags, generatedTags);
+
+    // Keep the Content tags field in sync with what we persist
+    if (tags.join(', ') !== (formData.tagsInput || '')) {
+      setFormData((prev) => ({
+        ...prev,
+        tagsInput: tags.join(', '),
+      }));
+    }
     
     // Ensure categoryIds is properly formatted
     const categoryIds = (formData.categoryIds || []).filter(id => id && id.trim() !== '');
@@ -2958,7 +2987,7 @@ export default function ProductForm({
 
     const finalProduct = {
       ...formData,
-      colorVariants: existingColorVariants,
+      colorVariants: ensureOneDefaultColorVariant(existingColorVariants),
       gstPercent: Number(formData.gstPercent || 0),
       mrp: Number(formData.mrp || 0),
       sellingPrice: Number(formData.sellingPrice || 0),
@@ -3012,8 +3041,6 @@ export default function ProductForm({
       delete finalProduct.brandCategoryId;
     }
 
-    // Premium collection is unused; keep the schema field false so old badges stay off.
-    finalProduct.isPremium = false;
     finalProduct.status = finalProduct.status || 'In Stock';
 
       await onSave(finalProduct);
@@ -3052,6 +3079,8 @@ export default function ProductForm({
     variantDraftValue,
     setVariantDraftValue,
     addVariantOptionValue,
+    removeVariantOptionValue,
+    variantBuilderInputs,
     renderVariantOptionValueChips,
     fullFormColorNames,
     handleGenerateVariantRows,
@@ -3119,7 +3148,6 @@ export default function ProductForm({
     customColorName,
     setCustomColorName,
     handleAddCustomColor,
-    handleSetDefaultColor,
     handleColorImageUpload,
     handleRemoveColorImage,
     childAssignedColorDisplay,

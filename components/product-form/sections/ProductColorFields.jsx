@@ -11,10 +11,10 @@ import { useProductForm } from '@/components/product-form/ProductFormContext';
 
 /**
  * Colour chips live on Selling (one source of truth).
- * Per-colour galleries are uploaded on Media so SKU generation does not require
- * bouncing back to a second colour picker.
+ * Colour is an attribute of SKUs — not a commercial default.
+ * Per-colour galleries are uploaded on Media.
  */
-export function ColorSelectionPanel() {
+export function ColorSelectionPanel({ mode = 'variant' } = {}) {
   const {
     formData,
     isChildProduct,
@@ -36,8 +36,9 @@ export function ColorSelectionPanel() {
     handleAddCustomColor,
     error,
     setError,
-    handleSetDefaultColor,
   } = useProductForm();
+
+  const isStandalone = mode === 'standalone';
 
   if (isChildProduct) {
     return (
@@ -79,65 +80,89 @@ export function ColorSelectionPanel() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-600">
-        Pick the colours this product is sold in. Variant SKUs will only use these colours. Photos
-        for each colour are uploaded on the Media step.
+      <p className="text-xs text-gray-500">
+        {isStandalone
+          ? 'Optional presentation swatches only — this product is still one SKU. The product page opens on the first colour.'
+          : 'Pick the colours this product is sold in. Variant SKUs only use these. Commercial default is the Def SKU row, not a colour.'}
       </p>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-2">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] gap-1.5">
         {AVAILABLE_COLORS.map((color) => {
           const isSelected = formData.colorVariants?.some((v) => v.colorName === color.name);
-          const isDefault = formData.colorVariants?.some(
-            (v) => v.colorName === color.name && v.isDefault
-          );
           return (
-            <label
+            <button
               key={color.name}
-              className={`flex cursor-pointer items-start gap-2 rounded-lg border-2 p-2.5 min-w-0 ${
-                isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'
+              type="button"
+              aria-pressed={Boolean(isSelected)}
+              onClick={() => handleColorChange(color)}
+              className={`flex min-w-0 items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors ${
+                isSelected
+                  ? 'border-neutral-400/70 bg-neutral-50 shadow-[inset_0_0_0_1px_rgba(23,23,23,0.06)]'
+                  : 'border-gray-200 bg-white hover:border-gray-300'
               }`}
             >
-              <input
-                type="checkbox"
-                checked={Boolean(isSelected)}
-                onChange={() => handleColorChange(color)}
-                className="mt-0.5 h-4 w-4 rounded text-primary"
-              />
               <span
                 style={color.swatch ? undefined : { backgroundColor: color.hex }}
-                className={`h-6 w-6 shrink-0 rounded-full border-2 border-gray-300 ${getPredefinedColorSwatchClassName(color)}`}
-              />
-              <span className="min-w-0 flex-1 text-sm font-medium leading-snug">
-                {color.name}
-                {isDefault ? <span className="block text-[10px] text-amber-700">Default</span> : null}
+                className={`relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${getPredefinedColorSwatchClassName(color)} ${
+                  isSelected
+                    ? 'border-gray-400 ring-2 ring-neutral-900/25 ring-offset-1'
+                    : 'border-gray-300'
+                }`}
+                aria-hidden
+              >
+                {isSelected ? (
+                  <svg
+                    viewBox="0 0 12 12"
+                    className={`h-2.5 w-2.5 drop-shadow-sm ${
+                      color.name === 'White' ||
+                      color.name === 'Transparent' ||
+                      color.name === 'Beige' ||
+                      color.name === 'Yellow' ||
+                      color.name === 'Silver'
+                        ? 'text-neutral-800'
+                        : 'text-white'
+                    }`}
+                    fill="none"
+                  >
+                    <path
+                      d="M2.5 6.2 4.8 8.5 9.5 3.5"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ) : null}
               </span>
-            </label>
+              <span
+                className={`min-w-0 flex-1 truncate text-xs leading-none ${
+                  isSelected ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'
+                }`}
+              >
+                {color.name}
+              </span>
+            </button>
           );
         })}
       </div>
 
       {getCustomColors().length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
           {getCustomColors().map((variant) => (
             <div
               key={variant.colorName}
-              className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3"
+              className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-2.5 py-2"
             >
-              <button
-                type="button"
-                onClick={() => handleSetDefaultColor(variant.colorName)}
-                className="flex min-w-0 items-center gap-2 text-left"
-                title="Set as default colour"
-              >
+              <div className="flex min-w-0 items-center gap-2">
                 <span
                   style={{ backgroundColor: variant.colorHex }}
-                  className="h-8 w-8 shrink-0 rounded-full border border-gray-300"
+                  className="h-5 w-5 shrink-0 rounded-full border border-gray-300"
                 />
-                <span className="truncate text-sm font-medium">{variant.colorName}</span>
-              </button>
+                <span className="truncate text-xs font-medium text-gray-900">{variant.colorName}</span>
+              </div>
               <button
                 type="button"
                 onClick={() => handleRemoveCustomColor(variant.colorName)}
-                className="p-1.5 text-red-500 hover:bg-red-50 rounded-md"
+                className="rounded-md p-1.5 text-red-500 transition-colors hover:bg-red-50"
                 aria-label={`Remove ${variant.colorName}`}
               >
                 <TrashIcon className="h-4 w-4" />
@@ -150,17 +175,10 @@ export function ColorSelectionPanel() {
       <button
         type="button"
         onClick={handleOpenColorPicker}
-        className="inline-flex items-center gap-2 rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 px-4 py-2 text-sm font-semibold text-primary hover:border-primary/50"
+        className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-800 transition-colors hover:border-neutral-900 hover:bg-gray-50"
       >
-        <PlusIcon className="h-4 w-4" /> Add custom colour
+        <PlusIcon className="h-3.5 w-3.5" /> Add custom colour
       </button>
-
-      {formData.colorVariants?.length > 1 ? (
-        <p className="text-xs text-gray-500">
-          Star a default on Media, or click a custom colour name to set default. The first selected
-          colour is default until you change it.
-        </p>
-      ) : null}
 
       {showColorPicker ? (
         <div
@@ -243,7 +261,6 @@ export function ColorPhotosPanel() {
     isUploading,
     handleColorImageUpload,
     handleRemoveColorImage,
-    handleSetDefaultColor,
   } = useProductForm();
 
   if (isChildProduct) {
@@ -266,40 +283,25 @@ export function ColorPhotosPanel() {
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-gray-600">
-        Upload once per colour here (Media step). These photos are shared by every size of that
-        colour. Photos uploaded on a variant row are SKU-only overrides and do not appear in this
-        panel.
+    <div className="space-y-2.5">
+      <p className="text-[11px] leading-snug text-gray-500">
+        Shared by every size of that colour. Variant-row photos are SKU-only overrides.
       </p>
       {variants.map((variant) => (
         <div
           key={variant.colorName}
-          className={`rounded-lg border-2 p-4 ${
-            variant.isDefault ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-gray-50'
-          }`}
+          className="rounded-md border border-gray-200 bg-gray-50/80 px-2.5 py-2"
         >
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span
                 style={{ backgroundColor: variant.colorHex }}
-                className="h-6 w-6 rounded-full border border-gray-300"
+                className="h-5 w-5 rounded-full border border-gray-300"
               />
-              <span className="font-medium text-gray-900">{variant.colorName}</span>
-              {variant.isDefault ? (
-                <span className="text-[11px] font-semibold text-amber-800">Default</span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => handleSetDefaultColor(variant.colorName)}
-                  className="text-[11px] font-semibold text-primary underline"
-                >
-                  Set default
-                </button>
-              )}
+              <span className="text-xs font-medium text-gray-900">{variant.colorName}</span>
             </div>
-            <label className="cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold hover:bg-gray-50">
-              {isUploading ? 'Uploading…' : 'Upload photos'}
+            <label className="cursor-pointer rounded-md border border-gray-200 bg-white px-2 py-1 text-[11px] font-semibold text-gray-800 hover:border-neutral-900 hover:bg-neutral-900 hover:text-white">
+              {isUploading ? 'Uploading…' : 'Upload'}
               <input
                 type="file"
                 accept="image/*"
@@ -310,21 +312,21 @@ export function ColorPhotosPanel() {
               />
             </label>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {(variant.images || []).map((url, imageIndex) => (
-              <div key={`${url}-${imageIndex}`} className="relative h-16 w-16">
+              <div key={`${url}-${imageIndex}`} className="relative h-14 w-14">
                 <Image
                   src={url}
                   alt=""
-                  width={64}
-                  height={64}
+                  width={56}
+                  height={56}
                   unoptimized
-                  className="h-16 w-16 rounded-md border border-gray-200 object-cover"
+                  className="h-14 w-14 rounded-md border border-gray-200 object-cover"
                 />
                 <button
                   type="button"
                   onClick={() => handleRemoveColorImage(variant.colorName, imageIndex)}
-                  className="absolute -right-1 -top-1 h-5 w-5 rounded-full bg-red-600 text-[10px] leading-5 text-white"
+                  className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-red-600 text-[9px] leading-4 text-white"
                   aria-label="Remove colour photo"
                 >
                   ×
@@ -332,7 +334,7 @@ export function ColorPhotosPanel() {
               </div>
             ))}
             {(variant.images || []).length === 0 ? (
-              <p className="text-xs text-gray-500">Falls back to hero image on the storefront.</p>
+              <p className="text-[11px] text-gray-400">Falls back to hero on storefront.</p>
             ) : null}
           </div>
         </div>

@@ -10,6 +10,7 @@ import {
   getPredefinedColorSwatchClassName,
   resolveColorDisplay,
 } from '@/components/product-form/lib/colors';
+import { parseOptionValues } from '@/lib/shared/variantMatrix';
 import { useProductForm } from '@/components/product-form/ProductFormContext';
 
 /** Match Product-step chip language: thin border, black when selected. */
@@ -18,13 +19,6 @@ const fieldClass =
 const fieldErrorClass =
   'w-full rounded-md border border-red-400 bg-red-50 px-2.5 py-2 text-sm text-gray-900 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/15';
 const labelClass = 'mb-1 block text-xs font-medium text-gray-600';
-
-function parseOptionValues(raw) {
-  return String(raw || '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
-}
 
 /**
  * Compact inline tag field — no title row; field name lives in placeholder / aria-label.
@@ -107,6 +101,7 @@ export default function ProductSellingSection() {
     handleColorChange,
     handleGenerateVariantRows,
     handleAddSingleVariantRow,
+    handleClearVariantBuilder,
     variantRows,
     addPriceBySizeRow,
     removePriceBySizeRow,
@@ -396,7 +391,7 @@ export default function ProductSellingSection() {
                 Variant attributes
               </h3>
               <p className="text-right text-[12px] leading-relaxed text-gray-500">
-                Pick up to two axes, add values, then generate.
+                Pick 1–2 axes, add values, then generate (m or m×n rows).
               </p>
             </header>
 
@@ -531,7 +526,7 @@ export default function ProductSellingSection() {
               <button
                 type="button"
                 onClick={handleGenerateVariantRows}
-                title="Build rows from the axes and values above"
+                title="Build m or m×n rows from the axes and values above"
                 className="rounded-md bg-emerald-600 px-3.5 py-2 text-sm font-semibold tracking-tight text-white transition-colors hover:bg-emerald-700"
               >
                 Generate variants
@@ -539,10 +534,20 @@ export default function ProductSellingSection() {
               <button
                 type="button"
                 onClick={handleAddSingleVariantRow}
-                title="Insert one empty SKU row without generating"
+                title="Insert one empty SKU row (shows Size & Colour columns if no axis is selected yet)"
                 className="rounded-md border border-gray-300 bg-gray-50 px-3.5 py-2 text-sm font-semibold tracking-tight text-gray-700 transition-colors hover:border-gray-400 hover:bg-white"
               >
                 Add blank row
+              </button>
+              <button
+                type="button"
+                onClick={handleClearVariantBuilder}
+                title="Clear axes, values, and all variant rows to start over"
+                aria-label="Clear variant attributes and start over"
+                className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-white px-2 py-1 text-[11px] font-medium tracking-tight text-red-700 transition-colors hover:border-red-300 hover:bg-red-50"
+              >
+                <TrashIcon className="h-3 w-3" />
+                Clear
               </button>
               <span
                 className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-1 text-[11px] text-gray-500"

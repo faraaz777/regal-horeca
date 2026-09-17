@@ -33,6 +33,7 @@ export default function ProductContentSection() {
     handleSwitchToJsonMode,
     handleSwitchToFormMode,
     handleSpecJsonChange,
+    handleApplySpecJson,
     handleFilterChange,
     handleFilterBlur,
     addFilter,
@@ -87,8 +88,20 @@ export default function ProductContentSection() {
                 onChange={(e) => handleSpecJsonChange(e.target.value)}
                 rows={8}
                 className="w-full rounded-md border border-gray-300 p-2 font-mono text-xs"
+                spellCheck={false}
               />
               {specJsonError ? <p className="mt-1 text-xs text-red-600">{specJsonError}</p> : null}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleApplySpecJson}
+                  disabled={Boolean(specJsonError)}
+                  title="Validate, apply, and return to the form editor"
+                  className="rounded-md bg-neutral-900 px-2.5 py-1 text-[11px] font-semibold tracking-tight text-white transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
+                >
+                  Apply JSON
+                </button>
+              </div>
             </div>
           ) : (
             <>

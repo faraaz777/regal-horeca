@@ -3,6 +3,7 @@
  *
  * Variant axes match the Product model: shape is a new product, not a variant.
  * Colour / size / weight / unit count are the only SKU axes (max two at once).
+ * Generate accepts 1 or 2 axes → m or m×n cartesian rows.
  */
 
 export const PRODUCT_FORM_STEPS = [

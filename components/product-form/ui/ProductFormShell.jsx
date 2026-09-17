@@ -40,6 +40,8 @@ export default function ProductFormShell() {
     handleSubmit,
     onCancel,
     isChildProduct,
+    enableLocalDraft,
+    handleLocalDraftFieldComplete,
   } = useProductForm();
 
   const StepBody = STEP_COMPONENTS[currentStep] || ProductIdentitySection;
@@ -96,7 +98,12 @@ export default function ProductFormShell() {
         </div>
       ) : null}
 
-      <form id="product-form" onSubmit={handleSubmit} className="flex flex-col gap-6">
+      <form
+        id="product-form"
+        onSubmit={handleSubmit}
+        onBlurCapture={enableLocalDraft ? handleLocalDraftFieldComplete : undefined}
+        className="flex flex-col gap-6"
+      >
         <div className="sticky top-0 z-30 -mx-1 border-b border-gray-200/80 bg-gray-100/95 px-2 py-3.5 backdrop-blur sm:px-3">
           <ProductFormStepper currentStep={currentStep} onStepChange={setCurrentStep} />
         </div>

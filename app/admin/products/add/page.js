@@ -6,6 +6,9 @@
  *
  * Excel import is optional: it prefills this same form (no _id). Save still
  * goes through createAdminProduct.
+ *
+ * Local draft (Strategy A): field-complete + variant-section autosave to
+ * localStorage; auto-restore on reload; browser beforeunload warning.
  */
 
 'use client';
@@ -19,6 +22,7 @@ import { showToast } from '@/lib/utils/toast';
 import { ApiError } from '@/lib/utils/apiClient';
 import { createAdminProduct } from '@/lib/client/saveAdminProduct';
 import { readImportProductDraft } from '@/lib/client/productImportDraft';
+import { readProductAddDraft, clearProductAddDraft } from '@/lib/client/productFormDraft';
 
 export default function AdminAddProductPage() {
   const router = useRouter();
@@ -26,6 +30,7 @@ export default function AdminAddProductPage() {
   const [error, setError] = useState('');
   const [seedProduct, setSeedProduct] = useState(null);
   const [seedSource, setSeedSource] = useState(null);
+  const [initialLocalDraft, setInitialLocalDraft] = useState(null);
   const [formKey, setFormKey] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
   const [isCheckingSeed, setIsCheckingSeed] = useState(true);
@@ -34,29 +39,45 @@ export default function AdminAddProductPage() {
     try {
       const imported = readImportProductDraft();
       if (imported) {
+        clearProductAddDraft();
         setSeedProduct(imported);
         setSeedSource('import');
+        setInitialLocalDraft(null);
         setFormKey((key) => key + 1);
         return;
       }
 
       const duplicateData = sessionStorage.getItem('duplicateProductData');
       if (duplicateData) {
+        clearProductAddDraft();
         setSeedProduct(JSON.parse(duplicateData));
         setSeedSource('duplicate');
+        setInitialLocalDraft(null);
         sessionStorage.removeItem('duplicateProductData');
+        setFormKey((key) => key + 1);
+        return;
+      }
+
+      const localDraft = readProductAddDraft();
+      if (localDraft) {
+        setSeedProduct(null);
+        setSeedSource('draft');
+        setInitialLocalDraft(localDraft);
+        setFormKey((key) => key + 1);
       }
     } catch (err) {
       console.error('Error parsing product seed data:', err);
-      showToast.error('Failed to load copied or imported product data');
+      showToast.error('Failed to load copied, imported, or draft product data');
     } finally {
       setIsCheckingSeed(false);
     }
   }, []);
 
   const applyImport = (payload) => {
+    clearProductAddDraft();
     setSeedProduct(payload);
     setSeedSource('import');
+    setInitialLocalDraft(null);
     setFormKey((key) => key + 1);
     setError('');
     showToast.success('Spreadsheet row loaded. Review and Save when ready.');
@@ -79,7 +100,7 @@ export default function AdminAddProductPage() {
       if (children.errors?.length > 0) {
         const firstMsg = children.errors[0]?.message || 'Unknown error';
         showToast.error(`${children.errors.length} variant(s) failed to save: ${firstMsg}`);
-        return;
+        return false;
       }
 
       const variantCount = children.created || 0;
@@ -89,6 +110,7 @@ export default function AdminAddProductPage() {
           : 'Product created successfully'
       );
       router.push('/admin/products');
+      return true;
     } catch (err) {
       if (err instanceof ApiError) {
         showToast.error(err.message);
@@ -97,6 +119,7 @@ export default function AdminAddProductPage() {
         showToast.error('An error occurred while creating the product');
         setError('An error occurred while creating the product');
       }
+      return false;
     } finally {
       toast.dismiss(toastId);
       setLoading(false);
@@ -117,7 +140,9 @@ export default function AdminAddProductPage() {
       ? 'Add product (from Excel)'
       : seedSource === 'duplicate'
         ? 'Duplicate product'
-        : 'Add product';
+        : seedSource === 'draft'
+          ? 'Add product (draft restored)'
+          : 'Add product';
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-8">
@@ -132,6 +157,9 @@ export default function AdminAddProductPage() {
           <h1 className="mb-1 text-2xl font-bold text-gray-900 sm:text-3xl">{heading}</h1>
           <p className="text-sm text-gray-500">
             Identity and a hero image are enough to save. Selling, media, and extras can wait.
+            {seedSource !== 'import' && seedSource !== 'duplicate' ? (
+              <> Fields autosave locally; reload restores your draft.</>
+            ) : null}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -150,10 +178,18 @@ export default function AdminAddProductPage() {
           missing — then Save. Nothing was written to the catalog yet.
         </div>
       ) : null}
+      {seedSource === 'draft' ? (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Restored your local draft from this browser. Closing or reloading will warn you while
+          unsaved work remains — Save writes it to the catalog.
+        </div>
+      ) : null}
 
       <ProductForm
         key={formKey}
         product={seedProduct || null}
+        initialLocalDraft={initialLocalDraft}
+        enableLocalDraft
         allProducts={[]}
         onSave={handleSave}
         onCancel={() => router.push('/admin/products')}

@@ -17,6 +17,25 @@ import {
   validateVariantBarcodesAgainstCatalog,
 } from '@/lib/utils/validateVariantBarcodes';
 import { stripChildVariantOwnedFields } from '@/lib/shared/childVariantPayload';
+import {
+  parseOptionValues,
+  getVariantCombinationKey,
+  buildVariantCombinations,
+  ensureBlankRowVariantFieldSelection,
+  inferVariantFieldSelection,
+  buildVariantBuilderInputsFromRows,
+  validateVariantRowsAgainstAxes,
+} from '@/lib/shared/variantMatrix';
+import {
+  convertSpecsToJson as serializeSpecificationsJson,
+  parseSpecificationsJson,
+} from '@/lib/shared/specificationsJson';
+import {
+  buildProductAddDraft,
+  isMeaningfulProductDraft,
+  saveProductAddDraft,
+  clearProductAddDraft,
+} from '@/lib/client/productFormDraft';
 import { adminFetch } from '@/lib/client/adminFetch';
 import {
   getTextLength,
@@ -65,6 +84,10 @@ export default function ProductForm({
   onOpenParent,
   initialView = 'full',
   saving = false,
+  /** Add-product only: localStorage draft on blur + variant changes. */
+  enableLocalDraft = false,
+  /** Draft payload restored by the Add page (auto-restore on reload). */
+  initialLocalDraft = null,
 }) {
   const { categories, brands, businessTypes } = useAppContext();
   
@@ -188,6 +211,192 @@ export default function ProductForm({
     showInCatalog: '',
   });
 
+  /**
+   * Add-product local draft (Strategy A).
+   * Blur → persist. Variant section changes → persist immediately.
+   * beforeunload warns while meaningful work exists and leave is not allowed.
+   */
+  const localDraftAppliedRef = useRef(false);
+  const suppressLocalDraftWriteRef = useRef(false);
+  const allowLeaveWithoutWarningRef = useRef(false);
+  const localDraftStateRef = useRef({});
+  const [localDraftRestored, setLocalDraftRestored] = useState(false);
+
+  localDraftStateRef.current = {
+    formData,
+    variantRows,
+    variantFieldSelection,
+    variantBuilderInputs,
+    variantDraftValue,
+    hasVariantsChoice,
+    currentStep,
+    bulkVariantInputs,
+  };
+
+  const persistLocalDraft = () => {
+    if (!enableLocalDraft || suppressLocalDraftWriteRef.current) return;
+    const result = saveProductAddDraft(localDraftStateRef.current);
+    if (!result.ok && result.error === 'QuotaExceededError') {
+      toast.error('Local draft could not be saved — browser storage is full.');
+    }
+  };
+
+  const handleLocalDraftFieldComplete = (event) => {
+    if (!enableLocalDraft) return;
+    const target = event?.target;
+    if (!target || typeof target.tagName !== 'string') return;
+    const tag = target.tagName.toUpperCase();
+    const isTextField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    const isRichText = Boolean(target.isContentEditable);
+    if (!isTextField && !isRichText) return;
+    // Ignore pure focus shifts inside the same control group without a completed edit.
+    if (target.type === 'button' || target.type === 'submit' || target.type === 'file') return;
+    persistLocalDraft();
+  };
+
+  // Auto-restore draft once on Add (initialLocalDraft from the page).
+  useEffect(() => {
+    if (!enableLocalDraft || localDraftAppliedRef.current) return;
+    if (!initialLocalDraft || typeof initialLocalDraft !== 'object') return;
+
+    suppressLocalDraftWriteRef.current = true;
+    localDraftAppliedRef.current = true;
+
+    const draftForm = initialLocalDraft.formData || {};
+    setFormData((prev) => ({
+      ...prev,
+      ...draftForm,
+      colorVariants: ensureOneDefaultColorVariant(draftForm.colorVariants || []),
+      gallery: Array.isArray(draftForm.gallery) ? draftForm.gallery : [],
+      specifications: Array.isArray(draftForm.specifications) ? draftForm.specifications : [],
+      faqs: Array.isArray(draftForm.faqs) ? draftForm.faqs : [],
+      filters: Array.isArray(draftForm.filters) && draftForm.filters.length > 0
+        ? draftForm.filters
+        : prev.filters,
+    }));
+
+    const restoredRows = Array.isArray(initialLocalDraft.variantRows)
+      ? initialLocalDraft.variantRows.map((row) => ({
+          ...row,
+          _rowId: row?._rowId || `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        }))
+      : [];
+    setVariantRows(ensureOneDefaultVariantRow(restoredRows));
+
+    if (initialLocalDraft.variantFieldSelection) {
+      setVariantFieldSelection({
+        size: false,
+        color: false,
+        weight: false,
+        unitCount: false,
+        ...initialLocalDraft.variantFieldSelection,
+      });
+    }
+    if (initialLocalDraft.variantBuilderInputs) {
+      setVariantBuilderInputs({
+        size: '',
+        color: '',
+        weight: '',
+        unitCount: '',
+        ...initialLocalDraft.variantBuilderInputs,
+      });
+    }
+    if (initialLocalDraft.variantDraftValue) {
+      setVariantDraftValue({
+        size: '',
+        color: '',
+        weight: '',
+        unitCount: '',
+        ...initialLocalDraft.variantDraftValue,
+      });
+    }
+    if (initialLocalDraft.bulkVariantInputs) {
+      setBulkVariantInputs((prev) => ({ ...prev, ...initialLocalDraft.bulkVariantInputs }));
+    }
+    if (initialLocalDraft.hasVariantsChoice === true || initialLocalDraft.hasVariantsChoice === false) {
+      setHasVariantsChoice(initialLocalDraft.hasVariantsChoice);
+    }
+    if (initialLocalDraft.currentStep) {
+      setCurrentStep(initialLocalDraft.currentStep);
+    }
+
+    setLocalDraftRestored(true);
+    // Allow writes on the next tick after React commits restored state.
+    queueMicrotask(() => {
+      suppressLocalDraftWriteRef.current = false;
+    });
+  }, [enableLocalDraft, initialLocalDraft]);
+
+  // Rebuild category/brand pickers after draft restore once taxonomy is loaded.
+  useEffect(() => {
+    if (!enableLocalDraft || !localDraftRestored) return;
+    if (!categories?.length && !brands?.length) return;
+
+    const categoryId = formData.categoryId;
+    if (categoryId && categories.length > 0) {
+      setCategorySelection(getCategoryAncestry(categoryId, categories));
+    }
+    const categoryIds = Array.isArray(formData.categoryIds) ? formData.categoryIds : [];
+    if (categoryIds.length > 0 && categories.length > 0) {
+      setAdditionalCategorySelections(
+        categoryIds.map((cid) => getCategoryAncestry(cid?._id || cid, categories))
+      );
+    }
+    const brandCategoryId = formData.brandCategoryId;
+    if (brandCategoryId && brands.length > 0) {
+      setBrandSelection(getBrandAncestry(brandCategoryId, brands));
+    }
+    const brandCategoryIds = Array.isArray(formData.brandCategoryIds) ? formData.brandCategoryIds : [];
+    if (brandCategoryIds.length > 0 && brands.length > 0) {
+      setAdditionalBrandSelections(
+        brandCategoryIds.map((bid) => getBrandAncestry(bid?._id || bid, brands))
+      );
+    }
+    // Only when taxonomy arrives after restore — not on every formData keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enableLocalDraft, localDraftRestored, categories, brands]);
+
+  // Variant section: persist everything on any change (not only blur).
+  useEffect(() => {
+    if (!enableLocalDraft || suppressLocalDraftWriteRef.current) return;
+    if (!localDraftAppliedRef.current && initialLocalDraft) return;
+    persistLocalDraft();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    enableLocalDraft,
+    variantRows,
+    variantFieldSelection,
+    variantBuilderInputs,
+    variantDraftValue,
+    hasVariantsChoice,
+    bulkVariantInputs,
+    formData.colorVariants,
+  ]);
+
+  // Also persist when media URLs land (upload complete is not a blur).
+  useEffect(() => {
+    if (!enableLocalDraft || suppressLocalDraftWriteRef.current) return;
+    if (!formData.heroImage && !(formData.gallery || []).length) return;
+    persistLocalDraft();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enableLocalDraft, formData.heroImage, formData.gallery, formData.detailPhotos]);
+
+  // Browser leave / reload / close-tab warning (not in-app route changes).
+  useEffect(() => {
+    if (!enableLocalDraft) return;
+
+    const onBeforeUnload = (event) => {
+      if (allowLeaveWithoutWarningRef.current) return;
+      const snapshot = buildProductAddDraft(localDraftStateRef.current);
+      if (!isMeaningfulProductDraft(snapshot)) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [enableLocalDraft]);
+
   /** Sellable colour for this child row (parent Variants → Colour column), not marketing swatches. */
   const childAssignedColorName = useMemo(() => {
     if (!isChildProduct) return '';
@@ -227,6 +436,13 @@ export default function ProductForm({
 
   useEffect(() => {
     if (isChildProduct) return;
+    /**
+     * Add-product local draft owns the variant yes/no choice on restore.
+     * Skipping here avoids overwriting the restored value with null.
+     */
+    if (enableLocalDraft && initialLocalDraft && !(product?._id || product?.id)) {
+      return;
+    }
     const productId = product?._id || product?.id;
     if (productId) {
       const isParent = product?.productType === 'parent';
@@ -242,7 +458,7 @@ export default function ProductForm({
       return;
     }
     setHasVariantsChoice(null);
-  }, [isChildProduct, product]);
+  }, [isChildProduct, product, enableLocalDraft, initialLocalDraft]);
 
   useEffect(() => {
     if (typeof onVariantsOnlyChange === 'function') {
@@ -268,6 +484,14 @@ export default function ProductForm({
       initialChildIdsRef.current = [];
       setVariantRows([]);
       setVariantFieldSelection({ size: false, color: false, weight: false, unitCount: false });
+      return;
+    }
+
+    /**
+     * Do not clear the SKU table when Add is hydrating from a local draft
+     * (product is null / has no children).
+     */
+    if (enableLocalDraft && initialLocalDraft && !(product?._id || product?.id)) {
       return;
     }
 
@@ -380,13 +604,19 @@ export default function ProductForm({
 
     setVariantRows(ensureOneDefaultVariantRow(normalized));
 
-    setVariantFieldSelection({
-      size: normalized.some((row) => row.size),
-      color: normalized.some((row) => row.color),
-      unitCount: normalized.some((row) => row.unitCount),
-      weight: normalized.some((row) => row.weight),
-    });
-  }, [product]);
+    /**
+     * Prefer saved variationTheme so Size/Colour columns stay visible even when
+     * rows were left blank; fall back to non-empty row attributes.
+     * Also restore chip values so Generate can rebuild the matrix on edit.
+     */
+    setVariantFieldSelection(
+      inferVariantFieldSelection({
+        rows: normalized,
+        variationTheme: product?.variationTheme,
+      })
+    );
+    setVariantBuilderInputs(buildVariantBuilderInputsFromRows(normalized));
+  }, [product, enableLocalDraft, initialLocalDraft]);
 
   // Price-by-size helpers
   const addPriceBySizeRow = () => {
@@ -486,12 +716,6 @@ export default function ProductForm({
     );
   };
 
-  const parseOptionValues = (raw) =>
-    String(raw || '')
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean);
-
   /** Colour names from parent colorVariants — source of truth for the variant matrix. */
   const fullFormColorNames = useMemo(
     () =>
@@ -560,11 +784,6 @@ export default function ProductForm({
     return out;
   }, [formData.colorVariants, variantRows]);
 
-  const getVariantCombinationKey = (combo) =>
-    [combo.size || '', combo.color || '', combo.weight || '', combo.unitCount || '']
-      .map((value) => String(value).toLowerCase())
-      .join('|');
-
   const createVariantRowId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
   const createEmptyVariantRow = () => ({
@@ -593,6 +812,16 @@ export default function ProductForm({
     price: '',
   });
 
+  /**
+   * Variant Matrix Generator
+   *
+   * Input examples:
+   *   Size = [S, M, L]                         → 3 rows (m)
+   *   Size = [S, M, L], Colour = [Black]       → 3 rows (m×n)
+   *   Size = [10", 12"], Colour = [Black, Gold] → 6 rows (m×n)
+   *
+   * Cartesian product of 1–2 selected axes. Matching existing rows are kept.
+   */
   const handleGenerateVariantRows = () => {
     const dimensions = [];
 
@@ -639,15 +868,23 @@ export default function ProductForm({
       return;
     }
 
-    if (dimensions.length !== 2) {
-      setError('Please select exactly 2 variant fields to generate variants.');
+    if (dimensions.length > 2) {
+      setError('You can generate variants from at most 2 axes at a time.');
       return;
     }
 
-    const combos = dimensions.reduce(
-      (acc, dim) => acc.flatMap((base) => dim.values.map((value) => ({ ...base, [dim.key]: value }))),
-      [{}]
-    );
+    let combos;
+    try {
+      combos = buildVariantCombinations(dimensions);
+    } catch (err) {
+      setError(err?.message || 'Unable to build the variant matrix.');
+      return;
+    }
+
+    if (combos.length === 0) {
+      setError('Add at least one value for each selected axis before generating.');
+      return;
+    }
 
     const existingByKey = new Map((variantRows || []).map((row) => [getVariantCombinationKey(row), row]));
 
@@ -901,8 +1138,52 @@ export default function ProductForm({
     setCurrentStep('selling');
   };
 
+  /**
+   * Blank rows still need Size/Colour (or whatever axes are active) editors in
+   * the table. If no axis is ticked yet, default to Size + Colour so those
+   * mandatory columns appear immediately.
+   */
   const handleAddSingleVariantRow = () => {
+    setVariantFieldSelection((prev) => ensureBlankRowVariantFieldSelection(prev));
     setVariantRows((prev) => ensureOneDefaultVariantRow([...prev, createEmptyVariantRow()]));
+    setError('');
+  };
+
+  /**
+   * Wipe axes, chip values, and SKU rows so the operator can rebuild the matrix
+   * from scratch. Linked child products are soft-deleted on the next save
+   * (same orphan path as deleting rows individually).
+   */
+  const handleClearVariantBuilder = () => {
+    const rowCount = (variantRows || []).length;
+    const linkedChildren = (variantRows || []).filter((row) => row?._childProductId).length;
+    const hasAxesOrValues =
+      selectedVariantFieldCount > 0 ||
+      Object.values(variantBuilderInputs || {}).some((v) => String(v || '').trim()) ||
+      Object.values(variantDraftValue || {}).some((v) => String(v || '').trim());
+
+    if (rowCount === 0 && !hasAxesOrValues) {
+      setError('');
+      return;
+    }
+
+    const childWarning =
+      linkedChildren > 0
+        ? `\n\n${linkedChildren} linked child SKU(s) will move to trash on save.`
+        : '';
+
+    const confirmed = window.confirm(
+      rowCount > 0
+        ? `Clear variant attributes and remove all ${rowCount} row(s)?${childWarning}\n\nYou can rebuild with Generate or Add blank row.`
+        : 'Clear selected axes and attribute values?'
+    );
+    if (!confirmed) return;
+
+    setVariantFieldSelection({ size: false, color: false, weight: false, unitCount: false });
+    setVariantBuilderInputs({ size: '', color: '', weight: '', unitCount: '' });
+    setVariantDraftValue({ size: '', color: '', weight: '', unitCount: '' });
+    setVariantRows([]);
+    setSelectedVariantRowIndex(null);
     setError('');
   };
 
@@ -1055,6 +1336,8 @@ export default function ProductForm({
   const [specJsonMode, setSpecJsonMode] = useState(false);
   const [specJsonInput, setSpecJsonInput] = useState('');
   const [specJsonError, setSpecJsonError] = useState('');
+  const [specJsonAppliedAt, setSpecJsonAppliedAt] = useState(0);
+  const specJsonDebounceRef = useRef(null);
   
   // Reset color picker state when opening
   const handleOpenColorPicker = () => {
@@ -2291,109 +2574,54 @@ export default function ProductForm({
   /**
    * Convert specifications array to JSON string
    */
-  const convertSpecsToJson = () => {
-    try {
-      const specs = formData.specifications || [];
-      
-      // Build the JSON object
-      const jsonObject = {
-        specifications: []
-      };
-      
-      // Handle empty array
-      if (Array.isArray(specs) && specs.length > 0) {
-        // Filter out null/undefined and ensure proper structure
-        const validSpecs = specs
-          .filter(spec => spec !== null && spec !== undefined)
-          .map(spec => ({
-            label: spec.label || '',
-            value: spec.value || '',
-            unit: spec.unit || ''
-          }))
-          .filter(spec => spec.label || spec.value || spec.unit); // Keep non-empty specs
-        
-        jsonObject.specifications = validSpecs;
-      }
-      
-      return JSON.stringify(jsonObject, null, 2);
-    } catch (error) {
-      console.error('Error converting specs to JSON:', error);
-      return JSON.stringify({ specifications: [] }, null, 2);
+  const convertSpecsToJson = () => serializeSpecificationsJson(formData.specifications || []);
+
+  /**
+   * Validate and parse JSON specifications (updates error state for the editor).
+   * Returns the parsed payload or null when invalid.
+   */
+  const validateAndParseSpecJson = (jsonString) => {
+    const result = parseSpecificationsJson(jsonString);
+    if (!result.ok) {
+      setSpecJsonError(result.error || 'Invalid specifications JSON');
+      return null;
     }
+    if (result.warning) {
+      setSpecJsonError(result.warning);
+    } else {
+      setSpecJsonError('');
+    }
+    return { specifications: result.specifications };
   };
 
   /**
-   * Validate and parse JSON specifications
+   * Apply JSON editor contents into formData.specifications, then return to the
+   * form editor so the operator can see the applied rows immediately.
    */
-  const validateAndParseSpecJson = (jsonString) => {
-    // Reset error
+  const handleApplySpecJson = () => {
+    if (specJsonDebounceRef.current) {
+      clearTimeout(specJsonDebounceRef.current);
+    }
+
+    const parsed = validateAndParseSpecJson(specJsonInput);
+    if (parsed === null) return false;
+
+    setFormData((prev) => ({
+      ...prev,
+      specifications: parsed.specifications,
+    }));
+    setSpecJsonMode(false);
+    setSpecJsonAppliedAt(0);
     setSpecJsonError('');
-    
-    // Handle empty/whitespace-only input
-    if (!jsonString || !jsonString.trim()) {
-      return { specifications: [] };
+    if (enableLocalDraft) {
+      queueMicrotask(() => persistLocalDraft());
     }
-
-    try {
-      // Parse JSON
-      const parsed = JSON.parse(jsonString.trim());
-      
-      // Handle both formats: object with specifications OR array (legacy)
-      let specifications = [];
-      
-      if (Array.isArray(parsed)) {
-        // Legacy format: just an array of specifications
-        specifications = parsed;
-      } else if (typeof parsed === 'object' && parsed !== null) {
-        // Object format: { specifications: [...] }
-        specifications = parsed.specifications || [];
-      } else {
-        setSpecJsonError('JSON must be an object with "specifications" array, or an array of specification objects');
-        return null;
-      }
-
-      // Validate specifications is an array
-      if (!Array.isArray(specifications)) {
-        setSpecJsonError('"specifications" must be an array of objects');
-        return null;
-      }
-
-      // Validate each item in array
-      const validatedSpecs = specifications.map((item, index) => {
-        // Handle null/undefined items
-        if (item === null || item === undefined) {
-          return { label: '', value: '', unit: '' };
-        }
-
-        // Handle non-object items
-        if (typeof item !== 'object') {
-          setSpecJsonError(`Specification at index ${index} must be an object`);
-          return null;
-        }
-
-        // Ensure required structure with defaults
-        return {
-          label: item.label || '',
-          value: item.value || '',
-          unit: item.unit || ''
-        };
-      }).filter(item => item !== null);
-
-      // Check if any items were invalid
-      if (validatedSpecs.length !== specifications.length) {
-        setSpecJsonError('Some specifications were invalid and have been filtered out');
-      }
-
-      return { specifications: validatedSpecs };
-    } catch (error) {
-      // Handle various JSON parsing errors
-      if (error instanceof SyntaxError) {
-        setSpecJsonError(`Invalid JSON: ${error.message}`);
-      } else {
-        setSpecJsonError(`Error parsing JSON: ${error.message}`);
-      }
-      return null;
-    }
+    toast.success(
+      parsed.specifications.length === 0
+        ? 'Specifications cleared from JSON.'
+        : `Applied ${parsed.specifications.length} specification${parsed.specifications.length === 1 ? '' : 's'}.`
+    );
+    return true;
   };
 
   /**
@@ -2409,10 +2637,11 @@ export default function ProductForm({
     setSpecJsonInput(jsonString);
     setSpecJsonMode(true);
     setSpecJsonError('');
+    setSpecJsonAppliedAt(0);
   };
 
   /**
-   * Handle switching to form mode
+   * Handle switching to form mode — applies JSON first so edits are not lost.
    */
   const handleSwitchToFormMode = () => {
     // Clear any pending debounce
@@ -2423,13 +2652,13 @@ export default function ProductForm({
     const parsed = validateAndParseSpecJson(specJsonInput);
     
     if (parsed !== null) {
-      setFormData({ 
-        ...formData, 
+      setFormData((prev) => ({
+        ...prev,
         specifications: parsed.specifications,
-        availableSizes: parsed.availableSizes
-      });
+      }));
       setSpecJsonMode(false);
       setSpecJsonError('');
+      setSpecJsonAppliedAt(0);
     }
     // If validation fails, stay in JSON mode and show error
   };
@@ -2437,9 +2666,9 @@ export default function ProductForm({
   /**
    * Handle JSON input change with real-time validation
    */
-  const specJsonDebounceRef = useRef(null);
   const handleSpecJsonChange = (value) => {
     setSpecJsonInput(value);
+    setSpecJsonAppliedAt(0);
     
     // Clear previous timeout
     if (specJsonDebounceRef.current) {
@@ -2455,9 +2684,7 @@ export default function ProductForm({
       
       // Debounce validation for better UX
       specJsonDebounceRef.current = setTimeout(() => {
-        const result = validateAndParseSpecJson(value);
-        // Result is now an object with {specifications, availableSizes} or null
-        // Error is set inside validateAndParseSpecJson
+        validateAndParseSpecJson(value);
       }, 500);
     } else {
       setSpecJsonError('');
@@ -2755,6 +2982,15 @@ export default function ProductForm({
       return;
     }
 
+    if (variantWorkflowEnabled && normalizedVariants.length > 0) {
+      const axisMsg = validateVariantRowsAgainstAxes(normalizedVariants, variantFieldSelection);
+      if (axisMsg) {
+        setError(axisMsg);
+        toast.error(axisMsg);
+        return;
+      }
+    }
+
     const parentOrSelfId = product?._id || product?.id || null;
 
     if (normalizedVariants.length > 0) {
@@ -3043,13 +3279,26 @@ export default function ProductForm({
 
     finalProduct.status = finalProduct.status || 'In Stock';
 
-      await onSave(finalProduct);
+      const saveResult = await onSave(finalProduct);
+      /**
+       * Only after a successful save: allow browser leave without warning and
+       * clear the Add draft so the next visit does not restore this product.
+       * onSave returns false when create failed without throwing.
+       */
+      if (enableLocalDraft && saveResult !== false) {
+        allowLeaveWithoutWarningRef.current = true;
+        clearProductAddDraft();
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const formApi = {
+    enableLocalDraft,
+    initialLocalDraft,
+    localDraftRestored,
+    handleLocalDraftFieldComplete,
     product,
     allProducts: allProducts || [],
     onSave,
@@ -3085,6 +3334,7 @@ export default function ProductForm({
     fullFormColorNames,
     handleGenerateVariantRows,
     handleAddSingleVariantRow,
+    handleClearVariantBuilder,
     selectedVariantRowIndex,
     setSelectedVariantRowIndex,
     bulkVariantInputs,
@@ -3166,9 +3416,11 @@ export default function ProductForm({
     specJsonMode,
     specJsonInput,
     specJsonError,
+    specJsonAppliedAt,
     handleSwitchToJsonMode,
     handleSwitchToFormMode,
     handleSpecJsonChange,
+    handleApplySpecJson,
     handleFilterChange,
     handleFilterBlur,
     addFilter,

@@ -1,19 +1,28 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
-import { PlusIcon, EditIcon, TrashIcon, SearchIcon, ChevronLeftIcon, ChevronRightIcon, DuplicateIcon, RestoreIcon } from '@/components/Icons';
+import { PlusIcon, EditIcon, TrashIcon, SearchIcon, ChevronLeftIcon, ChevronRightIcon, DuplicateIcon, RestoreIcon, FilterIcon } from '@/components/Icons';
 import { showToast } from '@/lib/utils/toast';
 import { apiClient, ApiError } from '@/lib/utils/apiClient';
 import { adminJson } from '@/lib/client/adminFetch';
 import { childRowListedInStorefrontCatalog } from '@/lib/utils/storefrontCatalogFilter';
 import ProductImportPanel, { ProductImportButtons } from '@/components/admin/products/ProductImportPanel';
 import { storeImportProductDraft } from '@/lib/client/productImportDraft';
+import { buildCategoryMaps, getChildrenByParentMap } from '@/lib/utils/categoryUtils';
+import '@/components/new/SidebarFilter.css';
+
+const CatalogFilterSidebar = dynamic(
+  () => import('@/components/catalog/CatalogFilterSidebar'),
+  { ssr: false, loading: () => <div className="sidebar-container animate-pulse h-64 bg-gray-50 rounded" /> }
+);
 
 const ITEMS_PER_PAGE = 20;
+const ADMIN_PRODUCTS_BASE = '/admin/products';
 
 /** Build confirm copy from delete-dependencies API payload. */
 function formatSoftDeleteWarning(deps, fallbackTitle) {
@@ -163,7 +172,27 @@ const ErrorDisplay = ({ error, onRetry }) => {
 };
 
 export default function AdminProductsPage() {
+  // Keep filter drawer open across URL/searchParam updates. Suspense may remount
+  // the inner page when query params change; state must live outside that boundary.
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  return (
+    <Suspense
+      fallback={
+        <div className="p-6 text-sm text-gray-500">Loading products…</div>
+      }
+    >
+      <AdminProductsPageInner
+        isFilterOpen={isFilterOpen}
+        setIsFilterOpen={setIsFilterOpen}
+      />
+    </Suspense>
+  );
+}
+
+function AdminProductsPageInner({ isFilterOpen, setIsFilterOpen }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -176,11 +205,227 @@ export default function AdminProductsPage() {
   /** Parent _id -> bool (expanded). Drives the variant child rows. */
   const [expandedParents, setExpandedParents] = useState({});
   const [importOpen, setImportOpen] = useState(false);
+  const [openFilterSections, setOpenFilterSections] = useState({
+    price: true,
+    color: true,
+    brand: true,
+  });
 
   const { data: meData } = useSWR('/api/auth/me', (url) => adminJson(url), {
     revalidateOnFocus: false,
   });
   const canHardDelete = meData?.user?.role === 'super_admin';
+
+  // Same catalog facet params as storefront — URL is source of truth for the sidebar.
+  const selectedCategorySlug = searchParams.get('category') || '';
+  const priceMin = searchParams.get('priceMin') || '';
+  const priceMax = searchParams.get('priceMax') || '';
+  const colorsParam = searchParams.get('colors') || '';
+  const brandsParam = searchParams.get('brands') || '';
+  const filtersParam = searchParams.get('filters') || '';
+
+  const selectedColors = useMemo(
+    () => (colorsParam ? colorsParam.split(',').filter(Boolean) : []),
+    [colorsParam]
+  );
+  const selectedBrands = useMemo(
+    () => (brandsParam ? brandsParam.split(',').filter(Boolean) : []),
+    [brandsParam]
+  );
+  const selectedFilters = useMemo(() => {
+    if (!filtersParam) return {};
+    try {
+      const parsed = JSON.parse(decodeURIComponent(filtersParam));
+      return typeof parsed === 'object' && parsed ? parsed : {};
+    } catch {
+      return {};
+    }
+  }, [filtersParam]);
+
+  const pushAdminFilterParams = useCallback(
+    (mutator) => {
+      const params = new URLSearchParams(searchParams.toString());
+      mutator(params);
+      const qs = params.toString();
+      router.push(qs ? `${ADMIN_PRODUCTS_BASE}?${qs}` : ADMIN_PRODUCTS_BASE, { scroll: false });
+    },
+    [searchParams, router]
+  );
+
+  const handlePriceMinChange = useCallback(
+    (value) => {
+      pushAdminFilterParams((params) => {
+        if (value) params.set('priceMin', value);
+        else params.delete('priceMin');
+      });
+    },
+    [pushAdminFilterParams]
+  );
+
+  const handlePriceMaxChange = useCallback(
+    (value) => {
+      pushAdminFilterParams((params) => {
+        if (value) params.set('priceMax', value);
+        else params.delete('priceMax');
+      });
+    },
+    [pushAdminFilterParams]
+  );
+
+  const handleColorToggle = useCallback(
+    (color) => {
+      pushAdminFilterParams((params) => {
+        const next = selectedColors.includes(color)
+          ? selectedColors.filter((c) => c !== color)
+          : [...selectedColors, color];
+        if (next.length) params.set('colors', next.join(','));
+        else params.delete('colors');
+      });
+    },
+    [pushAdminFilterParams, selectedColors]
+  );
+
+  const handleBrandToggle = useCallback(
+    (brand) => {
+      pushAdminFilterParams((params) => {
+        const next = selectedBrands.includes(brand)
+          ? selectedBrands.filter((b) => b !== brand)
+          : [...selectedBrands, brand];
+        if (next.length) params.set('brands', next.join(','));
+        else params.delete('brands');
+      });
+    },
+    [pushAdminFilterParams, selectedBrands]
+  );
+
+  const handleFilterToggle = useCallback(
+    (filterKey, value) => {
+      pushAdminFilterParams((params) => {
+        const current = selectedFilters[filterKey] || [];
+        const updated = current.includes(value)
+          ? current.filter((v) => v !== value)
+          : [...current, value];
+        const next = { ...selectedFilters, [filterKey]: updated };
+        Object.keys(next).forEach((key) => {
+          if (!next[key]?.length) delete next[key];
+        });
+        if (Object.keys(next).length) {
+          params.set('filters', encodeURIComponent(JSON.stringify(next)));
+        } else {
+          params.delete('filters');
+        }
+      });
+    },
+    [pushAdminFilterParams, selectedFilters]
+  );
+
+  const clearAllFilters = useCallback(() => {
+    pushAdminFilterParams((params) => {
+      params.delete('priceMin');
+      params.delete('priceMax');
+      params.delete('colors');
+      params.delete('brands');
+      params.delete('filters');
+      // Keep category when clearing chips (matches catalog Clear All).
+    });
+  }, [pushAdminFilterParams]);
+
+  const hasActiveFilters = useMemo(
+    () =>
+      !!(
+        priceMin ||
+        priceMax ||
+        selectedColors.length > 0 ||
+        selectedBrands.length > 0 ||
+        Object.keys(selectedFilters).length > 0
+      ),
+    [priceMin, priceMax, selectedColors, selectedBrands, selectedFilters]
+  );
+
+  const priceRange = useMemo(
+    () => ({
+      min: priceMin,
+      max: priceMax,
+      minValue: priceMin,
+      maxValue: priceMax,
+    }),
+    [priceMin, priceMax]
+  );
+
+  const { data: categoriesData } = useSWR(
+    '/api/categories',
+    (url) => fetch(url).then((r) => r.json()),
+    { revalidateOnFocus: false }
+  );
+  const categories = categoriesData?.categories || [];
+
+  const { currentCategory, parentCategory, displayCategories } = useMemo(() => {
+    const { parentMap, idMap, slugMap } = buildCategoryMaps(categories);
+    const current = selectedCategorySlug ? slugMap.get(selectedCategorySlug) : undefined;
+    const parentId = current?.parent?._id ?? current?.parent ?? null;
+    const parent = parentId != null ? idMap.get(parentId?.toString?.() ?? String(parentId)) : null;
+    const displayCategoriesList = current
+      ? getChildrenByParentMap(parentMap, current._id ?? current.id)
+      : getChildrenByParentMap(parentMap, null);
+    return {
+      currentCategory: current,
+      parentCategory: parent ?? null,
+      displayCategories: displayCategoriesList,
+    };
+  }, [selectedCategorySlug, categories]);
+
+  const facetsQuery = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('adminMode', 'true');
+    if (selectedCategorySlug) params.set('category', selectedCategorySlug);
+    if (searchTerm) params.set('search', searchTerm);
+    return params.toString();
+  }, [selectedCategorySlug, searchTerm]);
+
+  const { data: facetsData } = useSWR(
+    `/api/products/facets?${facetsQuery}`,
+    (url) => adminJson(url),
+    { revalidateOnFocus: false }
+  );
+
+  const facets = facetsData?.facets || {
+    colors: [],
+    brands: [],
+    filters: {},
+    priceRange: { min: 0, max: 0 },
+    totalProducts: 0,
+  };
+
+  useEffect(() => {
+    if (!facets.filters || Object.keys(facets.filters).length === 0) return;
+    setOpenFilterSections((prev) => {
+      const next = { ...prev };
+      Object.keys(facets.filters).forEach((key) => {
+        const sectionId = key.toLowerCase().replace(/\s+/g, '-');
+        if (next[sectionId] === undefined) {
+          next[sectionId] = key.toLowerCase() !== 'size';
+        }
+      });
+      return next;
+    });
+  }, [facets.filters]);
+
+  const toggleFilterSection = useCallback((section) => {
+    setOpenFilterSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  }, []);
+
+  const getFilterCount = useCallback(
+    (filterType, value) => {
+      if (filterType === 'color') {
+        return facets.colors?.includes(value) ? 1 : 0;
+      }
+      if (filterType === 'brand') {
+        return facets.brands?.includes(value) ? 1 : 0;
+      }
+      return 0;
+    },
+    [facets]
+  );
 
   // Admin list endpoint: returns parents/children/standalones in one shot, ignoring
   // the storefront visibility filter so admins see hidden variants.
@@ -194,6 +439,14 @@ export default function AdminProductsPage() {
     }
     if (rowKind && rowKind !== 'all') {
       url += `&adminListFilter=${encodeURIComponent(rowKind)}`;
+    }
+    if (selectedCategorySlug) url += `&category=${encodeURIComponent(selectedCategorySlug)}`;
+    if (priceMin) url += `&priceMin=${encodeURIComponent(priceMin)}`;
+    if (priceMax) url += `&priceMax=${encodeURIComponent(priceMax)}`;
+    if (selectedColors.length) url += `&colors=${encodeURIComponent(selectedColors.join(','))}`;
+    if (selectedBrands.length) url += `&brands=${encodeURIComponent(selectedBrands.join(','))}`;
+    if (Object.keys(selectedFilters).length) {
+      url += `&filters=${encodeURIComponent(JSON.stringify(selectedFilters))}`;
     }
     return url;
   };
@@ -363,7 +616,7 @@ export default function AdminProductsPage() {
     setCurrentPage(1);
     setIsBulkMode(false);
     setSelectedProducts(new Set());
-  }, [listFilter, adminListFilter]);
+  }, [listFilter, adminListFilter, selectedCategorySlug, priceMin, priceMax, colorsParam, brandsParam, filtersParam]);
 
   const handleAddProduct = () => {
     router.push('/admin/products/add');
@@ -673,134 +926,255 @@ export default function AdminProductsPage() {
   // Blur placeholder for images
   const blurDataURL = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q==';
 
+  const filterSidebarProps = {
+    onClose: () => setIsFilterOpen(false),
+    basePath: ADMIN_PRODUCTS_BASE,
+    selectedCategorySlug,
+    hasActiveFilters,
+    parentCategory,
+    displayCategories,
+    facets,
+    priceRange,
+    selectedColors,
+    selectedBrands,
+    selectedFilters,
+    openFilterSections,
+    toggleFilterSection,
+    onPriceMinChange: handlePriceMinChange,
+    onPriceMaxChange: handlePriceMaxChange,
+    onColorToggle: handleColorToggle,
+    onBrandToggle: handleBrandToggle,
+    onFilterToggle: handleFilterToggle,
+    onClearAllFilters: clearAllFilters,
+    getFilterCount,
+  };
+
+  const catalogFilterActive =
+    hasActiveFilters || Boolean(selectedCategorySlug);
+
   return (
-    <div>
+    <div className="relative">
+      {/* Catalog filters overlay the control hub from the left when toggled. */}
+      {isFilterOpen && (
+        <>
+          <button
+            type="button"
+            aria-label="Close filters"
+            className="fixed inset-0 z-40 bg-black/30"
+            onClick={() => setIsFilterOpen(false)}
+          />
+          <div className="fixed left-0 top-0 z-50 h-full w-[min(100vw,20rem)] overflow-y-auto bg-white shadow-xl border-r border-black/10">
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-black/10 bg-white px-4 py-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-800">Filters</h2>
+              <button
+                type="button"
+                onClick={() => setIsFilterOpen(false)}
+                className="rounded-md px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+              >
+                Close
+              </button>
+            </div>
+            <div className="p-4">
+              <CatalogFilterSidebar {...filterSidebarProps} />
+            </div>
+          </div>
+        </>
+      )}
+
       <ErrorDisplay error={error} onRetry={() => mutate()} />
-      
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 sm:mb-6 gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Manage Products</h1>
-          <div className="flex flex-wrap items-center gap-3 mt-3">
-            <div className="flex gap-2" role="tablist" aria-label="Product list filter">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={listFilter === 'active'}
-                onClick={() => setListFilter('active')}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  listFilter === 'active'
-                    ? 'bg-primary text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Active
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={listFilter === 'deleted'}
-                onClick={() => setListFilter('deleted')}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  listFilter === 'deleted'
-                    ? 'bg-primary text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Deleted
-              </button>
-            </div>
-            <div className="inline-flex items-center gap-2 select-none">
-              <span className="text-sm font-medium text-gray-700">Parents only</span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={adminListFilter === 'parents'}
-                aria-label="Show parent products only"
-                onClick={() => {
-                  setAdminListFilter((prev) => (prev === 'parents' ? 'all' : 'parents'));
-                }}
-                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                  adminListFilter === 'parents' ? 'bg-primary' : 'bg-gray-300'
-                }`}
-              >
-                <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                    adminListFilter === 'parents' ? 'translate-x-5' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-3 w-full md:w-auto flex-wrap">
-          {isBulkMode && selectedProducts.size > 0 && (
-            <div className="flex gap-2 flex-wrap w-full">
-              <button
-                onClick={handleBulkDelete}
-                className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-3 sm:px-4 rounded-md text-xs sm:text-sm transition-colors flex-1 sm:flex-none min-w-[120px]"
-                disabled={loading}
-              >
-                Delete ({selectedProducts.size})
-              </button>
-              <button
-                onClick={() => {
-                  setIsBulkMode(false);
-                  setSelectedProducts(new Set());
-                }}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-3 sm:px-4 rounded-md text-xs sm:text-sm transition-colors flex-1 sm:flex-none min-w-[120px]"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-          <div className="relative flex-grow md:flex-grow-0 w-full md:w-64">
-            <input 
-              type="text" 
-              placeholder="Search products..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 sm:py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-base"
-            />
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-              <SearchIcon className="w-4 h-4" />
-            </div>
-          </div>
+
+      {/*
+        Toolbar hierarchy (keeps the control hub scannable):
+        1) Title + primary CTA
+        2) One control bar: view tabs · search · filters · scope · secondary actions
+        3) Active filter context (category chip) when needed
+      */}
+      <div className="mb-5 space-y-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 tracking-tight">
+            Manage Products
+          </h1>
           {!isBulkMode && listFilter === 'active' && (
-            <select
-              value={adminListFilter}
-              onChange={(e) => {
-                setAdminListFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full md:w-56 border border-gray-300 rounded-md px-3 py-2.5 sm:py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-primary"
-              aria-label="Filter product rows"
+            <button
+              onClick={handleAddProduct}
+              className="inline-flex items-center justify-center gap-2 self-start sm:self-auto bg-primary hover:bg-primary-700 text-white font-semibold py-2.5 px-4 rounded-md transition-colors text-sm whitespace-nowrap"
             >
-              <option value="all">All products</option>
-              <option value="parents">Parents only</option>
-              <option value="children">Variants only</option>
-              <option value="catalog_visible">Catalog-visible</option>
-              <option value="hidden_catalog">Hidden from catalog (variants)</option>
-            </select>
+              <PlusIcon className="w-4 h-4" />
+              Add Product
+            </button>
           )}
-          {!isBulkMode && listFilter === 'active' && (
-            <>
+        </div>
+
+        <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <div
+                className="inline-flex rounded-md border border-gray-200 bg-gray-50 p-0.5"
+                role="tablist"
+                aria-label="Product list filter"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={listFilter === 'active'}
+                  onClick={() => setListFilter('active')}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                    listFilter === 'active'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Active
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={listFilter === 'deleted'}
+                  onClick={() => setListFilter('deleted')}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                    listFilter === 'deleted'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Deleted
+                </button>
+              </div>
+
               <button
-                onClick={() => setIsBulkMode(true)}
-                className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2.5 sm:py-2 px-3 sm:px-4 rounded-md text-xs sm:text-sm transition-colors whitespace-nowrap"
+                type="button"
+                onClick={() => setIsFilterOpen(true)}
+                className={`inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+                  catalogFilterActive || isFilterOpen
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+                aria-expanded={isFilterOpen}
+                aria-controls="admin-products-filters"
               >
-                Bulk Actions
+                <FilterIcon className="w-4 h-4" />
+                Filters
+                {catalogFilterActive && (
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${
+                      isFilterOpen || catalogFilterActive
+                        ? 'bg-white/20 text-white'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    On
+                  </span>
+                )}
               </button>
-              <ProductImportButtons onImport={() => setImportOpen(true)} />
-              <button 
-                onClick={handleAddProduct} 
-                className="bg-primary hover:bg-primary-700 text-white font-bold py-2.5 sm:py-2 px-3 sm:px-4 rounded-md flex items-center gap-2 whitespace-nowrap transition-colors text-xs sm:text-sm"
-              >
-                <PlusIcon /> <span className="hidden sm:inline">Add Product</span><span className="sm:hidden">Add</span>
-              </button>
-            </>
-          )}
-          {!isBulkMode && listFilter === 'deleted' && (
-            <p className="text-sm text-gray-500 self-center">Restore products to show them on the store again.</p>
+
+              {!isBulkMode && listFilter === 'active' && (
+                <select
+                  value={adminListFilter}
+                  onChange={(e) => {
+                    setAdminListFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="min-w-[10.5rem] border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+                  aria-label="Filter product rows"
+                >
+                  <option value="all">All products</option>
+                  <option value="parents">Parents only</option>
+                  <option value="children">Variants only</option>
+                  <option value="catalog_visible">Catalog-visible</option>
+                  <option value="hidden_catalog">Hidden from catalog</option>
+                </select>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-1 xl:flex-initial xl:justify-end">
+              {isBulkMode && selectedProducts.size > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={handleBulkDelete}
+                    className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-3 rounded-md text-sm transition-colors"
+                    disabled={loading}
+                  >
+                    Delete ({selectedProducts.size})
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsBulkMode(false);
+                      setSelectedProducts(new Set());
+                    }}
+                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-3 rounded-md text-sm transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="relative w-full sm:min-w-[14rem] sm:flex-1 xl:w-72 xl:flex-none">
+                    <input
+                      type="text"
+                      placeholder="Search products..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm bg-white"
+                    />
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                      <SearchIcon className="w-4 h-4" />
+                    </div>
+                  </div>
+
+                  {!isBulkMode && listFilter === 'active' && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => setIsBulkMode(true)}
+                        className="inline-flex items-center rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap"
+                      >
+                        Bulk Actions
+                      </button>
+                      <ProductImportButtons onImport={() => setImportOpen(true)} />
+                    </div>
+                  )}
+
+                  {!isBulkMode && listFilter === 'deleted' && (
+                    <p className="text-sm text-gray-500">
+                      Restore products to show them on the store again.
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          {(currentCategory || hasActiveFilters) && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                Applied
+              </span>
+              {currentCategory && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    pushAdminFilterParams((params) => {
+                      params.delete('category');
+                    })
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                  title="Clear category filter"
+                >
+                  Category: {currentCategory.name}
+                  <span className="text-gray-400" aria-hidden>
+                    ×
+                  </span>
+                </button>
+              )}
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="text-xs font-semibold uppercase tracking-wider text-primary hover:text-gray-900"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>

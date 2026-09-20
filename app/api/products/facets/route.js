@@ -21,6 +21,7 @@
 
 import { NextResponse } from 'next/server';
 import { queryProductFacets } from '@/lib/server/products/queryFacets';
+import { requireAuth } from '@/lib/server/auth/requireAuth';
 
 // Mark route as dynamic to prevent static generation
 export const dynamic = 'force-dynamic';
@@ -33,6 +34,14 @@ export async function GET(request) {
     const searchQuery = searchParams.get('search');
     const featured = searchParams.get('featured');
     const status = searchParams.get('status');
+    const adminMode = searchParams.get('adminMode') === 'true';
+
+    // Admin manage-products facets include parents/hidden rows (still exclude deleted).
+    if (adminMode) {
+      const auth = await requireAuth(request, { permission: 'products:read' });
+      if (auth.error) return auth.error;
+    }
+
     // Note: Facets are calculated from the filtered set, so we don't include
     // price, colors, brands, filters params here - those are for the products query.
     // Facets show what's available AFTER context filters (category, business, search).
@@ -42,6 +51,7 @@ export async function GET(request) {
       searchQuery,
       featured,
       status,
+      adminMode,
     });
 
     return NextResponse.json({
@@ -57,7 +67,9 @@ export async function GET(request) {
       },
     }, {
       headers: {
-        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        'Cache-Control': adminMode
+          ? 'private, no-store'
+          : 'public, s-maxage=300, stale-while-revalidate=600',
       },
     });
   } catch (error) {

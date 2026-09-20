@@ -505,6 +505,7 @@ export default function CatalogPageClient({ initialProductsData, initialFacetsDa
 
   const filterSidebarProps = {
     onClose: () => setIsFilterOpen(false),
+    basePath: '/catalog',
     selectedCategorySlug,
     hasActiveFilters,
     parentCategory,

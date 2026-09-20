@@ -33,6 +33,8 @@ function FilterSection({ title, id, children, count, isOpen, onToggle }) {
 
 export default function CatalogFilterSidebar({
   onClose,
+  /** Catalog and admin share this sidebar; default keeps storefront links working. */
+  basePath = '/catalog',
   selectedCategorySlug,
   hasActiveFilters,
   parentCategory,
@@ -55,7 +57,7 @@ export default function CatalogFilterSidebar({
   const router = useRouter();
 
   const handleReset = () => {
-    router.push('/catalog');
+    router.push(basePath);
   };
 
   return (
@@ -82,14 +84,14 @@ export default function CatalogFilterSidebar({
         <ul className="category-list">
           {parentCategory ? (
             <li>
-              <Link href={`/catalog?category=${parentCategory.slug}`} className="category-link opacity-40 hover:opacity-100">
+              <Link href={`${basePath}?category=${parentCategory.slug}`} className="category-link opacity-40 hover:opacity-100">
                 <ChevronLeftIcon className="w-4 h-4 mr-1" />
                 {parentCategory.name}
               </Link>
             </li>
           ) : selectedCategorySlug ? (
             <li>
-              <Link href="/catalog" className="category-link opacity-40 hover:opacity-100">
+              <Link href={basePath} className="category-link opacity-40 hover:opacity-100">
                 <ChevronLeftIcon className="w-4 h-4 mr-1" />
                 All Products
               </Link>
@@ -98,7 +100,7 @@ export default function CatalogFilterSidebar({
           {(displayCategories || []).map((cat) => (
             <li key={cat._id || cat.id}>
               <Link
-                href={`/catalog?category=${cat.slug}`}
+                href={`${basePath}?category=${cat.slug}`}
                 className={`category-link ${selectedCategorySlug === cat.slug ? 'active' : ''}`}
               >
                 {cat.name}

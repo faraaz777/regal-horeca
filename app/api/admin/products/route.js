@@ -14,6 +14,8 @@
  *   productType=parent|child|standalone
  *   parentProductId=<id>
  *   adminListFilter=all|parents|children|catalog_visible|hidden_catalog
+ *   category, priceMin, priceMax, colors, brands, filters, sortBy
+ *   (same catalog facet params as GET /api/products)
  */
 
 import { NextResponse } from 'next/server';
@@ -45,6 +47,13 @@ export async function GET(request) {
     const productType = searchParams.get('productType');
     const parentProductId = searchParams.get('parentProductId');
     const adminListFilter = searchParams.get('adminListFilter') || 'all';
+    const categorySlug = searchParams.get('category');
+    const priceMin = searchParams.get('priceMin');
+    const priceMax = searchParams.get('priceMax');
+    const colorsParam = searchParams.get('colors');
+    const brandsParam = searchParams.get('brands');
+    const filtersParam = searchParams.get('filters');
+    const sortBy = searchParams.get('sortBy') || 'newest';
 
     let listMode = 'active';
     if (includeAll) listMode = 'all';
@@ -59,7 +68,13 @@ export async function GET(request) {
       productType,
       parentProductId,
       adminListFilter,
-      sortBy: 'newest',
+      categorySlug,
+      priceMin,
+      priceMax,
+      colorsParam,
+      brandsParam,
+      filtersParam,
+      sortBy,
     });
 
     // Group children with their parents on the current page so the UI can render

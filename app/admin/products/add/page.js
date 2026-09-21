@@ -113,8 +113,13 @@ export default function AdminAddProductPage() {
       return true;
     } catch (err) {
       if (err instanceof ApiError) {
-        showToast.error(err.message);
-        setError(err.message);
+        const detail =
+          typeof err.details === 'string' && err.details && err.details !== err.message
+            ? ` (${err.details})`
+            : '';
+        const message = `${err.message}${detail}`;
+        showToast.error(message);
+        setError(message);
       } else {
         showToast.error('An error occurred while creating the product');
         setError('An error occurred while creating the product');

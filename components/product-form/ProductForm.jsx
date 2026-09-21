@@ -2900,7 +2900,8 @@ export default function ProductForm({
     setError('');
     try {
 
-    const rowsForVariantSubmit = isChildProduct ? [] : (variantRows || []);
+    const rowsForVariantSubmit =
+      isChildProduct || !variantWorkflowEnabled ? [] : (variantRows || []);
     const normalizedVariants = rowsForVariantSubmit
       .filter((row) => row && typeof row === 'object')
       .map((row) => {
@@ -3221,9 +3222,18 @@ export default function ProductForm({
       }
     });
 
+    const sanitizedColorVariants = ensureOneDefaultColorVariant(
+      existingColorVariants.filter(
+        (v) =>
+          v &&
+          String(v.colorName || '').trim() &&
+          /^#[0-9A-Fa-f]{6}$/.test(String(v.colorHex || '').trim())
+      )
+    );
+
     const finalProduct = {
       ...formData,
-      colorVariants: ensureOneDefaultColorVariant(existingColorVariants),
+      colorVariants: sanitizedColorVariants,
       gstPercent: Number(formData.gstPercent || 0),
       mrp: Number(formData.mrp || 0),
       sellingPrice: Number(formData.sellingPrice || 0),
@@ -3241,6 +3251,14 @@ export default function ProductForm({
       categoryIds,
       brandCategoryIds,
       filters: filtersWithSizeFromPricing,
+      // Drop blank spec rows — empty label/value fails mongoose required validation.
+      specifications: (formData.specifications || [])
+        .filter((s) => s && String(s.label || '').trim() && String(s.value || '').trim())
+        .map((s) => ({
+          label: String(s.label || '').trim(),
+          value: String(s.value || '').trim(),
+          unit: String(s.unit || '').trim(),
+        })),
     };
 
     // Mark this product as a parent carrier so the storefront chokepoint hides it.

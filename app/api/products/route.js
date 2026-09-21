@@ -10,11 +10,43 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
+// Ensure ref models are registered before populate (same isolate as this route).
+import '@/lib/models/Category';
+import '@/lib/models/Brand';
 import { generateUniqueSlug } from '@/lib/utils/slug';
 import { revalidateHomepage, revalidatePath, revalidateProducts } from '@/lib/utils/revalidate';
 import { queryProducts } from '@/lib/server/products/queryProducts';
 import { normalizeProductPayloadForCreate } from '@/lib/server/products/normalizeProductInput';
 import { assertProductWrite } from '@/lib/server/auth/adminApiGuard';
+
+function formatProductWriteError(error, fallback) {
+  if (error?.name === 'ValidationError' && error.errors) {
+    const parts = Object.values(error.errors)
+      .map((err) => err?.message)
+      .filter(Boolean);
+    if (parts.length > 0) {
+      return parts.slice(0, 3).join(' ');
+    }
+  }
+  if (error?.message) {
+    return `${fallback}: ${error.message}`;
+  }
+  return fallback;
+}
+
+async function loadProductAfterWrite(productId) {
+  try {
+    return await Product.findById(productId)
+      .populate('categoryId')
+      .populate('categoryIds', 'name slug level')
+      .populate('brandCategoryId', 'name slug level')
+      .populate('brandCategoryIds', 'name slug level')
+      .lean();
+  } catch (populateError) {
+    console.warn('Product populate after write failed:', populateError?.message || populateError);
+    return Product.findById(productId).lean();
+  }
+}
 
 // Allow caching with revalidation for better performance
 // Revalidate every 5 minutes (300 seconds)
@@ -168,12 +200,7 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
-      product: await Product.findById(product._id)
-        .populate('categoryId')
-        .populate('categoryIds', 'name slug level')
-        .populate('brandCategoryId', 'name slug level')
-        .populate('brandCategoryIds', 'name slug level')
-        .lean(),
+      product: await loadProductAfterWrite(product._id),
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating product:', error);
@@ -187,7 +214,10 @@ export async function POST(request) {
     }
 
     return NextResponse.json(
-      { error: 'Failed to create product', details: error.message },
+      {
+        error: formatProductWriteError(error, 'Failed to create product'),
+        details: error.message,
+      },
       { status: 500 }
     );
   }

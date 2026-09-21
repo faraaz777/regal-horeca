@@ -11,6 +11,8 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Product from '@/lib/models/Product';
+import '@/lib/models/Category';
+import '@/lib/models/Brand';
 import { generateUniqueSlug } from '@/lib/utils/slug';
 import { archiveSlugOnSoftDelete } from '@/lib/server/products/slugArchive';
 import { revalidateHomepage, revalidatePath, revalidateProducts, revalidateProductSlugs } from '@/lib/utils/revalidate';
@@ -21,6 +23,35 @@ import { findBarcodeConflicts, normalizeBarcode } from '@/lib/server/products/ba
 import { syncParentEmbeddedVariantFromChild } from '@/lib/server/products/syncParentEmbeddedVariants';
 import { stripChildVariantOwnedFields } from '@/lib/shared/childVariantPayload';
 import mongoose from 'mongoose';
+
+function formatProductWriteError(error, fallback) {
+  if (error?.name === 'ValidationError' && error.errors) {
+    const parts = Object.values(error.errors)
+      .map((err) => err?.message)
+      .filter(Boolean);
+    if (parts.length > 0) {
+      return parts.slice(0, 3).join(' ');
+    }
+  }
+  if (error?.message) {
+    return `${fallback}: ${error.message}`;
+  }
+  return fallback;
+}
+
+async function loadProductAfterWrite(productId) {
+  try {
+    return await Product.findById(productId)
+      .populate('categoryId')
+      .populate('categoryIds', 'name slug level')
+      .populate('brandCategoryId', 'name slug level')
+      .populate('brandCategoryIds', 'name slug level')
+      .lean();
+  } catch (populateError) {
+    console.warn('Product populate after write failed:', populateError?.message || populateError);
+    return Product.findById(productId).lean();
+  }
+}
 
 /**
  * GET /api/products/[id]
@@ -279,12 +310,7 @@ export async function PUT(request, { params }) {
 
     return NextResponse.json({
       success: true,
-      product: await Product.findById(id)
-        .populate('categoryId')
-        .populate('categoryIds', 'name slug level')
-        .populate('brandCategoryId', 'name slug level')
-        .populate('brandCategoryIds', 'name slug level')
-        .lean(),
+      product: await loadProductAfterWrite(id),
     });
   } catch (error) {
     console.error('Error updating product:', error);
@@ -298,7 +324,10 @@ export async function PUT(request, { params }) {
     }
 
     return NextResponse.json(
-      { error: 'Failed to update product', details: error.message },
+      {
+        error: formatProductWriteError(error, 'Failed to update product'),
+        details: error.message,
+      },
       { status: 500 }
     );
   }

@@ -72,7 +72,7 @@ function AdminEditProductPageInner() {
       if (children.errors?.length > 0) {
         const firstMsg = children.errors[0]?.message || 'Unknown error';
         showToast.error(`${children.errors.length} variant(s) failed to save: ${firstMsg}`);
-        return;
+        return false;
       }
       const syncedCount = (children.created || 0) + (children.updated || 0);
       const deletedCount = children.deleted || 0;
@@ -82,6 +82,7 @@ function AdminEditProductPageInner() {
           : 'Product updated successfully'
       );
       router.push('/admin/products');
+      return true;
     } catch (err) {
       if (err instanceof ApiError) {
         showToast.error(err.message);
@@ -90,6 +91,7 @@ function AdminEditProductPageInner() {
         showToast.error('Failed to update product');
         setError('Failed to update product');
       }
+      return false;
     } finally {
       toast.dismiss(toastId);
       setSaving(false);

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import useSWR from 'swr';
+import { confirmAdminNavLeave } from '@/lib/client/adminNavGuard';
 import {
   Menu,
   X,
@@ -129,6 +130,7 @@ export default function AdminShell({ children }) {
   const newEnquiriesCount = enquiriesData?.statusCounts?.new || 0;
 
   const handleLogout = useCallback(async () => {
+    if (!confirmAdminNavLeave()) return;
     try {
       await adminFetch('/api/auth/logout', { method: 'POST' });
     } finally {

@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/admin/inventory/jobs/dead-stock-automation",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}

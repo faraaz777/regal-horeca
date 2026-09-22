@@ -981,6 +981,43 @@ function VariantCard({
   );
 }
 
+/**
+ * Ordered navigable field keys matching VariantTable column order.
+ * Includes select-backed columns so Left/Right can skip over them when
+ * focusing inputs only (bulk row uses inputs for unit / GST).
+ */
+function buildVariantNavFields({ showSize, showColor, showUnitCount, showWeight }) {
+  const fields = ['name'];
+  if (showSize) fields.push('size');
+  fields.push('unit');
+  if (showColor) fields.push('color');
+  if (showUnitCount) fields.push('unitCount');
+  if (showWeight) fields.push('weight');
+  fields.push('sku', 'barcode', 'hsnCode', 'gstPercent', 'mrp', 'sellingPrice', 'discountPercent', 'marginPrice');
+  return fields;
+}
+
+/**
+ * Focus a navigable cell inside `root` (scoped so inline + sheet tables
+ * do not steal each other's focus via document.querySelector).
+ * When inputsOnly, SELECT cells are skipped so arrows behave like a sheet.
+ */
+function focusVariantCell(root, rowIndex, field, { inputsOnly = true } = {}) {
+  if (!root) return false;
+  const el = root.querySelector(`[data-variant-nav="${rowIndex}:${field}"]`);
+  if (!el || typeof el.focus !== 'function') return false;
+  if (inputsOnly && el.tagName !== 'INPUT') return false;
+  el.focus();
+  if (typeof el.select === 'function' && el.tagName === 'INPUT') {
+    try {
+      el.select();
+    } catch {
+      /* number inputs may reject select() in some browsers */
+    }
+  }
+  return true;
+}
+
 function VariantTable({
   formData,
   variantRows,
@@ -1000,10 +1037,94 @@ function VariantTable({
   layout = 'inline',
 }) {
   const sheet = layout === 'sheet';
+  const tableRootRef = useRef(null);
   const showSize = Boolean(variantFieldSelection.size);
   const showColor = Boolean(variantFieldSelection.color);
   const showUnitCount = Boolean(variantFieldSelection.unitCount);
   const showWeight = Boolean(variantFieldSelection.weight);
+
+  const navFields = useMemo(
+    () => buildVariantNavFields({ showSize, showColor, showUnitCount, showWeight }),
+    [showSize, showColor, showUnitCount, showWeight]
+  );
+
+  const hasBulkRow = Boolean(bulkVariantInputs && handleApplyBulkInputs);
+  const minRow = hasBulkRow ? -1 : 0;
+  const maxRow = variantRows.length - 1;
+
+  const handleVariantCellKeyDown = (e, rowIndex, field) => {
+    const { key } = e;
+    const isEnter = key === 'Enter';
+    if (
+      key !== 'ArrowUp' &&
+      key !== 'ArrowDown' &&
+      key !== 'ArrowLeft' &&
+      key !== 'ArrowRight' &&
+      !isEnter
+    ) {
+      return;
+    }
+
+    const root = tableRootRef.current;
+    const isSelect = e.target.tagName === 'SELECT';
+    const isNumberInput = e.target.tagName === 'INPUT' && e.target.type === 'number';
+    const fieldIndex = navFields.indexOf(field);
+    if (fieldIndex === -1) return;
+
+    // Enter → same column, next row (Excel-like).
+    if (isEnter) {
+      if (isSelect) return;
+      let nextRow = rowIndex + 1;
+      while (nextRow >= minRow && nextRow <= maxRow) {
+        if (focusVariantCell(root, nextRow, field)) {
+          e.preventDefault();
+          return;
+        }
+        nextRow += 1;
+      }
+      e.preventDefault();
+      return;
+    }
+
+    if (key === 'ArrowLeft' || key === 'ArrowRight') {
+      if (!isSelect) {
+        const input = e.target;
+        const value = String(input.value ?? '');
+        const start = input.selectionStart;
+        const end = input.selectionEnd;
+        // Only leave the cell when caret is at the edge (mid-text editing still works).
+        // type=number often reports null selection — treat as edge so arrows move cells.
+        if (typeof start === 'number' && typeof end === 'number' && start !== end) return;
+        if (key === 'ArrowLeft' && start != null && start > 0) return;
+        if (key === 'ArrowRight' && end != null && end < value.length) return;
+      }
+
+      const step = key === 'ArrowLeft' ? -1 : 1;
+      let nextFieldIndex = fieldIndex + step;
+      while (nextFieldIndex >= 0 && nextFieldIndex < navFields.length) {
+        const nextField = navFields[nextFieldIndex];
+        if (focusVariantCell(root, rowIndex, nextField)) {
+          e.preventDefault();
+          return;
+        }
+        nextFieldIndex += step;
+      }
+      return;
+    }
+
+    // ArrowUp / ArrowDown — same field, adjacent row (including bulk as -1).
+    // Always preventDefault for number inputs so the spinner does not change the value.
+    const step = key === 'ArrowUp' ? -1 : 1;
+    let nextRow = rowIndex + step;
+    while (nextRow >= minRow && nextRow <= maxRow) {
+      if (focusVariantCell(root, nextRow, field)) {
+        e.preventDefault();
+        return;
+      }
+      nextRow += step;
+    }
+    if (isSelect || isNumberInput) e.preventDefault();
+  };
 
   const identityCols =
     1 + (showSize ? 1 : 0) + 1 + (showColor ? 1 : 0) + (showUnitCount ? 1 : 0) + (showWeight ? 1 : 0);
@@ -1026,6 +1147,7 @@ function VariantTable({
 
   return (
     <div
+      ref={tableRootRef}
       className={
         sheet
           ? 'w-full min-w-0 overflow-x-hidden rounded-2xl border border-[#E2E8F0] bg-white'
@@ -1144,6 +1266,8 @@ function VariantTable({
                   style={inter}
                   value={bulkVariantInputs.name}
                   onChange={(e) => handleBulkVariantInputChange('name', e.target.value)}
+                  onKeyDown={(e) => handleVariantCellKeyDown(e, -1, 'name')}
+                  data-variant-nav="-1:name"
                   placeholder="Fill name…"
                 />
               </BareCell>
@@ -1154,6 +1278,8 @@ function VariantTable({
                   style={inter}
                   value={bulkVariantInputs.unit}
                   onChange={(e) => handleBulkVariantInputChange('unit', e.target.value)}
+                  onKeyDown={(e) => handleVariantCellKeyDown(e, -1, 'unit')}
+                  data-variant-nav="-1:unit"
                   placeholder="Unit"
                 />
               </BareCell>
@@ -1166,6 +1292,8 @@ function VariantTable({
                   style={inter}
                   value={bulkVariantInputs.sku}
                   onChange={(e) => handleBulkVariantInputChange('sku', e.target.value)}
+                  onKeyDown={(e) => handleVariantCellKeyDown(e, -1, 'sku')}
+                  data-variant-nav="-1:sku"
                   placeholder="SKU"
                 />
               </BareCell>
@@ -1175,6 +1303,8 @@ function VariantTable({
                   style={inter}
                   value={bulkVariantInputs.barcode}
                   onChange={(e) => handleBulkVariantInputChange('barcode', e.target.value)}
+                  onKeyDown={(e) => handleVariantCellKeyDown(e, -1, 'barcode')}
+                  data-variant-nav="-1:barcode"
                   placeholder="Barcode"
                 />
               </BareCell>
@@ -1184,6 +1314,8 @@ function VariantTable({
                   style={inter}
                   value={bulkVariantInputs.hsnCode}
                   onChange={(e) => handleBulkVariantInputChange('hsnCode', e.target.value)}
+                  onKeyDown={(e) => handleVariantCellKeyDown(e, -1, 'hsnCode')}
+                  data-variant-nav="-1:hsnCode"
                   placeholder="HSN"
                 />
               </BareCell>
@@ -1193,6 +1325,8 @@ function VariantTable({
                   style={inter}
                   value={bulkVariantInputs.gstPercent}
                   onChange={(e) => handleBulkVariantInputChange('gstPercent', e.target.value)}
+                  onKeyDown={(e) => handleVariantCellKeyDown(e, -1, 'gstPercent')}
+                  data-variant-nav="-1:gstPercent"
                   placeholder="GST"
                 />
               </BareCell>
@@ -1202,6 +1336,8 @@ function VariantTable({
                   style={inter}
                   value={formatIndianNumberInput(bulkVariantInputs.mrp)}
                   onChange={(e) => handleBulkVariantInputChange('mrp', e.target.value)}
+                  onKeyDown={(e) => handleVariantCellKeyDown(e, -1, 'mrp')}
+                  data-variant-nav="-1:mrp"
                   placeholder="MRP"
                 />
               </BareCell>
@@ -1211,6 +1347,8 @@ function VariantTable({
                   style={inter}
                   value={formatIndianNumberInput(bulkVariantInputs.sellingPrice)}
                   onChange={(e) => handleBulkVariantInputChange('sellingPrice', e.target.value)}
+                  onKeyDown={(e) => handleVariantCellKeyDown(e, -1, 'sellingPrice')}
+                  data-variant-nav="-1:sellingPrice"
                   placeholder="Sell"
                 />
               </BareCell>
@@ -1220,6 +1358,8 @@ function VariantTable({
                   style={inter}
                   value={bulkVariantInputs.discountPercent}
                   onChange={(e) => handleBulkVariantInputChange('discountPercent', e.target.value)}
+                  onKeyDown={(e) => handleVariantCellKeyDown(e, -1, 'discountPercent')}
+                  data-variant-nav="-1:discountPercent"
                   placeholder="%"
                 />
               </BareCell>
@@ -1229,6 +1369,8 @@ function VariantTable({
                   style={inter}
                   value={formatIndianNumberInput(bulkVariantInputs.marginPrice)}
                   onChange={(e) => handleBulkVariantInputChange('marginPrice', e.target.value)}
+                  onKeyDown={(e) => handleVariantCellKeyDown(e, -1, 'marginPrice')}
+                  data-variant-nav="-1:marginPrice"
                   placeholder="Margin"
                 />
               </BareCell>
@@ -1313,6 +1455,8 @@ function VariantTable({
                     style={inter}
                     value={row.name || ''}
                     onChange={(e) => handleVariantRowChange(index, 'name', e.target.value)}
+                    onKeyDown={(e) => handleVariantCellKeyDown(e, index, 'name')}
+                    data-variant-nav={`${index}:name`}
                     placeholder="Variant name"
                   />
                 </BareCell>
@@ -1323,6 +1467,8 @@ function VariantTable({
                       style={inter}
                       value={row.size || ''}
                       onChange={(e) => handleVariantRowChange(index, 'size', e.target.value)}
+                      onKeyDown={(e) => handleVariantCellKeyDown(e, index, 'size')}
+                      data-variant-nav={`${index}:size`}
                     />
                   </BareCell>
                 ) : null}
@@ -1332,6 +1478,8 @@ function VariantTable({
                     style={inter}
                     value={row.unit || ''}
                     onChange={(e) => handleVariantRowChange(index, 'unit', e.target.value)}
+                    onKeyDown={(e) => handleVariantCellKeyDown(e, index, 'unit')}
+                    data-variant-nav={`${index}:unit`}
                   >
                     <option value="">—</option>
                     {UNIT_OPTIONS.map((u) => (
@@ -1358,6 +1506,8 @@ function VariantTable({
                       }}
                       value={row.color || ''}
                       onChange={(e) => handleVariantRowChange(index, 'color', e.target.value)}
+                      onKeyDown={(e) => handleVariantCellKeyDown(e, index, 'color')}
+                      data-variant-nav={`${index}:color`}
                     >
                       <option value="">—</option>
                       {variantTableColorOptions.map((o) => (
@@ -1375,6 +1525,8 @@ function VariantTable({
                       style={inter}
                       value={row.unitCount || ''}
                       onChange={(e) => handleVariantRowChange(index, 'unitCount', e.target.value)}
+                      onKeyDown={(e) => handleVariantCellKeyDown(e, index, 'unitCount')}
+                      data-variant-nav={`${index}:unitCount`}
                     />
                   </BareCell>
                 ) : null}
@@ -1385,6 +1537,8 @@ function VariantTable({
                       style={inter}
                       value={row.weight || ''}
                       onChange={(e) => handleVariantRowChange(index, 'weight', e.target.value)}
+                      onKeyDown={(e) => handleVariantCellKeyDown(e, index, 'weight')}
+                      data-variant-nav={`${index}:weight`}
                     />
                   </BareCell>
                 ) : null}
@@ -1395,6 +1549,8 @@ function VariantTable({
                     style={inter}
                     value={row.sku || ''}
                     onChange={(e) => handleVariantRowChange(index, 'sku', e.target.value)}
+                    onKeyDown={(e) => handleVariantCellKeyDown(e, index, 'sku')}
+                    data-variant-nav={`${index}:sku`}
                     placeholder="SKU"
                   />
                 </BareCell>
@@ -1404,6 +1560,8 @@ function VariantTable({
                     style={inter}
                     value={row.barcode || ''}
                     onChange={(e) => handleVariantRowChange(index, 'barcode', e.target.value)}
+                    onKeyDown={(e) => handleVariantCellKeyDown(e, index, 'barcode')}
+                    data-variant-nav={`${index}:barcode`}
                   />
                 </BareCell>
                 <BareCell roomy={sheet}>
@@ -1412,6 +1570,8 @@ function VariantTable({
                     style={inter}
                     value={row.hsnCode || ''}
                     onChange={(e) => handleVariantRowChange(index, 'hsnCode', e.target.value)}
+                    onKeyDown={(e) => handleVariantCellKeyDown(e, index, 'hsnCode')}
+                    data-variant-nav={`${index}:hsnCode`}
                   />
                 </BareCell>
                 <BareCell roomy={sheet}>
@@ -1420,6 +1580,8 @@ function VariantTable({
                     style={inter}
                     value={row.gstPercent ?? 0}
                     onChange={(e) => handleVariantRowChange(index, 'gstPercent', e.target.value)}
+                    onKeyDown={(e) => handleVariantCellKeyDown(e, index, 'gstPercent')}
+                    data-variant-nav={`${index}:gstPercent`}
                   >
                     {GST_OPTIONS.map((g) => (
                       <option key={g} value={g}>
@@ -1435,6 +1597,8 @@ function VariantTable({
                     style={inter}
                     value={formatIndianNumberInput(row.mrp ?? '')}
                     onChange={(e) => handleVariantRowChange(index, 'mrp', e.target.value)}
+                    onKeyDown={(e) => handleVariantCellKeyDown(e, index, 'mrp')}
+                    data-variant-nav={`${index}:mrp`}
                     placeholder="0"
                   />
                 </BareCell>
@@ -1444,6 +1608,8 @@ function VariantTable({
                     style={inter}
                     value={formatIndianNumberInput(row.sellingPrice ?? '')}
                     onChange={(e) => handleVariantRowChange(index, 'sellingPrice', e.target.value)}
+                    onKeyDown={(e) => handleVariantCellKeyDown(e, index, 'sellingPrice')}
+                    data-variant-nav={`${index}:sellingPrice`}
                     placeholder="0"
                   />
                 </BareCell>
@@ -1454,6 +1620,8 @@ function VariantTable({
                     type="number"
                     value={row.discountPercent ?? ''}
                     onChange={(e) => handleVariantRowChange(index, 'discountPercent', e.target.value)}
+                    onKeyDown={(e) => handleVariantCellKeyDown(e, index, 'discountPercent')}
+                    data-variant-nav={`${index}:discountPercent`}
                     placeholder="0"
                   />
                 </BareCell>
@@ -1463,6 +1631,8 @@ function VariantTable({
                     style={inter}
                     value={formatIndianNumberInput(row.marginPrice ?? '')}
                     onChange={(e) => handleVariantRowChange(index, 'marginPrice', e.target.value)}
+                    onKeyDown={(e) => handleVariantCellKeyDown(e, index, 'marginPrice')}
+                    data-variant-nav={`${index}:marginPrice`}
                     placeholder="0"
                   />
                 </BareCell>

@@ -1,27 +1,22 @@
 /**
  * runDeadStockAutomation.mjs
  *
- * Evaluates InventoryRule dead-stock velocity rules and updates deadStockMarked.
- * Prefer this for cron / Task Scheduler. Admins can also POST
- * /api/admin/inventory/jobs/dead-stock-automation
+ * Calls the same HTTP job as Vercel cron — one code path, no duplicated rules.
  *
- * Rule:
- *   If sold qty in deadStockPeriod < deadStockQty AND sellableQty > 0 → mark
- *   If sold qty >= deadStockQty → clear tag
- *   Skip rules younger than one full period (avoids marking brand-new intake)
+ * Env:
+ *   APP_URL or NEXT_PUBLIC_SITE_URL  Base URL (default http://localhost:3000)
+ *   CRON_SECRET                      Required (Authorization Bearer)
  *
  * Flags:
- *   --dry-run   Log only
- *   --uri=...   Override MONGODB_URI
+ *   --dry-run
  *
  * Usage:
- *   node scripts/runDeadStockAutomation.mjs --dry-run
- *   node scripts/runDeadStockAutomation.mjs
+ *   npm run job:dead-stock:dry
+ *   npm run job:dead-stock
  */
 
 import path from 'node:path';
 import fs from 'node:fs';
-import mongoose from 'mongoose';
 
 function loadEnvFile(name) {
   try {
@@ -49,19 +44,11 @@ function loadEnvFile(name) {
 }
 
 function parseArgs(argv) {
-  const opts = { dryRun: false, uri: null };
+  const opts = { dryRun: false };
   for (const arg of argv) {
     if (arg === '--dry-run') opts.dryRun = true;
-    else if (arg.startsWith('--uri=')) opts.uri = arg.slice(6);
   }
   return opts;
-}
-
-const MS_DAY = 86400000;
-
-function periodMs(period) {
-  const days = { day: 1, week: 7, month: 30, '3month': 90, '6month': 180 }[period] || 30;
-  return days * MS_DAY;
 }
 
 async function main() {
@@ -69,134 +56,67 @@ async function main() {
   loadEnvFile('.env');
 
   const opts = parseArgs(process.argv.slice(2));
-  if (opts.uri) process.env.MONGODB_URI = opts.uri;
-
-  const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
-  if (!uri) {
-    console.error('Missing MONGODB_URI');
+  const secret = process.env.CRON_SECRET;
+  if (!secret) {
+    console.error(
+      'CRON_SECRET is required. Set it in .env.local, then call this script while the app is running (or against production APP_URL).'
+    );
     process.exit(1);
   }
 
-  await mongoose.connect(uri);
-  const db = mongoose.connection.db;
-  const now = new Date();
+  const base = (
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    'http://localhost:3000'
+  ).replace(/\/$/, '');
 
-  const rules = await db.collection('inventoryrules').find({}).toArray();
-  let marked = 0;
-  let cleared = 0;
-  let skippedTooNew = 0;
-  let unchanged = 0;
-  const changes = [];
+  const url = `${base}/api/admin/inventory/jobs/dead-stock-automation`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${secret}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ dryRun: opts.dryRun }),
+  });
 
-  for (const rule of rules) {
-    const ms = periodMs(rule.deadStockPeriod);
-    if (rule.createdAt && now - new Date(rule.createdAt) < ms) {
-      skippedTooNew += 1;
-      continue;
-    }
+  const text = await response.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { error: text || 'Invalid JSON response' };
+  }
 
-    const from = new Date(now.getTime() - ms);
-    const soldAgg = await db
-      .collection('stockledgers')
-      .aggregate([
-        {
-          $match: {
-            productId: rule.productId,
-            createdAt: { $gte: from, $lte: now },
-            $or: [{ type: 'sale_fulfill' }, { reason: 'sold', statusBucket: 'sold' }],
-          },
-        },
-        { $group: { _id: null, qty: { $sum: { $abs: '$qty' } } } },
-      ])
-      .toArray();
-    const soldQty = soldAgg[0]?.qty || 0;
+  if (!response.ok) {
+    console.error(`Job failed (${response.status}):`, data.error || data);
+    process.exit(1);
+  }
 
-    const stockRows = await db
-      .collection('stocks')
-      .find({ productId: rule.productId, statusBucket: 'sellable', qty: { $gt: 0 } })
-      .project({ qty: 1 })
-      .toArray();
-    const sellableQty = stockRows.reduce((s, r) => s + (r.qty || 0), 0);
-
-    const target = Number(rule.deadStockQty) || 0;
-    const currentlyMarked = Boolean(rule.deadStockMarked);
-    let nextMarked = currentlyMarked;
-    if (soldQty >= target) nextMarked = false;
-    else if (sellableQty > 0) nextMarked = true;
-
-    if (nextMarked === currentlyMarked) {
-      unchanged += 1;
-      continue;
-    }
-
-    if (!opts.dryRun) {
-      await db
-        .collection('inventoryrules')
-        .updateOne({ _id: rule._id }, { $set: { deadStockMarked: nextMarked, updatedAt: now } });
-
-      const periodLabel =
-        { day: 'A day', week: 'Week', month: 'Month', '3month': '3 months', '6month': '6 months' }[
-          rule.deadStockPeriod
-        ] || rule.deadStockPeriod;
-      const reason = nextMarked
-        ? `${periodLabel} sales rule failed: sold ${soldQty} / target ${target}`
-        : `Sales recovered: sold ${soldQty} / target ${target} in ${periodLabel}`;
-
-      await db.collection('auditlogs').insertOne({
-        actorRole: 'system',
-        action: nextMarked ? 'inventory.dead_stock_marked' : 'inventory.dead_stock_cleared',
-        entityType: 'Product',
-        entityId: rule.productId,
-        before: {
-          condition: currentlyMarked ? 'HAS_DEAD_STOCK' : 'NORMAL',
-          deadStockMarked: currentlyMarked,
-        },
-        after: {
-          condition: nextMarked ? 'HAS_DEAD_STOCK' : 'NORMAL',
-          deadStockMarked: nextMarked,
-        },
-        metadata: {
-          source: 'automation',
-          reason,
-          soldQty,
-          targetQty: target,
-          sellableQty,
-          deadStockPeriod: rule.deadStockPeriod,
-        },
-        ip: '',
-        userAgent: '',
-        createdAt: now,
-      });
-    }
-
-    const action = nextMarked ? 'marked' : 'cleared';
-    if (nextMarked) marked += 1;
-    else cleared += 1;
-    changes.push({
-      productId: String(rule.productId),
-      action,
-      soldQty,
-      targetQty: target,
-      sellableQty,
-    });
+  for (const change of data.changes || []) {
     console.log(
-      `${action.toUpperCase()} product=${rule.productId} sold=${soldQty}/${target} sellable=${sellableQty}`
+      `${String(change.action).toUpperCase()} product=${change.productId} velocity=${change.velocityQty ?? change.soldQty}/${change.targetQty} sellable=${change.sellableQty}`
     );
   }
 
-  const summary = {
-    success: true,
-    dryRun: opts.dryRun,
-    ranAt: now.toISOString(),
-    evaluated: rules.length,
-    marked,
-    cleared,
-    unchanged,
-    skippedTooNew,
-    changeCount: changes.length,
-  };
-  console.log(JSON.stringify(summary, null, 2));
-  await mongoose.disconnect();
+  console.log(
+    JSON.stringify(
+      {
+        success: data.success,
+        dryRun: data.dryRun,
+        ranAt: data.ranAt,
+        evaluated: data.evaluated,
+        marked: data.marked,
+        cleared: data.cleared,
+        unchanged: data.unchanged,
+        skippedTooNew: data.skippedTooNew,
+        changeCount: (data.changes || []).length,
+      },
+      null,
+      2
+    )
+  );
 }
 
 main().catch((err) => {

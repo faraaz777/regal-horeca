@@ -32,10 +32,13 @@ import {
 } from '@/lib/shared/specificationsJson';
 import {
   buildProductAddDraft,
+  buildProductFormDirtySnapshot,
   isMeaningfulProductDraft,
   saveProductAddDraft,
   clearProductAddDraft,
+  PRODUCT_FORM_LEAVE_MESSAGE,
 } from '@/lib/client/productFormDraft';
+import { clearAdminNavBlocker, setAdminNavBlocker } from '@/lib/client/adminNavGuard';
 import { adminFetch } from '@/lib/client/adminFetch';
 import {
   getTextLength,
@@ -222,6 +225,16 @@ export default function ProductForm({
   const localDraftStateRef = useRef({});
   const [localDraftRestored, setLocalDraftRestored] = useState(false);
 
+  /** Edit-mode dirty baseline (captured after hydrate settles). */
+  const dirtyBaselineRef = useRef(null);
+  const dirtyBaselineProductKeyRef = useRef(null);
+  const [dirtyBaselineVersion, setDirtyBaselineVersion] = useState(0);
+  /** Bumps when edit product fields finish hydrating so baseline can capture. */
+  const [editHydrateEpoch, setEditHydrateEpoch] = useState(0);
+  const pageUrlRef = useRef('');
+  const hasUnsavedChangesRef = useRef(false);
+  const historyTrapArmedRef = useRef(false);
+
   localDraftStateRef.current = {
     formData,
     variantRows,
@@ -381,21 +394,281 @@ export default function ProductForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enableLocalDraft, formData.heroImage, formData.gallery, formData.detailPhotos]);
 
-  // Browser leave / reload / close-tab warning (not in-app route changes).
+  /**
+   * Capture a dirty baseline after edit hydrate settles (variant table + sku clear effects).
+   * Once per product id — do not recapture when the user edits rows.
+   * editHydrateEpoch ensures we re-run after initializedProductIdRef is set
+   * (that ref alone is not a React dep and previously skipped baseline forever).
+   */
   useEffect(() => {
-    if (!enableLocalDraft) return;
+    if (!isExistingProductRecord) {
+      dirtyBaselineRef.current = null;
+      dirtyBaselineProductKeyRef.current = null;
+      return undefined;
+    }
+
+    const productKey = String(product?._id || product?.id || '');
+    if (!productKey) return undefined;
+
+    if (dirtyBaselineProductKeyRef.current && dirtyBaselineProductKeyRef.current !== productKey) {
+      dirtyBaselineRef.current = null;
+      dirtyBaselineProductKeyRef.current = null;
+    }
+
+    if (initializedProductIdRef.current !== productKey) return undefined;
+    if (dirtyBaselineProductKeyRef.current === productKey && dirtyBaselineRef.current) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    // Allow variant-row + SKU-clear effects to settle before snapshotting.
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+      if (initializedProductIdRef.current !== productKey) return;
+      if (dirtyBaselineProductKeyRef.current === productKey && dirtyBaselineRef.current) return;
+      dirtyBaselineRef.current = buildProductFormDirtySnapshot(localDraftStateRef.current);
+      dirtyBaselineProductKeyRef.current = productKey;
+      setDirtyBaselineVersion((v) => v + 1);
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    isExistingProductRecord,
+    product?._id,
+    product?.id,
+    variantRows.length,
+    hasVariantsChoice,
+    editHydrateEpoch,
+  ]);
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (allowLeaveWithoutWarningRef.current) return false;
+
+    if (isExistingProductRecord) {
+      if (!dirtyBaselineRef.current || dirtyBaselineProductKeyRef.current == null) return false;
+      return (
+        buildProductFormDirtySnapshot({
+          formData,
+          variantRows,
+          variantFieldSelection,
+          variantBuilderInputs,
+          hasVariantsChoice,
+        }) !== dirtyBaselineRef.current
+      );
+    }
+
+    if (enableLocalDraft) {
+      return isMeaningfulProductDraft(
+        buildProductAddDraft({
+          formData,
+          variantRows,
+          variantFieldSelection,
+          variantBuilderInputs,
+          variantDraftValue,
+          hasVariantsChoice,
+          currentStep,
+          bulkVariantInputs,
+        })
+      );
+    }
+
+    return false;
+    // dirtyBaselineVersion forces recompute after baseline capture
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isExistingProductRecord,
+    enableLocalDraft,
+    formData,
+    variantRows,
+    variantFieldSelection,
+    variantBuilderInputs,
+    variantDraftValue,
+    hasVariantsChoice,
+    currentStep,
+    bulkVariantInputs,
+    dirtyBaselineVersion,
+  ]);
+
+  hasUnsavedChangesRef.current = hasUnsavedChanges;
+
+  useEffect(() => {
+    pageUrlRef.current = `${window.location.pathname}${window.location.search}`;
+  }, []);
+
+  /**
+   * Register Control Hub / Logout blocker while dirty.
+   * Cleared on unmount or when the form becomes clean.
+   */
+  useEffect(() => {
+    if (!hasUnsavedChanges) {
+      clearAdminNavBlocker();
+      return undefined;
+    }
+
+    setAdminNavBlocker(() => {
+      if (allowLeaveWithoutWarningRef.current || !hasUnsavedChangesRef.current) return null;
+      return PRODUCT_FORM_LEAVE_MESSAGE;
+    });
+
+    return () => {
+      clearAdminNavBlocker();
+    };
+  }, [hasUnsavedChanges]);
+
+  /**
+   * Leave guards: tab close / reload, Control Hub / sidebar Links, browser back, Cancel.
+   * Soft SPA navigations do not fire beforeunload — capture-phase click covers those.
+   * When dirty, push a history trap so the first Back triggers confirm instead of leaving silently.
+   */
+  useEffect(() => {
+    const shouldWarn = () =>
+      !allowLeaveWithoutWarningRef.current && Boolean(hasUnsavedChangesRef.current);
+
+    const confirmLeave = () => {
+      if (typeof window !== 'undefined' && !window.confirm(PRODUCT_FORM_LEAVE_MESSAGE)) {
+        return false;
+      }
+      allowLeaveWithoutWarningRef.current = true;
+      clearAdminNavBlocker();
+      return true;
+    };
 
     const onBeforeUnload = (event) => {
-      if (allowLeaveWithoutWarningRef.current) return;
-      const snapshot = buildProductAddDraft(localDraftStateRef.current);
-      if (!isMeaningfulProductDraft(snapshot)) return;
+      if (!shouldWarn()) return;
       event.preventDefault();
       event.returnValue = '';
+      return '';
+    };
+
+    const onAnchorClick = (event) => {
+      if (!shouldWarn()) return;
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      const anchor = event.target.closest?.('a[href]');
+      if (!anchor) return;
+      if (anchor.target === '_blank' || anchor.hasAttribute('download')) return;
+
+      const href = anchor.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+      if (href.startsWith('mailto:') || href.startsWith('tel:')) return;
+
+      try {
+        const targetUrl = new URL(anchor.href, window.location.href);
+        if (
+          targetUrl.origin === window.location.origin &&
+          targetUrl.pathname === window.location.pathname &&
+          targetUrl.search === window.location.search
+        ) {
+          return;
+        }
+      } catch {
+        if (href === `${window.location.pathname}${window.location.search}`) return;
+      }
+
+      if (!confirmLeave()) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        return;
+      }
+    };
+
+    const onPopState = () => {
+      if (!shouldWarn()) {
+        historyTrapArmedRef.current = false;
+        return;
+      }
+      if (!window.confirm(PRODUCT_FORM_LEAVE_MESSAGE)) {
+        try {
+          window.history.pushState(
+            { __productFormGuard: 1 },
+            '',
+            pageUrlRef.current || window.location.href
+          );
+          historyTrapArmedRef.current = true;
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+      allowLeaveWithoutWarningRef.current = true;
+      clearAdminNavBlocker();
+      historyTrapArmedRef.current = false;
+      // Extra pushState was consumed by this Back — step again to leave the edit page.
+      try {
+        window.history.back();
+      } catch {
+        /* ignore */
+      }
     };
 
     window.addEventListener('beforeunload', onBeforeUnload);
-    return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [enableLocalDraft]);
+    document.addEventListener('click', onAnchorClick, true);
+    window.addEventListener('popstate', onPopState);
+
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      document.removeEventListener('click', onAnchorClick, true);
+      window.removeEventListener('popstate', onPopState);
+    };
+  }, []);
+
+  /**
+   * Arm a history trap only while dirty so browser Back asks before leaving.
+   */
+  useEffect(() => {
+    if (!hasUnsavedChanges) {
+      historyTrapArmedRef.current = false;
+      return undefined;
+    }
+
+    pageUrlRef.current = `${window.location.pathname}${window.location.search}`;
+    if (!historyTrapArmedRef.current) {
+      try {
+        window.history.pushState(
+          { __productFormGuard: 1 },
+          '',
+          pageUrlRef.current
+        );
+        historyTrapArmedRef.current = true;
+      } catch {
+        /* ignore */
+      }
+    }
+    return undefined;
+  }, [hasUnsavedChanges]);
+
+  const handleCancel = () => {
+    if (typeof onCancel !== 'function') return;
+    if (hasUnsavedChangesRef.current && !allowLeaveWithoutWarningRef.current) {
+      if (!window.confirm(PRODUCT_FORM_LEAVE_MESSAGE)) return;
+    }
+    allowLeaveWithoutWarningRef.current = true;
+    clearAdminNavBlocker();
+    onCancel();
+  };
+
+  const handleOpenParent = (parentId) => {
+    if (typeof onOpenParent !== 'function') return;
+    if (hasUnsavedChangesRef.current && !allowLeaveWithoutWarningRef.current) {
+      if (!window.confirm(PRODUCT_FORM_LEAVE_MESSAGE)) return;
+    }
+    allowLeaveWithoutWarningRef.current = true;
+    clearAdminNavBlocker();
+    onOpenParent(parentId);
+  };
 
   /** Sellable colour for this child row (parent Variants → Colour column), not marketing swatches. */
   const childAssignedColorName = useMemo(() => {
@@ -1676,6 +1949,7 @@ export default function ProductForm({
       }
       
       initializedProductIdRef.current = productKey;
+      setEditHydrateEpoch((n) => n + 1);
     } else if (!product) {
       // Reset when switching from edit to add mode
       initializedProductIdRef.current = null;
@@ -3303,9 +3577,12 @@ export default function ProductForm({
        * clear the Add draft so the next visit does not restore this product.
        * onSave returns false when create failed without throwing.
        */
-      if (enableLocalDraft && saveResult !== false) {
+      if (saveResult !== false) {
         allowLeaveWithoutWarningRef.current = true;
-        clearProductAddDraft();
+        clearAdminNavBlocker();
+        if (enableLocalDraft) {
+          clearProductAddDraft();
+        }
       }
     } finally {
       setIsSubmitting(false);
@@ -3320,9 +3597,10 @@ export default function ProductForm({
     product,
     allProducts: allProducts || [],
     onSave,
-    onCancel,
+    onCancel: handleCancel,
     onCategoryChange,
-    onOpenParent,
+    onOpenParent: handleOpenParent,
+    hasUnsavedChanges,
     currentStep,
     setCurrentStep,
     formData,

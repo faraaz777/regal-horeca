@@ -440,7 +440,9 @@ export default function AllocateStockPanel({
                 Inventory rules
               </p>
               <p className="text-[11px] text-gray-500 mb-3">
-                Min/max and dead-stock thresholds for this intake
+                Min/max gates, plus a sales-velocity rule (qty that should sell in
+                the chosen window). A scheduled job applies the dead-stock tag —
+                it is a label only; stock stays sellable.
               </p>
 
               <div className="space-y-3">

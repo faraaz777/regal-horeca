@@ -45,6 +45,7 @@ export function buildRulesFormFromRule(rule) {
     deadStockPeriod: rule.deadStockPeriod || 'month',
     deadStockQty: String(rule.deadStockQty ?? ''),
     deadStockMarked: Boolean(rule.deadStockMarked),
+    deadStockManualClear: Boolean(rule.deadStockManualClear),
     gateRemark: rule.gateRemark || '',
   };
 }
@@ -75,7 +76,13 @@ function RulesReadView({ rule, stockUnit, showPermissionNote = false }) {
         <RuleRow label="Qty to sell in period" value={`${rule.deadStockQty} ${unit}`} />
         <RuleRow
           label="Dead stock tag"
-          value={rule.deadStockMarked ? 'Yes (sales can still sell)' : 'No'}
+          value={
+            rule.deadStockMarked
+              ? 'Yes (sales can still sell)'
+              : rule.deadStockManualClear
+                ? 'No (manual clear — held until sales recover)'
+                : 'No'
+          }
           highlight={rule.deadStockMarked}
         />
         <RuleRow label="Set at intake" value={setAtLabel} />
@@ -261,7 +268,8 @@ export default function RulesPanel({
         <span>
           <span className="text-sm font-medium text-gray-800">Dead stock tag</span>
           <span className="block text-[11px] text-gray-500 mt-0.5">
-            Product-wide label only — sales can still sell this item.
+            Product-wide label only — sales can still sell this item. Clearing it
+            sticks until sales recover (automation will not immediately re-mark).
           </span>
         </span>
       </label>
@@ -276,6 +284,12 @@ export default function RulesPanel({
         />
       </Field>
 
+      <p className="text-[11px] text-gray-500">
+        Velocity rule: sell at least the qty above within the chosen window
+        (rolling days). A nightly job applies the tag; changing the period/qty
+        restarts the waiting period.
+        {rulesForm?.deadStockManualClear ? ' Manual clear is active.' : ''}
+      </p>
       <p className="text-[11px] text-gray-500">
         Set at intake: {setAtLabel}
         {rule.updatedAt && ` · Last updated: ${updatedAtLabel}`}

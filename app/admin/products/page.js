@@ -12,6 +12,8 @@ import { apiClient, ApiError } from '@/lib/utils/apiClient';
 import { adminJson } from '@/lib/client/adminFetch';
 import { childRowListedInStorefrontCatalog } from '@/lib/utils/storefrontCatalogFilter';
 import ProductImportPanel, { ProductImportButtons } from '@/components/admin/products/ProductImportPanel';
+import { PrintLabelButton } from '@/components/admin/products/ProductLabel';
+import { collectProductLabelItems, toProductLabelItem } from '@/lib/shared/productLabel';
 import { storeImportProductDraft } from '@/lib/client/productImportDraft';
 import { buildCategoryMaps, getChildrenByParentMap } from '@/lib/utils/categoryUtils';
 import '@/components/new/SidebarFilter.css';
@@ -19,6 +21,11 @@ import '@/components/new/SidebarFilter.css';
 const CatalogFilterSidebar = dynamic(
   () => import('@/components/catalog/CatalogFilterSidebar'),
   { ssr: false, loading: () => <div className="sidebar-container animate-pulse h-64 bg-gray-50 rounded" /> }
+);
+
+const ProductLabelPrintDialog = dynamic(
+  () => import('@/components/admin/products/ProductLabelPrintDialog'),
+  { ssr: false }
 );
 
 const ITEMS_PER_PAGE = 20;
@@ -205,6 +212,7 @@ function AdminProductsPageInner({ isFilterOpen, setIsFilterOpen }) {
   /** Parent _id -> bool (expanded). Drives the variant child rows. */
   const [expandedParents, setExpandedParents] = useState({});
   const [importOpen, setImportOpen] = useState(false);
+  const [labelPrint, setLabelPrint] = useState(null);
   const [openFilterSections, setOpenFilterSections] = useState({
     price: true,
     color: true,
@@ -632,6 +640,15 @@ function AdminProductsPageInner({ isFilterOpen, setIsFilterOpen }) {
     const qs = variantsOnly ? '?step=selling' : '';
     router.push(`/admin/products/${productId}/edit${qs}`);
   };
+
+  const openLabelPrint = useCallback((nextItems, { allowPick } = {}) => {
+    const items = (nextItems || []).filter(Boolean);
+    if (items.length === 0) {
+      toast.error('Nothing to print on a label yet.');
+      return;
+    }
+    setLabelPrint({ items, allowPick: allowPick ?? items.length > 1 });
+  }, []);
 
   const buildDeleteProductConfirmMessage = (productId, productHint) => {
     if (productHint?.productType === 'child') {
@@ -1428,6 +1445,15 @@ function AdminProductsPageInner({ isFilterOpen, setIsFilterOpen }) {
                                 >
                                   <EditIcon />
                                 </button>
+                                <PrintLabelButton
+                                  className="mr-4"
+                                  disabled={loading}
+                                  onClick={() =>
+                                    openLabelPrint(
+                                      collectProductLabelItems(product, displayChildren, isCarrier)
+                                    )
+                                  }
+                                />
                                 {!isCarrier ? (
                                   <button
                                     onClick={() => handleDuplicateProduct(product)}
@@ -1613,6 +1639,23 @@ function AdminProductsPageInner({ isFilterOpen, setIsFilterOpen }) {
                                 )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                {listFilter === 'active' && (
+                                  <PrintLabelButton
+                                    className="mr-4"
+                                    disabled={loading}
+                                    onClick={() =>
+                                      openLabelPrint(
+                                        [
+                                          toProductLabelItem(child, {
+                                            fallbackSlug: child.slug || product.slug,
+                                            fallbackTitle: product.title,
+                                          }),
+                                        ],
+                                        { allowPick: false }
+                                      )
+                                    }
+                                  />
+                                )}
                                 <button
                                   onClick={() => handleEditProduct(product)}
                                   className="text-indigo-600 hover:text-indigo-900"
@@ -1843,6 +1886,15 @@ function AdminProductsPageInner({ isFilterOpen, setIsFilterOpen }) {
                             >
                               <EditIcon />
                             </button>
+                            <PrintLabelButton
+                              className="p-2"
+                              disabled={loading}
+                              onClick={() =>
+                                openLabelPrint(
+                                  collectProductLabelItems(product, displayChildren, isCarrier)
+                                )
+                              }
+                            />
                             {!isCarrier ? (
                               <button
                                 onClick={() => handleDuplicateProduct(product)}
@@ -2005,9 +2057,26 @@ function AdminProductsPageInner({ isFilterOpen, setIsFilterOpen }) {
                                         In catalog
                                       </label>
                                     )}
+                                    {listFilter === 'active' && (
+                                      <PrintLabelButton
+                                        className="ml-auto"
+                                        disabled={loading}
+                                        onClick={() =>
+                                          openLabelPrint(
+                                            [
+                                              toProductLabelItem(child, {
+                                                fallbackSlug: child.slug || product.slug,
+                                                fallbackTitle: product.title,
+                                              }),
+                                            ],
+                                            { allowPick: false }
+                                          )
+                                        }
+                                      />
+                                    )}
                                     <button
                                       onClick={() => handleEditProduct(product)}
-                                      className="ml-auto text-indigo-600"
+                                      className={listFilter === 'active' ? 'text-indigo-600' : 'ml-auto text-indigo-600'}
                                       title="Edit variant via parent"
                                     >
                                       <EditIcon />
@@ -2082,6 +2151,13 @@ function AdminProductsPageInner({ isFilterOpen, setIsFilterOpen }) {
           </>
         )}
       </div>
+      {labelPrint ? (
+        <ProductLabelPrintDialog
+          items={labelPrint.items}
+          allowPick={labelPrint.allowPick}
+          onClose={() => setLabelPrint(null)}
+        />
+      ) : null}
       <ProductImportPanel
         open={importOpen}
         onClose={() => setImportOpen(false)}

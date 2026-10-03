@@ -4,7 +4,11 @@ import { PrintIcon } from '@/components/Icons';
 
 /**
  * Physical sticker face. Width/height are millimetres so @page and jsPDF
- * match the preview. 50×25 keeps the name to one line; 50×30 allows two.
+ * match the preview. Default stock is 60×40; tighter 50×25 / 50×30 still work.
+ *
+ * QR is a high-DPI PNG <img> (not inline SVG). Inline SVG had no intrinsic
+ * size in the mm box and disappeared in preview; PNG at ~512px stays visible
+ * and sharp with crisp-edges rendering.
  */
 
 export function PrintLabelButton({ onClick, disabled, className = '' }) {
@@ -22,8 +26,11 @@ export function PrintLabelButton({ onClick, disabled, className = '' }) {
 }
 
 export default function ProductLabel({ item, size, qrDataUrl }) {
-  const tight = Number(size?.heightMm) <= 25;
-  const qrMm = tight ? 11 : 13;
+  const heightMm = Number(size?.heightMm) || 40;
+  const tight = heightMm <= 25;
+  const roomy = heightMm >= 40;
+  const qrMm = tight ? 11 : roomy ? 18 : 13;
+  const pad = tight ? '1.2mm 1.4mm' : roomy ? '2.2mm 2.4mm' : '1.6mm 1.8mm';
 
   return (
     <div
@@ -32,7 +39,7 @@ export default function ProductLabel({ item, size, qrDataUrl }) {
         width: `${size.widthMm}mm`,
         height: `${size.heightMm}mm`,
         boxSizing: 'border-box',
-        padding: tight ? '1.2mm 1.4mm' : '1.6mm 1.8mm',
+        padding: pad,
         display: 'flex',
         alignItems: 'stretch',
         background: '#ffffff',
@@ -40,6 +47,8 @@ export default function ProductLabel({ item, size, qrDataUrl }) {
         overflow: 'hidden',
         fontFamily: 'Arial, Helvetica, sans-serif',
         border: '0.15mm solid #e5e7eb',
+        WebkitFontSmoothing: 'antialiased',
+        textRendering: 'geometricPrecision',
       }}
     >
       <div
@@ -53,7 +62,7 @@ export default function ProductLabel({ item, size, qrDataUrl }) {
       >
         <div
           style={{
-            fontSize: tight ? '5.5pt' : '6.5pt',
+            fontSize: tight ? '5.5pt' : roomy ? '8pt' : '6.5pt',
             fontWeight: 800,
             letterSpacing: '0.16em',
             color: '#EE4023',
@@ -64,13 +73,13 @@ export default function ProductLabel({ item, size, qrDataUrl }) {
         </div>
         <div
           style={{
-            fontSize: tight ? '6.5pt' : '7.5pt',
+            fontSize: tight ? '6.5pt' : roomy ? '10pt' : '7.5pt',
             fontWeight: 700,
             lineHeight: 1.15,
-            marginTop: '0.7mm',
+            marginTop: roomy ? '1.2mm' : '0.7mm',
             overflow: 'hidden',
             display: '-webkit-box',
-            WebkitLineClamp: tight ? 1 : 2,
+            WebkitLineClamp: tight ? 1 : roomy ? 3 : 2,
             WebkitBoxOrient: 'vertical',
           }}
         >
@@ -80,7 +89,7 @@ export default function ProductLabel({ item, size, qrDataUrl }) {
           {item.sku ? (
             <div
               style={{
-                fontSize: tight ? '5.5pt' : '6pt',
+                fontSize: tight ? '5.5pt' : roomy ? '8pt' : '6pt',
                 fontWeight: 600,
                 letterSpacing: '0.02em',
               }}
@@ -91,7 +100,7 @@ export default function ProductLabel({ item, size, qrDataUrl }) {
           {item.variantLine ? (
             <div
               style={{
-                fontSize: tight ? '5pt' : '5.5pt',
+                fontSize: tight ? '5pt' : roomy ? '7pt' : '5.5pt',
                 color: '#444444',
                 marginTop: '0.3mm',
                 overflow: 'hidden',
@@ -105,17 +114,19 @@ export default function ProductLabel({ item, size, qrDataUrl }) {
         </div>
       </div>
       {qrDataUrl ? (
-        // QR is a data URL so print/PDF never wait on a network image.
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={qrDataUrl}
           alt=""
+          width={512}
+          height={512}
           style={{
             width: `${qrMm}mm`,
             height: `${qrMm}mm`,
-            marginLeft: '1.2mm',
+            marginLeft: roomy ? '2mm' : '1.2mm',
             alignSelf: 'center',
             flexShrink: 0,
+            imageRendering: 'pixelated',
           }}
         />
       ) : (
@@ -123,7 +134,7 @@ export default function ProductLabel({ item, size, qrDataUrl }) {
           style={{
             width: `${qrMm}mm`,
             height: `${qrMm}mm`,
-            marginLeft: '1.2mm',
+            marginLeft: roomy ? '2mm' : '1.2mm',
             alignSelf: 'center',
             flexShrink: 0,
             background: '#f3f4f6',

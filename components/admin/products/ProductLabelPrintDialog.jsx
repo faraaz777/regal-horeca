@@ -6,6 +6,11 @@
  * Print uses a body-level sheet and hides every other node so AdminShell
  * and the product list do not appear on the sticker. jsPDF writes the same
  * millimetre page so Download PDF matches the printer stock.
+ *
+ * Sharpness notes:
+ * - Print root is off-screen (not display:none) so fonts/SVG lay out before print.
+ * - QR is a high-DPI PNG <img> (inline SVG collapsed in the mm face).
+ * - PDF capture targets ~600 dpi; off-viewport -200vw captures were soft.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -15,7 +20,7 @@ import { toPng } from 'html-to-image';
 import toast from 'react-hot-toast';
 import { XIcon } from '@/components/Icons';
 import { SITE_CONFIG } from '@/lib/constants/seo';
-import { qrSvgDataUrl } from '@/lib/client/productLabelQr';
+import { qrPngDataUrl } from '@/lib/client/productLabelQr';
 import {
   DEFAULT_LABEL_SIZE_ID,
   getLabelSize,
@@ -23,6 +28,13 @@ import {
   labelQrValue,
 } from '@/lib/shared/productLabel';
 import ProductLabel from './ProductLabel';
+
+/** Thermal / desktop label printers are usually 203–300 dpi; 600 keeps headroom. */
+const PDF_CAPTURE_DPI = 600;
+
+function mmToPx(mm, dpi = PDF_CAPTURE_DPI) {
+  return Math.max(1, Math.round((Number(mm) / 25.4) * dpi));
+}
 
 function buildPrintCss(size) {
   return `
@@ -39,7 +51,13 @@ function buildPrintCss(size) {
   #product-label-print-root {
     display: block !important;
     position: static !important;
-    width: ${size.widthMm}mm;
+    left: auto !important;
+    top: auto !important;
+    width: ${size.widthMm}mm !important;
+    height: auto !important;
+    overflow: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
   }
   #product-label-print-root .product-label-print-page {
     width: ${size.widthMm}mm;
@@ -52,7 +70,15 @@ function buildPrintCss(size) {
     page-break-after: auto;
     break-after: auto;
   }
-  #product-label-print-root .product-label-face { border: none !important; }
+  #product-label-print-root .product-label-face {
+    border: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  #product-label-print-root .product-label-face img {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
 }
 `.trim();
 }
@@ -94,7 +120,7 @@ export default function ProductLabelPrintDialog({ items, allowPick = false, onCl
         const value = labelQrValue(item, baseUrl);
         if (!value) continue;
         try {
-          next[item.id] = await qrSvgDataUrl(value);
+          next[item.id] = await qrPngDataUrl(value);
         } catch {
           next[item.id] = '';
         }
@@ -143,15 +169,27 @@ export default function ProductLabelPrintDialog({ items, allowPick = false, onCl
         unit: 'mm',
         format: [size.widthMm, size.heightMm],
       });
+      const canvasWidth = mmToPx(size.widthMm);
+      const canvasHeight = mmToPx(size.heightMm);
 
       for (let i = 0; i < nodes.length; i += 1) {
         const dataUrl = await toPng(nodes[i], {
           cacheBust: true,
-          pixelRatio: 6,
+          // Explicit canvas size beats pixelRatio alone — avoids soft captures
+          // when the node is visually tiny in CSS mm.
+          canvasWidth,
+          canvasHeight,
+          pixelRatio: 1,
           backgroundColor: '#ffffff',
+          style: {
+            transform: 'none',
+            width: `${size.widthMm}mm`,
+            height: `${size.heightMm}mm`,
+          },
         });
         if (i > 0) pdf.addPage([size.widthMm, size.heightMm], orientation);
-        pdf.addImage(dataUrl, 'PNG', 0, 0, size.widthMm, size.heightMm);
+        // NONE keeps the 600 dpi raster; FAST recompresses and softens QR modules.
+        pdf.addImage(dataUrl, 'PNG', 0, 0, size.widthMm, size.heightMm, undefined, 'NONE');
       }
 
       const first = selectedItems[0];
@@ -286,7 +324,8 @@ export default function ProductLabelPrintDialog({ items, allowPick = false, onCl
                 )}
               </div>
               <p className="mt-2 text-[11px] leading-relaxed text-gray-500">
-                Set the printer paper to {size.label} and turn off “fit to page”, or the sticker will shrink.
+                In the print dialog: set paper to {size.label}, scale to 100% / Actual size, and turn
+                off “fit to page”. Scaling is the usual cause of a soft sticker.
               </p>
             </div>
           </div>
@@ -312,7 +351,24 @@ export default function ProductLabelPrintDialog({ items, allowPick = false, onCl
         </div>
       </div>
 
-      <div id="product-label-print-root" className="hidden" aria-hidden="true">
+      {/*
+        Keep the print sheet in layout (opacity/position), not display:none.
+        Some engines rasterize poorly from nodes that were never painted.
+      */}
+      <div
+        id="product-label-print-root"
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          width: `${size.widthMm}mm`,
+          opacity: 0,
+          pointerEvents: 'none',
+          zIndex: -1,
+          overflow: 'hidden',
+        }}
+      >
         {selectedItems.map((item) => (
           <div key={`print-${item.id}`} className="product-label-print-page">
             <ProductLabel item={item} size={size} qrDataUrl={qrByKey[item.id]} />
@@ -320,7 +376,16 @@ export default function ProductLabelPrintDialog({ items, allowPick = false, onCl
         ))}
       </div>
 
-      <div ref={captureRef} className="pointer-events-none fixed -left-[200vw] top-0 print:hidden" aria-hidden="true">
+      {/*
+        Capture sheet sits on-screen at full mm size under opacity 0.
+        Far off-screen (-200vw) made html-to-image soft / undersized.
+      */}
+      <div
+        ref={captureRef}
+        className="pointer-events-none fixed left-0 top-0 z-[-1] print:hidden"
+        aria-hidden="true"
+        style={{ opacity: 0 }}
+      >
         {selectedItems.map((item) => (
           <div key={`capture-${item.id}`} data-label-capture>
             <ProductLabel item={item} size={size} qrDataUrl={qrByKey[item.id]} />

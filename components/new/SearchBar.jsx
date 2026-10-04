@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Search, X, Package, ArrowRight, Loader2 } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -11,9 +11,15 @@ import Link from "next/link";
 // Constants
 const DEBOUNCE_DELAY = 300;
 const MAX_RESULTS = 6;
+/**
+ * Browsers often restore focus to the search input on history Back.
+ * Briefly suppress focus-driven open so that restore doesn't reopen suggestions.
+ */
+const FOCUS_OPEN_SUPPRESS_MS = 400;
 
 export default function SearchBar({ className = "", placeholder = "What are you looking for" }) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const { categories } = useAppContext();
 
@@ -29,6 +35,23 @@ export default function SearchBar({ className = "", placeholder = "What are you 
   const inputRef = useRef(null);
   const timeoutRef = useRef(null);
   const isMountedRef = useRef(true);
+  /**
+   * Suggestions may only auto-open after intentional typing.
+   * URL sync / route changes / submit must not reopen the dropdown.
+   */
+  const allowAutoOpenRef = useRef(false);
+  const suppressFocusOpenUntilRef = useRef(0);
+
+  const closeSuggestions = useCallback((options = {}) => {
+    const { allowAutoOpen = false } = options;
+    allowAutoOpenRef.current = allowAutoOpen;
+    setShowResults(false);
+    setSelectedIndex(-1);
+  }, []);
+
+  const suppressFocusOpenBriefly = useCallback(() => {
+    suppressFocusOpenUntilRef.current = Date.now() + FOCUS_OPEN_SUPPRESS_MS;
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -41,11 +64,23 @@ export default function SearchBar({ className = "", placeholder = "What are you 
     };
   }, []);
 
-  // Load existing ?search=value when on catalog
+  /**
+   * Keep the input in sync with ?search= for catalog landings,
+   * but never treat URL-driven query changes as "user is searching".
+   * Without this, Back from PDP → catalog reopens Product Suggestions.
+   */
   useEffect(() => {
     const existing = searchParams.get("search") || "";
+    suppressFocusOpenBriefly();
+    closeSuggestions();
     setQuery(existing);
-  }, [searchParams]);
+  }, [searchParams, closeSuggestions, suppressFocusOpenBriefly]);
+
+  // Close suggestions whenever the route changes (PDP, catalog filters, etc.)
+  useEffect(() => {
+    suppressFocusOpenBriefly();
+    closeSuggestions();
+  }, [pathname, closeSuggestions, suppressFocusOpenBriefly]);
 
   // Relevance scoring function
   const calculateRelevance = useCallback((product, queryLower) => {
@@ -139,7 +174,10 @@ export default function SearchBar({ className = "", placeholder = "What are you 
           });
           
           setSearchResults(sortedResults);
-          setShowResults(true);
+          // Prefetch results for URL-synced queries, but only open when the user typed.
+          if (allowAutoOpenRef.current) {
+            setShowResults(true);
+          }
         }
       } catch (error) {
         console.error('Search error:', error);
@@ -169,8 +207,7 @@ export default function SearchBar({ className = "", placeholder = "What are you 
         resultsRef.current &&
         !resultsRef.current.contains(event.target)
       ) {
-        setShowResults(false);
-        setSelectedIndex(-1);
+        closeSuggestions();
       }
     };
 
@@ -178,7 +215,7 @@ export default function SearchBar({ className = "", placeholder = "What are you 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, []);
+  }, [closeSuggestions]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -199,23 +236,20 @@ export default function SearchBar({ className = "", placeholder = "What are you 
           const productSlug = product?.slug || product?._id || product?.id;
           if (productSlug) {
             router.push(`/products/${productSlug}`);
-            setShowResults(false);
-            setSelectedIndex(-1);
+            closeSuggestions();
           }
         } else if (e.key === "Escape") {
-          setShowResults(false);
-          setSelectedIndex(-1);
+          closeSuggestions();
           inputRef.current?.blur();
         }
       } else if (e.key === "Escape") {
-        setShowResults(false);
-        setSelectedIndex(-1);
+        closeSuggestions();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showResults, searchResults, selectedIndex, router]);
+  }, [showResults, searchResults, selectedIndex, router, closeSuggestions]);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -234,7 +268,8 @@ export default function SearchBar({ className = "", placeholder = "What are you 
     const trimmed = query.trim();
     if (!trimmed) return;
 
-    setShowResults(false);
+    suppressFocusOpenBriefly();
+    closeSuggestions();
     // When performing explicit search, start fresh with only search term so results match
     // what live search suggested (live search does not apply filters)
     const newParams = new URLSearchParams();
@@ -244,6 +279,7 @@ export default function SearchBar({ className = "", placeholder = "What are you 
   };
 
   const clearSearch = () => {
+    allowAutoOpenRef.current = false;
     setQuery("");
     setSearchResults([]);
     setShowResults(false);
@@ -257,9 +293,33 @@ export default function SearchBar({ className = "", placeholder = "What are you 
   }, []);
 
   const handleResultClick = useCallback(() => {
-    setShowResults(false);
-    setSelectedIndex(-1);
-  }, []);
+    suppressFocusOpenBriefly();
+    closeSuggestions();
+  }, [closeSuggestions, suppressFocusOpenBriefly]);
+
+  const handleInputChange = (e) => {
+    const nextValue = e.target.value;
+    allowAutoOpenRef.current = true;
+    setQuery(nextValue);
+    if (nextValue.trim()) {
+      setShowResults(true);
+    } else {
+      setShowResults(false);
+      setSelectedIndex(-1);
+    }
+  };
+
+  const handleInputFocus = () => {
+    // Ignore focus restored by the browser during Back/forward navigation.
+    if (Date.now() < suppressFocusOpenUntilRef.current) return;
+    if (!query.trim()) return;
+
+    // Mark intentional focus so an in-flight prefetch can open when it finishes.
+    allowAutoOpenRef.current = true;
+    if (searchResults.length > 0 || isSearching) {
+      setShowResults(true);
+    }
+  };
 
   return (
     <div ref={searchBarRef} className={`relative w-full ${className}`}>
@@ -275,13 +335,8 @@ export default function SearchBar({ className = "", placeholder = "What are you 
               type="text"
               value={query}
               placeholder={placeholder}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                if (e.target.value.trim()) {
-                  setShowResults(true);
-                }
-              }}
-              onFocus={() => query.trim() && searchResults.length > 0 && setShowResults(true)}
+              onChange={handleInputChange}
+              onFocus={handleInputFocus}
               className="flex-1 bg-transparent outline-none text-xs placeholder:text-black/70 text-black"
               aria-label="Search products"
               aria-autocomplete="list"

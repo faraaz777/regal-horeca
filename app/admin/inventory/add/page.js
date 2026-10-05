@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
-import { Search, ArrowLeft, Package, Loader2 } from 'lucide-react';
+import { Search, ArrowLeft, Package, Loader2, X } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
 import { useDebounce } from '@/hooks/useDebounce';
 import { canWriteInventory } from '@/lib/shared/permissions';
@@ -17,6 +17,12 @@ const SEARCH_STATUS_STYLES = {
   in: 'bg-sky-100 text-sky-800',
   out: 'bg-gray-100 text-gray-600',
 };
+
+const INVENTORY_STATUS_OPTIONS = [
+  { value: 'all', label: 'All products' },
+  { value: 'out', label: 'Not in inventory' },
+  { value: 'in', label: 'In inventory' },
+];
 
 /**
  * Search is discovery — badges only, never live qty numbers.
@@ -198,6 +204,9 @@ export default function AddToInventoryPage() {
   const [searchQ, setSearchQ] = useState('');
   const debouncedQ = useDebounce(searchQ.trim(), 300);
   const isSearchPending = searchQ.trim() !== debouncedQ;
+  const [selectedBrands, setSelectedBrands] = useState([]);
+  const [selectedColors, setSelectedColors] = useState([]);
+  const [inventoryStatus, setInventoryStatus] = useState('all');
   const [selected, setSelected] = useState(null);
   const [opening, setOpening] = useState(EMPTY_OPENING);
   const [submitting, setSubmitting] = useState(false);
@@ -274,9 +283,31 @@ export default function AddToInventoryPage() {
     );
   }, [selected, opening]);
 
-  const searchUrl = debouncedQ
-    ? `/api/admin/inventory/search?q=${encodeURIComponent(debouncedQ)}&limit=50`
-    : null;
+  const hasActiveFilters =
+    selectedBrands.length > 0 ||
+    selectedColors.length > 0 ||
+    inventoryStatus !== 'all';
+
+  const canSearch = Boolean(debouncedQ) || hasActiveFilters;
+
+  const searchUrl = useMemo(() => {
+    if (!canSearch) return null;
+    const params = new URLSearchParams();
+    if (debouncedQ) params.set('q', debouncedQ);
+    if (selectedBrands.length) params.set('brands', selectedBrands.join(','));
+    if (selectedColors.length) params.set('colors', selectedColors.join(','));
+    if (inventoryStatus !== 'all') params.set('inventoryStatus', inventoryStatus);
+    params.set('limit', '50');
+    return `/api/admin/inventory/search?${params.toString()}`;
+  }, [canSearch, debouncedQ, selectedBrands, selectedColors, inventoryStatus]);
+
+  const { data: facetsData } = useSWR('/api/admin/inventory/discovery-facets', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60_000,
+  });
+  const facetBrands = facetsData?.brands || [];
+  const facetColors = facetsData?.colors || [];
+
   const { data: searchData, isLoading: searchLoading } = useSWR(
     searchUrl,
     fetcher,
@@ -287,10 +318,28 @@ export default function AddToInventoryPage() {
     }
   );
 
-  const showSearchLoading = Boolean(debouncedQ) && (searchLoading || isSearchPending);
+  const showSearchLoading = canSearch && (searchLoading || isSearchPending);
   const results = searchData?.results || [];
   const isWorking = Boolean(selected);
   const showAllocatePanel = canRecordStock && isWorking;
+
+  const toggleBrand = useCallback((brand) => {
+    setSelectedBrands((prev) =>
+      prev.includes(brand) ? prev.filter((b) => b !== brand) : [...prev, brand]
+    );
+  }, []);
+
+  const toggleColor = useCallback((color) => {
+    setSelectedColors((prev) =>
+      prev.includes(color) ? prev.filter((c) => c !== color) : [...prev, color]
+    );
+  }, []);
+
+  const clearAllFilters = useCallback(() => {
+    setSelectedBrands([]);
+    setSelectedColors([]);
+    setInventoryStatus('all');
+  }, []);
 
   const allocationProduct = useMemo(() => {
     if (!selected) return null;
@@ -729,7 +778,117 @@ export default function AddToInventoryPage() {
             />
           </div>
 
-          {debouncedQ && (
+          {/*
+            Discovery filters use the catalog product universe (same brand/color
+            meaning as Manage Products). Inventory status is applied server-side
+            so “Not in inventory” is not a post-limit client trim.
+          */}
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <label className="block min-w-0">
+              <span className="sr-only">Brand</span>
+              <select
+                value=""
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value) toggleBrand(value);
+                  e.target.value = '';
+                }}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+                aria-label="Filter by brand"
+              >
+                <option value="">Brand…</option>
+                {facetBrands.map((brand) => (
+                  <option key={brand} value={brand} disabled={selectedBrands.includes(brand)}>
+                    {brand}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block min-w-0">
+              <span className="sr-only">Color</span>
+              <select
+                value=""
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value) toggleColor(value);
+                  e.target.value = '';
+                }}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+                aria-label="Filter by color"
+              >
+                <option value="">Color…</option>
+                {facetColors.map((color) => (
+                  <option key={color} value={color} disabled={selectedColors.includes(color)}>
+                    {color}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block min-w-0">
+              <span className="sr-only">Inventory status</span>
+              <select
+                value={inventoryStatus}
+                onChange={(e) => setInventoryStatus(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+                aria-label="Filter by inventory status"
+              >
+                {INVENTORY_STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {hasActiveFilters && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {selectedBrands.map((brand) => (
+                <button
+                  key={`brand-${brand}`}
+                  type="button"
+                  onClick={() => toggleBrand(brand)}
+                  className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
+                >
+                  Brand: {brand}
+                  <X size={12} aria-hidden />
+                </button>
+              ))}
+              {selectedColors.map((color) => (
+                <button
+                  key={`color-${color}`}
+                  type="button"
+                  onClick={() => toggleColor(color)}
+                  className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800 hover:bg-violet-100"
+                >
+                  Color: {color}
+                  <X size={12} aria-hidden />
+                </button>
+              ))}
+              {inventoryStatus !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setInventoryStatus('all')}
+                  className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-800 hover:bg-sky-100"
+                >
+                  {INVENTORY_STATUS_OPTIONS.find((o) => o.value === inventoryStatus)?.label ||
+                    inventoryStatus}
+                  <X size={12} aria-hidden />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="text-xs font-medium text-gray-500 hover:text-red-600 underline"
+              >
+                Clear filters
+              </button>
+            </div>
+          )}
+
+          {canSearch && (
             <div className="mt-4 border border-gray-100 rounded-xl divide-y max-h-80 overflow-y-auto">
               {showSearchLoading && results.length === 0 ? (
                 <div className="p-4 text-sm text-gray-500 text-center flex items-center justify-center gap-2">

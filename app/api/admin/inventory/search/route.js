@@ -25,6 +25,12 @@ export const dynamic = 'force-dynamic';
  * Discovery only — product identity + badges.
  * Does NOT return live quantities (those belong on Stock snapshots / detail views).
  * Ledger is used only as a presence signal for “already in inventory”.
+ *
+ * Optional filters (catalog semantics, same as Manage Products):
+ * - brands, colors (CSV)
+ * - inventoryStatus: all | in | out
+ *
+ * Text (`q`) is optional when at least one filter is set.
  */
 export async function GET(request) {
   const auth = await requireAuth(request, { permission: 'inventory:read' });
@@ -35,6 +41,9 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const parsed = inventorySearchSchema.safeParse({
       q: searchParams.get('q') || '',
+      brands: searchParams.get('brands') || '',
+      colors: searchParams.get('colors') || '',
+      inventoryStatus: searchParams.get('inventoryStatus') || 'all',
       limit: searchParams.get('limit') || 50,
     });
 
@@ -42,7 +51,12 @@ export async function GET(request) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
 
-    const products = await searchInventoryProducts(parsed.data.q, parsed.data.limit);
+    const { q, brands, colors, inventoryStatus, limit } = parsed.data;
+    const products = await searchInventoryProducts(q, limit, {
+      brands,
+      colors,
+      inventoryStatus,
+    });
     const productIds = products.map((p) => p._id);
 
     /**
@@ -98,10 +112,18 @@ export async function GET(request) {
       };
     });
 
-    enriched.sort((a, b) => {
-      if (a.hasStock === b.hasStock) return a.title.localeCompare(b.title);
-      return a.hasStock ? -1 : 1;
-    });
+    /**
+     * When not filtering by presence, keep in-inventory rows first so operators
+     * spot existing SKUs quickly. Status filters already constrain the set.
+     */
+    if (inventoryStatus === 'all') {
+      enriched.sort((a, b) => {
+        if (a.hasStock === b.hasStock) return a.title.localeCompare(b.title);
+        return a.hasStock ? -1 : 1;
+      });
+    } else {
+      enriched.sort((a, b) => a.title.localeCompare(b.title));
+    }
 
     return NextResponse.json({ results: enriched });
   } catch (error) {

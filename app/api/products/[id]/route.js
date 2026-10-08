@@ -22,6 +22,11 @@ import { assertProductWrite } from '@/lib/server/auth/adminApiGuard';
 import { findBarcodeConflicts, normalizeBarcode } from '@/lib/server/products/barcodeValidation';
 import { syncParentEmbeddedVariantFromChild } from '@/lib/server/products/syncParentEmbeddedVariants';
 import { stripChildVariantOwnedFields } from '@/lib/shared/childVariantPayload';
+import {
+  sanitizeRelatedProductIds,
+  syncRelatedProductLinks,
+  pullProductFromAllRelatedLists,
+} from '@/lib/server/products/relatedProductsSync';
 import mongoose from 'mongoose';
 
 function formatProductWriteError(error, fallback) {
@@ -217,6 +222,19 @@ export async function PUT(request, { params }) {
       );
     }
 
+    const previousRelatedIds = (product.relatedProductIds || []).map((rid) => String(rid));
+    const relatedFieldInPayload = Object.prototype.hasOwnProperty.call(
+      updateData,
+      'relatedProductIds'
+    );
+
+    if (relatedFieldInPayload) {
+      updateData.relatedProductIds = await sanitizeRelatedProductIds(updateData.relatedProductIds, {
+        selfId: id,
+        previousIds: previousRelatedIds,
+      });
+    }
+
     const resolvedProductType = product.productType || 'standalone';
     if (resolvedProductType === 'child') {
       stripChildVariantOwnedFields(updateData);
@@ -274,6 +292,7 @@ export async function PUT(request, { params }) {
     }
 
     // Update product (retry once on optimistic concurrency conflicts)
+    let savedProduct = product;
     Object.assign(product, updateData);
     try {
       await product.save();
@@ -283,14 +302,23 @@ export async function PUT(request, { params }) {
       if (!fresh) throw saveError;
       Object.assign(fresh, updateData);
       await fresh.save();
+      savedProduct = fresh;
     }
 
-    if (resolvedProductType === 'child' && product.parentProductId) {
-      await syncParentEmbeddedVariantFromChild(product.parentProductId, product);
+    if (relatedFieldInPayload) {
+      await syncRelatedProductLinks({
+        productId: id,
+        previousIds: previousRelatedIds,
+        nextIds: savedProduct.relatedProductIds || [],
+      });
+    }
+
+    if (resolvedProductType === 'child' && savedProduct.parentProductId) {
+      await syncParentEmbeddedVariantFromChild(savedProduct.parentProductId, savedProduct);
     }
 
     // Get the new slug (either from updateData if changed, or old slug)
-    const newSlug = product.slug || oldSlug;
+    const newSlug = savedProduct.slug || oldSlug;
 
     // Revalidate homepage to update cached products
     revalidateHomepage();
@@ -384,6 +412,7 @@ export async function DELETE(request, { params }) {
           doc.deletedAt = now;
           await archiveSlugOnSoftDelete(doc);
           await doc.save();
+          await pullProductFromAllRelatedLists(child._id);
           slugsToRevalidate.push(child.slug);
         }
       }
@@ -392,6 +421,7 @@ export async function DELETE(request, { params }) {
     product.deletedAt = now;
     await archiveSlugOnSoftDelete(product);
     await product.save();
+    await pullProductFromAllRelatedLists(product._id);
 
     revalidateProductSlugs(slugsToRevalidate);
 

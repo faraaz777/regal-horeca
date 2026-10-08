@@ -7,6 +7,7 @@ import FormAccordion from '@/components/product-form/ui/FormAccordion';
 import FormCard from '@/components/product-form/ui/FormCard';
 import { getTextLength } from '@/components/product-form/lib/formatters';
 import { useProductForm } from '@/components/product-form/ProductFormContext';
+import { formatRelatedProductLabel } from '@/lib/shared/relatedProductDisplay';
 
 export default function ProductContentSection() {
   const ctx = useProductForm();
@@ -52,6 +53,8 @@ export default function ProductContentSection() {
     filteredRelatedCandidates,
     searchedProducts,
     allProducts,
+    selectedRelatedProducts,
+    selectedFrequentlyOrderedProducts,
     handleRelatedProductChange,
     handleFrequentlyOrderedProductChange,
     handleAutoSuggestRelated,
@@ -221,7 +224,7 @@ export default function ProductContentSection() {
           <FormCard
             compact
             title="Related products"
-            description="Pick from search results. Typing searches the full catalog."
+            description="Family default for variants that inherit — links are mutual on save. Pick exact SKUs (size · color), not parent families."
           >
             <RelatedPicker
               filteredRelatedCandidates={filteredRelatedCandidates}
@@ -230,6 +233,7 @@ export default function ProductContentSection() {
               searchedProducts={searchedProducts}
               allProducts={allProducts}
               selectedIds={formData.relatedProductIds}
+              selectedProducts={selectedRelatedProducts}
               onToggle={handleRelatedProductChange}
               showMatch
             />
@@ -247,6 +251,7 @@ export default function ProductContentSection() {
               searchedProducts={searchedProducts}
               allProducts={allProducts}
               selectedIds={formData.frequentlyOrderedTogetherProductIds}
+              selectedProducts={selectedFrequentlyOrderedProducts}
               onToggle={handleFrequentlyOrderedProductChange}
             />
           </FormCard>
@@ -420,53 +425,127 @@ function RelatedPicker({
   searchedProducts,
   allProducts,
   selectedIds,
+  selectedProducts = [],
   onToggle,
   showMatch = false,
 }) {
   const isSearching = debouncedSearchQuery.trim().length > 0;
+  const selectedIdSet = new Set((selectedIds || []).map((id) => id?.toString()).filter(Boolean));
+  const linkedProducts = (selectedProducts || []).filter((p) =>
+    selectedIdSet.has((p._id || p.id)?.toString())
+  );
+  // Avoid duplicating linked rows inside search/candidate results.
+  const candidateRows = (filteredRelatedCandidates || []).filter(
+    (p) => !selectedIdSet.has((p._id || p.id)?.toString())
+  );
+
   return (
-    <div className="max-h-60 overflow-y-auto rounded-md border border-gray-300 bg-gray-50">
-      {debouncedSearchQuery.trim() && relatedProductsSearchQuery !== debouncedSearchQuery ? (
-        <p className="p-4 text-center text-sm text-gray-500">Searching…</p>
-      ) : filteredRelatedCandidates.length > 0 ? (
-        filteredRelatedCandidates.map((otherProduct) => {
-          const productId = otherProduct._id || otherProduct.id;
-          const isSelected = selectedIds?.some((id) => id?.toString() === productId?.toString());
-          const isHighMatch = showMatch && !isSearching && otherProduct.relevanceScore >= 5;
-          return (
-            <label
-              key={productId}
-              className={`flex cursor-pointer items-center justify-between p-2 hover:bg-white ${isSelected ? 'bg-blue-50' : ''}`}
-            >
-              <div className="flex items-center gap-3 overflow-hidden">
-                <input type="checkbox" checked={Boolean(isSelected)} onChange={() => onToggle(productId)} className="h-4 w-4 rounded text-primary" />
-                {otherProduct.heroImage ? (
-                  <Image src={otherProduct.heroImage} alt="" width={32} height={32} className="h-8 w-8 rounded border object-cover" />
-                ) : (
-                  <span className="h-8 w-8 rounded bg-gray-200" />
-                )}
-                <span className="truncate text-sm">{otherProduct.title}</span>
-              </div>
-              {isHighMatch ? <StarIcon filled className="h-4 w-4 text-amber-500" /> : null}
-            </label>
-          );
-        })
-      ) : (
-        <p className="p-4 text-center text-sm italic text-gray-500">
-          {relatedProductsSearchQuery
-            ? `No products matching “${relatedProductsSearchQuery}”.`
-            : (allProducts || []).length <= 1
-              ? 'Type to search the catalog, or save other products first.'
-              : 'No products match the current filters.'}
-        </p>
-      )}
-      {filteredRelatedCandidates.length > 0 && debouncedSearchQuery.trim() ? (
-        <p className="border-t border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-700">
-          {searchedProducts.length > 0
-            ? `Found ${filteredRelatedCandidates.length} matching “${debouncedSearchQuery}”`
-            : `Showing ${filteredRelatedCandidates.length}`}
-        </p>
+    <div className="space-y-2">
+      {linkedProducts.length > 0 ? (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50/60">
+          <div className="border-b border-emerald-100 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
+            Linked ({linkedProducts.length})
+          </div>
+          <div className="max-h-40 overflow-y-auto divide-y divide-emerald-100/80">
+            {linkedProducts.map((otherProduct) => {
+              const productId = otherProduct._id || otherProduct.id;
+              return (
+                <label
+                  key={`linked-${productId}`}
+                  className="flex cursor-pointer items-center justify-between gap-2 p-2 hover:bg-white/70"
+                >
+                  <div className="flex min-w-0 items-center gap-3 overflow-hidden">
+                    <input
+                      type="checkbox"
+                      checked
+                      onChange={() => onToggle(productId)}
+                      className="h-4 w-4 rounded text-primary"
+                    />
+                    {otherProduct.heroImage ? (
+                      <Image
+                        src={otherProduct.heroImage}
+                        alt=""
+                        width={32}
+                        height={32}
+                        className="h-8 w-8 rounded border object-cover"
+                      />
+                    ) : (
+                      <span className="h-8 w-8 rounded bg-gray-200" />
+                    )}
+                    <span
+                      className="truncate text-sm font-medium text-gray-900"
+                      title={formatRelatedProductLabel(otherProduct)}
+                    >
+                      {formatRelatedProductLabel(otherProduct)}
+                    </span>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        </div>
       ) : null}
+
+      <div className="max-h-60 overflow-y-auto rounded-md border border-gray-300 bg-gray-50">
+        {debouncedSearchQuery.trim() && relatedProductsSearchQuery !== debouncedSearchQuery ? (
+          <p className="p-4 text-center text-sm text-gray-500">Searching…</p>
+        ) : candidateRows.length > 0 ? (
+          candidateRows.map((otherProduct) => {
+            const productId = otherProduct._id || otherProduct.id;
+            const isHighMatch = showMatch && !isSearching && otherProduct.relevanceScore >= 5;
+            return (
+              <label
+                key={productId}
+                className="flex cursor-pointer items-center justify-between p-2 hover:bg-white"
+              >
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <input
+                    type="checkbox"
+                    checked={false}
+                    onChange={() => onToggle(productId)}
+                    className="h-4 w-4 rounded text-primary"
+                  />
+                  {otherProduct.heroImage ? (
+                    <Image
+                      src={otherProduct.heroImage}
+                      alt=""
+                      width={32}
+                      height={32}
+                      className="h-8 w-8 rounded border object-cover"
+                    />
+                  ) : (
+                    <span className="h-8 w-8 rounded bg-gray-200" />
+                  )}
+                  <span
+                    className="truncate text-sm"
+                    title={formatRelatedProductLabel(otherProduct)}
+                  >
+                    {formatRelatedProductLabel(otherProduct)}
+                  </span>
+                </div>
+                {isHighMatch ? <StarIcon filled className="h-4 w-4 text-amber-500" /> : null}
+              </label>
+            );
+          })
+        ) : (
+          <p className="p-4 text-center text-sm italic text-gray-500">
+            {relatedProductsSearchQuery
+              ? `No products matching “${relatedProductsSearchQuery}”.`
+              : linkedProducts.length > 0
+                ? 'Type to search and add more products.'
+                : (allProducts || []).length <= 1
+                  ? 'Type to search the catalog, or save other products first.'
+                  : 'No products match the current filters.'}
+          </p>
+        )}
+        {candidateRows.length > 0 && debouncedSearchQuery.trim() ? (
+          <p className="border-t border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-700">
+            {searchedProducts.length > 0
+              ? `Found ${candidateRows.length} matching “${debouncedSearchQuery}”`
+              : `Showing ${candidateRows.length}`}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }

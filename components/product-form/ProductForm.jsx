@@ -38,6 +38,7 @@ import {
   clearProductAddDraft,
   PRODUCT_FORM_LEAVE_MESSAGE,
 } from '@/lib/client/productFormDraft';
+import { isRelatedProductTargetAllowed } from '@/lib/shared/relatedProductDisplay';
 import { clearAdminNavBlocker, setAdminNavBlocker } from '@/lib/client/adminNavGuard';
 import { adminFetch } from '@/lib/client/adminFetch';
 import {
@@ -1595,8 +1596,111 @@ export default function ProductForm({
   );
   
   const searchedProducts = searchProductsData?.products || [];
-  
-  // AI generation state
+
+  /**
+   * Selected related / FOT rows must stay visible on edit even when allProducts=[]
+   * and the admin has not typed a search yet. Cache + id fetch fill that gap.
+   */
+  const [relatedProductsCache, setRelatedProductsCache] = useState({});
+
+  const selectedRelationIds = useMemo(() => {
+    const ids = [
+      ...(formData.relatedProductIds || []),
+      ...(formData.frequentlyOrderedTogetherProductIds || []),
+    ]
+      .map((id) => (id?._id || id)?.toString())
+      .filter(Boolean);
+    return [...new Set(ids)];
+  }, [formData.relatedProductIds, formData.frequentlyOrderedTogetherProductIds]);
+
+  const linkedProductsUrl =
+    selectedRelationIds.length > 0
+      ? `/api/products?ids=${encodeURIComponent(selectedRelationIds.join(','))}&limit=${Math.min(
+          100,
+          Math.max(selectedRelationIds.length, 1)
+        )}`
+      : null;
+
+  const { data: linkedProductsData } = useSWR(
+    linkedProductsUrl,
+    (url) => fetch(url).then((res) => res.json()),
+    { revalidateOnFocus: false, dedupingInterval: 5000 }
+  );
+
+  useEffect(() => {
+    const fromApi = linkedProductsData?.products || [];
+    if (!fromApi.length) return;
+    setRelatedProductsCache((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      fromApi.forEach((p) => {
+        const id = (p._id || p.id)?.toString();
+        if (!id || next[id]) return;
+        next[id] = p;
+        changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, [linkedProductsData]);
+
+  // Fill any selected ids the list API skipped (e.g. parent reverse-links, hidden children).
+  const relatedProductsCacheRef = useRef(relatedProductsCache);
+  relatedProductsCacheRef.current = relatedProductsCache;
+
+  useEffect(() => {
+    const missing = selectedRelationIds.filter((id) => !relatedProductsCacheRef.current[id]);
+    if (missing.length === 0) return undefined;
+
+    let cancelled = false;
+    (async () => {
+      const fetched = {};
+      await Promise.all(
+        missing.map(async (id) => {
+          try {
+            const res = await adminFetch(`/api/products/${id}`);
+            const data = await res.json();
+            if (data?.success && data.product) {
+              // Keep the selection key so checkbox / remove still matches form ids.
+              fetched[id] = { ...data.product, _id: id, id };
+            }
+          } catch {
+            /* ignore — row may be deleted */
+          }
+        })
+      );
+      if (cancelled || Object.keys(fetched).length === 0) return;
+      setRelatedProductsCache((prev) => ({ ...prev, ...fetched }));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRelationIds.join('|')]);
+
+  const rememberRelatedProduct = (productLike) => {
+    if (!productLike) return;
+    const id = (productLike._id || productLike.id)?.toString();
+    if (!id) return;
+    setRelatedProductsCache((prev) =>
+      prev[id] ? prev : { ...prev, [id]: productLike }
+    );
+  };
+
+  const selectedRelatedProducts = useMemo(
+    () =>
+      (formData.relatedProductIds || [])
+        .map((id) => relatedProductsCache[(id?._id || id)?.toString()])
+        .filter(Boolean),
+    [formData.relatedProductIds, relatedProductsCache]
+  );
+
+  const selectedFrequentlyOrderedProducts = useMemo(
+    () =>
+      (formData.frequentlyOrderedTogetherProductIds || [])
+        .map((id) => relatedProductsCache[(id?._id || id)?.toString()])
+        .filter(Boolean),
+    [formData.frequentlyOrderedTogetherProductIds, relatedProductsCache]
+  );
   const [aiLoading, setAiLoading] = useState({ summary: false, description: false });
   const [aiCooldown, setAiCooldown] = useState({ summary: false, description: false });
   
@@ -1872,6 +1976,19 @@ export default function ProductForm({
       const frequentlyOrderedTogetherProductIds = (product.frequentlyOrderedTogetherProductIds || [])
         .map(rp => (rp?._id || rp)?.toString())
         .filter(Boolean);
+
+      // Seed picker cache when API already populated related/FOT docs.
+      const seedCache = {};
+      [...(product.relatedProductIds || []), ...(product.frequentlyOrderedTogetherProductIds || [])].forEach(
+        (rp) => {
+          if (!rp || typeof rp !== 'object') return;
+          const id = (rp._id || rp.id)?.toString();
+          if (id && (rp.title || rp.sku)) seedCache[id] = rp;
+        }
+      );
+      if (Object.keys(seedCache).length > 0) {
+        setRelatedProductsCache((prev) => ({ ...seedCache, ...prev }));
+      }
       
       // Always set form data, even if categories/brands aren't loaded yet.
       // Drop children/variants from the payload — they hydrate the SKU table, not form fields.
@@ -2265,12 +2382,34 @@ export default function ProductForm({
   };
 
   const handleRelatedProductChange = (productId) => {
-    const currentRelated = formData.relatedProductIds || [];
     const productIdStr = productId?.toString();
-    if (currentRelated.some(id => id?.toString() === productIdStr)) {
-      setFormData({ 
-        ...formData, 
-        relatedProductIds: currentRelated.filter(id => id?.toString() !== productIdStr) 
+    if (!productIdStr) return;
+
+    /**
+     * Client guard only — server sanitizeRelatedProductIds is authoritative.
+     * Prefer catalog search hits (already exclude parents); still block parent rows
+     * if they appear in local candidate lists.
+     */
+    const candidate =
+      searchedProducts.find((p) => (p._id || p.id)?.toString() === productIdStr) ||
+      allProducts.find((p) => (p._id || p.id)?.toString() === productIdStr) ||
+      null;
+    const currentRelated = formData.relatedProductIds || [];
+    const alreadySelected = currentRelated.some((id) => id?.toString() === productIdStr);
+
+    if (!alreadySelected && candidate) {
+      const type = candidate.productType || 'standalone';
+      if (type === 'parent') {
+        toast.error('Select a specific variant or standalone SKU — not the parent family.');
+        return;
+      }
+      rememberRelatedProduct(candidate);
+    }
+
+    if (alreadySelected) {
+      setFormData({
+        ...formData,
+        relatedProductIds: currentRelated.filter((id) => id?.toString() !== productIdStr),
       });
     } else {
       setFormData({ ...formData, relatedProductIds: [...currentRelated, productId] });
@@ -2280,12 +2419,18 @@ export default function ProductForm({
   const handleFrequentlyOrderedProductChange = (productId) => {
     const current = formData.frequentlyOrderedTogetherProductIds || [];
     const productIdStr = productId?.toString();
+    const candidate =
+      searchedProducts.find((p) => (p._id || p.id)?.toString() === productIdStr) ||
+      allProducts.find((p) => (p._id || p.id)?.toString() === productIdStr) ||
+      relatedProductsCache[productIdStr] ||
+      null;
     if (current.some(id => id?.toString() === productIdStr)) {
       setFormData({
         ...formData,
         frequentlyOrderedTogetherProductIds: current.filter(id => id?.toString() !== productIdStr),
       });
     } else {
+      if (candidate) rememberRelatedProduct(candidate);
       setFormData({ ...formData, frequentlyOrderedTogetherProductIds: [...current, productId] });
     }
   };
@@ -2621,7 +2766,7 @@ export default function ProductForm({
   const filteredRelatedCandidates = useMemo(() => {
     if (!debouncedSearchQuery.trim()) {
       // Not searching - use original sorted candidates with relevance scoring
-      return getSortedRelatedCandidates;
+      return (getSortedRelatedCandidates || []).filter(isRelatedProductTargetAllowed);
     }
     
     // When searching: Return simple search results without category/relevance logic
@@ -2629,9 +2774,10 @@ export default function ProductForm({
     const currentProductId = product?._id || product?.id;
     
     const simpleSearchResults = searchedProducts
-      .filter(p => {
+      .filter((p) => {
         const pid = p._id || p.id;
-        return pid?.toString() !== currentProductId?.toString();
+        if (pid?.toString() === currentProductId?.toString()) return false;
+        return isRelatedProductTargetAllowed(p);
       })
       .map(p => ({
         ...p,
@@ -2675,9 +2821,13 @@ export default function ProductForm({
           .filter(c => c.relevanceScore > 0)
           .slice(0, 4);
     
-    const matchIds = topMatches.map(c => c._id || c.id);
+    const matchIds = topMatches
+      .filter(isRelatedProductTargetAllowed)
+      .map((c) => c._id || c.id)
+      .filter(Boolean);
 
     if (matchIds.length > 0) {
+      topMatches.filter(isRelatedProductTargetAllowed).forEach(rememberRelatedProduct);
       const newSelection = Array.from(new Set([...(formData.relatedProductIds || []), ...matchIds]));
       setFormData({ ...formData, relatedProductIds: newSelection });
     } else {
@@ -3733,6 +3883,8 @@ export default function ProductForm({
     debouncedSearchQuery,
     filteredRelatedCandidates,
     searchedProducts,
+    selectedRelatedProducts,
+    selectedFrequentlyOrderedProducts,
     handleRelatedProductChange,
     handleFrequentlyOrderedProductChange,
     handleAutoSuggestRelated,

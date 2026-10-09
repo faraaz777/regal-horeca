@@ -3,14 +3,11 @@
 /**
  * Label preview + print/PDF.
  *
- * Print uses a body-level sheet and hides every other node so AdminShell
- * and the product list do not appear on the sticker. jsPDF writes the same
- * millimetre page so Download PDF matches the printer stock.
+ * One size only: 50 × 40 mm. Preview, browser print, and PDF capture all
+ * render the same ProductLabel face (no screen-only border / size chrome).
  *
- * Sharpness notes:
- * - Print root is off-screen (not display:none) so fonts/SVG lay out before print.
- * - QR is a high-DPI PNG <img> (inline SVG collapsed in the mm face).
- * - PDF capture targets ~600 dpi; off-viewport -200vw captures were soft.
+ * Print uses a body-level sheet and hides every other node so AdminShell
+ * and the product list do not appear on the sticker.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -21,12 +18,7 @@ import toast from 'react-hot-toast';
 import { XIcon } from '@/components/Icons';
 import { SITE_CONFIG } from '@/lib/constants/seo';
 import { qrPngDataUrl } from '@/lib/client/productLabelQr';
-import {
-  DEFAULT_LABEL_SIZE_ID,
-  getLabelSize,
-  LABEL_SIZES,
-  labelQrValue,
-} from '@/lib/shared/productLabel';
+import { LABEL_SIZE, labelQrValue } from '@/lib/shared/productLabel';
 import ProductLabel from './ProductLabel';
 
 /** Thermal / desktop label printers are usually 203–300 dpi; 600 keeps headroom. */
@@ -71,7 +63,6 @@ function buildPrintCss(size) {
     break-after: auto;
   }
   #product-label-print-root .product-label-face {
-    border: none !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -86,12 +77,11 @@ function buildPrintCss(size) {
 export default function ProductLabelPrintDialog({ items, allowPick = false, onClose }) {
   const captureRef = useRef(null);
   const [mounted, setMounted] = useState(false);
-  const [sizeId, setSizeId] = useState(DEFAULT_LABEL_SIZE_ID);
   const [selectedIds, setSelectedIds] = useState(() => new Set((items || []).map((item) => item.id)));
   const [qrByKey, setQrByKey] = useState({});
   const [busy, setBusy] = useState(false);
 
-  const size = getLabelSize(sizeId);
+  const size = LABEL_SIZE;
   const selectedItems = useMemo(() => {
     const list = Array.isArray(items) ? items : [];
     if (!allowPick) return list;
@@ -175,8 +165,6 @@ export default function ProductLabelPrintDialog({ items, allowPick = false, onCl
       for (let i = 0; i < nodes.length; i += 1) {
         const dataUrl = await toPng(nodes[i], {
           cacheBust: true,
-          // Explicit canvas size beats pixelRatio alone — avoids soft captures
-          // when the node is visually tiny in CSS mm.
           canvasWidth,
           canvasHeight,
           pixelRatio: 1,
@@ -188,7 +176,6 @@ export default function ProductLabelPrintDialog({ items, allowPick = false, onCl
           },
         });
         if (i > 0) pdf.addPage([size.widthMm, size.heightMm], orientation);
-        // NONE keeps the 600 dpi raster; FAST recompresses and softens QR modules.
         pdf.addImage(dataUrl, 'PNG', 0, 0, size.widthMm, size.heightMm, undefined, 'NONE');
       }
 
@@ -240,28 +227,9 @@ export default function ProductLabelPrintDialog({ items, allowPick = false, onCl
           </div>
 
           <div className="space-y-4 px-4 py-4">
-            <div>
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Size</p>
-              <div className="flex gap-2">
-                {Object.values(LABEL_SIZES).map((option) => {
-                  const active = option.id === sizeId;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => setSizeId(option.id)}
-                      className={`rounded-md border px-3 py-1.5 text-sm font-medium ${
-                        active
-                          ? 'border-gray-900 bg-gray-900 text-white'
-                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <p className="text-sm text-gray-600">
+              Size: <span className="font-medium text-gray-900">{size.label}</span>
+            </p>
 
             {allowPick ? (
               <div>
@@ -312,13 +280,24 @@ export default function ProductLabelPrintDialog({ items, allowPick = false, onCl
                 Preview
                 {selectedItems.length > 1 ? ` · ${selectedItems.length} labels` : ''}
               </p>
+              {/*
+                Outline is on the wrapper only — not on the sticker face —
+                so preview pixels match print/PDF exactly.
+              */}
               <div className="flex justify-center rounded-lg bg-gray-100 p-4">
                 {previewItem ? (
-                  <ProductLabel
-                    item={previewItem}
-                    size={size}
-                    qrDataUrl={qrByKey[previewItem.id]}
-                  />
+                  <div
+                    style={{
+                      boxShadow: '0 0 0 1px #d1d5db',
+                      lineHeight: 0,
+                    }}
+                  >
+                    <ProductLabel
+                      item={previewItem}
+                      size={size}
+                      qrDataUrl={qrByKey[previewItem.id]}
+                    />
+                  </div>
                 ) : (
                   <p className="text-sm text-gray-500">Select a variant to preview.</p>
                 )}
@@ -352,8 +331,8 @@ export default function ProductLabelPrintDialog({ items, allowPick = false, onCl
       </div>
 
       {/*
-        Keep the print sheet in layout (opacity/position), not display:none.
-        Some engines rasterize poorly from nodes that were never painted.
+        Same ProductLabel instances as preview (shared size + QR). Kept in
+        layout (opacity), not display:none, so print paints the same face.
       */}
       <div
         id="product-label-print-root"
@@ -376,10 +355,6 @@ export default function ProductLabelPrintDialog({ items, allowPick = false, onCl
         ))}
       </div>
 
-      {/*
-        Capture sheet sits on-screen at full mm size under opacity 0.
-        Far off-screen (-200vw) made html-to-image soft / undersized.
-      */}
       <div
         ref={captureRef}
         className="pointer-events-none fixed left-0 top-0 z-[-1] print:hidden"

@@ -18,6 +18,10 @@ import { revalidateHomepage, revalidatePath, revalidateProducts } from '@/lib/ut
 import { queryProducts } from '@/lib/server/products/queryProducts';
 import { normalizeProductPayloadForCreate } from '@/lib/server/products/normalizeProductInput';
 import { assertProductWrite } from '@/lib/server/auth/adminApiGuard';
+import {
+  sanitizeRelatedProductIds,
+  syncRelatedProductLinks,
+} from '@/lib/server/products/relatedProductsSync';
 
 function formatProductWriteError(error, fallback) {
   if (error?.name === 'ValidationError' && error.errors) {
@@ -184,9 +188,35 @@ export async function POST(request) {
 
     normalizeProductPayloadForCreate(productData);
 
+    /**
+     * Related products: server is authoritative.
+     * Sanitize before insert; mutual reverse-links run after we have an _id.
+     */
+    productData.relatedProductIds = await sanitizeRelatedProductIds(
+      productData.relatedProductIds,
+      { previousIds: [] }
+    );
+
     // Create product
     const product = new Product(productData);
     await product.save();
+
+    const nextRelatedIds = await sanitizeRelatedProductIds(product.relatedProductIds, {
+      selfId: product._id,
+      previousIds: [],
+    });
+    const nextRelatedKey = nextRelatedIds.map(String).join(',');
+    const savedRelatedKey = (product.relatedProductIds || []).map(String).join(',');
+    if (nextRelatedKey !== savedRelatedKey) {
+      product.relatedProductIds = nextRelatedIds;
+      await product.save();
+    }
+
+    await syncRelatedProductLinks({
+      productId: product._id,
+      previousIds: [],
+      nextIds: nextRelatedIds,
+    });
 
     // Revalidate homepage to update cached products
     revalidateHomepage();

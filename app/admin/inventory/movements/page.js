@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
+import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import toast from 'react-hot-toast';
 import {
@@ -22,6 +23,12 @@ import { LEDGER_FILTER_TYPES, LEDGER_FILTER_TYPE_LABELS } from '@/lib/shared/inv
 import LocationSelector from '@/components/admin/inventory/LocationSelector';
 import ProductImageThumb from '@/components/admin/inventory/ProductImageThumb';
 import { resolveCascadeLocation } from '@/lib/client/locationCascadeApi';
+import { addIsoDays } from '@/lib/shared/ledgerCalendar';
+
+const InsightsDashboard = dynamic(() => import('@/components/admin/inventory/insights/InsightsDashboard'), {
+  ssr: false,
+  loading: () => <div className="p-8 text-center text-sm text-[#64748B]">Loading insights…</div>,
+});
 
 const fetcher = (url) => adminJson(url);
 
@@ -78,6 +85,7 @@ async function downloadExport(url) {
 }
 
 export default function StockMovementsPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialProductId = searchParams.get('productId') || '';
   const initialLocationId = searchParams.get('locationId') || '';
@@ -86,12 +94,17 @@ export default function StockMovementsPage() {
   const role = meData?.user?.role;
   const canView = canReadStockLedger(role);
 
-  const [activeTab, setActiveTab] = useState('movements');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [search, setSearch] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'movements');
+  const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || '');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [appliedSearch, setAppliedSearch] = useState(searchParams.get('search') || '');
+  const [dateFrom, setDateFrom] = useState(searchParams.get('dateFrom') || '');
+  const [dateTo, setDateTo] = useState(searchParams.get('dateTo') || '');
   const [referenceFilter, setReferenceFilter] = useState('');
+  const [refsFilter, setRefsFilter] = useState(searchParams.get('refs') || '');
+  const [insightUnit, setInsightUnit] = useState(searchParams.get('unit') || '');
+  const [calendarMonth, setCalendarMonth] = useState(searchParams.get('calendarMonth') || '');
+  const [agingFilter, setAgingFilter] = useState(searchParams.get('aging') || '');
   const [productFilterId, setProductFilterId] = useState(initialProductId);
   const [operatorFilterId, setOperatorFilterId] = useState('');
   /** Whose sale it was, as opposed to who keyed the movement in. */
@@ -105,7 +118,7 @@ export default function StockMovementsPage() {
     references: 1,
   });
   const [locationFilter, setLocationFilter] = useState({
-    branchId: null,
+    branchId: searchParams.get('branchId'),
     floorId: null,
     rackId: null,
     locationId: initialLocationId || null,
@@ -148,25 +161,110 @@ export default function StockMovementsPage() {
     });
   };
 
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setAppliedSearch(search.replace(/[\r\n]+/g, ' ').trim());
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [search]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (activeTab !== 'movements') params.set('tab', activeTab);
+    if (appliedSearch) params.set('search', appliedSearch);
+    if (typeFilter) params.set('type', typeFilter);
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    if (productFilterId) params.set('productId', productFilterId);
+    if (locationFilter.branchId) params.set('branchId', locationFilter.branchId);
+    if (locationFilter.locationId) params.set('locationId', locationFilter.locationId);
+    if (refsFilter) params.set('refs', refsFilter);
+    if (insightUnit) params.set('unit', insightUnit);
+    if (calendarMonth) params.set('calendarMonth', calendarMonth);
+    if (agingFilter) params.set('aging', agingFilter);
+    const next = params.toString();
+    if (next === searchParams.toString()) return;
+    router.replace(next ? `/admin/inventory/movements?${next}` : '/admin/inventory/movements', { scroll: false });
+  }, [
+    activeTab,
+    appliedSearch,
+    typeFilter,
+    dateFrom,
+    dateTo,
+    productFilterId,
+    locationFilter.branchId,
+    locationFilter.locationId,
+    refsFilter,
+    insightUnit,
+    calendarMonth,
+    agingFilter,
+    router,
+    searchParams,
+  ]);
+
+  const applyDates = (nextFrom, nextTo) => {
+    if (nextFrom && nextTo && nextFrom > nextTo) {
+      setDateFrom(nextTo);
+      setDateTo(nextFrom);
+    } else {
+      setDateFrom(nextFrom);
+      setDateTo(nextTo);
+    }
+    resetAllPages();
+  };
+
+  const applyDatePreset = (dayCount) => {
+    const end = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+    const start = dayCount <= 1 ? end : addIsoDays(end, -(dayCount - 1));
+    applyDates(start, end);
+  };
+
+  const drillToLedger = (next) => {
+    if (Object.prototype.hasOwnProperty.call(next, 'type')) setTypeFilter(next.type || '');
+    if (next.dateFrom) setDateFrom(next.dateFrom);
+    if (next.dateTo) setDateTo(next.dateTo);
+    if (next.productId) {
+      setProductFilterId(next.productId);
+      setSearch('');
+      setAppliedSearch('');
+    }
+    if (next.branchId) {
+      setLocationFilter({ branchId: next.branchId, floorId: null, rackId: null, locationId: null });
+    }
+    if (Object.prototype.hasOwnProperty.call(next, 'refs')) setRefsFilter(next.refs || '');
+    if (next.userId) setOperatorFilterId(next.userId);
+    setActiveTab('movements');
+    resetAllPages();
+  };
+
   const sharedParams = useMemo(() => {
     const params = new URLSearchParams();
     if (typeFilter) params.set('type', typeFilter);
-    if (search.trim()) params.set('search', search.trim());
+    if (appliedSearch) params.set('search', appliedSearch);
     if (dateFrom) params.set('dateFrom', dateFrom);
     if (dateTo) params.set('dateTo', dateTo);
     if (productFilterId) params.set('productId', productFilterId);
     if (locationFilter.locationId) params.set('locationId', locationFilter.locationId);
+    if (locationFilter.branchId) params.set('branchId', locationFilter.branchId);
+    if (refsFilter) params.set('refs', refsFilter);
     if (operatorFilterId) params.set('userId', operatorFilterId);
     if (soldForFilterId) params.set('soldForUserId', soldForFilterId);
     if (referenceFilter.trim()) params.set('refExact', referenceFilter.trim());
     return params;
   }, [
     typeFilter,
-    search,
+    appliedSearch,
     dateFrom,
     dateTo,
     productFilterId,
     locationFilter.locationId,
+    locationFilter.branchId,
+    refsFilter,
     operatorFilterId,
     soldForFilterId,
     referenceFilter,
@@ -187,9 +285,9 @@ export default function StockMovementsPage() {
     params.set('limit', '20');
     if (locationFilter.locationId) params.set('locationId', locationFilter.locationId);
     if (productFilterId) params.set('productId', productFilterId);
-    if (search.trim()) params.set('search', search.trim());
+    if (appliedSearch) params.set('search', appliedSearch);
     return `/api/admin/inventory/activity/position?${params}`;
-  }, [canView, activeTab, pages.position, locationFilter.locationId, productFilterId, search]);
+  }, [canView, activeTab, pages.position, locationFilter.locationId, productFilterId, appliedSearch]);
 
   const operatorsUrl = useMemo(() => {
     if (!canView || activeTab !== 'operators') return null;
@@ -200,10 +298,13 @@ export default function StockMovementsPage() {
   }, [canView, activeTab, sharedParams, pages.operators]);
 
   const insightsUrl = useMemo(() => {
-    if (!canView || activeTab !== 'insights') return null;
+    if (!canView || (activeTab !== 'insights' && activeTab !== 'movements')) return null;
     const params = new URLSearchParams(sharedParams);
+    if (insightUnit) params.set('unit', insightUnit);
+    if (calendarMonth) params.set('calendarMonth', calendarMonth);
+    if (agingFilter) params.set('aging', agingFilter);
     return `/api/admin/inventory/activity/insights?${params}`;
-  }, [canView, activeTab, sharedParams]);
+  }, [canView, activeTab, sharedParams, insightUnit, calendarMonth, agingFilter]);
 
   const referencesUrl = useMemo(() => {
     if (!canView || activeTab !== 'references') return null;
@@ -215,7 +316,7 @@ export default function StockMovementsPage() {
     if (dateTo) params.set('dateTo', dateTo);
     if (productFilterId) params.set('productId', productFilterId);
     if (locationFilter.locationId) params.set('locationId', locationFilter.locationId);
-    if (search.trim()) params.set('refSearch', search.trim());
+    if (appliedSearch) params.set('refSearch', appliedSearch);
     return `/api/admin/inventory/activity/references?${params}`;
   }, [
     canView,
@@ -226,13 +327,13 @@ export default function StockMovementsPage() {
     dateTo,
     productFilterId,
     locationFilter.locationId,
-    search,
+    appliedSearch,
   ]);
 
   const movementRes = useSWR(movementUrl, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
   const positionRes = useSWR(positionUrl, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
   const operatorsRes = useSWR(operatorsUrl, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
-  const insightsRes = useSWR(insightsUrl, fetcher, { revalidateOnFocus: false });
+  const insightsRes = useSWR(insightsUrl, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
   const referencesRes = useSWR(referencesUrl, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
 
   const movementItems = movementRes.data?.items || [];
@@ -244,6 +345,12 @@ export default function StockMovementsPage() {
   const referenceItems = referencesRes.data?.items || [];
   const referencePagination = referencesRes.data?.pagination || { page: 1, pages: 1, total: 0 };
   const insights = insightsRes.data;
+  const searchTruncated = Boolean(
+    (activeTab === 'movements' && movementRes.data?.searchMeta?.truncated) ||
+    (activeTab === 'position' && positionRes.data?.searchMeta?.truncated) ||
+    (activeTab === 'operators' && operatorsRes.data?.searchMeta?.truncated) ||
+    (activeTab === 'insights' && insightsRes.data?.searchMeta?.truncated)
+  );
 
   const buildExportUrl = useCallback(
     (format) => {
@@ -365,39 +472,79 @@ export default function StockMovementsPage() {
           ))}
         </div>
 
+        <div className="flex flex-wrap gap-2">
+          {[
+            { id: 'today', label: 'Today', days: 1 },
+            { id: '7', label: '7 days', days: 7 },
+            { id: '30', label: '30 days', days: 30 },
+            { id: '90', label: '90 days', days: 90 },
+          ].map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => applyDatePreset(preset.days)}
+              className="px-3 py-1.5 text-sm font-medium rounded-full border border-[#E2E8F0] text-[#334155] hover:bg-slate-50"
+            >
+              {preset.label}
+            </button>
+          ))}
+          {(dateFrom || dateTo) && (
+            <button
+              type="button"
+              onClick={() => applyDates('', '')}
+              className="px-3 py-1.5 text-sm font-medium rounded-full border border-[#E2E8F0] text-[#334155] hover:bg-slate-50"
+            >
+              Clear dates
+            </button>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
           <div className="relative lg:col-span-2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
               type="text"
-              placeholder={activeTab === 'references' ? 'Search reference…' : 'Search remark or ref…'}
+              placeholder={activeTab === 'references' ? 'Search reference…' : 'Search product, SKU, or barcode'}
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
+                if (activeTab !== 'references') setProductFilterId('');
+                resetAllPages();
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                setAppliedSearch(search.replace(/[\r\n]+/g, ' ').trim());
                 resetAllPages();
               }}
               className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
             />
           </div>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => {
-              setDateFrom(e.target.value);
-              resetAllPages();
-            }}
-            className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg"
-          />
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => {
-              setDateTo(e.target.value);
-              resetAllPages();
-            }}
-            className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg"
-          />
+          <label className="block text-xs text-[#64748B]">
+            From
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => applyDates(e.target.value, dateTo)}
+              className="mt-1 w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg"
+            />
+          </label>
+          <label className="block text-xs text-[#64748B]">
+            To
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => applyDates(dateFrom, e.target.value)}
+              className="mt-1 w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg"
+            />
+          </label>
         </div>
+
+        {searchTruncated && (
+          <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            Showing the closest products. Type more of the name or SKU to narrow the list.
+          </p>
+        )}
 
         <div className="border-t border-gray-100 pt-4">
           <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Filter by location</p>
@@ -418,12 +565,43 @@ export default function StockMovementsPage() {
           />
         </div>
 
-        {(productFilterId || operatorFilterId || soldForFilterId || referenceFilter) && (
+        {(productFilterId || operatorFilterId || soldForFilterId || referenceFilter || refsFilter || locationFilter.branchId || locationFilter.locationId || appliedSearch || typeFilter || dateFrom || dateTo || agingFilter) && (
           <div className="flex flex-wrap items-center gap-2 text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
-            {productFilterId && <span>Product filter active</span>}
-            {operatorFilterId && <span>Recorded-by filter active</span>}
-            {soldForFilterId && <span>Sold-for filter active</span>}
-            {referenceFilter && <span>Ref: {referenceFilter}</span>}
+            {appliedSearch && (
+              <button type="button" onClick={() => { setSearch(''); setAppliedSearch(''); resetAllPages(); }}>Search: {appliedSearch} ×</button>
+            )}
+            {typeFilter && (
+              <button type="button" onClick={() => { setTypeFilter(''); resetAllPages(); }}>Type: {LEDGER_FILTER_TYPE_LABELS[typeFilter] || typeFilter} ×</button>
+            )}
+            {productFilterId && (
+              <button type="button" onClick={() => { setProductFilterId(''); resetAllPages(); }}>Product pinned ×</button>
+            )}
+            {(dateFrom || dateTo) && (
+              <button type="button" onClick={() => applyDates('', '')}>
+                Dates: {dateFrom || '…'} – {dateTo || '…'} ×
+              </button>
+            )}
+            {locationFilter.branchId && (
+              <button type="button" onClick={() => { setLocationFilter({ branchId: null, floorId: null, rackId: null, locationId: null }); resetAllPages(); }}>Branch filter ×</button>
+            )}
+            {locationFilter.locationId && (
+              <button type="button" onClick={() => { setLocationFilter((prev) => ({ ...prev, rackId: null, locationId: null })); resetAllPages(); }}>Rack filter ×</button>
+            )}
+            {agingFilter === '45' && (
+              <button type="button" onClick={() => setAgingFilter('')}>Stock older than 45 days ×</button>
+            )}
+            {operatorFilterId && (
+              <button type="button" onClick={() => { setOperatorFilterId(''); resetAllPages(); }}>Recorded-by filter ×</button>
+            )}
+            {soldForFilterId && (
+              <button type="button" onClick={() => { setSoldForFilterId(''); resetAllPages(); }}>Sold-for filter ×</button>
+            )}
+            {referenceFilter && (
+              <button type="button" onClick={() => { setReferenceFilter(''); resetAllPages(); }}>Ref: {referenceFilter} ×</button>
+            )}
+            {refsFilter && (
+              <button type="button" onClick={() => { setRefsFilter(''); resetAllPages(); }}>Transfer refs ×</button>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -431,6 +609,14 @@ export default function StockMovementsPage() {
                 setOperatorFilterId('');
                 setSoldForFilterId('');
                 setReferenceFilter('');
+                setRefsFilter('');
+                setSearch('');
+                setAppliedSearch('');
+                setTypeFilter('');
+                setDateFrom('');
+                setDateTo('');
+                setAgingFilter('');
+                setLocationFilter({ branchId: null, floorId: null, rackId: null, locationId: null });
                 resetAllPages();
               }}
               className="ml-auto inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-900"
@@ -449,8 +635,20 @@ export default function StockMovementsPage() {
               {movementRes.error.message || 'Failed to load movements'}
             </div>
           )}
-          <div className="p-4 border-b border-gray-100">
+          <div className="p-4 border-b border-gray-100 space-y-2">
             <p className="text-sm text-gray-600">Append-only ledger · {movementPagination.total || 0} entries</p>
+            {insights?.kpis && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('insights')}
+                className="flex flex-wrap gap-3 text-left text-xs text-[#334155]"
+              >
+                {(insights.kpis || []).slice(0, 5).map((kpi) => (
+                  <span key={kpi.id}>{kpi.title}: {Number(kpi.value || 0).toLocaleString()}</span>
+                ))}
+                <span className="text-[#047857]">Open insights · {insights.range?.label}</span>
+              </button>
+            )}
           </div>
           <div className="divide-y divide-gray-100">
             {(movementRes.isLoading || movementRes.isValidating) && movementItems.length === 0 ? (
@@ -774,62 +972,35 @@ export default function StockMovementsPage() {
       )}
 
       {activeTab === 'insights' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-          {!insights && insightsRes.isLoading ? (
-            <div className="md:col-span-2 xl:col-span-4 p-8 bg-white border border-gray-200 rounded-xl text-center text-gray-500">
-              <Loader2 className="inline animate-spin text-emerald-600" size={24} />
+        <div>
+          {insightsRes.error ? (
+            <div className="p-4 text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl">
+              {insightsRes.error.message || 'Failed to load insights'}
+              <button type="button" className="ml-3 underline" onClick={() => insightsRes.mutate()}>Retry</button>
+            </div>
+          ) : !insights ? (
+            <div className="p-8 bg-white border border-[#E2E8F0] rounded-xl text-center text-[#64748B]">
+              <Loader2 className="inline animate-spin text-[#047857]" size={24} />
               <p className="mt-2">Loading insights…</p>
             </div>
           ) : (
-            <>
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <p className="text-xs text-gray-500">Stock added</p>
-                <p className="text-2xl font-bold text-emerald-700 mt-1">+{Number(insights?.addedQty || 0).toLocaleString()}</p>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <p className="text-xs text-gray-500">Stock removed</p>
-                <p className="text-2xl font-bold text-rose-700 mt-1">-{Number(insights?.removedQty || 0).toLocaleString()}</p>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <p className="text-xs text-gray-500">Transfers</p>
-                <p className="text-2xl font-bold text-violet-700 mt-1">{Number(insights?.transferCount || 0).toLocaleString()}</p>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <p className="text-xs text-gray-500">Movements</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{Number(insights?.movementCount || 0).toLocaleString()}</p>
-              </div>
-
-              <div className="md:col-span-2 bg-white border border-gray-200 rounded-xl p-4">
-                <p className="text-xs text-gray-500">Most moved item</p>
-                {insights?.topItem ? (
-                  <div className="mt-2">
-                    <p className="font-semibold text-gray-900">{insights.topItem.title}</p>
-                    <p className="text-xs text-gray-500 font-mono">{insights.topItem.sku || '—'}</p>
-                    <p className="text-xs text-gray-600 mt-1">
-                      {Number(insights.topItem.movedQtyAbs || 0).toLocaleString()} pcs · {insights.topItem.movementCount} movements
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-400 mt-2">No item data</p>
-                )}
-              </div>
-
-              <div className="md:col-span-2 bg-white border border-gray-200 rounded-xl p-4">
-                <p className="text-xs text-gray-500">Top active racks</p>
-                <div className="mt-2 space-y-2">
-                  {(insights?.topRacks || []).length === 0 ? (
-                    <p className="text-sm text-gray-400">No rack activity</p>
-                  ) : (
-                    (insights?.topRacks || []).map((rack) => (
-                      <div key={rack.locationId} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-700">{rack.locationDisplayPath}</span>
-                        <span className="font-semibold text-gray-900">{rack.movementCount}</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </>
+            <InsightsDashboard
+              data={insights}
+              onDrill={drillToLedger}
+              onBranch={(branchId) => {
+                if (!branchId) return;
+                setLocationFilter({ branchId, floorId: null, rackId: null, locationId: null });
+                resetAllPages();
+              }}
+              onUnit={(unit) => setInsightUnit(unit)}
+              onCalendarMonth={(delta) => {
+                const base = calendarMonth || insights.calendar?.month;
+                if (!base) return;
+                const shifted = delta > 0 ? addIsoDays(base, 32) : addIsoDays(base, -1);
+                setCalendarMonth(`${shifted.slice(0, 7)}-01`);
+              }}
+              onAging={(value) => setAgingFilter(value)}
+            />
           )}
         </div>
       )}

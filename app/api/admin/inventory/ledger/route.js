@@ -28,11 +28,13 @@ export async function GET(request) {
     const data = await listStockLedgerEntries({
       productId: searchParams.get('productId') || '',
       locationId: searchParams.get('locationId') || '',
+      branchId: searchParams.get('branchId') || '',
       type: searchParams.get('type') || '',
       dateFrom: searchParams.get('dateFrom') || '',
       dateTo: searchParams.get('dateTo') || '',
       search: searchParams.get('search') || '',
       refExact: searchParams.get('refExact') || '',
+      refs: searchParams.get('refs') || '',
       userId: searchParams.get('userId') || '',
       soldForUserId: searchParams.get('soldForUserId') || '',
       page,

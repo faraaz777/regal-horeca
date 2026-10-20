@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import { requireAuth } from '@/lib/server/auth/requireAuth';
 import { canReadStockLedger } from '@/lib/shared/permissions';
-import { getActivityInsights } from '@/lib/server/inventory/stockActivityHubService';
+import { getMovementInsights } from '@/lib/server/inventory/movementInsightsService';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,15 +21,19 @@ export async function GET(request) {
   try {
     await connectToDatabase();
     const { searchParams } = new URL(request.url);
-    const data = await getActivityInsights({
+    const data = await getMovementInsights({
       productId: searchParams.get('productId') || '',
       locationId: searchParams.get('locationId') || '',
+      branchId: searchParams.get('branchId') || '',
       type: searchParams.get('type') || '',
       dateFrom: searchParams.get('dateFrom') || '',
       dateTo: searchParams.get('dateTo') || '',
       search: searchParams.get('search') || '',
-      refExact: searchParams.get('refExact') || '',
       userId: searchParams.get('userId') || '',
+      bucket: searchParams.get('bucket') || '',
+      unit: searchParams.get('unit') || '',
+      calendarMonth: searchParams.get('calendarMonth') || '',
+      aging: searchParams.get('aging') || '',
     });
     return NextResponse.json(data);
   } catch (error) {

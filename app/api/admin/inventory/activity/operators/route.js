@@ -27,6 +27,7 @@ export async function GET(request) {
     const data = await listOperators({
       productId: searchParams.get('productId') || '',
       locationId: searchParams.get('locationId') || '',
+      branchId: searchParams.get('branchId') || '',
       type: searchParams.get('type') || '',
       dateFrom: searchParams.get('dateFrom') || '',
       dateTo: searchParams.get('dateTo') || '',

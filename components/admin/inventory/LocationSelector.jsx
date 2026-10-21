@@ -71,6 +71,8 @@ export default function LocationSelector({
   allowedLocationIds,
   className = '',
   labelClassName = '',
+  inputClassName = '',
+  fields,
 }) {
   const [branchId, setBranchId] = useState(selectedBranchId || '');
   const [floorId, setFloorId] = useState(selectedFloorId || '');
@@ -202,32 +204,42 @@ export default function LocationSelector({
     return formatRackDisplayName(rack);
   }, [rackId, racks]);
 
-  const isHorizontal = layout === 'horizontal';
+  const showBranch = !fields || fields.includes('branch');
+  const showFloor = !fields || fields.includes('floor');
+  const showRack = !fields || fields.includes('rack');
+  const fieldCount = [showBranch, showFloor, showRack].filter(Boolean).length;
+  const fieldInputClass = inputClassName || inputClass;
+
+  const isHorizontal = layout === 'horizontal' && fieldCount > 1;
   const containerClass = isHorizontal
-    ? `grid grid-cols-1 sm:grid-cols-3 gap-3 ${className}`
-    : `space-y-3 ${className}`;
+    ? `grid grid-cols-1 gap-3 ${fieldCount === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3'} ${className}`
+    : fieldCount <= 1
+      ? className
+      : `space-y-3 ${className}`;
 
   return (
     <div className={containerClass}>
-      <CascadeField
-        label="Branch"
-        required={required && !showOptional}
-        loading={branchesLoading}
-        emptyMessage={!branchesLoading && branches.length === 0 ? 'No branches configured' : null}
-        labelClassName={labelClassName || undefined}
-      >
-        <SearchableSelect
-          options={branchOptions}
-          value={branchId}
-          disabled={disabled}
-          placeholder={showOptional ? 'Search branches…' : 'Search branch…'}
-          emptyOption={branchEmptyOption}
-          inputClassName={inputClass}
-          onChange={handleBranchChange}
-        />
-      </CascadeField>
+      {showBranch && (
+        <CascadeField
+          label="Branch"
+          required={required && !showOptional}
+          loading={branchesLoading}
+          emptyMessage={!branchesLoading && branches.length === 0 ? 'No branches configured' : null}
+          labelClassName={labelClassName || undefined}
+        >
+          <SearchableSelect
+            options={branchOptions}
+            value={branchId}
+            disabled={disabled}
+            placeholder={showOptional ? 'Search branches…' : 'Search branch…'}
+            emptyOption={branchEmptyOption}
+            inputClassName={fieldInputClass}
+            onChange={handleBranchChange}
+          />
+        </CascadeField>
+      )}
 
-      {(isHorizontal || branchId) && (
+      {showFloor && (isHorizontal || branchId) && (
         <CascadeField
           label="Floor"
           required={required && !showOptional}
@@ -241,13 +253,13 @@ export default function LocationSelector({
             disabled={disabled || !branchId || !!floorEmpty}
             placeholder={showOptional ? 'Search floors…' : 'Search floor…'}
             emptyOption={floorEmptyOption}
-            inputClassName={inputClass}
+            inputClassName={fieldInputClass}
             onChange={handleFloorChange}
           />
         </CascadeField>
       )}
 
-      {(isHorizontal || floorId) && (
+      {showRack && (isHorizontal || floorId) && (
         <CascadeField
           label="Rack"
           required={required && !showOptional}
@@ -261,7 +273,7 @@ export default function LocationSelector({
             disabled={disabled || !floorId || !!rackEmpty}
             placeholder={showOptional ? 'Search racks…' : 'Search rack…'}
             emptyOption={rackEmptyOption}
-            inputClassName={inputClass}
+            inputClassName={fieldInputClass}
             onChange={handleRackChange}
           />
         </CascadeField>

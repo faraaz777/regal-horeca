@@ -14,7 +14,7 @@ import {
   YAxis,
 } from 'recharts';
 import { useState } from 'react';
-import { ArrowDownRight, ArrowLeftRight, ArrowUpRight, AlertTriangle, Boxes, Info } from 'lucide-react';
+import { ArrowDownRight, ArrowLeftRight, ArrowUpRight, AlertTriangle, Boxes } from 'lucide-react';
 import { weekdayLabel } from '@/lib/shared/ledgerCalendar';
 
 const COLORS = {
@@ -35,36 +35,50 @@ function trendSentence(series, bucket) {
 }
 
 function ChartInfo({ what, why, when }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div className="relative shrink-0 group/info">
+    <div
+      className="relative z-20 shrink-0"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
       <button
         type="button"
-        className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[#64748B] hover:bg-slate-100 hover:text-[#0F172A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#047857]"
         aria-label="What this chart shows"
+        aria-expanded={open}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        className="mt-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-[#C7C7CC] bg-white text-[10px] font-medium leading-none text-[#8E8E93] hover:border-[#047857] hover:text-[#047857] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#047857]"
       >
-        <Info size={16} />
+        i
       </button>
-      <div
-        role="tooltip"
-        className="invisible absolute right-0 top-full z-30 mt-1.5 w-80 rounded-lg border border-[#E2E8F0] bg-white p-3 text-left text-xs leading-5 text-[#334155] opacity-0 shadow-lg transition-opacity group-hover/info:visible group-hover/info:opacity-100 group-focus-within/info:visible group-focus-within/info:opacity-100"
-      >
-        <p><span className="font-semibold text-[#0F172A]">What. </span>{what}</p>
-        <p className="mt-2"><span className="font-semibold text-[#0F172A]">Why. </span>{why}</p>
-        <p className="mt-2"><span className="font-semibold text-[#0F172A]">When. </span>{when}</p>
-      </div>
+      {open ? (
+        <div className="absolute right-0 top-full z-50 w-72 pt-1">
+          <div
+            role="tooltip"
+            className="rounded-lg border border-[#E2E8F0] bg-white p-3 text-left text-xs leading-5 text-[#334155] shadow-lg"
+          >
+            <p><span className="font-semibold text-[#0F172A]">What. </span>{what}</p>
+            <p className="mt-2"><span className="font-semibold text-[#0F172A]">Why. </span>{why}</p>
+            <p className="mt-2"><span className="font-semibold text-[#0F172A]">When. </span>{when}</p>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 function ChartCard({ title, measure, info, children, sentence, action }) {
   return (
-    <section className="relative z-0 bg-white border border-[#E2E8F0] rounded-[12px] p-4 shadow-sm hover:z-30 focus-within:z-30">
+    <section className="relative bg-white border border-[#E2E8F0] rounded-[12px] p-4 shadow-sm hover:z-30 focus-within:z-30">
       <div className="flex items-start justify-between gap-3">
-        <h3 className="text-base font-semibold text-[#0F172A]">{title}</h3>
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold text-[#0F172A]">{title}</h3>
+          <p className="text-sm text-[#64748B] mt-1">{measure}</p>
+        </div>
         {info ? <ChartInfo {...info} /> : null}
       </div>
-      <p className="text-sm text-[#64748B] mt-1">{measure}</p>
-      <div className="mt-4">{children}</div>
+      <div className="relative z-0 mt-4">{children}</div>
       <p className="text-sm text-[#0F172A] mt-3">{sentence}</p>
       {action}
     </section>

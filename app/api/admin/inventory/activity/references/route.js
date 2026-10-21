@@ -29,6 +29,7 @@ export async function GET(request) {
       type: searchParams.get('type') || '',
       dateFrom: searchParams.get('dateFrom') || '',
       dateTo: searchParams.get('dateTo') || '',
+      brand: searchParams.get('brand') || '',
       refSearch: searchParams.get('refSearch') || '',
       page,
       limit,

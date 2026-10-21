@@ -10,6 +10,7 @@ import {
   Loader2,
   Search,
   X,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   BarChart3,
@@ -31,6 +32,51 @@ const InsightsDashboard = dynamic(() => import('@/components/admin/inventory/ins
 });
 
 const fetcher = (url) => adminJson(url);
+
+const DATE_PRESETS = [
+  { id: '1', label: 'Today', days: 1 },
+  { id: '7', label: '7 days', days: 7 },
+  { id: '30', label: '30 days', days: 30 },
+  { id: '90', label: '90 days', days: 90 },
+];
+
+function kolkataToday() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+function matchingDatePreset(dateFrom, dateTo) {
+  if (!dateFrom && !dateTo) return '';
+  const end = kolkataToday();
+  const match = DATE_PRESETS.find((preset) => {
+    const start = preset.days <= 1 ? end : addIsoDays(end, -(preset.days - 1));
+    return dateFrom === start && dateTo === end;
+  });
+  return match ? match.id : 'custom';
+}
+
+function FilterSelect({ label, value, onChange, children }) {
+  return (
+    <label className="relative block min-w-0">
+      <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</span>
+      <span className="relative block">
+        <select
+          aria-label={label}
+          value={value}
+          onChange={onChange}
+          className="h-11 w-full appearance-none rounded-full border border-slate-200 bg-white pl-4 pr-9 text-sm text-slate-800 shadow-sm focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+        >
+          {children}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+      </span>
+    </label>
+  );
+}
 
 const TABS = [
   { id: 'movements', label: 'Movements', icon: ScrollText },
@@ -96,6 +142,7 @@ export default function StockMovementsPage() {
 
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'movements');
   const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || '');
+  const [brandFilter, setBrandFilter] = useState(searchParams.get('brand') || '');
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [appliedSearch, setAppliedSearch] = useState(searchParams.get('search') || '');
   const [dateFrom, setDateFrom] = useState(searchParams.get('dateFrom') || '');
@@ -173,6 +220,7 @@ export default function StockMovementsPage() {
     if (activeTab !== 'movements') params.set('tab', activeTab);
     if (appliedSearch) params.set('search', appliedSearch);
     if (typeFilter) params.set('type', typeFilter);
+    if (brandFilter) params.set('brand', brandFilter);
     if (dateFrom) params.set('dateFrom', dateFrom);
     if (dateTo) params.set('dateTo', dateTo);
     if (productFilterId) params.set('productId', productFilterId);
@@ -189,6 +237,7 @@ export default function StockMovementsPage() {
     activeTab,
     appliedSearch,
     typeFilter,
+    brandFilter,
     dateFrom,
     dateTo,
     productFilterId,
@@ -245,6 +294,7 @@ export default function StockMovementsPage() {
   const sharedParams = useMemo(() => {
     const params = new URLSearchParams();
     if (typeFilter) params.set('type', typeFilter);
+    if (brandFilter) params.set('brand', brandFilter);
     if (appliedSearch) params.set('search', appliedSearch);
     if (dateFrom) params.set('dateFrom', dateFrom);
     if (dateTo) params.set('dateTo', dateTo);
@@ -258,6 +308,7 @@ export default function StockMovementsPage() {
     return params;
   }, [
     typeFilter,
+    brandFilter,
     appliedSearch,
     dateFrom,
     dateTo,
@@ -286,8 +337,9 @@ export default function StockMovementsPage() {
     if (locationFilter.locationId) params.set('locationId', locationFilter.locationId);
     if (productFilterId) params.set('productId', productFilterId);
     if (appliedSearch) params.set('search', appliedSearch);
+    if (brandFilter) params.set('brand', brandFilter);
     return `/api/admin/inventory/activity/position?${params}`;
-  }, [canView, activeTab, pages.position, locationFilter.locationId, productFilterId, appliedSearch]);
+  }, [canView, activeTab, pages.position, locationFilter.locationId, productFilterId, appliedSearch, brandFilter]);
 
   const operatorsUrl = useMemo(() => {
     if (!canView || activeTab !== 'operators') return null;
@@ -312,6 +364,7 @@ export default function StockMovementsPage() {
     params.set('page', String(pages.references));
     params.set('limit', '20');
     if (typeFilter) params.set('type', typeFilter);
+    if (brandFilter) params.set('brand', brandFilter);
     if (dateFrom) params.set('dateFrom', dateFrom);
     if (dateTo) params.set('dateTo', dateTo);
     if (productFilterId) params.set('productId', productFilterId);
@@ -323,6 +376,7 @@ export default function StockMovementsPage() {
     activeTab,
     pages.references,
     typeFilter,
+    brandFilter,
     dateFrom,
     dateTo,
     productFilterId,
@@ -330,6 +384,8 @@ export default function StockMovementsPage() {
     appliedSearch,
   ]);
 
+  const brandRes = useSWR(canView ? '/api/admin/inventory/brands' : null, fetcher, { revalidateOnFocus: false });
+  const brandOptions = brandRes.data?.brands || [];
   const movementRes = useSWR(movementUrl, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
   const positionRes = useSWR(positionUrl, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
   const operatorsRes = useSWR(operatorsUrl, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
@@ -440,104 +496,123 @@ export default function StockMovementsPage() {
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setTypeFilter('');
-              resetAllPages();
-            }}
-            className={`px-3 py-1.5 text-sm font-medium rounded-full border ${
-              !typeFilter ? 'border-emerald-600 text-emerald-700 bg-emerald-50' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            All types
-          </button>
-          {LEDGER_FILTER_TYPES.map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => {
-                setTypeFilter(key);
-                resetAllPages();
-              }}
-              className={`px-3 py-1.5 text-sm font-medium rounded-full border ${
-                typeFilter === key
-                  ? 'border-emerald-600 text-emerald-700 bg-emerald-50'
-                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {LEDGER_FILTER_TYPE_LABELS[key]}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {[
-            { id: 'today', label: 'Today', days: 1 },
-            { id: '7', label: '7 days', days: 7 },
-            { id: '30', label: '30 days', days: 30 },
-            { id: '90', label: '90 days', days: 90 },
-          ].map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              onClick={() => applyDatePreset(preset.days)}
-              className="px-3 py-1.5 text-sm font-medium rounded-full border border-[#E2E8F0] text-[#334155] hover:bg-slate-50"
-            >
-              {preset.label}
-            </button>
-          ))}
-          {(dateFrom || dateTo) && (
-            <button
-              type="button"
-              onClick={() => applyDates('', '')}
-              className="px-3 py-1.5 text-sm font-medium rounded-full border border-[#E2E8F0] text-[#334155] hover:bg-slate-50"
-            >
-              Clear dates
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
-          <div className="relative lg:col-span-2">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input
-              type="text"
-              placeholder={activeTab === 'references' ? 'Search reference…' : 'Search product, SKU, or barcode'}
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                if (activeTab !== 'references') setProductFilterId('');
-                resetAllPages();
-              }}
-              onKeyDown={(e) => {
-                if (e.key !== 'Enter') return;
-                e.preventDefault();
-                setAppliedSearch(search.replace(/[\r\n]+/g, ' ').trim());
-                resetAllPages();
-              }}
-              className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-            />
+        <div className="space-y-3">
+          <div className="grid grid-cols-4 items-end gap-3">
+            <label className="relative col-span-3 block min-w-0">
+              <span className="sr-only">{activeTab === 'references' ? 'Search reference' : 'Search product, SKU, or barcode'}</span>
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+              <input
+                type="text"
+                placeholder={activeTab === 'references' ? 'Search reference' : 'Search product, SKU, or barcode'}
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  if (activeTab !== 'references') setProductFilterId('');
+                  resetAllPages();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return;
+                  e.preventDefault();
+                  setAppliedSearch(search.replace(/[\r\n]+/g, ' ').trim());
+                  resetAllPages();
+                }}
+                className="h-11 w-full rounded-full border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm focus:border-emerald-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </label>
+            <div className="col-span-1 min-w-0">
+              <LocationSelector
+                mode="filter"
+                fields={['branch']}
+                selectedBranchId={locationFilter.branchId}
+                selectedFloorId={locationFilter.floorId}
+                selectedRackId={locationFilter.rackId}
+                labelClassName="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500"
+                inputClassName="h-11 w-full rounded-full border border-slate-200 bg-white px-4 pr-9 text-sm text-slate-800 shadow-sm focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                onChange={(selection) => {
+                  setLocationFilter({
+                    branchId: selection.branchId,
+                    floorId: selection.floorId,
+                    rackId: selection.rackId,
+                    locationId: selection.locationId,
+                  });
+                  resetAllPages();
+                }}
+              />
+            </div>
           </div>
-          <label className="block text-xs text-[#64748B]">
-            From
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => applyDates(e.target.value, dateTo)}
-              className="mt-1 w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg"
-            />
-          </label>
-          <label className="block text-xs text-[#64748B]">
-            To
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => applyDates(dateFrom, e.target.value)}
-              className="mt-1 w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg"
-            />
-          </label>
+
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+            <FilterSelect
+              label="Type"
+              value={typeFilter}
+              onChange={(event) => {
+                setTypeFilter(event.target.value);
+                resetAllPages();
+              }}
+            >
+              <option value="">All types</option>
+              {LEDGER_FILTER_TYPES.map((key) => (
+                <option key={key} value={key}>{LEDGER_FILTER_TYPE_LABELS[key]}</option>
+              ))}
+            </FilterSelect>
+
+            <FilterSelect
+              label="Dates"
+              value={matchingDatePreset(dateFrom, dateTo)}
+              onChange={(event) => {
+                const next = event.target.value;
+                if (next === 'custom') return;
+                if (!next) {
+                  applyDates('', '');
+                  return;
+                }
+                const preset = DATE_PRESETS.find((item) => item.id === next);
+                if (preset) applyDatePreset(preset.days);
+              }}
+            >
+              <option value="">All dates</option>
+              {DATE_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>{preset.label}</option>
+              ))}
+              <option value="custom">Custom range</option>
+            </FilterSelect>
+
+            <FilterSelect
+              label="Brand"
+              value={brandFilter}
+              onChange={(event) => {
+                setBrandFilter(event.target.value);
+                resetAllPages();
+              }}
+            >
+              <option value="">All brands</option>
+              {brandFilter && !brandOptions.includes(brandFilter) ? (
+                <option value={brandFilter}>{brandFilter}</option>
+              ) : null}
+              {brandOptions.map((brand) => (
+                <option key={brand} value={brand}>{brand}</option>
+              ))}
+            </FilterSelect>
+
+            <label className="block min-w-0">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">From</span>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => applyDates(e.target.value, dateTo)}
+                className="h-11 w-full rounded-full border border-slate-200 bg-white px-4 text-sm text-slate-800 shadow-sm focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </label>
+            <label className="block min-w-0">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">To</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => applyDates(dateFrom, e.target.value)}
+                className="h-11 w-full rounded-full border border-slate-200 bg-white px-4 text-sm text-slate-800 shadow-sm focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              />
+            </label>
+          </div>
         </div>
 
         {searchTruncated && (
@@ -546,32 +621,38 @@ export default function StockMovementsPage() {
           </p>
         )}
 
-        <div className="border-t border-gray-100 pt-4">
-          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Filter by location</p>
-          <LocationSelector
-            mode="filter"
-            selectedBranchId={locationFilter.branchId}
-            selectedFloorId={locationFilter.floorId}
-            selectedRackId={locationFilter.rackId}
-            onChange={(selection) => {
-              setLocationFilter({
-                branchId: selection.branchId,
-                floorId: selection.floorId,
-                rackId: selection.rackId,
-                locationId: selection.locationId,
-              });
-              resetAllPages();
-            }}
-          />
-        </div>
+        {locationFilter.branchId && (
+          <div className="border-t border-gray-100 pt-4">
+            <LocationSelector
+              mode="filter"
+              fields={['floor', 'rack']}
+              layout="horizontal"
+              selectedBranchId={locationFilter.branchId}
+              selectedFloorId={locationFilter.floorId}
+              selectedRackId={locationFilter.rackId}
+              onChange={(selection) => {
+                setLocationFilter({
+                  branchId: selection.branchId,
+                  floorId: selection.floorId,
+                  rackId: selection.rackId,
+                  locationId: selection.locationId,
+                });
+                resetAllPages();
+              }}
+            />
+          </div>
+        )}
 
-        {(productFilterId || operatorFilterId || soldForFilterId || referenceFilter || refsFilter || locationFilter.branchId || locationFilter.locationId || appliedSearch || typeFilter || dateFrom || dateTo || agingFilter) && (
+        {(productFilterId || operatorFilterId || soldForFilterId || referenceFilter || refsFilter || locationFilter.branchId || locationFilter.locationId || appliedSearch || typeFilter || brandFilter || dateFrom || dateTo || agingFilter) && (
           <div className="flex flex-wrap items-center gap-2 text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
             {appliedSearch && (
               <button type="button" onClick={() => { setSearch(''); setAppliedSearch(''); resetAllPages(); }}>Search: {appliedSearch} ×</button>
             )}
             {typeFilter && (
               <button type="button" onClick={() => { setTypeFilter(''); resetAllPages(); }}>Type: {LEDGER_FILTER_TYPE_LABELS[typeFilter] || typeFilter} ×</button>
+            )}
+            {brandFilter && (
+              <button type="button" onClick={() => { setBrandFilter(''); resetAllPages(); }}>Brand: {brandFilter} ×</button>
             )}
             {productFilterId && (
               <button type="button" onClick={() => { setProductFilterId(''); resetAllPages(); }}>Product pinned ×</button>
@@ -613,6 +694,7 @@ export default function StockMovementsPage() {
                 setSearch('');
                 setAppliedSearch('');
                 setTypeFilter('');
+                setBrandFilter('');
                 setDateFrom('');
                 setDateTo('');
                 setAgingFilter('');

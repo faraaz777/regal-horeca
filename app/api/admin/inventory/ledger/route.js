@@ -33,6 +33,7 @@ export async function GET(request) {
       dateFrom: searchParams.get('dateFrom') || '',
       dateTo: searchParams.get('dateTo') || '',
       search: searchParams.get('search') || '',
+      brand: searchParams.get('brand') || '',
       refExact: searchParams.get('refExact') || '',
       refs: searchParams.get('refs') || '',
       userId: searchParams.get('userId') || '',

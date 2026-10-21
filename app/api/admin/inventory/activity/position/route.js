@@ -28,6 +28,7 @@ export async function GET(request) {
       locationId: searchParams.get('locationId') || '',
       productId: searchParams.get('productId') || '',
       search: searchParams.get('search') || '',
+      brand: searchParams.get('brand') || '',
       page,
       limit,
     });

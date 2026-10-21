@@ -10,21 +10,45 @@ import { showToast } from '@/lib/utils/toast';
 import ProductStockSheetTable from '@/components/admin/inventory/ProductStockSheetTable';
 
 const searchFetcher = (url) => adminJson(url);
+const MAX_SELECTED = 20;
+
+const INVENTORY_OPTIONS = [
+  { value: 'all', label: 'All products' },
+  { value: 'in', label: 'In inventory' },
+  { value: 'out', label: 'Not in inventory' },
+];
 
 export default function ProductStockSheetPage() {
   const [query, setQuery] = useState('');
   const debounced = useDebounce(query.trim(), 250);
+  const [brand, setBrand] = useState('');
+  const [color, setColor] = useState('');
+  const [inventoryStatus, setInventoryStatus] = useState('all');
   const [selected, setSelected] = useState([]);
   const [showImages, setShowImages] = useState(true);
   const [sheet, setSheet] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  const searchUrl = `/api/admin/inventory/product-sheet/search?q=${encodeURIComponent(debounced)}`;
+  const searchUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    if (debounced) params.set('q', debounced);
+    if (brand) params.set('brand', brand);
+    if (color) params.set('color', color);
+    if (inventoryStatus !== 'all') params.set('inventoryStatus', inventoryStatus);
+    return `/api/admin/inventory/product-sheet/search?${params.toString()}`;
+  }, [debounced, brand, color, inventoryStatus]);
   const { data, isLoading: searching } = useSWR(searchUrl, searchFetcher, {
     revalidateOnFocus: false,
   });
+  const { data: brandData } = useSWR(
+    '/api/admin/inventory/product-sheet/search?brandsOnly=1',
+    searchFetcher,
+    { revalidateOnFocus: false, dedupingInterval: 60_000 }
+  );
   const results = data?.results || [];
+  const brands = brandData?.brands || [];
+  const colors = brandData?.colors || [];
   const selectedIds = useMemo(() => new Set(selected.map((p) => p._id)), [selected]);
 
   const toggleProduct = (product) => {
@@ -33,11 +57,35 @@ export default function ProductStockSheetPage() {
       if (prev.some((p) => p._id === product._id)) {
         return prev.filter((p) => p._id !== product._id);
       }
-      if (prev.length >= 20) {
+      if (prev.length >= MAX_SELECTED) {
         showToast.error('Select at most 20 products at a time.');
         return prev;
       }
       return [...prev, product];
+    });
+  };
+
+  const addShown = () => {
+    setSheet(null);
+    setSelected((prev) => {
+      const seen = new Set(prev.map((p) => p._id));
+      const next = [...prev];
+      for (const product of results) {
+        if (next.length >= MAX_SELECTED) break;
+        if (seen.has(product._id)) continue;
+        seen.add(product._id);
+        next.push(product);
+      }
+      if (next.length === prev.length) {
+        showToast.error(
+          prev.length >= MAX_SELECTED
+            ? 'Select at most 20 products at a time.'
+            : 'Nothing new to add from this list.'
+        );
+      } else if (results.some((product) => !seen.has(product._id))) {
+        showToast.error('Added until the 20 product limit. Narrow the filters to pick the rest.');
+      }
+      return next;
     });
   };
 
@@ -150,9 +198,68 @@ export default function ProductStockSheetPage() {
               className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg"
             />
           </div>
-          <p className="text-xs text-gray-500">
-            Parents and standalones only. Choosing a parent includes every variant.
-          </p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <label className="block">
+              <span className="sr-only">Brand</span>
+              <select
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800"
+                aria-label="Filter by brand"
+              >
+                <option value="">All brands</option>
+                {brands.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="sr-only">Color</span>
+              <select
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800"
+                aria-label="Filter by color"
+              >
+                <option value="">All colors</option>
+                {colors.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="sr-only">Inventory</span>
+              <select
+                value={inventoryStatus}
+                onChange={(e) => setInventoryStatus(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800"
+                aria-label="Filter by inventory"
+              >
+                {INVENTORY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-gray-500">
+              Parents and standalones only. Choosing a parent includes every variant. Up to 25 shown.
+            </p>
+            <button
+              type="button"
+              onClick={addShown}
+              disabled={!results.length}
+              className="shrink-0 text-xs font-semibold text-emerald-700 hover:text-emerald-800 disabled:opacity-40"
+            >
+              Add shown
+            </button>
+          </div>
           <div className="max-h-72 overflow-y-auto divide-y divide-gray-100 border border-gray-100 rounded-lg">
             {searching && <p className="px-3 py-4 text-sm text-gray-500">Searching…</p>}
             {!searching && results.length === 0 && (

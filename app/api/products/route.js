@@ -17,6 +17,7 @@ import { generateUniqueSlug } from '@/lib/utils/slug';
 import { revalidateHomepage, revalidatePath, revalidateProducts } from '@/lib/utils/revalidate';
 import { queryProducts } from '@/lib/server/products/queryProducts';
 import { normalizeProductPayloadForCreate } from '@/lib/server/products/normalizeProductInput';
+import { catalogIdentityGap } from '@/lib/shared/catalogIdentity';
 import { assertProductWrite } from '@/lib/server/auth/adminApiGuard';
 import {
   sanitizeRelatedProductIds,
@@ -187,6 +188,18 @@ export async function POST(request) {
     }
 
     normalizeProductPayloadForCreate(productData);
+
+    /**
+     * Brand name and a department are required on parent and standalone
+     * products. Child creates go through the children route and copy both
+     * from the parent. Cascade depth and brand-tree linking stay optional.
+     */
+    if (productData.productType !== 'child') {
+      const taxonomyGap = catalogIdentityGap(productData);
+      if (taxonomyGap) {
+        return NextResponse.json({ error: taxonomyGap }, { status: 400 });
+      }
+    }
 
     /**
      * Related products: server is authoritative.

@@ -22,6 +22,7 @@ export const dynamic = 'force-dynamic';
  * POST /api/admin/inventory/movement
  *
  * Posts add, minus (batch lines supported), or transfer.
+ * A note is required on every manual movement so the ledger keeps a reason.
  * Caps batch size and remark/ref length to keep payloads bounded.
  *
  * Permissions: inventory:write
@@ -44,7 +45,7 @@ export async function POST(request) {
       lines,
     } = body;
 
-    const remark = String(body.remark || '');
+    const remark = String(body.remark || '').trim();
     const ref = String(body.ref || '');
 
     if (!productId || !action) {
@@ -58,9 +59,13 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
+    if (!remark) {
+      return NextResponse.json({ error: 'Note is required' }, { status: 400 });
+    }
+
     if (remark.length > MAX_MOVEMENT_REMARK_LENGTH) {
       return NextResponse.json(
-        { error: `Remark must be ${MAX_MOVEMENT_REMARK_LENGTH} characters or fewer` },
+        { error: `Note must be ${MAX_MOVEMENT_REMARK_LENGTH} characters or fewer` },
         { status: 400 }
       );
     }

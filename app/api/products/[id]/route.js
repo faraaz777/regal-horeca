@@ -22,6 +22,7 @@ import { assertProductWrite } from '@/lib/server/auth/adminApiGuard';
 import { findBarcodeConflicts, normalizeBarcode } from '@/lib/server/products/barcodeValidation';
 import { syncParentEmbeddedVariantFromChild } from '@/lib/server/products/syncParentEmbeddedVariants';
 import { stripChildVariantOwnedFields } from '@/lib/shared/childVariantPayload';
+import { catalogIdentityGap } from '@/lib/shared/catalogIdentity';
 import {
   sanitizeRelatedProductIds,
   syncRelatedProductLinks,
@@ -289,6 +290,28 @@ export async function PUT(request, { params }) {
         }
       }
       updateData.barcode = nextBarcode;
+    }
+
+    /**
+     * Same gate as create: a parent or standalone product must keep a brand
+     * name and a department. Fields omitted from this update keep their
+     * stored values. Child documents copy taxonomy from the parent.
+     */
+    const nextType = updateData.productType || resolvedProductType;
+    if (nextType !== 'child') {
+      const nextBrand = Object.prototype.hasOwnProperty.call(updateData, 'brand')
+        ? updateData.brand
+        : product.brand;
+      const nextCategoryId = Object.prototype.hasOwnProperty.call(updateData, 'categoryId')
+        ? updateData.categoryId
+        : product.categoryId;
+      const taxonomyGap = catalogIdentityGap({
+        brand: nextBrand,
+        categoryId: nextCategoryId,
+      });
+      if (taxonomyGap) {
+        return NextResponse.json({ error: taxonomyGap }, { status: 400 });
+      }
     }
 
     // Update product (retry once on optimistic concurrency conflicts)

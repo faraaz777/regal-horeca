@@ -50,7 +50,7 @@ export default function ProductFormShell() {
 
   const hasTitle = Boolean(String(formData.title || '').trim());
   const hasHero = Boolean(formData.heroImage);
-  const hasBrand = Boolean(String(formData.brand || '').trim() || formData.brandCategoryId);
+  const hasBrandName = Boolean(String(formData.brand || '').trim());
   const hasCategory = Boolean(formData.categoryId);
   const hasSkuPath =
     isChildProduct ||
@@ -58,11 +58,27 @@ export default function ProductFormShell() {
     (hasVariantsChoice === false && String(formData.sku || '').trim()) ||
     hasVariantsChoice === null;
 
-  const canSave = hasTitle && hasHero;
+  const missingRequired = [
+    !hasTitle ? 'name' : null,
+    !hasHero ? 'hero image' : null,
+    !isChildProduct && !hasBrandName ? 'brand' : null,
+    !isChildProduct && !hasCategory ? 'department' : null,
+  ].filter(Boolean);
+  const canSave = missingRequired.length === 0;
   const readinessItems = [
     { id: 'title', label: 'Product name', done: hasTitle },
-    { id: 'brand', label: 'Brand', done: hasBrand, hint: 'Catalog-ready' },
-    { id: 'category', label: 'Category', done: hasCategory, hint: 'Catalog-ready' },
+    {
+      id: 'brand',
+      label: 'Brand',
+      done: hasBrandName,
+      hint: isChildProduct ? 'From the parent' : undefined,
+    },
+    {
+      id: 'category',
+      label: 'Category',
+      done: hasCategory,
+      hint: isChildProduct ? 'From the parent' : 'Department required',
+    },
     { id: 'hero', label: 'Hero image', done: hasHero },
     {
       id: 'sell',
@@ -74,7 +90,7 @@ export default function ProductFormShell() {
       hint: variantWorkflowEnabled ? 'Def radio in Variant SKUs' : 'Catalog-ready',
     },
   ];
-  const catalogReadyCount = [hasTitle, hasBrand, hasCategory, hasHero, hasSkuPath && hasVariantsChoice !== null].filter(
+  const catalogReadyCount = [hasTitle, hasBrandName, hasCategory, hasHero, hasSkuPath && hasVariantsChoice !== null].filter(
     Boolean
   ).length;
 
@@ -117,6 +133,7 @@ export default function ProductFormShell() {
             <ReadinessCard
               items={readinessItems}
               canSave={canSave}
+              requiredLabel={missingRequired.join(' + ')}
               catalogReadyCount={catalogReadyCount}
               catalogReadyTotal={5}
             />
@@ -155,7 +172,10 @@ export default function ProductFormShell() {
                 Cancel
               </button>
               <p className="text-[11px] text-gray-400">
-                Save stays available on every step. Title and hero image are required.
+                Save stays available on every step.{' '}
+                {isChildProduct
+                  ? 'Name and hero image are required.'
+                  : 'Name, hero image, brand, and a department are required.'}
               </p>
             </div>
           </aside>

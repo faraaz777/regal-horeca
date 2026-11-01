@@ -1,15 +1,22 @@
 'use client';
 
 /**
- * Catalog quality vs save-gate, split on purpose:
- * API still only requires title + hero. Brand/category/SKU are "ready to publish" hints.
+ * Save-gate versus catalog completeness.
+ * Parent and standalone saves need name, hero, brand, and a department.
+ * Deeper category levels and the brand tree stay optional.
  */
-export default function ReadinessCard({ items, canSave, catalogReadyCount, catalogReadyTotal }) {
+export default function ReadinessCard({
+  items,
+  canSave,
+  requiredLabel,
+  catalogReadyCount,
+  catalogReadyTotal,
+}) {
   return (
     <aside className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <h3 className="text-sm font-semibold text-gray-900">Readiness</h3>
       <p className="mt-1 text-xs text-gray-500">
-        Required to save: {canSave ? 'ready' : 'title + hero image'}
+        Required to save: {canSave ? 'ready' : requiredLabel || 'name, hero image, brand, and a department'}
       </p>
       <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
         <div

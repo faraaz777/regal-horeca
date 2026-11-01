@@ -123,7 +123,9 @@ export default function ProductIdentitySection() {
           </div>
 
           <div className="relative" ref={brandInputRef}>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Brand</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Brand{isChildProduct ? '' : ' *'}
+            </label>
             <input
               name="brand"
               value={formData.brand}
@@ -189,9 +191,12 @@ export default function ProductIdentitySection() {
         </div>
 
         <div>
-          <p className="mb-1.5 text-sm font-medium text-gray-700">Category</p>
+          <p className="mb-1.5 text-sm font-medium text-gray-700">
+            Category{isChildProduct ? '' : ' *'}
+          </p>
           <p className="mb-2 text-xs text-gray-500">
             Department → category → subcategory → type. Each choice unlocks the next.
+            {isChildProduct ? '' : ' A department is required. Deeper levels stay optional.'}
           </p>
           <CascadeSelect
             nodes={categories}

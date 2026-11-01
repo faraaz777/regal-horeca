@@ -46,6 +46,19 @@ const EMPTY_LOCATION = {
   rackId: null,
 };
 
+/**
+ * Manual add, remove, and transfer must carry a note.
+ * The ledger is the audit trail; a blank remark leaves no reason for the movement.
+ */
+function movementNoteError(remark) {
+  const text = String(remark || '').trim();
+  if (!text) return 'Note is required';
+  if (text.length > MAX_MOVEMENT_REMARK_LENGTH) {
+    return `Note must be ${MAX_MOVEMENT_REMARK_LENGTH} characters or fewer`;
+  }
+  return '';
+}
+
 export default function StockMovementModal({
   item,
   onClose,
@@ -365,8 +378,9 @@ export default function StockMovementModal({
       return false;
     }
 
-    if (String(form.remark || '').length > MAX_MOVEMENT_REMARK_LENGTH) {
-      toast.error(`Remark must be ${MAX_MOVEMENT_REMARK_LENGTH} characters or fewer`);
+    const noteError = movementNoteError(form.remark);
+    if (noteError) {
+      toast.error(noteError);
       return false;
     }
 
@@ -378,7 +392,7 @@ export default function StockMovementModal({
           productId: item._id,
           action: 'add',
           reason: form.reason,
-          remark: form.remark,
+          remark: String(form.remark || '').trim(),
           lines,
         }),
       });
@@ -415,8 +429,9 @@ export default function StockMovementModal({
         return;
       }
 
-      if (String(form.remark || '').length > MAX_MOVEMENT_REMARK_LENGTH) {
-        toast.error(`Remark must be ${MAX_MOVEMENT_REMARK_LENGTH} characters or fewer`);
+      const noteError = movementNoteError(form.remark);
+      if (noteError) {
+        toast.error(noteError);
         return;
       }
 
@@ -438,7 +453,7 @@ export default function StockMovementModal({
             productId: item._id,
             action: 'minus',
             reason: form.reason,
-            remark: form.remark,
+            remark: String(form.remark || '').trim(),
             soldForUserId: isSoldMovement ? form.soldForUserId : null,
             lines,
           }),
@@ -474,8 +489,9 @@ export default function StockMovementModal({
         return;
       }
 
-      if (String(form.remark || '').length > MAX_MOVEMENT_REMARK_LENGTH) {
-        toast.error(`Remark must be ${MAX_MOVEMENT_REMARK_LENGTH} characters or fewer`);
+      const noteError = movementNoteError(form.remark);
+      if (noteError) {
+        toast.error(noteError);
         return;
       }
 
@@ -532,6 +548,12 @@ export default function StockMovementModal({
         return;
       }
 
+      const noteError = movementNoteError(form.remark);
+      if (noteError) {
+        toast.error(noteError);
+        return;
+      }
+
       setSubmitting(true);
       try {
         await adminJson('/api/admin/inventory/movement', {
@@ -540,7 +562,7 @@ export default function StockMovementModal({
             productId: item._id,
             action: 'transfer',
             quantity: qty,
-            remark: form.remark,
+            remark: String(form.remark || '').trim(),
             fromLocationId: form.fromLocationId || null,
             toLocationId: form.toLocationId,
           }),
@@ -728,20 +750,6 @@ export default function StockMovementModal({
                     onChange={(userId) => update('soldForUserId', userId)}
                   />
                 )}
-
-                <details className="group">
-                  <summary className="cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-800 list-none">
-                    + Optional note
-                  </summary>
-                  <input
-                    type="text"
-                    placeholder="Optional note"
-                    className="mt-2 w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl"
-                    value={form.remark}
-                    maxLength={MAX_MOVEMENT_REMARK_LENGTH}
-                    onChange={(e) => update('remark', e.target.value)}
-                  />
-                </details>
               </>
             ) : tab === 'add' ? (
               <>
@@ -783,20 +791,6 @@ export default function StockMovementModal({
                     onAdd={handleAddNewRack}
                   />
                 )}
-
-                <details className="group">
-                  <summary className="cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-800 list-none">
-                    + Optional note
-                  </summary>
-                  <input
-                    type="text"
-                    placeholder="Optional note"
-                    className="mt-2 w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl"
-                    value={form.remark}
-                    maxLength={MAX_MOVEMENT_REMARK_LENGTH}
-                    onChange={(e) => update('remark', e.target.value)}
-                  />
-                </details>
               </>
             ) : (
               <>
@@ -813,20 +807,28 @@ export default function StockMovementModal({
                   stockUnit={stockUnit}
                   isLoading={isLoading}
                 />
-                <details className="group">
-                  <summary className="cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-800 list-none">
-                    + Optional note
-                  </summary>
-                  <input
-                    type="text"
-                    placeholder="Optional note"
-                    className="mt-2 w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl"
-                    value={form.remark}
-                    maxLength={MAX_MOVEMENT_REMARK_LENGTH}
-                    onChange={(e) => update('remark', e.target.value)}
-                  />
-                </details>
               </>
+            )}
+
+            {!isRulesTab && (
+              <div>
+                <label
+                  htmlFor="movement-note"
+                  className="block text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-2"
+                >
+                  Note <span className="text-red-600">*</span>
+                </label>
+                <input
+                  id="movement-note"
+                  type="text"
+                  required
+                  placeholder="Why is this stock moving?"
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl"
+                  value={form.remark}
+                  maxLength={MAX_MOVEMENT_REMARK_LENGTH}
+                  onChange={(e) => update('remark', e.target.value)}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -882,6 +884,7 @@ export default function StockMovementModal({
                 type="button"
                 disabled={
                   submitting ||
+                  !String(form.remark || '').trim() ||
                   (tab === 'minus' &&
                     (sellableLocationRows.length === 0 ||
                       totalMinusQty <= 0 ||

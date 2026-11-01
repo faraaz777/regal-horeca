@@ -17,6 +17,7 @@ import {
   validateVariantBarcodesAgainstCatalog,
 } from '@/lib/utils/validateVariantBarcodes';
 import { stripChildVariantOwnedFields } from '@/lib/shared/childVariantPayload';
+import { catalogIdentityGap } from '@/lib/shared/catalogIdentity';
 import {
   parseOptionValues,
   getVariantCombinationKey,
@@ -3395,10 +3396,27 @@ export default function ProductForm({
       normalizedVariants.push(defaultRow, ...nonDefaultRows);
     }
 
-    // Only title and hero image are required - everything else can be added later
+    /**
+     * Name and hero stay required. Parent and standalone products also need
+     * a brand name and a department. The cascade and brand tree are unchanged;
+     * categoryId is already the deepest level the operator selected.
+     * Child SKUs inherit both from the parent.
+     */
     if (!formData.title || !formData.heroImage) {
       setError("Please provide a Title and a Hero Image.");
       return;
+    }
+
+    if (!isChildProduct) {
+      const taxonomyGap = catalogIdentityGap({
+        brand: formData.brand,
+        categoryId: formData.categoryId,
+      });
+      if (taxonomyGap) {
+        setError(taxonomyGap);
+        toast.error(taxonomyGap);
+        return;
+      }
     }
 
     if (variantWorkflowEnabled && normalizedVariants.length === 0) {

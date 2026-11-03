@@ -49,10 +49,11 @@ const EMPTY_LOCATION = {
 /**
  * Manual add, remove, and transfer must carry a note.
  * The ledger is the audit trail; a blank remark leaves no reason for the movement.
+ * A Sold removal already names the salesperson, so the note stays optional there.
  */
-function movementNoteError(remark) {
+function movementNoteError(remark, { required = true } = {}) {
   const text = String(remark || '').trim();
-  if (!text) return 'Note is required';
+  if (required && !text) return 'Note is required';
   if (text.length > MAX_MOVEMENT_REMARK_LENGTH) {
     return `Note must be ${MAX_MOVEMENT_REMARK_LENGTH} characters or fewer`;
   }
@@ -429,7 +430,7 @@ export default function StockMovementModal({
         return;
       }
 
-      const noteError = movementNoteError(form.remark);
+      const noteError = movementNoteError(form.remark, { required: !isSoldMovement });
       if (noteError) {
         toast.error(noteError);
         return;
@@ -601,6 +602,7 @@ export default function StockMovementModal({
     availableAtTransferFrom,
     fromSel,
     toSel,
+    isSoldMovement,
   ]);
 
   const handleMaxWarnContinue = useCallback(async () => {
@@ -816,13 +818,13 @@ export default function StockMovementModal({
                   htmlFor="movement-note"
                   className="block text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-2"
                 >
-                  Note <span className="text-red-600">*</span>
+                  Note{isSoldMovement ? '' : <span className="text-red-600"> *</span>}
                 </label>
                 <input
                   id="movement-note"
                   type="text"
-                  required
-                  placeholder="Why is this stock moving?"
+                  required={!isSoldMovement}
+                  placeholder={isSoldMovement ? 'Optional note' : 'Why is this stock moving?'}
                   className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl"
                   value={form.remark}
                   maxLength={MAX_MOVEMENT_REMARK_LENGTH}
@@ -884,7 +886,7 @@ export default function StockMovementModal({
                 type="button"
                 disabled={
                   submitting ||
-                  !String(form.remark || '').trim() ||
+                  (!isSoldMovement && !String(form.remark || '').trim()) ||
                   (tab === 'minus' &&
                     (sellableLocationRows.length === 0 ||
                       totalMinusQty <= 0 ||

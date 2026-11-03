@@ -23,6 +23,7 @@ export const dynamic = 'force-dynamic';
  *
  * Posts add, minus (batch lines supported), or transfer.
  * A note is required on every manual movement so the ledger keeps a reason.
+ * Sold is the exception: the salesperson already identifies the sale.
  * Caps batch size and remark/ref length to keep payloads bounded.
  *
  * Permissions: inventory:write
@@ -59,7 +60,12 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
-    if (!remark) {
+    /**
+     * Minus with no reason is already treated as a sale below, and a sale
+     * must name the salesperson. That identity replaces the note.
+     */
+    const soldWithoutNote = action === 'minus' && (reason || 'sold') === 'sold';
+    if (!remark && !soldWithoutNote) {
       return NextResponse.json({ error: 'Note is required' }, { status: 400 });
     }
 

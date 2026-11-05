@@ -280,7 +280,7 @@ export default function BrandReportPage() {
       link.click();
       URL.revokeObjectURL(url);
       if (response.headers.get('x-export-capped') === '1') {
-        showToast.error('Excel includes the first 500 matching articles.');
+        showToast.error('Excel includes the first 900 matching articles.');
       }
       return null;
     } catch (err) {
@@ -368,7 +368,7 @@ export default function BrandReportPage() {
             />
             Tick all visible
           </label>
-          <span className="text-xs sm:text-sm">{selected.size ? `${selected.size} ticked` : 'Nothing selected = filtered rows, up to 500'}</span>
+          <span className="text-xs sm:text-sm">{selected.size ? `${selected.size} ticked` : 'Nothing selected = filtered rows, up to 900'}</span>
           <span className="text-gray-400 text-xs sm:text-sm">
             {data?.totals ? `${data.totals.variants} articles in ${data.totals.families} groups` : ''}
           </span>
@@ -400,7 +400,8 @@ export default function BrandReportPage() {
         </p>
       ) : null}
 
-      <div className="mt-3 max-h-[calc(100vh-15rem)] overflow-auto bg-white border border-gray-200 rounded-xl">
+      {/* Tall viewport budget so grouped rows stay readable without constant inner scrolling */}
+      <div className="mt-3 max-h-[calc(100dvh-9rem)] min-h-[28rem] overflow-auto bg-white border border-gray-200 rounded-xl">
         {!canQuery ? (
           <p className="p-8 text-sm text-gray-500">Choose a filter and press Apply, or search for a product.</p>
         ) : isLoading && !data ? (

@@ -83,6 +83,14 @@ function blobToDataUrl(blob) {
   });
 }
 
+function proxyImageUrl(url) {
+  return `/api/admin/inventory/brand-report/image?url=${encodeURIComponent(url)}`;
+}
+
+/**
+ * R2 photos are not CORS-enabled. Fetch through the same-origin proxy,
+ * then swap each img to a data URL so html-to-image can embed them.
+ */
 async function inlineSheetImages(root, cache) {
   const images = [...root.querySelectorAll('img')];
   await Promise.all(images.map(async (img) => {
@@ -90,7 +98,7 @@ async function inlineSheetImages(root, cache) {
     if (!url || url.startsWith('data:')) return;
     if (!cache.has(url)) {
       try {
-        const response = await fetch(url, { mode: 'cors' });
+        const response = await fetch(proxyImageUrl(url), { credentials: 'include' });
         if (!response.ok) throw new Error('image');
         cache.set(url, await blobToDataUrl(await response.blob()));
       } catch {
@@ -101,6 +109,14 @@ async function inlineSheetImages(root, cache) {
     if (dataUrl) {
       img.removeAttribute('crossorigin');
       img.src = dataUrl;
+      await new Promise((resolve) => {
+        if (img.complete) {
+          resolve();
+          return;
+        }
+        img.onload = () => resolve();
+        img.onerror = () => resolve();
+      });
       return;
     }
     const spot = document.createElement('span');
@@ -111,33 +127,24 @@ async function inlineSheetImages(root, cache) {
 
 async function captureSheet(node, cache, pixelRatio) {
   const { toPng } = await import('html-to-image');
-  const options = {
-    pixelRatio,
-    backgroundColor: '#ffffff',
-    cacheBust: false,
-    width: node.offsetWidth,
-    height: node.scrollHeight,
-  };
+  const clone = node.cloneNode(true);
+  clone.style.position = 'fixed';
+  clone.style.left = '0';
+  clone.style.top = '0';
+  clone.style.zIndex = '-1';
+  clone.style.width = `${node.offsetWidth}px`;
+  document.body.appendChild(clone);
   try {
-    return await toPng(node, options);
-  } catch {
-    const clone = node.cloneNode(true);
-    clone.style.position = 'fixed';
-    clone.style.left = '0';
-    clone.style.top = '0';
-    clone.style.zIndex = '-1';
-    clone.style.width = `${node.offsetWidth}px`;
-    document.body.appendChild(clone);
-    try {
-      await inlineSheetImages(clone, cache);
-      return await toPng(clone, {
-        ...options,
-        width: clone.offsetWidth,
-        height: clone.scrollHeight,
-      });
-    } finally {
-      clone.remove();
-    }
+    await inlineSheetImages(clone, cache);
+    return await toPng(clone, {
+      pixelRatio,
+      backgroundColor: '#ffffff',
+      cacheBust: false,
+      width: clone.offsetWidth,
+      height: clone.scrollHeight,
+    });
+  } finally {
+    clone.remove();
   }
 }
 
@@ -265,7 +272,7 @@ export default function BrandReportPdfPreview({ rows, generatedAt, brandName, se
                         <td className="border border-gray-200 px-1.5 py-1.5 text-gray-500">{pageIndex * ROWS_PER_PAGE + index + 1}</td>
                         <td className="border border-gray-200 px-1.5 py-1.5">
                           {row.imageUrl ? (
-                            <img src={row.imageUrl} alt="" crossOrigin="anonymous" className="h-7 w-7 rounded-full object-cover bg-gray-100" />
+                            <img src={row.imageUrl} alt="" className="h-7 w-7 rounded-full object-cover bg-gray-100" />
                           ) : (
                             <span className="inline-block h-7 w-7 rounded-full bg-gray-100" />
                           )}

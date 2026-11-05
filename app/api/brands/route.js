@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Brand from '@/lib/models/Brand';
 import { requireAuth } from '@/lib/server/auth/requireAuth';
+import { sanitizeBrandImageForLevel } from '@/lib/taxonomy/taxonomyValidation';
 
 // Force dynamic rendering to prevent caching issues in production
 export const dynamic = 'force-dynamic';
@@ -118,6 +119,9 @@ export async function POST(request) {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '');
     }
+
+    // Logos only on top-level brands (department)
+    sanitizeBrandImageForLevel(brandData, brandData.level);
 
     // Create brand
     const brand = new Brand(brandData);

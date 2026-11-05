@@ -20,6 +20,13 @@ export default function TaxonomyEditPanel({ config, node, idMap, saving, onClose
 
   const nodeId = node?._id ?? node?.id;
   const path = nodeId ? getTaxonomyPath(nodeId?.toString?.() ?? nodeId, idMap) : [];
+  /**
+   * Categories allow images on every level. Brands only show logo controls
+   * on department (top-level brand) via config.imageLevels.
+   */
+  const showImage =
+    !!config.supportsImage &&
+    (!Array.isArray(config.imageLevels) || config.imageLevels.includes(node?.level));
 
   useEffect(() => {
     if (!node) return;
@@ -68,7 +75,7 @@ export default function TaxonomyEditPanel({ config, node, idMap, saving, onClose
       level: node.level,
       parent: node.parent?._id ?? node.parent ?? null,
     };
-    if (config.supportsImage) payload.image = form.image;
+    if (showImage) payload.image = form.image;
     onSave(payload);
   };
 
@@ -127,9 +134,11 @@ export default function TaxonomyEditPanel({ config, node, idMap, saving, onClose
               </div>
             </section>
 
-            {config.supportsImage && (
+            {showImage && (
               <section className="space-y-3 rounded-xl border border-gray-100 bg-gray-50/50 p-4">
-                <p className="text-sm font-medium text-gray-700">Image</p>
+                <p className="text-sm font-medium text-gray-700">
+                  {config.type === 'brand' ? 'Brand logo' : 'Image'}
+                </p>
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/gif,image/webp"

@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/connect';
 import Brand from '@/lib/models/Brand';
 import { requireAuth } from '@/lib/server/auth/requireAuth';
+import { sanitizeBrandImageForLevel } from '@/lib/taxonomy/taxonomyValidation';
 
 /**
  * GET /api/brands/[id]
@@ -87,6 +88,10 @@ export async function PUT(request, { params }) {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '');
     }
+
+    // Logos only on top-level brands (department); nested nodes clear image
+    const nextLevel = updateData.level || brand.level;
+    sanitizeBrandImageForLevel(updateData, nextLevel);
 
     // Update brand
     Object.assign(brand, updateData);

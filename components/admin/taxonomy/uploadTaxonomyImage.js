@@ -4,7 +4,8 @@ import { compressImageFile } from '@/lib/client/imageCompression';
 import { adminFetch } from '@/lib/client/adminFetch';
 
 /**
- * Upload taxonomy image (categories) to R2 via admin API.
+ * Upload taxonomy image to R2 via admin API.
+ * Categories use folder "categories"; brand logos use "brands".
  */
 export async function uploadTaxonomyImage(file, folder = 'categories') {
   const MAX_INPUT_SIZE = 15 * 1024 * 1024;

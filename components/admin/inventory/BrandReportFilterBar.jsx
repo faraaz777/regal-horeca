@@ -27,9 +27,9 @@ const ARTICLE_CHOICES = [
 ];
 
 function filtersMatch(left, right) {
-  return left.brand === right.brand
-    && left.categoryId === right.categoryId
-    && left.subCategoryId === right.subCategoryId
+  return left.brandId === right.brandId
+    && left.brandCategoryId === right.brandCategoryId
+    && left.brandSubCategoryId === right.brandSubCategoryId
     && left.articleStatus === right.articleStatus
     && left.stockStatus === right.stockStatus
     && left.color === right.color;
@@ -37,9 +37,9 @@ function filtersMatch(left, right) {
 
 function hasFilter(filters) {
   return Boolean(
-    filters.brand
-    || filters.categoryId
-    || filters.subCategoryId
+    filters.brandId
+    || filters.brandCategoryId
+    || filters.brandSubCategoryId
     || filters.articleStatus
     || filters.stockStatus
     || filters.color
@@ -199,8 +199,9 @@ function Picker({ label, selectedId, display, placeholder, options, disabled, on
 }
 
 /**
- * Brand and category are typed menus. Article and stock stay radios.
- * Color stays a swipe. Enter in search does not apply the filters.
+ * Brand / category / subcategory are one Brand-tree path.
+ * Article and stock stay radios. Color stays a swipe.
+ * Enter in search does not apply the filters.
  */
 export default function BrandReportFilterBar({
   search,
@@ -215,9 +216,11 @@ export default function BrandReportFilterBar({
 }) {
   const dirty = !filtersMatch(draft, appliedFilters);
   const settled = !dirty && hasFilter(appliedFilters);
-  const categoryList = categories.filter((item) => item.level === 'category');
+  const categoryList = categories.filter(
+    (item) => item.level === 'category' && (!draft.brandId || item.parentId === draft.brandId)
+  );
   const subList = categories.filter(
-    (item) => item.level === 'subcategory' && item.parentId === draft.categoryId
+    (item) => item.level === 'subcategory' && item.parentId === draft.brandCategoryId
   );
 
   return (
@@ -253,28 +256,29 @@ export default function BrandReportFilterBar({
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <Picker
           label="Brand"
-          selectedId={draft.brand}
-          display={draft.brand}
+          selectedId={draft.brandId}
+          display={brands.find((item) => item.id === draft.brandId)?.name || ''}
           placeholder="Any brand"
-          options={brands.map((brand) => ({ id: brand, label: brand }))}
-          onChange={(brand) => onChange({ brand })}
+          options={brands.map((item) => ({ id: item.id, label: item.name }))}
+          onChange={(brandId) => onChange({ brandId, brandCategoryId: '', brandSubCategoryId: '' })}
         />
         <Picker
           label="Category"
-          selectedId={draft.categoryId}
-          display={categoryList.find((item) => item.id === draft.categoryId)?.name || ''}
-          placeholder="Any category"
+          selectedId={draft.brandCategoryId}
+          display={categoryList.find((item) => item.id === draft.brandCategoryId)?.name || ''}
+          placeholder={draft.brandId ? 'Any category' : 'Pick a brand'}
           options={categoryList.map((item) => ({ id: item.id, label: item.name }))}
-          onChange={(categoryId) => onChange({ categoryId, subCategoryId: '' })}
+          disabled={!draft.brandId}
+          onChange={(brandCategoryId) => onChange({ brandCategoryId, brandSubCategoryId: '' })}
         />
         <Picker
-          label="Inside"
-          selectedId={draft.subCategoryId}
-          display={subList.find((item) => item.id === draft.subCategoryId)?.name || ''}
-          placeholder={draft.categoryId ? 'Any sub-category' : 'Pick a category'}
+          label="Sub"
+          selectedId={draft.brandSubCategoryId}
+          display={subList.find((item) => item.id === draft.brandSubCategoryId)?.name || ''}
+          placeholder={draft.brandCategoryId ? 'Any sub-category' : 'Pick a category'}
           options={subList.map((item) => ({ id: item.id, label: item.name }))}
-          disabled={!draft.categoryId}
-          onChange={(subCategoryId) => onChange({ subCategoryId })}
+          disabled={!draft.brandCategoryId}
+          onChange={(brandSubCategoryId) => onChange({ brandSubCategoryId })}
         />
       </div>
 

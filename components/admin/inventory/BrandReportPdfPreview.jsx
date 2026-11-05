@@ -7,8 +7,28 @@ import {
   ARTICLE_STATUS_LABELS,
   STOCK_STATUS_LABELS,
 } from '@/lib/shared/maintainedArticle';
+import { resolveBrandReportColumns } from '@/lib/shared/brandReportColumns';
 
 const ROWS_PER_PAGE = 8;
+
+function pdfCell(row, columnId) {
+  switch (columnId) {
+    case 'gstPercent':
+    case 'maxDiscountPercent':
+      return percent(row[columnId]);
+    case 'mrp':
+    case 'sellingPrice':
+      return rupee(row[columnId]);
+    case 'totalQuantity':
+      return Number(row.totalQuantity || 0).toLocaleString('en-IN');
+    case 'articleStatus':
+      return ARTICLE_STATUS_LABELS[row.articleStatus] || '—';
+    case 'stockStatus':
+      return STOCK_STATUS_LABELS[row.stockStatus] || '—';
+    default:
+      return text(row[columnId]);
+  }
+}
 
 /**
  * The PDF is a capture of this sheet, so the file matches the preview.
@@ -121,13 +141,14 @@ async function captureSheet(node, cache, pixelRatio) {
   }
 }
 
-export default function BrandReportPdfPreview({ rows, generatedAt, brandName, selectionLabel, onClose }) {
+export default function BrandReportPdfPreview({ rows, generatedAt, brandName, selectionLabel, columns, onClose }) {
   const sheetRefs = useRef([]);
   const [exporting, setExporting] = useState('');
   const [mountedPages, setMountedPages] = useState(1);
   const pages = chunkRows(rows);
   const heading = brandHeading(rows, brandName);
   const stamp = liveDate(generatedAt);
+  const activeColumns = resolveBrandReportColumns(columns);
   const pagesReady = mountedPages >= pages.length;
 
   useEffect(() => {
@@ -233,7 +254,7 @@ export default function BrandReportPdfPreview({ rows, generatedAt, brandName, se
                 <table className="mt-4 w-full border-collapse text-[11px] text-gray-900">
                   <thead>
                     <tr className="bg-gray-50 text-left text-[9px] font-semibold uppercase tracking-wide text-gray-500">
-                      {['S.No', 'Image', 'Name', 'Size', 'Unit', 'Color', 'SKU', 'Barcode', 'HSN code', 'GST%', 'MRP', 'SP', 'Max discount %', 'Total qnty', 'Location', 'Article status', 'Stock status'].map((label) => (
+                      {['S.No', 'Image', 'Name', ...activeColumns.map((column) => column.excelHeader)].map((label) => (
                         <th key={label} className="border border-gray-200 px-1.5 py-2 align-bottom whitespace-normal leading-tight">{label}</th>
                       ))}
                     </tr>
@@ -250,20 +271,14 @@ export default function BrandReportPdfPreview({ rows, generatedAt, brandName, se
                           )}
                         </td>
                         <td className="border border-gray-200 px-1.5 py-1.5 font-medium">{text(row.name)}</td>
-                        <td className="border border-gray-200 px-1.5 py-1.5 whitespace-nowrap">{text(row.size)}</td>
-                        <td className="border border-gray-200 px-1.5 py-1.5">{text(row.unit)}</td>
-                        <td className="border border-gray-200 px-1.5 py-1.5">{text(row.color)}</td>
-                        <td className="border border-gray-200 px-1.5 py-1.5 font-mono break-all">{text(row.sku)}</td>
-                        <td className="border border-gray-200 px-1.5 py-1.5 font-mono">{text(row.barcode)}</td>
-                        <td className="border border-gray-200 px-1.5 py-1.5">{text(row.hsnCode)}</td>
-                        <td className="border border-gray-200 px-1.5 py-1.5">{percent(row.gstPercent)}</td>
-                        <td className="border border-gray-200 px-1.5 py-1.5 whitespace-nowrap">{rupee(row.mrp)}</td>
-                        <td className="border border-gray-200 px-1.5 py-1.5 whitespace-nowrap">{rupee(row.sellingPrice)}</td>
-                        <td className="border border-gray-200 px-1.5 py-1.5">{percent(row.maxDiscountPercent)}</td>
-                        <td className="border border-gray-200 px-1.5 py-1.5 font-semibold">{Number(row.totalQuantity || 0).toLocaleString('en-IN')}</td>
-                        <td className="border border-gray-200 px-1.5 py-1.5 max-w-[140px] break-words">{text(row.location)}</td>
-                        <td className="border border-gray-200 px-1.5 py-1.5">{ARTICLE_STATUS_LABELS[row.articleStatus] || '—'}</td>
-                        <td className="border border-gray-200 px-1.5 py-1.5">{STOCK_STATUS_LABELS[row.stockStatus] || '—'}</td>
+                        {activeColumns.map((column) => (
+                          <td
+                            key={column.id}
+                            className={`border border-gray-200 px-1.5 py-1.5 ${column.id === 'totalQuantity' ? 'font-semibold' : ''} ${column.id === 'sku' || column.id === 'barcode' ? 'font-mono break-all' : ''} ${column.id === 'location' ? 'max-w-[140px] break-words' : ''} ${column.id === 'size' || column.id === 'mrp' || column.id === 'sellingPrice' ? 'whitespace-nowrap' : ''}`}
+                          >
+                            {pdfCell(row, column.id)}
+                          </td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>

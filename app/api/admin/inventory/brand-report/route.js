@@ -1,8 +1,9 @@
 /**
  * GET /api/admin/inventory/brand-report
  *
- * facets=1 returns brands and category options.
+ * facets=1 returns Brand-tree departments plus brand categories/subcategories.
  * Otherwise returns one page of grouped catalog articles with stock rules.
+ * Brand filters use brandCategoryId, not the general Category tree.
  * Any filter is enough. A search with no filter needs 2+ characters.
  *
  * Permissions: inventory:read

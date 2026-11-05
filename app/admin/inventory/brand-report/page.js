@@ -8,9 +8,9 @@ import { adminFetch, adminJson } from '@/lib/client/adminFetch';
 import { showToast } from '@/lib/utils/toast';
 import BrandReportPdfPreview from '@/components/admin/inventory/BrandReportPdfPreview';
 import BrandReportFilterBar from '@/components/admin/inventory/BrandReportFilterBar';
+import BrandReportColumnPicker from '@/components/admin/inventory/BrandReportColumnPicker';
 import {
   ARTICLE_MAINTAINED,
-  ARTICLE_NON_MAINTAINED,
   ARTICLE_STATUS_LABELS,
   STOCK_DEAD,
   STOCK_LOW,
@@ -18,13 +18,19 @@ import {
   STOCK_OVER,
   STOCK_STATUS_LABELS,
 } from '@/lib/shared/maintainedArticle';
+import {
+  BRAND_REPORT_DEFAULT_COLUMN_IDS,
+  readStoredBrandReportColumns,
+  resolveBrandReportColumns,
+  storeBrandReportColumns,
+} from '@/lib/shared/brandReportColumns';
 
 const fetcher = (url) => adminJson(url);
 
 const EMPTY_FILTERS = {
-  brand: '',
-  categoryId: '',
-  subCategoryId: '',
+  brandId: '',
+  brandCategoryId: '',
+  brandSubCategoryId: '',
   articleStatus: '',
   stockStatus: '',
   color: '',
@@ -32,9 +38,9 @@ const EMPTY_FILTERS = {
 
 function hasReportScope(filters, query) {
   return Boolean(
-    filters.brand
-    || filters.categoryId
-    || filters.subCategoryId
+    filters.brandId
+    || filters.brandCategoryId
+    || filters.brandSubCategoryId
     || filters.articleStatus
     || filters.stockStatus
     || filters.color
@@ -62,6 +68,37 @@ function percent(value) {
 const HEAD = 'sticky top-0 z-10 bg-[#f7f7f8] px-2.5 h-9 text-left text-[11px] font-medium text-gray-500 border-b border-gray-200 whitespace-nowrap';
 const CELL = 'px-2.5 h-10 border-b border-gray-100 whitespace-nowrap align-middle';
 const NUM = `${CELL} text-right tabular-nums text-gray-800`;
+
+function cellValue(row, columnId) {
+  switch (columnId) {
+    case 'size':
+    case 'unit':
+    case 'color':
+    case 'sku':
+    case 'barcode':
+    case 'hsnCode':
+    case 'location':
+      return dash(row[columnId]);
+    case 'gstPercent':
+    case 'maxDiscountPercent':
+      return percent(row[columnId]);
+    case 'mrp':
+    case 'sellingPrice':
+      return money(row[columnId]);
+    case 'totalQuantity':
+      return Number(row.totalQuantity || 0).toLocaleString('en-IN');
+    case 'minQuantity':
+    case 'maxQuantity':
+    case 'reorderQty':
+      return dash(row[columnId]);
+    case 'articleStatus':
+      return <ArticleBadge status={row.articleStatus} />;
+    case 'stockStatus':
+      return <StockBadge status={row.stockStatus} />;
+    default:
+      return '—';
+  }
+}
 
 function ArticleBadge({ status }) {
   const maintained = status === ARTICLE_MAINTAINED;
@@ -108,6 +145,17 @@ export default function BrandReportPage() {
   const [selected, setSelected] = useState(() => new Set());
   const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState('');
+  const [visibleColumns, setVisibleColumns] = useState(() => [...BRAND_REPORT_DEFAULT_COLUMN_IDS]);
+  const activeColumns = useMemo(() => resolveBrandReportColumns(visibleColumns), [visibleColumns]);
+
+  useEffect(() => {
+    setVisibleColumns(readStoredBrandReportColumns());
+  }, []);
+
+  const setColumns = (next) => {
+    setVisibleColumns(next);
+    storeBrandReportColumns(next);
+  };
 
   const { data: facets } = useSWR('/api/admin/inventory/brand-report?facets=1', fetcher, {
     revalidateOnFocus: false,
@@ -117,9 +165,9 @@ export default function BrandReportPage() {
   const reportUrl = useMemo(() => {
     if (!canQuery) return null;
     const params = new URLSearchParams({ page: String(page) });
-    if (appliedFilters.brand) params.set('brand', appliedFilters.brand);
-    if (appliedFilters.categoryId) params.set('categoryId', appliedFilters.categoryId);
-    if (appliedFilters.subCategoryId) params.set('subCategoryId', appliedFilters.subCategoryId);
+    if (appliedFilters.brandId) params.set('brandId', appliedFilters.brandId);
+    if (appliedFilters.brandCategoryId) params.set('brandCategoryId', appliedFilters.brandCategoryId);
+    if (appliedFilters.brandSubCategoryId) params.set('brandSubCategoryId', appliedFilters.brandSubCategoryId);
     if (appliedFilters.articleStatus) params.set('articleStatus', appliedFilters.articleStatus);
     if (appliedFilters.stockStatus) params.set('stockStatus', appliedFilters.stockStatus);
     if (appliedFilters.color) params.set('color', appliedFilters.color);
@@ -190,6 +238,7 @@ export default function BrandReportPage() {
     ...appliedFilters,
     q: appliedQuery,
     rowIds: [...selected],
+    columns: visibleColumns,
   });
 
   const exportRows = async (format) => {
@@ -249,8 +298,9 @@ export default function BrandReportPage() {
     setPreview({
       rows: body.rows,
       generatedAt: body.generatedAt,
-      brandName: appliedFilters.brand,
+      brandName: (facets?.brands || []).find((item) => item.id === appliedFilters.brandId)?.name || '',
       selectionLabel: picked ? `${body.rows.length} selected` : `${body.rows.length} articles`,
+      columns: visibleColumns,
     });
   };
 
@@ -287,8 +337,8 @@ export default function BrandReportPage() {
         categories={facets?.categories || []}
       />
 
-      <div className="mt-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+      <div className="mt-4 flex items-start justify-between gap-3">
+        <div className="min-w-0 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-gray-600">
           <div className="inline-flex h-8 rounded-full bg-gray-100 p-0.5" role="group" aria-label="Display">
             {REPORT_VIEWS.map(([value, label]) => (
               <button
@@ -318,25 +368,26 @@ export default function BrandReportPage() {
             />
             Tick all visible
           </label>
-          <span>{selected.size ? `${selected.size} ticked` : 'Nothing selected = filtered rows, up to 500'}</span>
-          <span className="text-gray-400">
+          <span className="text-xs sm:text-sm">{selected.size ? `${selected.size} ticked` : 'Nothing selected = filtered rows, up to 500'}</span>
+          <span className="text-gray-400 text-xs sm:text-sm">
             {data?.totals ? `${data.totals.variants} articles in ${data.totals.families} groups` : ''}
           </span>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex shrink-0 flex-nowrap items-center gap-1.5 sm:gap-2">
+          <BrandReportColumnPicker columns={visibleColumns} onChange={setColumns} />
           <button
             type="button"
             disabled={!!busy}
             onClick={openPreview}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold border border-gray-200 rounded-lg bg-white"
+            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2.5 text-xs font-semibold text-gray-700 whitespace-nowrap"
           >
-            <FileText size={14} /> {busy === 'json' ? 'Preparing…' : 'PDF preview'}
+            <FileText size={14} /> {busy === 'json' ? 'Preparing…' : 'PDF'}
           </button>
           <button
             type="button"
             disabled={!!busy}
             onClick={() => exportRows('xlsx')}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-white bg-emerald-700 rounded-lg"
+            className="inline-flex h-8 items-center gap-1.5 rounded-full bg-emerald-700 px-2.5 text-xs font-semibold text-white whitespace-nowrap"
           >
             <FileSpreadsheet size={14} /> {busy === 'xlsx' ? 'Exporting…' : 'Excel'}
           </button>
@@ -345,7 +396,7 @@ export default function BrandReportPage() {
 
       {data?.scanCapped ? (
         <p className="mt-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          This filter matches more than 2,500 articles. The table and export use the first matches. Narrow the brand or category for the rest.
+          This filter matches more than 2,500 articles. The table and export use the first matches. Narrow the brand tree for the rest.
         </p>
       ) : null}
 
@@ -367,15 +418,14 @@ export default function BrandReportPage() {
                 <th className={`${HEAD} w-10`} />
                 <th className={`${HEAD} w-10`}>#</th>
                 <th className={`${HEAD} min-w-[240px]`}>Product</th>
-                {['Size', 'Unit', 'Color', 'SKU', 'Barcode', 'HSN'].map((label) => (
-                  <th key={label} className={HEAD}>{label}</th>
+                {activeColumns.map((column) => (
+                  <th
+                    key={column.id}
+                    className={`${HEAD}${column.align === 'right' ? ' text-right' : ''}`}
+                  >
+                    {column.label}
+                  </th>
                 ))}
-                {['GST', 'MRP', 'SP', 'Disc', 'Qty', 'Min', 'Max', 'Reorder'].map((label) => (
-                  <th key={label} className={`${HEAD} text-right`}>{label}</th>
-                ))}
-                <th className={HEAD}>Location</th>
-                <th className={HEAD}>Article</th>
-                <th className={HEAD}>Stock</th>
               </tr>
             </thead>
             <tbody>
@@ -389,6 +439,7 @@ export default function BrandReportPage() {
                         group={group}
                         startIndex={start}
                         selected={selected}
+                        columns={activeColumns}
                         onToggleGroup={() => toggleGroup(group.rows)}
                         onToggleRow={toggleRow}
                       />
@@ -400,6 +451,7 @@ export default function BrandReportPage() {
                       row={row}
                       index={index + 1}
                       checked={selected.has(row.id)}
+                      columns={activeColumns}
                       onToggle={() => toggleRow(row.id)}
                     />
                   ))}
@@ -422,6 +474,7 @@ export default function BrandReportPage() {
           generatedAt={preview.generatedAt}
           brandName={preview.brandName}
           selectionLabel={preview.selectionLabel}
+          columns={preview.columns}
           onClose={() => setPreview(null)}
         />
       ) : null}
@@ -429,7 +482,7 @@ export default function BrandReportPage() {
   );
 }
 
-function GroupBlock({ group, startIndex, selected, onToggleGroup, onToggleRow }) {
+function GroupBlock({ group, startIndex, selected, columns, onToggleGroup, onToggleRow }) {
   const ids = group.rows.map((row) => row.id);
   const allOn = ids.every((id) => selected.has(id));
   return (
@@ -439,7 +492,7 @@ function GroupBlock({ group, startIndex, selected, onToggleGroup, onToggleRow })
           <input type="checkbox" checked={allOn} onChange={onToggleGroup} aria-label={`Select ${group.familyTitle}`} className="h-3.5 w-3.5 accent-gray-900" />
         </td>
         <td className={`${CELL} bg-[#f7f7f8]`} />
-        <td colSpan={18} className={`${CELL} bg-[#f7f7f8]`}>
+        <td colSpan={1 + columns.length} className={`${CELL} bg-[#f7f7f8]`}>
           <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-gray-900">
             <ChevronDown size={14} className="text-gray-400" />
             <span className="truncate max-w-[420px]" title={group.familyTitle}>{group.familyTitle}</span>
@@ -448,13 +501,20 @@ function GroupBlock({ group, startIndex, selected, onToggleGroup, onToggleRow })
         </td>
       </tr>
       {group.rows.map((row, index) => (
-        <ArticleRow key={row.id} row={row} index={startIndex + index + 1} checked={selected.has(row.id)} onToggle={() => onToggleRow(row.id)} />
+        <ArticleRow
+          key={row.id}
+          row={row}
+          index={startIndex + index + 1}
+          checked={selected.has(row.id)}
+          columns={columns}
+          onToggle={() => onToggleRow(row.id)}
+        />
       ))}
     </>
   );
 }
 
-function ArticleRow({ row, index, checked, onToggle }) {
+function ArticleRow({ row, index, checked, columns, onToggle }) {
   return (
     <tr className="hover:bg-gray-50/80">
       <td className={CELL}>
@@ -471,23 +531,19 @@ function ArticleRow({ row, index, checked, onToggle }) {
           <span className="truncate font-medium text-gray-900" title={row.name}>{row.name}</span>
         </span>
       </td>
-      <td className={`${CELL} text-gray-600`}>{dash(row.size)}</td>
-      <td className={`${CELL} text-gray-600`}>{dash(row.unit)}</td>
-      <td className={`${CELL} text-gray-600`}>{dash(row.color)}</td>
-      <td className={`${CELL} font-mono text-[11px] text-gray-600`}>{dash(row.sku)}</td>
-      <td className={`${CELL} font-mono text-[11px] text-gray-500`}>{dash(row.barcode)}</td>
-      <td className={`${CELL} text-gray-600`}>{dash(row.hsnCode)}</td>
-      <td className={NUM}>{percent(row.gstPercent)}</td>
-      <td className={NUM}>{money(row.mrp)}</td>
-      <td className={NUM}>{money(row.sellingPrice)}</td>
-      <td className={NUM}>{percent(row.maxDiscountPercent)}</td>
-      <td className={`${NUM} font-semibold text-gray-900`}>{Number(row.totalQuantity || 0).toLocaleString('en-IN')}</td>
-      <td className={NUM}>{dash(row.minQuantity)}</td>
-      <td className={NUM}>{dash(row.maxQuantity)}</td>
-      <td className={NUM}>{dash(row.reorderQty)}</td>
-      <td className={`${CELL} max-w-[160px] truncate text-gray-500`} title={row.location}>{dash(row.location)}</td>
-      <td className={CELL}><ArticleBadge status={row.articleStatus} /></td>
-      <td className={CELL}><StockBadge status={row.stockStatus} /></td>
+      {columns.map((column) => {
+        const right = column.align === 'right';
+        const mono = column.id === 'sku' || column.id === 'barcode';
+        return (
+          <td
+            key={column.id}
+            className={`${right ? NUM : CELL}${mono ? ' font-mono text-[11px]' : ''}${column.id === 'totalQuantity' ? ' font-semibold text-gray-900' : ''}${column.id === 'location' ? ' max-w-[160px] truncate text-gray-500' : ''}${!right && !mono && column.id !== 'articleStatus' && column.id !== 'stockStatus' ? ' text-gray-600' : ''}`}
+            title={column.id === 'location' ? row.location : undefined}
+          >
+            {cellValue(row, column.id)}
+          </td>
+        );
+      })}
     </tr>
   );
 }

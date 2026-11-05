@@ -3,6 +3,7 @@
  *
  * format=json returns the filtered rows (capped) for preview and PDF.
  * format=xlsx returns the workbook. rowIds limits the export to ticked rows.
+ * columns limits Excel to the same visible fields as the on-screen table.
  * An empty selection exports the filtered set up to the cap.
  *
  * Permissions: inventory:read
@@ -42,7 +43,7 @@ export async function POST(request) {
     const rows = flattenBrandReportRows(report.groups);
 
     if (format === 'xlsx' || format === 'excel') {
-      const workbook = await buildBrandReportWorkbook(rows);
+      const workbook = await buildBrandReportWorkbook(rows, body.columns);
       const buffer = await workbook.xlsx.writeBuffer();
       const stamp = new Date().toISOString().slice(0, 10);
       return new NextResponse(buffer, {

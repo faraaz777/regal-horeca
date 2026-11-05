@@ -25,6 +25,11 @@ import { adminJson } from '@/lib/client/adminFetch';
 import { canWriteInventory } from '@/lib/shared/permissions';
 import dynamic from 'next/dynamic';
 import { LOCATION_PATH_SEP } from '@/lib/shared/inventoryConstants';
+import {
+  ARTICLE_MAINTAINED,
+  ARTICLE_NON_MAINTAINED,
+} from '@/lib/shared/maintainedArticle';
+import ArticleStatusBadge from '@/components/admin/inventory/ArticleStatusBadge';
 import MiniBarcode from '@/components/admin/inventory/MiniBarcode';
 
 /** Load movement modal only when opened — keeps the inventory list bundle lighter. */
@@ -301,7 +306,8 @@ function InventoryMobileCard({
           )}
         </button>
 
-        <div className="flex-1 min-w-0 flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start gap-2">
           <button
             type="button"
             onClick={() => setNameExpanded((v) => !v)}
@@ -321,15 +327,6 @@ function InventoryMobileCard({
                 {item.brand}
               </p>
             ) : null}
-            {isDeadStock ? (
-              <span className="inline-flex mt-1.5 items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold leading-tight bg-amber-100 text-amber-800">
-                Dead stock
-              </span>
-            ) : null}
-            <div className="mt-1.5 flex items-center gap-1 text-[11px] text-gray-400 min-w-0">
-              <Barcode size={12} className="shrink-0" aria-hidden />
-              <span className="truncate font-mono">SKU: {item.sku || '—'}</span>
-            </div>
           </button>
 
           <div className="relative shrink-0 flex flex-col items-end gap-2">
@@ -415,6 +412,19 @@ function InventoryMobileCard({
               )}
             </div>
           </div>
+          </div>
+          <div className="mt-1.5 flex flex-nowrap items-center gap-1.5">
+            {isDeadStock ? (
+              <span className="inline-flex shrink-0 items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold leading-tight bg-amber-100 text-amber-800">
+                Dead stock
+              </span>
+            ) : null}
+            <ArticleStatusBadge status={item.articleStatus} />
+          </div>
+          <div className="mt-1.5 flex items-center gap-1 text-[11px] text-gray-400 min-w-0">
+            <Barcode size={12} className="shrink-0" aria-hidden />
+            <span className="truncate font-mono">SKU: {item.sku || '—'}</span>
+          </div>
         </div>
       </div>
 
@@ -465,6 +475,7 @@ export default function AdminInventoryPage() {
   const [brand, setBrand] = useState('');
   const [stockStatus, setStockStatus] = useState('');
   const [condition, setCondition] = useState('');
+  const [articleStatus, setArticleStatus] = useState('');
   const [movementItem, setMovementItem] = useState(null);
   const [movementTab, setMovementTab] = useState('add');
   const [highlightId, setHighlightId] = useState(focusProductId);
@@ -488,7 +499,7 @@ export default function AdminInventoryPage() {
 
   useEffect(() => {
     setMobilePage(1);
-  }, [debouncedSearch, brand, stockStatus, condition]);
+  }, [debouncedSearch, brand, stockStatus, condition, articleStatus]);
 
   useEffect(() => {
     if (!isMobile) return;
@@ -504,8 +515,9 @@ export default function AdminInventoryPage() {
     if (brand) params.set('brand', brand);
     if (stockStatus) params.set('stockStatus', stockStatus);
     if (condition) params.set('condition', condition);
+    if (articleStatus) params.set('articleStatus', articleStatus);
     return `/api/admin/inventory?${params}`;
-  }, [debouncedSearch, brand, stockStatus, condition, isMobile, mobilePage]);
+  }, [debouncedSearch, brand, stockStatus, condition, articleStatus, isMobile, mobilePage]);
 
   const { data, error, isLoading, isValidating, mutate } = useSWR(inventoryUrl, fetcher, {
     revalidateOnFocus: false,
@@ -528,7 +540,7 @@ export default function AdminInventoryPage() {
     pages: Math.ceil(totalCount / (isMobile ? MOBILE_PAGE_SIZE : DESKTOP_PAGE_SIZE)) || 1,
   };
   const brands = brandsData?.brands || [];
-  const hasExtraFilters = Boolean(condition);
+  const hasExtraFilters = Boolean(condition || articleStatus);
 
   const clearFocusParams = useCallback(() => {
     router.replace('/admin/inventory', { scroll: false });
@@ -648,6 +660,16 @@ export default function AdminInventoryPage() {
               <option value="">All conditions</option>
               <option value="NORMAL">Normal</option>
               <option value="HAS_DEAD_STOCK">Dead stock</option>
+            </select>
+            <select
+              value={articleStatus}
+              onChange={(e) => setArticleStatus(e.target.value)}
+              className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 min-w-[160px]"
+              aria-label="Filter by article"
+            >
+              <option value="">All articles</option>
+              <option value={ARTICLE_MAINTAINED}>Maintained</option>
+              <option value={ARTICLE_NON_MAINTAINED}>Non-maintained</option>
             </select>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -778,6 +800,20 @@ export default function AdminInventoryPage() {
                       <option value="HAS_DEAD_STOCK">Dead stock</option>
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                      Article
+                    </label>
+                    <select
+                      value={articleStatus}
+                      onChange={(e) => setArticleStatus(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                    >
+                      <option value="">All articles</option>
+                      <option value={ARTICLE_MAINTAINED}>Maintained</option>
+                      <option value={ARTICLE_NON_MAINTAINED}>Non-maintained</option>
+                    </select>
+                  </div>
                   <Link
                     href="/admin/inventory/product-sheet"
                     onClick={() => setFiltersOpen(false)}
@@ -870,11 +906,14 @@ export default function AdminInventoryPage() {
                             {item.brand}
                             {item.categoryName ? ` · ${item.categoryName}` : ''}
                           </div>
-                          {(item.isDeadStock || item.condition === 'HAS_DEAD_STOCK') && (
-                            <span className="inline-flex mt-1 items-center gap-1 px-1.5 py-px rounded text-[10px] font-semibold bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-200">
-                              ⚠ Dead stock
-                            </span>
-                          )}
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            {(item.isDeadStock || item.condition === 'HAS_DEAD_STOCK') && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-px rounded text-[10px] font-semibold bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-200">
+                                ⚠ Dead stock
+                              </span>
+                            )}
+                            <ArticleStatusBadge status={item.articleStatus} />
+                          </div>
                         </div>
                       </div>
                     </td>

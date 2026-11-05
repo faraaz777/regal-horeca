@@ -5,6 +5,7 @@ import {
   DEAD_STOCK_PERIOD_LABELS,
   DEAD_STOCK_PERIODS,
 } from '@/lib/shared/inventoryConstants';
+import ArticleStatusBadge from '@/components/admin/inventory/ArticleStatusBadge';
 
 function Field({ label, required, children }) {
   return (
@@ -127,7 +128,8 @@ export default function RulesPanel({
   if (!rule) {
     return (
       <div className="rounded-lg border border-amber-100 bg-amber-50/60 px-4 py-5 text-center">
-        <p className="text-sm font-medium text-amber-900">No inventory rules on file</p>
+        <ArticleStatusBadge rule={null} />
+        <p className="text-sm font-medium text-amber-900 mt-2">No inventory rules on file</p>
         <p className="text-xs text-amber-800 mt-1">
           Rules are set during the first inventory gate when opening stock is recorded.
         </p>
@@ -153,9 +155,12 @@ export default function RulesPanel({
     return (
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
-            Inventory gate rules
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+              Inventory gate rules
+            </p>
+            <ArticleStatusBadge rule={rule} />
+          </div>
           {canEdit && !isEditing && (
             <button
               type="button"
@@ -182,9 +187,17 @@ export default function RulesPanel({
 
   return (
     <div className="space-y-4">
-      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
-        Inventory gate rules
-      </p>
+      <div className="flex items-center gap-2">
+        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+          Inventory gate rules
+        </p>
+        <ArticleStatusBadge
+          rule={{
+            minStock: rulesForm?.minStock,
+            maxStock: rulesForm?.maxStock,
+          }}
+        />
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Min stock" required>

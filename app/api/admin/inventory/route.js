@@ -17,6 +17,7 @@ export async function GET(request) {
     const brand = searchParams.get('brand') || '';
     const stockStatus = searchParams.get('stockStatus') || '';
     const condition = searchParams.get('condition') || '';
+    const articleStatus = searchParams.get('articleStatus') || '';
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '50', 10);
 
@@ -26,6 +27,7 @@ export async function GET(request) {
       brand,
       stockStatus,
       condition,
+      articleStatus,
       page,
       limit,
     });

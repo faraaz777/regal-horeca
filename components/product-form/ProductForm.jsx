@@ -61,6 +61,10 @@ import {
   normalizeTag,
 } from '@/components/product-form/lib/generateProductTags';
 import { getCategoryAncestry, getBrandAncestry } from '@/components/product-form/lib/taxonomyAncestry';
+import {
+  buildBrandCollectionOptions,
+  getBrandTopLevelId,
+} from '@/lib/shared/brandCollection';
 import { ProductFormProvider } from '@/components/product-form/ProductFormContext';
 import ProductFormShell from '@/components/product-form/ui/ProductFormShell';
 
@@ -812,6 +816,9 @@ export default function ProductForm({
           discountPercent: Number(child.discountPercent || 0),
           marginPrice: Number(child.marginPrice || 0),
           price: Number(child.sellingPrice || child.price || 0),
+          brandCategoryId: String(
+            child.brandCategoryId?._id || child.brandCategoryId || ''
+          ).trim(),
           _childProductId: child._id || null,
           _legacyParentVariantId: child.legacyParentVariantId || '',
         };
@@ -865,6 +872,7 @@ export default function ProductForm({
         discountPercent: Number(variant?.discountPercent || 0),
         marginPrice: Number(variant?.marginPrice || 0),
         price: Number(variant?.sellingPrice || variant?.price || 0),
+        brandCategoryId: String(variant?.brandCategoryId || '').trim(),
         // Persist child product id when hydrating from `product.children` so callers
         // can issue PATCH/DELETE against the existing variant rather than recreating it.
         _childProductId: variant?._childProductId || null,
@@ -1085,6 +1093,8 @@ export default function ProductForm({
     discountPercent: 0,
     marginPrice: 0,
     price: '',
+    // Empty = parent default collection; resolved on save.
+    brandCategoryId: '',
   });
 
   /**
@@ -2156,6 +2166,7 @@ export default function ProductForm({
   const handleBrandCategoryChange = (level, id) => {
     const levelOrder = ['department', 'category', 'subcategory'];
     const currentLevelIndex = levelOrder.indexOf(level);
+    const previousParentCollectionId = String(formData.brandCategoryId || '').trim();
 
     setBrandSelection((prevSelection) => {
       const newSelection = { [level]: id };
@@ -2189,6 +2200,22 @@ export default function ProductForm({
         brand: brandName || prev.brand,
       }));
 
+      /**
+       * Parent default collection changed: update rows that still used the old
+       * default (or had none). Leave true collection overrides alone.
+       */
+      if (brandCategoryId && brandCategoryId !== previousParentCollectionId) {
+        setVariantRows((prev) =>
+          prev.map((row) => {
+            const current = String(row.brandCategoryId || '').trim();
+            if (!current || current === previousParentCollectionId) {
+              return { ...row, brandCategoryId: '' };
+            }
+            return row;
+          })
+        );
+      }
+
       return newSelection;
     });
   };
@@ -2208,14 +2235,26 @@ export default function ProductForm({
         }
       }
     }
+
+    const mostSpecificLevel = ['subcategory', 'category', 'department'].find((l) => newSelection[l]);
+    const leafId = mostSpecificLevel ? String(newSelection[mostSpecificLevel] || '').trim() : '';
+    const parentLeaf = String(formData.brandCategoryId || '').trim();
+    if (
+      leafId &&
+      parentLeaf &&
+      getBrandTopLevelId(leafId, brands) !== getBrandTopLevelId(parentLeaf, brands)
+    ) {
+      toast.error('Allowed collections must stay under the same top-level brand as the parent.');
+      return;
+    }
     
     newSelections[index] = newSelection;
     setAdditionalBrandSelections(newSelections);
 
     // Update brandCategoryIds array
     const updatedBrandCategoryIds = newSelections.map(sel => {
-      const mostSpecificLevel = ['subcategory', 'category', 'department'].find(l => sel[l]);
-      return mostSpecificLevel ? sel[mostSpecificLevel] : null;
+      const leaf = ['subcategory', 'category', 'department'].find(l => sel[l]);
+      return leaf ? sel[leaf] : null;
     }).filter(Boolean);
 
     setFormData({ ...formData, brandCategoryIds: updatedBrandCategoryIds });
@@ -2226,6 +2265,17 @@ export default function ProductForm({
   };
 
   const removeAdditionalBrandCategory = (index) => {
+    const removed = additionalBrandSelections[index] || {};
+    const removedLeafLevel = ['subcategory', 'category', 'department'].find((l) => removed[l]);
+    const removedId = removedLeafLevel ? String(removed[removedLeafLevel] || '').trim() : '';
+    if (
+      removedId &&
+      (variantRows || []).some((row) => String(row.brandCategoryId || '').trim() === removedId)
+    ) {
+      toast.error('A variant still uses this collection. Change those rows first.');
+      return;
+    }
+
     const newSelections = additionalBrandSelections.filter((_, i) => i !== index);
     setAdditionalBrandSelections(newSelections);
     
@@ -2237,6 +2287,16 @@ export default function ProductForm({
 
     setFormData({ ...formData, brandCategoryIds: updatedBrandCategoryIds });
   };
+
+  const brandCollectionOptions = useMemo(
+    () =>
+      buildBrandCollectionOptions({
+        parentBrandCategoryId: formData.brandCategoryId,
+        additionalBrandCategoryIds: formData.brandCategoryIds,
+        brands,
+      }),
+    [formData.brandCategoryId, formData.brandCategoryIds, brands]
+  );
 
   const handleChange = (e) => {
     const { name, value, type } = e.target;
@@ -3366,6 +3426,7 @@ export default function ProductForm({
           discountPercent: Number(row.discountPercent || 0),
           marginPrice: Number(row.marginPrice || 0),
           price: Number(row.sellingPrice || row.price || 0),
+          brandCategoryId: String(row.brandCategoryId || '').trim(),
           _childProductId: row._childProductId || null,
           _legacyParentVariantId: row._legacyParentVariantId || '',
         };
@@ -3846,6 +3907,7 @@ export default function ProductForm({
     handleAdditionalBrandCategoryChange,
     addAdditionalBrandCategory,
     removeAdditionalBrandCategory,
+    brandCollectionOptions,
     handleBusinessTypeChange,
     handleImageUpload,
     handleRemoveGalleryImage,

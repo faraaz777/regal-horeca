@@ -81,7 +81,7 @@ function contrastOnHex(hex) {
  * Sheet col widths as % so table-layout:fixed truly spans the viewport.
  * Without this, browsers size from first-row content and leave a dead right gap.
  */
-function buildSheetColPercents({ showSize, showColor, showUnitCount, showWeight }) {
+function buildSheetColPercents({ showSize, showColor, showUnitCount, showWeight, brandCompressed }) {
   const weights = [
     2.4, // #
     2.2, // Def — compact radio
@@ -103,10 +103,30 @@ function buildSheetColPercents({ showSize, showColor, showUnitCount, showWeight 
     4.2, // Disc
     5.8, // Margin
     10.5, // Images — room for + and thumbnails
-    3.2 // Actions / Apply
+    3.2, // Actions / Apply / delete
+    // Far-right Brand collection — compressed keeps a thin rail so it can reopen
+    brandCompressed ? 2.4 : 9.5
   );
   const total = weights.reduce((sum, w) => sum + w, 0);
   return weights.map((w) => `${((w / total) * 100).toFixed(3)}%`);
+}
+
+const BRAND_COL_COMPRESS_KEY = 'regal.variantTable.brandColCompressed';
+
+function readBrandColCompressed() {
+  try {
+    return window.localStorage.getItem(BRAND_COL_COMPRESS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeBrandColCompressed(value) {
+  try {
+    window.localStorage.setItem(BRAND_COL_COMPRESS_KEY, value ? '1' : '0');
+  } catch {
+    // Ignore quota / private mode.
+  }
 }
 
 /**
@@ -114,6 +134,74 @@ function buildSheetColPercents({ showSize, showColor, showUnitCount, showWeight 
  * plus optional full-screen sheet for dense editing.
  * Product save stays on the form Save action (no duplicate Save here).
  */
+function BrandCollectionSelect({
+  row,
+  index,
+  brandCollectionOptions,
+  parentBrandCategoryId,
+  handleVariantRowChange,
+  className,
+  style,
+  compressed = false,
+  onExpand,
+}) {
+  const parentId = String(parentBrandCategoryId || '').trim();
+  const current = String(row.brandCategoryId || '').trim() || parentId;
+  const options = brandCollectionOptions || [];
+  const disabled = !parentId || options.length === 0;
+  const selected = options.find((option) => option.id === current);
+  const shortLabel = selected
+    ? selected.isParentDefault
+      ? 'Def'
+      : String(selected.label || '').split('›').pop()?.trim()?.slice(0, 4) || '…'
+    : '—';
+  const fullTitle = selected
+    ? selected.isParentDefault
+      ? `Default · ${selected.label}`
+      : selected.label
+    : disabled
+      ? 'Set the main brand collection first'
+      : 'Brand collection';
+
+  if (compressed) {
+    return (
+      <button
+        type="button"
+        onClick={onExpand}
+        title={`${fullTitle} — click to expand`}
+        className="mx-auto flex h-7 w-full max-w-[2.25rem] items-center justify-center rounded-md border border-[#D4F3E8] bg-[#EDFAF5] text-[10px] font-semibold text-[#1E7A57] hover:bg-[#D4F3E8]"
+        style={style}
+      >
+        {shortLabel}
+      </button>
+    );
+  }
+
+  return (
+    <select
+      className={className}
+      style={style}
+      value={current}
+      disabled={disabled}
+      title={fullTitle}
+      onChange={(e) => {
+        const next = String(e.target.value || '').trim();
+        handleVariantRowChange(index, 'brandCategoryId', next === parentId ? '' : next);
+      }}
+    >
+      {disabled ? (
+        <option value="">Set main brand first</option>
+      ) : (
+        options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.isParentDefault ? `Default · ${option.label}` : option.label}
+          </option>
+        ))
+      )}
+    </select>
+  );
+}
+
 export default function ProductVariantsTable() {
   const {
     formData,
@@ -133,6 +221,7 @@ export default function ProductVariantsTable() {
     isUploading,
     variantTableColorOptions,
     getVariantPricingErrors,
+    brandCollectionOptions,
   } = useProductForm();
 
   const [view, setView] = useState('cards');
@@ -174,6 +263,7 @@ export default function ProductVariantsTable() {
     variantRows,
     variantFieldSelection,
     variantTableColorOptions,
+    brandCollectionOptions,
     getVariantPricingErrors,
     handleSetDefaultVariantRow,
     handleVariantRowChange,
@@ -324,6 +414,7 @@ export default function ProductVariantsTable() {
               formData={formData}
               variantFieldSelection={variantFieldSelection}
               variantTableColorOptions={variantTableColorOptions}
+              brandCollectionOptions={brandCollectionOptions}
               isUploading={isUploading}
               getVariantPricingErrors={getVariantPricingErrors}
               handleSetDefaultVariantRow={handleSetDefaultVariantRow}
@@ -604,6 +695,7 @@ function VariantCard({
   formData,
   variantFieldSelection,
   variantTableColorOptions,
+  brandCollectionOptions,
   isUploading,
   getVariantPricingErrors,
   handleSetDefaultVariantRow,
@@ -848,6 +940,18 @@ function VariantCard({
                 accent={palette.accent}
               />
             </div>
+            <div className="col-span-2 sm:col-span-4">
+              <FieldLabel>Brand collection</FieldLabel>
+              <BrandCollectionSelect
+                row={row}
+                index={index}
+                brandCollectionOptions={brandCollectionOptions}
+                parentBrandCategoryId={formData?.brandCategoryId}
+                handleVariantRowChange={handleVariantRowChange}
+                className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[12px] text-gray-700"
+                style={inter}
+              />
+            </div>
           </div>
         </div>
 
@@ -1023,6 +1127,7 @@ function VariantTable({
   variantRows,
   variantFieldSelection,
   variantTableColorOptions,
+  brandCollectionOptions,
   getVariantPricingErrors,
   handleSetDefaultVariantRow,
   handleVariantRowChange,
@@ -1038,10 +1143,23 @@ function VariantTable({
 }) {
   const sheet = layout === 'sheet';
   const tableRootRef = useRef(null);
+  const [brandColCompressed, setBrandColCompressed] = useState(false);
   const showSize = Boolean(variantFieldSelection.size);
   const showColor = Boolean(variantFieldSelection.color);
   const showUnitCount = Boolean(variantFieldSelection.unitCount);
   const showWeight = Boolean(variantFieldSelection.weight);
+
+  useEffect(() => {
+    setBrandColCompressed(readBrandColCompressed());
+  }, []);
+
+  const toggleBrandColCompressed = () => {
+    setBrandColCompressed((prev) => {
+      const next = !prev;
+      writeBrandColCompressed(next);
+      return next;
+    });
+  };
 
   const navFields = useMemo(
     () => buildVariantNavFields({ showSize, showColor, showUnitCount, showWeight }),
@@ -1130,7 +1248,13 @@ function VariantTable({
     1 + (showSize ? 1 : 0) + 1 + (showColor ? 1 : 0) + (showUnitCount ? 1 : 0) + (showWeight ? 1 : 0);
 
   const sheetColPercents = sheet
-    ? buildSheetColPercents({ showSize, showColor, showUnitCount, showWeight })
+    ? buildSheetColPercents({
+        showSize,
+        showColor,
+        showUnitCount,
+        showWeight,
+        brandCompressed: brandColCompressed,
+      })
     : null;
 
   /**
@@ -1218,6 +1342,38 @@ function VariantTable({
               <GroupHead color={GROUP_COLORS.images} label="Imgs" />
             </th>
             <th style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0' }} />
+            <th
+              className="px-1.5 py-2 text-left"
+              style={{
+                background: GROUP_COLORS.identity.bg,
+                borderBottom: `2px solid ${GROUP_COLORS.identity.dot}`,
+              }}
+            >
+              {brandColCompressed ? (
+                <button
+                  type="button"
+                  onClick={toggleBrandColCompressed}
+                  title="Expand brand collection column"
+                  className="mx-auto flex h-6 w-full items-center justify-center rounded text-[10px] font-bold text-[#1E7A57] hover:bg-white/70"
+                  style={dm}
+                >
+                  ›
+                </button>
+              ) : (
+                <div className="flex items-center justify-between gap-1">
+                  <GroupHead color={GROUP_COLORS.identity} label="Brand" />
+                  <button
+                    type="button"
+                    onClick={toggleBrandColCompressed}
+                    title="Compress brand collection column"
+                    className="rounded px-1 text-[10px] font-bold text-[#64748B] hover:bg-white/70 hover:text-[#1E7A57]"
+                    style={dm}
+                  >
+                    ‹
+                  </button>
+                </div>
+              )}
+            </th>
           </tr>
 
           <tr style={{ background: '#F8FAFC' }}>
@@ -1240,6 +1396,15 @@ function VariantTable({
             <ColHead>Margin ₹</ColHead>
             <ColHead left={GROUP_COLORS.images.left}>Images</ColHead>
             <th style={{ borderBottom: '1px solid #EEF2F7' }} />
+            {brandColCompressed ? (
+              <th className="px-0.5 py-1.5 text-center" style={{ borderBottom: '1px solid #EEF2F7' }}>
+                <span className="text-[8px] font-bold uppercase tracking-wide text-[#94A3B8]" style={dm}>
+                  Br
+                </span>
+              </th>
+            ) : (
+              <ColHead left={GROUP_COLORS.identity.left}>Collection</ColHead>
+            )}
           </tr>
 
           {/* Bulk fill — restores Apply-to-empty-cells from prior sheet */}
@@ -1386,6 +1551,7 @@ function VariantTable({
                   Apply
                 </button>
               </td>
+              <BareCell left={GROUP_COLORS.identity.left} />
             </tr>
           ) : null}
         </thead>
@@ -1658,6 +1824,23 @@ function VariantTable({
                     <XIcon />
                   </button>
                 </td>
+
+                <BareCell left={GROUP_COLORS.identity.left} roomy={sheet}>
+                  <BrandCollectionSelect
+                    row={row}
+                    index={index}
+                    brandCollectionOptions={brandCollectionOptions}
+                    parentBrandCategoryId={formData?.brandCategoryId}
+                    handleVariantRowChange={handleVariantRowChange}
+                    className={selectBase}
+                    style={inter}
+                    compressed={brandColCompressed}
+                    onExpand={() => {
+                      setBrandColCompressed(false);
+                      writeBrandColCompressed(false);
+                    }}
+                  />
+                </BareCell>
               </tr>
             );
           })}

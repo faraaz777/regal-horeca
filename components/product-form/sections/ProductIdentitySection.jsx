@@ -247,7 +247,10 @@ export default function ProductIdentitySection() {
         </div>
       </FormAccordion>
 
-      <FormAccordion title="Additional brand placements" description="Optional extra brand-tree nodes. Primary brand is the field above.">
+      <FormAccordion
+        title="Allowed collections for variants"
+        description="Optional alternate collections under the same brand (e.g. Choco, Golden Rim). Variants default to the main brand above; only overridden rows use these."
+      >
         <div className="space-y-3">
           {additionalBrandSelections.map((selection, index) => (
             <div key={index} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
@@ -270,7 +273,7 @@ export default function ProductIdentitySection() {
             onClick={addAdditionalBrandCategory}
             className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
           >
-            <PlusIcon className="h-4 w-4" /> Add additional brand category
+            <PlusIcon className="h-4 w-4" /> Add allowed collection
           </button>
         </div>
       </FormAccordion>

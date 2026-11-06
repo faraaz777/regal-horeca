@@ -3,8 +3,8 @@
  *
  * PATCH  /api/admin/products/children/[childId]
  *   Update fields on a single child variant. Allowed fields are pricing/sku/etc.
- *   plus visibleOnClient, showInCatalog, and isDefault. Mirrored fields (categoryId, brand) cannot
- *   be set directly here — they propagate from the parent.
+ *   plus visibleOnClient, showInCatalog, isDefault, and brandCategoryId (effective
+ *   collection under the parent brand). categoryId still mirrors the parent.
  *
  * DELETE /api/admin/products/children/[childId]
  *   Soft-delete one child. Soft-deleting the last visible child does NOT touch the
@@ -25,6 +25,7 @@ import {
   buildChildPayloadFromVariantRow,
   sanitizeChildVariationAttributes,
 } from '@/lib/shared/childVariantPayload';
+import { resolveAndValidateChildBrandCategoryId } from '@/lib/server/products/childBrandCollection';
 
 export const dynamic = 'force-dynamic';
 
@@ -108,10 +109,23 @@ export async function PATCH(request, { params }) {
           ? body.showInCatalog
           : child.showInCatalog,
         isDefault: body.isDefault,
+        brandCategoryId: Object.prototype.hasOwnProperty.call(body, 'brandCategoryId')
+          ? body.brandCategoryId
+          : child.brandCategoryId,
         _legacyParentVariantId: child.legacyParentVariantId,
       },
       { parent, variationTheme: parent?.variationTheme }
     );
+
+    const brandResolved = await resolveAndValidateChildBrandCategoryId({
+      requestedId: built.brandCategoryId,
+      parent,
+    });
+    if (!brandResolved.ok) {
+      return NextResponse.json({ error: brandResolved.error }, { status: 400 });
+    }
+    child.brandCategoryId = brandResolved.brandCategoryId || null;
+    if (parent?.brand) child.brand = parent.brand;
 
     if (built.barcode) {
       const conflicts = await findBarcodeConflictsForChild(child, built.barcode);

@@ -7,8 +7,9 @@
  * POST   /api/admin/products/[parentId]/children
  *   Create one child variant. If the parent is currently 'standalone', the route
  *   atomically promotes it to 'parent' and copies variationTheme from the request.
- *   The created child auto-derives title/slug, mirrors category/brand from parent,
- *   and computes searchBlob.
+ *   The created child auto-derives title/slug, mirrors category + brand name from
+ *   parent, stores one effective brandCategoryId (parent default or allowed
+ *   collection override), and computes searchBlob.
  */
 
 import { NextResponse } from 'next/server';
@@ -24,6 +25,7 @@ import {
   deriveChildTitle,
   sanitizeChildVariationAttributes,
 } from '@/lib/shared/childVariantPayload';
+import { resolveAndValidateChildBrandCategoryId } from '@/lib/server/products/childBrandCollection';
 
 export const dynamic = 'force-dynamic';
 
@@ -122,10 +124,19 @@ export async function POST(request, { params }) {
         images: body.images,
         showInCatalog: body.showInCatalog,
         isDefault: body.isDefault,
+        brandCategoryId: body.brandCategoryId,
         _legacyParentVariantId: body.legacyParentVariantId,
       },
       { parent, variationTheme: parent.variationTheme }
     );
+
+    const brandResolved = await resolveAndValidateChildBrandCategoryId({
+      requestedId: built.brandCategoryId || body.brandCategoryId,
+      parent,
+    });
+    if (!brandResolved.ok) {
+      return NextResponse.json({ error: brandResolved.error }, { status: 400 });
+    }
 
     const variationAttributes = built.variationAttributes;
     const barcode = built.barcode;
@@ -158,6 +169,7 @@ export async function POST(request, { params }) {
       categoryId: parent.categoryId || null,
       categoryIds: Array.isArray(parent.categoryIds) ? parent.categoryIds : [],
       brand: parent.brand || '',
+      brandCategoryId: brandResolved.brandCategoryId || null,
       businessTypeSlugs: Array.isArray(parent.businessTypeSlugs) ? parent.businessTypeSlugs : [],
       sku: built.sku,
       barcode,

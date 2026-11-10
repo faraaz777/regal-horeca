@@ -33,6 +33,7 @@ import {
   Banknote,
   FileSpreadsheet,
   ClipboardCheck,
+  Link2,
 } from 'lucide-react';
 import {
   collectNavHrefs,
@@ -59,6 +60,7 @@ const NAV_ICONS = {
   '/admin/inventory/product-sheet': FileSpreadsheet,
   '/admin/inventory/brand-report': ClipboardCheck,
   '/admin/products': Boxes,
+  '/admin/product-mapping': Link2,
   '/admin/categories': FolderTree,
   '/admin/brands': Tag,
   '/admin/business-types': Briefcase,

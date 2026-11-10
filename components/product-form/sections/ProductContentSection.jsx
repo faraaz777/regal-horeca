@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import RichTextEditor from '@/components/RichTextEditor';
 import { PlusIcon, TrashIcon, MagicIcon, SearchIcon, StarIcon } from '@/components/Icons';
 import FormAccordion from '@/components/product-form/ui/FormAccordion';
@@ -14,6 +15,7 @@ export default function ProductContentSection() {
   const {
     formData,
     setFormData,
+    product,
     handleChange,
     handleAIGenerate,
     aiLoading,
@@ -224,8 +226,24 @@ export default function ProductContentSection() {
           <FormCard
             compact
             title="Related products"
-            description="Family default for variants that inherit — links are mutual on save. Pick exact SKUs (size · color), not parent families."
+            description="Family default for variants that inherit — links are mutual on save. Pick exact SKUs (size · color), not parent families. Offer-instead SKU links live in Product mapping, not here."
           >
+            {product?._id || product?.id ? (
+              <p className="mb-2 text-xs">
+                <Link
+                  href={
+                    product.productType === 'child' || product.productType === 'standalone'
+                      ? `/admin/product-mapping?productId=${product._id || product.id}`
+                      : '/admin/product-mapping'
+                  }
+                  className="font-semibold text-primary hover:underline"
+                >
+                  {product.productType === 'parent'
+                    ? 'Map each variant SKU in Product mapping'
+                    : 'Open product mapping for this SKU'}
+                </Link>
+              </p>
+            ) : null}
             <RelatedPicker
               filteredRelatedCandidates={filteredRelatedCandidates}
               relatedProductsSearchQuery={relatedProductsSearchQuery}

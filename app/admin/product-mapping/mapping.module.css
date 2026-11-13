@@ -516,6 +516,43 @@
   border-bottom: 1px solid var(--map-line-soft);
 }
 
+/**
+ * Linked-detail jump control — opens the peer by exact id so reverse
+ * mapping is never confused with a same-SKU twin from search.
+ */
+.inspectorOpen {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 0 0 8px;
+  border: 0;
+  border-bottom: 1px solid var(--map-line-soft);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  border-radius: var(--map-radius);
+}
+
+.inspectorOpen:hover .productName {
+  color: var(--map-accent-deep);
+  text-decoration: underline;
+}
+
+.inspectorOpen:hover .openHint {
+  color: var(--map-accent);
+}
+
+.openHint {
+  margin: 4px 0 0;
+  font-size: 10.5px;
+  font-weight: 650;
+  color: var(--map-mute);
+}
+
 .kv {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);

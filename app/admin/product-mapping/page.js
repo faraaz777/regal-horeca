@@ -8,9 +8,9 @@
  * A link is only SKU ↔ SKU. No type or audience.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Download, Link2, Pencil, Unlink, X } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
 import { showToast } from '@/lib/utils/toast';
@@ -90,6 +90,7 @@ function HitList({ hits, onPick }) {
 }
 
 export default function ProductMappingPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialId = searchParams.get('productId') || '';
 
@@ -104,6 +105,8 @@ export default function ProductMappingPage() {
   const [selectedId, setSelectedId] = useState('');
   const [workbenchOpen, setWorkbenchOpen] = useState(false);
   const [workbenchPickId, setWorkbenchPickId] = useState('');
+  /** Skip duplicate loads when we already fetched this id before updating the URL. */
+  const loadedIdRef = useRef('');
 
   async function loadLinks(productId) {
     setLoading(true);
@@ -116,15 +119,22 @@ export default function ProductMappingPage() {
       setSelectedId('');
       setBrandFilter('');
       if (nextSource?.title) setSourceQuery(nextSource.title);
+      loadedIdRef.current = productId;
     } catch (error) {
       showToast.error(error.message || 'Could not load mappings.');
+      loadedIdRef.current = '';
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    if (initialId) loadLinks(initialId);
+    if (!initialId) {
+      loadedIdRef.current = '';
+      return;
+    }
+    if (initialId === loadedIdRef.current) return;
+    loadLinks(initialId);
   }, [initialId]);
 
   useEffect(() => {
@@ -175,6 +185,20 @@ export default function ProductMappingPage() {
   async function pickSource(row) {
     setSourceHits([]);
     await loadLinks(row.id);
+    router.replace(`/admin/product-mapping?productId=${encodeURIComponent(row.id)}`);
+  }
+
+  /**
+   * Jump into a peer's mapping by exact product id.
+   * Avoids landing on a same-SKU twin from search.
+   */
+  async function openProductMapping(productId) {
+    if (!productId || productId === source?.id) return;
+    setSourceHits([]);
+    setWorkbenchOpen(false);
+    setWorkbenchPickId('');
+    await loadLinks(productId);
+    router.replace(`/admin/product-mapping?productId=${encodeURIComponent(productId)}`);
   }
 
   function clearSource() {
@@ -186,6 +210,8 @@ export default function ProductMappingPage() {
     setBrandFilter('');
     setWorkbenchOpen(false);
     setWorkbenchPickId('');
+    loadedIdRef.current = '';
+    router.replace('/admin/product-mapping');
   }
 
   function openWorkbench(preselectId = '') {
@@ -431,13 +457,29 @@ export default function ProductMappingPage() {
                 <div className={styles.inspectorBody}>
                   {detail ? (
                     <>
-                      <div className={styles.inspectorTop}>
-                        <Thumb src={detail.imageUrl} large />
-                        <div style={{ minWidth: 0 }}>
-                          <p className={styles.productName} title={detail.title}>{detail.title}</p>
-                          <p className={styles.sourceMeta}>{skuMeta(detail)}</p>
+                      {selectedLink && detail?.id && detail.id !== source?.id ? (
+                        <button
+                          type="button"
+                          className={styles.inspectorOpen}
+                          onClick={() => openProductMapping(detail.id)}
+                          title="Open this SKU in Product Mapping"
+                        >
+                          <Thumb src={detail.imageUrl} large />
+                          <div style={{ minWidth: 0 }}>
+                            <p className={styles.productName} title={detail.title}>{detail.title}</p>
+                            <p className={styles.sourceMeta}>{skuMeta(detail)}</p>
+                            <p className={styles.openHint}>Open mapping for this SKU →</p>
+                          </div>
+                        </button>
+                      ) : (
+                        <div className={styles.inspectorTop}>
+                          <Thumb src={detail.imageUrl} large />
+                          <div style={{ minWidth: 0 }}>
+                            <p className={styles.productName} title={detail.title}>{detail.title}</p>
+                            <p className={styles.sourceMeta}>{skuMeta(detail)}</p>
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       <dl className={styles.kv}>
                         <dt>Barcode</dt>

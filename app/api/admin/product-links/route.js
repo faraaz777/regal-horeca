@@ -2,8 +2,8 @@
  * GET /api/admin/product-links?productId=
  * POST /api/admin/product-links
  *
- * Lists or creates one SKU-to-SKU product mapping.
- * A link is only "this SKU ↔ that SKU" — no type or audience.
+ * Lists or creates SKU-to-SKU product mappings.
+ * POST supports star (to master) or mesh (all-to-all) via `mode`.
  * Stock, MRP and selling price are read live; they are not stored on the link.
  *
  * Permissions:
@@ -17,8 +17,10 @@ import { hasPermission } from '@/lib/shared/permissions';
 import { connectToDatabase } from '@/lib/db/connect';
 import {
   createProductLink,
+  createProductLinks,
   listProductLinks,
 } from '@/lib/server/products/productLinkService';
+import { PRODUCT_LINK_MODE_STAR } from '@/lib/shared/productLink';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,12 +65,29 @@ export async function POST(request) {
   try {
     await connectToDatabase();
     const body = await request.json();
-    const result = await createProductLink({
-      productId: body.productId,
-      otherProductId: body.otherProductId,
-      note: body.note,
-      createdBy: auth.session.userId,
-    });
+
+    const otherProductIds = Array.isArray(body.otherProductIds)
+      ? body.otherProductIds
+      : body.otherProductId
+        ? [body.otherProductId]
+        : [];
+
+    const result =
+      otherProductIds.length > 1 || body.mode
+        ? await createProductLinks({
+            productId: body.productId,
+            otherProductIds,
+            mode: body.mode || PRODUCT_LINK_MODE_STAR,
+            note: body.note,
+            createdBy: auth.session.userId,
+          })
+        : await createProductLink({
+            productId: body.productId,
+            otherProductId: otherProductIds[0],
+            note: body.note,
+            createdBy: auth.session.userId,
+          });
+
     if (result.error) {
       return NextResponse.json({ success: false, error: result.error }, { status: 400 });
     }

@@ -553,6 +553,51 @@
   color: var(--map-mute);
 }
 
+.dialogOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(28, 36, 48, 0.35);
+}
+
+.dialog {
+  width: min(420px, 100%);
+  padding: 14px;
+  background: #fff;
+  border: 1px solid var(--map-line);
+  border-radius: var(--map-radius);
+  box-shadow: 0 12px 28px rgba(28, 36, 48, 0.18);
+}
+
+.dialogTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.dialogBody {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--map-ink-soft);
+}
+
+.dialogBody strong {
+  color: var(--map-ink);
+}
+
+.dialogActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 14px;
+}
+
 .kv {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);

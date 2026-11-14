@@ -14,6 +14,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Download, Link2, Pencil, Unlink, X } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
 import { showToast } from '@/lib/utils/toast';
+import {
+  PRODUCT_LINK_UNLINK_GROUP,
+  PRODUCT_LINK_UNLINK_PAIR,
+} from '@/lib/shared/productLink';
 import LinkWorkbench from './LinkWorkbench';
 import styles from './mapping.module.css';
 
@@ -105,6 +109,8 @@ export default function ProductMappingPage() {
   const [selectedId, setSelectedId] = useState('');
   const [workbenchOpen, setWorkbenchOpen] = useState(false);
   const [workbenchPickId, setWorkbenchPickId] = useState('');
+  const [unlinkTarget, setUnlinkTarget] = useState(null);
+  const [unlinking, setUnlinking] = useState(false);
   /** Skip duplicate loads when we already fetched this id before updating the URL. */
   const loadedIdRef = useRef('');
 
@@ -220,14 +226,41 @@ export default function ProductMappingPage() {
     setWorkbenchOpen(true);
   }
 
-  async function removeLink(id) {
+  function requestUnlink(row) {
+    /**
+     * If removing this peer would drop more than the single edge,
+     * ask whether to detach from the whole connected group.
+     */
+    if ((row.groupDetachCount || 1) > 1) {
+      setUnlinkTarget(row);
+      return;
+    }
+    confirmUnlink(row.id, PRODUCT_LINK_UNLINK_PAIR);
+  }
+
+  async function confirmUnlink(linkId, scope) {
+    if (!linkId || unlinking) return;
+    setUnlinking(true);
     try {
-      await adminJson(`/api/admin/product-links/${id}`, { method: 'DELETE' });
-      setLinks((prev) => prev.filter((row) => row.id !== id));
-      if (selectedId === id) setSelectedId('');
-      showToast.success('Unlinked.');
+      const params = new URLSearchParams({ scope });
+      if (source?.id) params.set('viewerProductId', source.id);
+      const body = await adminJson(`/api/admin/product-links/${linkId}?${params}`, {
+        method: 'DELETE',
+      });
+      const removed = Number(body.data?.removed) || 1;
+      if (source?.id) await loadLinks(source.id);
+      if (scope === PRODUCT_LINK_UNLINK_GROUP) {
+        showToast.success(
+          removed === 1 ? 'Removed from group.' : `Removed from group (${removed} links).`
+        );
+      } else {
+        showToast.success('Unlinked.');
+      }
+      setUnlinkTarget(null);
     } catch (error) {
       showToast.error(error.message || 'Could not unlink.');
+    } finally {
+      setUnlinking(false);
     }
   }
 
@@ -428,7 +461,7 @@ export default function ProductMappingPage() {
                                   aria-label="Unlink"
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    removeLink(row.id);
+                                    requestUnlink(row);
                                   }}
                                 >
                                   <Unlink size={13} />
@@ -544,6 +577,44 @@ export default function ProductMappingPage() {
         }}
         onSaved={() => source?.id && loadLinks(source.id)}
       />
+
+      {unlinkTarget ? (
+        <div className={styles.dialogOverlay} role="dialog" aria-modal="true" aria-label="Unlink options">
+          <div className={styles.dialog}>
+            <h3 className={styles.dialogTitle}>Unlink product</h3>
+            <p className={styles.dialogBody}>
+              <strong>{unlinkTarget.product.title}</strong> is connected to{' '}
+              {unlinkTarget.groupDetachCount} SKUs in this group.
+            </p>
+            <div className={styles.dialogActions}>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                disabled={unlinking}
+                onClick={() => setUnlinkTarget(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={styles.ghostBtn}
+                disabled={unlinking}
+                onClick={() => confirmUnlink(unlinkTarget.id, PRODUCT_LINK_UNLINK_PAIR)}
+              >
+                Only this pair
+              </button>
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                disabled={unlinking}
+                onClick={() => confirmUnlink(unlinkTarget.id, PRODUCT_LINK_UNLINK_GROUP)}
+              >
+                {unlinking ? 'Removing…' : 'Remove from whole group'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

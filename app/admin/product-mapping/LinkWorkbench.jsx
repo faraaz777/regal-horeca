@@ -2,13 +2,19 @@
 
 /**
  * Link Workbench — full-screen multi-select catalog picker.
- * Opens from Link SKU / F6. Stages picks, then creates plain SKU↔SKU links.
+ * Opens from Link SKU / F6. Stages picks, then creates star or mesh links.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LayoutGrid, List, Search, X } from 'lucide-react';
 import { adminJson } from '@/lib/client/adminFetch';
 import { showToast } from '@/lib/utils/toast';
+import {
+  PRODUCT_LINK_MODE_MESH,
+  PRODUCT_LINK_MODE_STAR,
+  meshEdgeCount,
+  starEdgeCount,
+} from '@/lib/shared/productLink';
 import styles from './workbench.module.css';
 
 function norm(value) {
@@ -94,6 +100,7 @@ export default function LinkWorkbench({
   const [sizes, setSizes] = useState([]);
   const [stockFilter, setStockFilter] = useState([]);
   const [picked, setPicked] = useState([]);
+  const [linkMode, setLinkMode] = useState(PRODUCT_LINK_MODE_MESH);
   const [saving, setSaving] = useState(false);
 
   const linkedIds = useMemo(
@@ -121,6 +128,7 @@ export default function LinkWorkbench({
     setSizes([]);
     setStockFilter([]);
     setHideLinked(false);
+    setLinkMode(PRODUCT_LINK_MODE_MESH);
     lastClickedRef.current = null;
     const timer = setTimeout(() => searchRef.current?.focus(), 40);
     return () => clearTimeout(timer);
@@ -233,37 +241,51 @@ export default function LinkWorkbench({
     setPicked((prev) => prev.filter((row) => row.id !== id));
   }
 
+  const plannedEdges = useMemo(() => {
+    if (!picked.length) return 0;
+    return linkMode === PRODUCT_LINK_MODE_MESH
+      ? meshEdgeCount(picked.length + 1)
+      : starEdgeCount(picked.length);
+  }, [picked.length, linkMode]);
+
+  const afterSave = useMemo(() => {
+    const ids = new Set(existingLinks.map((row) => row.product.id));
+    picked.forEach((row) => ids.add(row.id));
+    return ids.size;
+  }, [existingLinks, picked]);
+
   const saveLinks = useCallback(async () => {
     if (!picked.length || !source?.id || saving) return;
     setSaving(true);
     try {
-      /**
-       * Parallel creates — each pair is independent and capped server-side.
-       * Partial failures are reported; successful links still refresh.
-       */
-      const results = await Promise.allSettled(
-        picked.map((product) =>
-          adminJson('/api/admin/product-links', {
-            method: 'POST',
-            body: JSON.stringify({
-              productId: source.id,
-              otherProductId: product.id,
-            }),
-          })
-        )
-      );
-      const ok = results.filter((r) => r.status === 'fulfilled').length;
-      const fail = results.length - ok;
-      if (ok) showToast.success(ok === 1 ? '1 product linked.' : `${ok} products linked.`);
-      if (fail) showToast.error(`${fail} could not be linked.`);
-      if (ok) {
+      const body = await adminJson('/api/admin/product-links', {
+        method: 'POST',
+        body: JSON.stringify({
+          productId: source.id,
+          otherProductIds: picked.map((product) => product.id),
+          mode: linkMode,
+        }),
+      });
+      const created = Number(body.data?.created) || 0;
+      if (created) {
+        showToast.success(
+          linkMode === PRODUCT_LINK_MODE_MESH
+            ? `Group linked (${created} edge${created === 1 ? '' : 's'}).`
+            : created === 1
+              ? '1 product linked.'
+              : `${created} products linked.`
+        );
         await onSaved?.();
         onClose?.();
+      } else {
+        showToast.error(body.data?.error || 'Nothing new to link.');
       }
+    } catch (error) {
+      showToast.error(error.message || 'Could not save links.');
     } finally {
       setSaving(false);
     }
-  }, [picked, source?.id, saving, onSaved, onClose]);
+  }, [picked, source?.id, saving, linkMode, onSaved, onClose]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -282,8 +304,6 @@ export default function LinkWorkbench({
   }, [open, onClose, saveLinks]);
 
   if (!open || !source) return null;
-
-  const afterSave = existingLinks.length + picked.length;
 
   return (
     <div className={styles.overlay} role="dialog" aria-modal="true" aria-label="Link Workbench">
@@ -502,17 +522,46 @@ export default function LinkWorkbench({
           </div>
 
           <div className={styles.controls}>
+            <div className={styles.modeBlock}>
+              <p className={styles.modeTitle}>Link mode</p>
+              <div className={styles.modeToggle}>
+                <button
+                  type="button"
+                  className={`${styles.modeBtn} ${linkMode === PRODUCT_LINK_MODE_MESH ? styles.modeBtnOn : ''}`}
+                  onClick={() => setLinkMode(PRODUCT_LINK_MODE_MESH)}
+                >
+                  All to each other
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.modeBtn} ${linkMode === PRODUCT_LINK_MODE_STAR ? styles.modeBtnOn : ''}`}
+                  onClick={() => setLinkMode(PRODUCT_LINK_MODE_STAR)}
+                >
+                  To master only
+                </button>
+              </div>
+              <p className={styles.modeHint}>
+                {linkMode === PRODUCT_LINK_MODE_MESH
+                  ? picked.length
+                    ? `${picked.length + 1} SKUs → up to ${plannedEdges} links. Opening any one lists the others.`
+                    : 'Mesh links every selected SKU to every other (including master).'
+                  : picked.length
+                    ? `${picked.length} link${picked.length === 1 ? '' : 's'} to master only (star).`
+                    : 'Star links each pick only to the master SKU.'}
+              </p>
+            </div>
+
             <div className={styles.summary}>
               <div className={styles.summaryCell}>
-                <span>New</span>
+                <span>Picks</span>
                 <strong>{picked.length}</strong>
               </div>
               <div className={styles.summaryCell}>
-                <span>Existing</span>
-                <strong>{existingLinks.length}</strong>
+                <span>Edges</span>
+                <strong>{plannedEdges}</strong>
               </div>
               <div className={styles.summaryCell}>
-                <span>After</span>
+                <span>Listed</span>
                 <strong>{afterSave}</strong>
               </div>
             </div>
